@@ -1,0 +1,16 @@
+## Interface: 30300
+## Title: Ashoholic - Ebonhold Roster
+## Notes: Tracks characters, Soul Ash, Raid Reset Costs, and World Tour lockouts on Project Ebonhold.
+## Author: OLP
+## Version: 2.0
+## SavedVariables: AshoholicDB
+## Dependencies: ProjectEbonhold
+## OptionalDeps: Ace3
+
+Libraries\Load_Libraries.xml
+
+Core.lua
+Characters.lua
+Minimap.lua
+Themes.lua
+UI.lua

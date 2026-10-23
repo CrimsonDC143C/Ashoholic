@@ -1,0 +1,5 @@
+# Exclude these from GitHub's "Download ZIP" button
+.gitignore export-ignore
+.gitattributes export-ignore
+README.md export-ignore
+images/ export-ignore

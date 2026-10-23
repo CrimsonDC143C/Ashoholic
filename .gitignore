@@ -1,0 +1,9 @@
+# Ignore backups
+*.bak
+
+# Ignore local sync configs
+sync_config.txt
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
