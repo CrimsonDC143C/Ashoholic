@@ -1,0 +1,119 @@
+﻿<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="Core.lua"></Script>
+	<Script file="Comm.lua"></Script>
+	<Script file="Characters.lua"></Script>
+	<Script file="Altoholic.lua"></Script>
+	
+	<GameTooltip name="AltoTooltip" inherits="GameTooltipTemplate" parent="UIParent" hidden="true" />
+
+	<Button name="AltoholicMinimapButton" parent="Minimap" toplevel="true">
+		<Size><AbsDimension x="33" y="33"/></Size>
+		<Anchors><Anchor point="CENTER" relativeTo="Minimap" relativePoint="RIGHT"><Offset><AbsDimension x="5" y="0"/></Offset></Anchor></Anchors>		
+		<Scripts>
+			<OnLoad>self:RegisterForClicks("LeftButtonDown", "RightButtonDown"); self:RegisterForDrag("RightButton")</OnLoad>
+			<OnClick>if button == "LeftButton" then Altoholic:ToggleUI() end</OnClick>
+			<OnUpdate>if(self.isMoving == true) then Altoholic:UpdateMinimapIconCoords() end</OnUpdate>
+			<OnDragStart>self.isMoving = true;</OnDragStart>
+			<OnDragStop>self.isMoving = false;</OnDragStop>
+			<OnEnter>Altoholic:ShowWidgetTooltip(self)</OnEnter>
+			<OnLeave>AltoTooltip:Hide();</OnLeave>
+		</Scripts>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" file="Interface\Icons\INV_Drink_13">
+					<Size><AbsDimension x="21" y="21"/></Size>
+					<Anchors><Anchor point="TOPLEFT"><Offset><AbsDimension x="7" y="-6"/></Offset></Anchor></Anchors>
+					<TexCoords left="0.075" right="0.925" top="0.075" bottom="0.925"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture file="Interface\Minimap\MiniMap-TrackingBorder">
+					<Size><AbsDimension x="56" y="56"/></Size>
+					<Anchors><Anchor point="TOPLEFT"/></Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+		<HighlightTexture alphaMode="ADD" file="Interface\Minimap\UI-Minimap-ZoomButton-Highlight"/>
+	</Button>
+
+	<Frame name="AltoholicFrame" toplevel="true" parent="UIParent" movable="true" enableMouse="true" hidden="true">
+		<Size><AbsDimension x="720" y="360"/></Size>
+		<Anchors><Anchor point="CENTER" /></Anchors>
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+			<BackgroundInsets><AbsInset left="11" right="12" top="12" bottom="11" /></BackgroundInsets>
+			<TileSize><AbsValue val="32" /></TileSize>
+			<EdgeSize><AbsValue val="32" /></EdgeSize>
+		</Backdrop>
+		<Scripts>
+			<OnLoad>self:RegisterForDrag("LeftButton"); self.elapsed = 0;</OnLoad>
+			<OnDragStart>self:StartMoving(); self.isMoving = true;</OnDragStart>
+			<OnDragStop>self:StopMovingOrSizing(); self.isMoving = false;</OnDragStop>
+			<OnMouseDown>
+				Altoholic.SelectedLine = nil
+				if Altoholic.Tabs and Altoholic.Tabs.Summary and Altoholic.Tabs.Summary.Refresh then
+					Altoholic.Tabs.Summary:Refresh()
+				end
+			</OnMouseDown>
+			<OnShow>
+				Altoholic.SelectedLine = nil
+				if Altoholic.Tabs and Altoholic.Tabs.Summary and Altoholic.Tabs.Summary.MenuItem_OnClick then
+					Altoholic.Tabs.Summary:MenuItem_OnClick(1)
+				end
+				PlaySound("UChatScrollButton");
+			</OnShow>
+			<OnHide>PlaySound("UChatScrollButton");</OnHide>
+		</Scripts>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Anchors>
+						<Anchor point="TOPLEFT"><Offset x="11" y="-11"/></Anchor>
+						<Anchor point="BOTTOMRIGHT"><Offset x="-12" y="11"/></Anchor>
+					</Anchors>
+					<Color r="0" g="0" b="0" a="0.40"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString name="$parentName" inherits="GameFontNormalLarge" justifyH="CENTER" text="Ashoholic - Ebonhold Roster">
+					<Size><AbsDimension x="300" y="24"/></Size>
+					<Anchors><Anchor point="TOP"><Offset><AbsDimension x="0" y="-13"/></Offset></Anchor></Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parentCloseButton" inherits="UIPanelCloseButton">
+				<Anchors><Anchor point="TOPRIGHT"><Offset><AbsDimension x="-5" y="-5"/></Offset></Anchor></Anchors>
+			</Button>
+		</Frames>
+	</Frame>
+	
+	<Frame name="AltoMsgBox" toplevel="true" parent="UIParent" hidden="true">
+		<Size><AbsDimension x="323" y="100"/></Size>
+		<Anchors><Anchor point="CENTER"><Offset><AbsDimension x="0" y="-10"/></Offset></Anchor></Anchors>
+		<Layers>
+			<Layer>
+				<FontString name="$Parent_Text" inherits="GameFontNormalSmall">
+					<Size x="300" y="28" />
+					<Anchors><Anchor point="TOP"><Offset x="10" y="-20" /></Anchor></Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+			<BackgroundInsets><AbsInset left="11" right="12" top="12" bottom="11" /></BackgroundInsets>
+			<TileSize><AbsValue val="32" /></TileSize>
+			<EdgeSize><AbsValue val="32" /></EdgeSize>
+		</Backdrop>
+		<Frames>
+			<Button name="$ParentYesButton" inherits="UIPanelButtonTemplate" text="YES">
+				<Size><AbsDimension x="109" y="24"/></Size>
+				<Anchors><Anchor point="BOTTOMLEFT"><Offset><AbsDimension x="55" y="18"/></Offset></Anchor></Anchors>
+				<Scripts><OnClick>Altoholic:MsgBox_OnClick(1)</OnClick></Scripts>
+			</Button>
+			<Button name="$ParentNoButton" inherits="UIPanelButtonTemplate" text="NO">
+				<Size><AbsDimension x="109" y="24"/></Size>
+				<Anchors><Anchor point="LEFT" relativeTo="$ParentYesButton" relativePoint="RIGHT"><Offset><AbsDimension x="0" y="0"/></Offset></Anchor></Anchors>
+				<Scripts><OnClick>Altoholic:MsgBox_OnClick(nil)</OnClick></Scripts>
+			</Button>
+		</Frames>
+	</Frame>
+</Ui>

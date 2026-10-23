@@ -1,0 +1,45 @@
+<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+	<Script file="TabSummary.lua"></Script>
+	
+	<Frame name="AltoholicTabSummary" parent="AltoholicFrame">
+		<Size><AbsDimension x="700" y="320"/></Size>
+		<Anchors><Anchor point="TOPLEFT"><Offset x="25" y="-35"/></Anchor></Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<!-- Seamless horizontal line connecting the column headers -->
+				<Texture name="$parentHeaderLine">
+					<Size x="667" y="1"/>
+					<Anchors><Anchor point="TOPLEFT"><Offset x="2" y="-39"/></Anchor></Anchors>
+					<Color r="0.4" g="0.4" b="0.4" a="0.5"/>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Frames>
+			<!-- Fixed Column Headers -->
+			<Button name="$parent_Sort1" inherits="AltoSortButtonTemplate" id="1">
+				<Size><AbsDimension x="140" y="19"/></Size>
+				<Anchors><Anchor point="TOPLEFT"><Offset x="0" y="-20"/></Anchor></Anchors>
+			</Button>
+			<Button name="$parent_Sort2" inherits="AltoSortButtonTemplate" id="2">
+				<Size><AbsDimension x="45" y="19"/></Size>
+				<Anchors><Anchor point="LEFT" relativeTo="$parent_Sort1" relativePoint="RIGHT" /></Anchors>
+			</Button>
+			<Button name="$parent_Sort3" inherits="AltoSortButtonTemplate" id="3">
+				<Size><AbsDimension x="100" y="19"/></Size>
+				<Anchors><Anchor point="LEFT" relativeTo="$parent_Sort2" relativePoint="RIGHT" /></Anchors>
+			</Button>
+			<Button name="$parent_Sort4" inherits="AltoSortButtonTemplate" id="4">
+				<Size><AbsDimension x="110" y="19"/></Size>
+				<Anchors><Anchor point="LEFT" relativeTo="$parent_Sort3" relativePoint="RIGHT" /></Anchors>
+			</Button>
+			<Button name="$parent_Sort5" inherits="AltoSortButtonTemplate" id="5">
+				<Size><AbsDimension x="135" y="19"/></Size>
+				<Anchors><Anchor point="LEFT" relativeTo="$parent_Sort4" relativePoint="RIGHT" /></Anchors>
+			</Button>
+			<Button name="$parent_Sort6" inherits="AltoSortButtonTemplate" id="6">
+				<Size><AbsDimension x="140" y="19"/></Size>
+				<Anchors><Anchor point="LEFT" relativeTo="$parent_Sort5" relativePoint="RIGHT" /></Anchors>
+			</Button>
+		</Frames>
+	</Frame>
+</Ui>
