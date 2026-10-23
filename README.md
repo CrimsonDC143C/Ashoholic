@@ -11,7 +11,6 @@ Whether you are a hardcore prestige grinder, an altoholic, or someone who multib
 ## Special Thanks & Credits
 
 Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/altoholic) by Thaoky, modified for Ebonhold by Crimmy.
-This project would not exist without the original **Ashoholic** addon created by Crimson. 
 
 ## Key Features
 
