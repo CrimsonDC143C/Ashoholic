@@ -10,7 +10,7 @@ Whether you are a hardcore prestige grinder, an altoholic, or someone who multib
 
 ## Special Thanks & Credits
 
-Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/altoholic) by Thaoky, modified for Ebonhold by Crimmy.
+Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/altoholic) by Thaoky, modified for Ebonhold by Crimson, with contributions and large UI overhaul courtesy of MarkusLastu.
 
 ## Key Features
 
