@@ -1,0 +1,38 @@
+name: Package addon
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Ashoholic.zip
+        run: |
+          version="$(sed -n 's/^## Version:[[:space:]]*//p' Ashoholic/Ashoholic.toc | tr -d '\r')"
+          echo "version=$version" >> "$GITHUB_ENV"
+          git archive --format=zip --prefix=Ashoholic/ -o Ashoholic.zip HEAD:Ashoholic
+          unzip -l Ashoholic.zip
+
+      - name: Publish Ashoholic.zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Extract Ashoholic.zip into Interface/AddOns. The archive contains a single Ashoholic folder."
+          if gh release view "v$version" >/dev/null 2>&1; then
+            gh release upload "v$version" Ashoholic.zip --clobber
+          else
+            gh release create "v$version" Ashoholic.zip \
+              --title "Ashoholic v$version" \
+              --latest \
+              --notes "$notes"
+          fi

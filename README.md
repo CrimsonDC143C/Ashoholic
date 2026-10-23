@@ -1,6 +1,6 @@
 # 🍷 Ashoholic - Ebonhold Roster
 
-[![Download Latest Release](https://img.shields.io/badge/Download-Ashoholic_v2.0-blue?style=for-the-badge)](https://github.com/MarkusLastu/Ashoholic/releases/latest)
+[![Download Latest Release](https://img.shields.io/badge/Download-Ashoholic_v2.0-blue?style=for-the-badge)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
 
 **A highly customizable character, gold, and Soul Ash tracker for Project Ebonhold (WotLK 3.3.5).**
 
@@ -43,10 +43,10 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 
 ## Installation
 
-1.  Extract `Ashoholic.zip` into your addons `Ebonhold\Interface\AddOns\` directory. 
-    *   *Note: Ensure the folder is named exactly `Ashoholic`.*
-2.  Make sure you have the **ProjectEbonhold** addon enabled.
-3.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
+1.  Download [Ashoholic.zip](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip) from the button above.
+2.  Extract it into `Ebonhold\Interface\AddOns\`. The zip contains one `Ashoholic` folder, with `Ashoholic.toc` directly inside it.
+3.  Make sure you have the **ProjectEbonhold** addon enabled.
+4.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
 
 ## Multi-Account Syncing (Optional)
 
