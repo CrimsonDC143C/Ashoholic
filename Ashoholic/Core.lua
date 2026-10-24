@@ -567,7 +567,12 @@ end)
 
 -- Primary hook: watch for ProjectEbonhold.PrestigeService.DoPrestige() itself.
 -- This is what CherryPicker calls directly, so it fires for both manual and
--- auto-prestige without depending on the confirm dialog or the level drop.
+-- auto-prestige without depending on the confirm dialog.
+--
+-- Do not treat a level drop as a prestige. Accepting death (Release Spirit)
+-- also sends the character back to level 1 and banks that run's Soul Ash into
+-- the tree. Prestige is the only path that burns the account wallet, and it
+-- does not change level.
 local prestigeHookFrame = CreateFrame("Frame")
 prestigeHookFrame.elapsed = 0
 prestigeHookFrame:SetScript("OnUpdate", function(self, elapsed)
@@ -583,31 +588,6 @@ prestigeHookFrame:SetScript("OnUpdate", function(self, elapsed)
         end)
         addon.prestigeHooked = true
     end
-end)
-
--- Backup hook: watch for the level drop (80 → 1 on death and respawn). This
--- catches any prestige path we missed. The didReset guard inside
--- ResetAllSoulAsh prevents double chat messages when both hooks fire.
-local prestigeWatcher = CreateFrame("Frame")
-prestigeWatcher.elapsed = 0
-prestigeWatcher.lastLevel = nil
-prestigeWatcher:SetScript("OnUpdate", function(self, elapsed)
-    self.elapsed = self.elapsed + elapsed
-    if self.elapsed < 2 then return end
-    self.elapsed = 0
-
-    local level = UnitLevel("player")
-    if not level or level <= 0 then return end
-
-    if not self.lastLevel then
-        self.lastLevel = level
-        return
-    end
-
-    if level < self.lastLevel then
-        addon:ResetAllSoulAsh("Prestige complete — this account's Soul Ash has been reset.")
-    end
-    self.lastLevel = level
 end)
 
 function addon:ResetAllCharacterData()
