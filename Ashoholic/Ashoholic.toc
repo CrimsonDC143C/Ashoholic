@@ -5,7 +5,7 @@
 ## Version: 2.0
 ## SavedVariables: AshoholicDB
 ## Dependencies: ProjectEbonhold
-## OptionalDeps: Ace3
+## OptionalDeps: Ace3, SharedMedia
 
 Libraries\Load_Libraries.xml
 

@@ -23,6 +23,7 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 *   **Fully Customizable UI:** 
     *   15+ built-in themes.
     *   Full RGBA color picker for every element.
+    *   Font choices for the title, column headers, and roster row types. Install SharedMedia separately to add its registered fonts to the font menus.
     *   Drag-and-drop column reordering and resizing.
     *   Save your own custom themes.
 *   **Prestige Automation:** Hooks into the Ebonhold Prestige Service to automatically wipe your active Soul Ash tracking the moment you prestige.

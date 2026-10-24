@@ -8,6 +8,31 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 local GOLD, EMBER, MUTED, SOUL, LOC, DIM =
     "|cFFFFD24A", "|cFFFF8A2B", "|cFF8C867D", "|cFF6FE6DC", "|cFFD6CFC0", "|cFFB8B2A8"
 
+local FONTS = {
+    { name = "Morpheus",      path = "Fonts\\MORPHEUS.TTF" },
+    { name = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
+    { name = "Arial Narrow",  path = "Fonts\\ARIALN.TTF" },
+    { name = "Skurri",        path = "Fonts\\SKURRI.TTF" },
+}
+local fontPaths = {}
+for _, font in ipairs(FONTS) do fontPaths[font.path] = true end
+
+local media = LibStub and LibStub:GetLibrary("LibSharedMedia-3.0", true)
+if media then
+    for _, name in ipairs(media:List("font") or {}) do
+        local path = media:Fetch("font", name)
+        if path and not fontPaths[path] then
+            FONTS[#FONTS + 1] = { name = name, path = path }
+            fontPaths[path] = true
+        end
+    end
+end
+
+local function ResolveFont(path, fallback)
+    if path and fontPaths[path] then return path end
+    return fallback
+end
+
 local T = addon.Themes:Get(addon.Themes.default)
 local C = T
 local BUTTON_STYLES = T.btn
@@ -841,7 +866,11 @@ function addon:CreateUI()
         else fsize = L.characterFontSize end
 
         for _, fs in ipairs(row.fonts) do
-            if fs.basePath then fs:SetFont(fs.basePath, fsize, fs.baseFlags) end
+            local fontKey = ltype == 0 and "realmFont" or
+                ltype == 1 and "accountFont" or
+                ltype == 3 and "totalsFont" or "characterFont"
+            local path = ResolveFont(L[fontKey], fs.basePath)
+            if path then fs:SetFont(path, fsize, fs.baseFlags) end
             fs:SetTextColor(T.body[1], T.body[2], T.body[3])
             if fs.baseHeight then fs:SetHeight(fsize + 2) end
         end
@@ -1394,7 +1423,7 @@ function addon:CreateUI()
         else
             frame:SetBackdropBorderColor(0, 0, 0, 0)
         end
-        title:SetFont(L.titleFont, L.titleSize)
+        title:SetFont(ResolveFont(L.titleFont, "Fonts\\MORPHEUS.TTF"), L.titleSize)
         title:SetText("Ashoholic")
         title:SetTextColor(unpack(T.titleRGB))
         subtitle:SetText("Ebonhold Roster")
@@ -1414,7 +1443,7 @@ function addon:CreateUI()
             if btn.hl then btn.hl:SetVertexColor(br[1], br[2], br[3], br[4] or 0.14) end
             if btn.label then
                 local p, _, f = btn.label:GetFont()
-                btn.label:SetFont(p, L.headerFontSize, f)
+                btn.label:SetFont(ResolveFont(L.headerFont, p), L.headerFontSize, f)
                 btn.label:SetText(btn.col.title)
                 btn.label:SetTextColor(unpack(T.headerRGB or {1, 0.82, 0}))
             end
@@ -1425,7 +1454,7 @@ function addon:CreateUI()
         end
         for _, fs in ipairs(themedLabels) do
             local p, _, f = fs:GetFont()
-            fs:SetFont(p, L.headerFontSize, f)
+            fs:SetFont(ResolveFont(L.headerFont, p), L.headerFontSize, f)
         end
         for _, fs in ipairs(themedLabels) do fs.Retheme() end
         for _, tint in ipairs(gripTints) do tint() end
@@ -2468,29 +2497,27 @@ function addon:ToggleConfigUI()
     end
 
     -- FONT ----------------------------------------------------------------
-    local FONTS = {
-        { name = "Morpheus",      path = "Fonts\\MORPHEUS.TTF" },
-        { name = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
-        { name = "Arial Narrow",  path = "Fonts\\ARIALN.TTF" },
-        { name = "Skurri",        path = "Fonts\\SKURRI.TTF" },
-    }
-    local function addFont()
+    local function addFont(label, key, inLayout, allowDefault)
         local yPos = nextY(32)
         local l = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         l:SetPoint("TOPLEFT", 0, yPos)
-        l:SetText("Title Font")
-        local dd = CreateFrame("Frame", "AshoholicFontDD", body, "UIDropDownMenuTemplate")
+        l:SetText(label)
+        local dd = CreateFrame("Frame", "AshoholicFontDD_" .. key, body, "UIDropDownMenuTemplate")
         dd:SetPoint("TOPLEFT", 200, yPos + 6)
         UIDropDownMenu_SetWidth(dd, 180)
         UIDropDownMenu_Initialize(dd, function(self, level)
-            local cur = addon.customDraft and addon.customDraft.layout.titleFont
-            for _, f in ipairs(FONTS) do
+            local draft = addon.customDraft
+            local cur = draft and draft.layout[key]
+            local choices = {}
+            if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
+            for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
+            for _, f in ipairs(choices) do
                 local info = {}
                 info.text = f.name
                 info.checked = (cur == f.path)
                 info.func = function()
                     if not addon.customDraft then return end
-                    addon.customDraft.layout.titleFont = f.path
+                    addon.customDraft.layout[key] = f.path
                     addon:ApplyDraft()
                     UIDropDownMenu_SetText(dd, f.name)
                 end
@@ -2499,10 +2526,14 @@ function addon:ToggleConfigUI()
         end)
         local function Refresh()
             local d = addon.customDraft
-            if not d then UIDropDownMenu_SetText(dd, FONTS[1].name); return end
-            local cur = FONTS[1]
-            for _, f in ipairs(FONTS) do
-                if f.path == d.layout.titleFont then cur = f; break end
+            local choices = {}
+            if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
+            for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
+            if not d then UIDropDownMenu_SetText(dd, choices[1].name); return end
+            local path = d.layout[key]
+            local cur = choices[1]
+            for _, font in ipairs(choices) do
+                if font.path == path then cur = font; break end
             end
             UIDropDownMenu_SetText(dd, cur.name)
         end
@@ -2593,7 +2624,7 @@ function addon:ToggleConfigUI()
     addColor("Settings title text", "settingsTitleText")
     addColor("Gradient bottom",  "titleLo")
     addColor("Gradient top",     "titleHi")
-    addFont()
+    addFont("Title font", "titleFont", true, false)
     addSlider("Title size",      "titleSize", 10, 32, true)
 
     sectionTitle("Column Headers")
@@ -2601,6 +2632,7 @@ function addon:ToggleConfigUI()
     addColor("Header text",      "headerText")
     addColor("Hover glow",       "accentBright")
     addColor("Sort arrow",       "sortArrow")
+    addFont("Header font",       "headerFont", true, true)
     addSlider("Header font size","headerFontSize", 8, 22, true)
 
     sectionTitle("Columns")
@@ -2621,9 +2653,13 @@ function addon:ToggleConfigUI()
     addSlider("Row height",        "rowHeight", 16, 44, true)
     addSlider("Row spacing",       "rowStep",   17, 52, true)
     addSlider("Realm font size",   "realmFontSize",     8, 22, true)
+    addFont("Realm font",          "realmFont", true, true)
     addSlider("Account font size", "accountFontSize",   8, 22, true)
+    addFont("Account font",        "accountFont", true, true)
     addSlider("Character font size","characterFontSize", 8, 22, true)
+    addFont("Character font",      "characterFont", true, true)
     addSlider("Totals font size",  "totalsFontSize",    8, 22, true)
+    addFont("Totals font",         "totalsFont", true, true)
     addToggle("Alternating stripes","stripes", true)
 
     sectionTitle("Accent Bars")
