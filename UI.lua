@@ -33,6 +33,13 @@ local function ResolveFont(path, fallback)
     return fallback
 end
 
+local function ApplyFont(fs, path, size)
+    if not fs.ashBaseFont then
+        fs.ashBaseFont, fs.ashBaseSize, fs.ashBaseFlags = fs:GetFont()
+    end
+    fs:SetFont(ResolveFont(path, fs.ashBaseFont), size or fs.ashBaseSize, fs.ashBaseFlags)
+end
+
 local T = addon.Themes:Get(addon.Themes.default)
 local C = T
 local BUTTON_STYLES = T.btn
@@ -469,6 +476,7 @@ local function CreateFlatButton(parent, width, height, label, styleName)
     b.text:SetPoint("CENTER")
     b.text:SetText(label)
     function b:ApplyStyle(hover)
+        ApplyFont(self.text, T.layout[styleName == "danger" and "dangerFont" or "buttonFont"])
         local s = BUTTON_STYLES[styleName or "default"]
         if hover then
             self:SetBackdropColor(unpack(s.hoverBg))
@@ -2146,10 +2154,13 @@ function addon:CreateUI()
         title:SetText("Ashoholic")
         title:SetTextColor(unpack(T.titleRGB))
         subtitle:SetText("Ebonhold Roster")
+        ApplyFont(subtitle, L.mutedFont)
         if T.mutedRGB then subtitle:SetTextColor(unpack(T.mutedRGB)) end
         version:SetText(addon.Version or "")
+        ApplyFont(version, L.mutedFont)
         if T.mutedRGB then version:SetTextColor(unpack(T.mutedRGB)) end
         sliderHint:SetText("Shift+scroll to pan columns")
+        ApplyFont(sliderHint, L.mutedFont)
         if T.mutedRGB then sliderHint:SetTextColor(unpack(T.mutedRGB)) end
         hSlider:SetBackdropColor(unpack(T.sliderBg))
         hSlider:SetBackdropBorderColor(unpack(T.sliderBorder))
@@ -2161,8 +2172,7 @@ function addon:CreateUI()
         for _, btn in ipairs(headerButtons) do
             if btn.hl then btn.hl:SetVertexColor(br[1], br[2], br[3], br[4] or 0.14) end
             if btn.label then
-                local p, _, f = btn.label:GetFont()
-                btn.label:SetFont(ResolveFont(L.headerFont, p), L.headerFontSize, f)
+                ApplyFont(btn.label, L.headerFont, L.headerFontSize)
                 btn.label:SetText(btn.col.title)
                 btn.label:SetTextColor(unpack(T.headerRGB or {1, 0.82, 0}))
             end
@@ -2172,8 +2182,7 @@ function addon:CreateUI()
             end
         end
         for _, fs in ipairs(themedLabels) do
-            local p, _, f = fs:GetFont()
-            fs:SetFont(ResolveFont(L.headerFont, p), L.headerFontSize, f)
+            ApplyFont(fs, L.headerFont, L.headerFontSize)
         end
         for _, fs in ipairs(themedLabels) do fs.Retheme() end
         for _, tint in ipairs(gripTints) do tint() end
@@ -2275,7 +2284,14 @@ function addon:ToggleConfigUI()
         cfg:SetBackdropBorderColor(0, 0, 0, 0)
     end
 
-    cfg:SetScript("OnHide", function() if addon.customDraft then addon:CancelDraft() end end)
+    cfg:SetScript("OnHide", function(self)
+        if addon.customizeDirty then
+            self:Show()
+            StaticPopup_Show("ASH_CONFIRM_CLOSE")
+            return
+        end
+        if addon.customDraft then addon:CancelDraft() end
+    end)
 
     -- Confirmation popup + Hide override: whenever the user closes the
     -- window (X button, ESC, or toggling the * button) with unsaved
@@ -2333,6 +2349,7 @@ function addon:ToggleConfigUI()
     local function Themed(fs, kind, text)
         texts[#texts + 1] = function()
             fs:SetText(text)
+            if kind == "muted" then ApplyFont(fs, T.layout.mutedFont) end
             local rgb = (kind == "muted") and T.mutedRGB or T.sectionHeaderRGB
             if rgb then fs:SetTextColor(unpack(rgb)) end
         end
@@ -2345,6 +2362,7 @@ function addon:ToggleConfigUI()
     local refreshCustomTab, refreshCustomizeTab
 
     local function StyleTab(tab)
+        ApplyFont(tab.text, T.layout.tabFont)
         if tab.hovered then
             tab:SetBackdropColor(unpack(T.tabHoverBg))
             tab:SetBackdropBorderColor(unpack(T.tabHoverBorder))
@@ -3232,45 +3250,176 @@ function addon:ToggleConfigUI()
     end
 
     -- FONT ----------------------------------------------------------------
+    local fontMenu, fontMenuScroll, fontMenuChild, fontMenuButtons, fontMenuBar
+    local fontMenuChoices, fontMenuSelect, fontMenuOwner
+
+    page3:HookScript("OnHide", function()
+        if fontMenu then fontMenu:Hide() end
+    end)
+
+    local function EnsureFontMenu()
+        if fontMenu then return end
+        fontMenu = CreateFrame("Frame", nil, page3)
+        fontMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+        fontMenu:SetFrameLevel(100)
+        fontMenu:SetClampedToScreen(true)
+        fontMenu:EnableMouse(true)
+        fontMenu:SetWidth(230)
+        fontMenu:SetBackdrop(FLAT_BACKDROP)
+        fontMenu:SetBackdropColor(unpack(T.panel))
+        fontMenu:SetBackdropBorderColor(unpack(T.border))
+
+        fontMenuScroll = CreateFrame("ScrollFrame", nil, fontMenu)
+        fontMenuScroll:SetPoint("TOPLEFT", 4, -4)
+        fontMenuScroll:SetPoint("BOTTOMRIGHT", -26, 4)
+        fontMenuBar = CreateFrame("Slider", nil, fontMenu)
+        fontMenuBar:SetOrientation("VERTICAL")
+        fontMenuBar:SetPoint("TOPRIGHT", -6, -4)
+        fontMenuBar:SetPoint("BOTTOMRIGHT", -6, 4)
+        fontMenuBar:SetWidth(12)
+        fontMenuBar:SetBackdrop(FLAT_BACKDROP)
+        fontMenuBar:SetBackdropColor(unpack(T.sliderBg))
+        fontMenuBar:SetBackdropBorderColor(unpack(T.sliderBorder))
+        fontMenuBar:SetMinMaxValues(0, 0)
+        fontMenuBar:SetValueStep(1)
+        fontMenuBar:SetThumbTexture(WHITE)
+        local thumb = fontMenuBar:GetThumbTexture()
+        thumb:SetWidth(12)
+        thumb:SetHeight(24)
+        thumb:SetVertexColor(unpack(T.accent))
+        fontMenuBar:SetScript("OnValueChanged", function(self, value)
+            fontMenuScroll:SetVerticalScroll(value)
+        end)
+        fontMenuScroll:SetScript("OnVerticalScroll", function(self, value)
+            if fontMenuBar:GetValue() ~= value then fontMenuBar:SetValue(value) end
+        end)
+        fontMenuScroll:EnableMouseWheel(true)
+        fontMenuScroll:SetScript("OnMouseWheel", function(self, delta)
+            local _, maxScroll = fontMenuBar:GetMinMaxValues()
+            fontMenuBar:SetValue(Clamp(self:GetVerticalScroll() - delta * 44, 0, maxScroll))
+        end)
+
+        fontMenuChild = CreateFrame("Frame", nil, fontMenuScroll)
+        fontMenuChild:SetWidth(198)
+        fontMenuScroll:SetScrollChild(fontMenuChild)
+
+        fontMenuButtons = {}
+        for i = 1, #FONTS + 1 do
+            local button = CreateFrame("Button", nil, fontMenuChild)
+            button:SetSize(196, 22)
+            button:SetBackdrop(FLAT_BACKDROP)
+            button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            button.text:SetPoint("LEFT", 6, 0)
+            button.text:SetJustifyH("LEFT")
+            button:SetScript("OnEnter", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.hoverBg))
+                self:SetBackdropBorderColor(unpack(style.hoverBorder))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnLeave", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.bg))
+                self:SetBackdropBorderColor(unpack(style.border))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnClick", function(self)
+                local choice = fontMenuChoices and fontMenuChoices[self.choiceIndex]
+                if choice and fontMenuSelect then fontMenuSelect(choice) end
+                fontMenu:Hide()
+            end)
+            fontMenuButtons[i] = button
+        end
+
+        fontMenu:SetScript("OnHide", function()
+            fontMenuSelect = nil
+            fontMenuChoices = nil
+            fontMenuOwner = nil
+        end)
+    end
+
     local function addFont(label, key, inLayout, allowDefault)
         local yPos = nextY(32)
         local l = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         l:SetPoint("TOPLEFT", 0, yPos)
         l:SetText(label)
-        local dd = CreateFrame("Frame", "AshoholicFontDD_" .. key, body, "UIDropDownMenuTemplate")
-        dd:SetPoint("TOPLEFT", 200, yPos + 6)
-        UIDropDownMenu_SetWidth(dd, 180)
-        UIDropDownMenu_Initialize(dd, function(self, level)
-            local draft = addon.customDraft
-            local cur = draft and draft.layout[key]
+        local dd = CreateFlatButton(body, 180, 22, "", "default")
+        dd:SetPoint("TOPLEFT", 200, yPos + 2)
+        dd.text:ClearAllPoints()
+        dd.text:SetPoint("LEFT", dd, "LEFT", 8, 0)
+        dd.text:SetPoint("RIGHT", dd, "RIGHT", -26, 0)
+        dd.text:SetJustifyH("LEFT")
+        local arrow = dd:CreateTexture(nil, "OVERLAY")
+        arrow:SetSize(18, 18)
+        arrow:SetPoint("RIGHT", -4, 0)
+        arrow:SetTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+
+        local function ShowFontMenu()
+            EnsureFontMenu()
+            fontMenuOwner = dd
             local choices = {}
             if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
             for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
-            for _, f in ipairs(choices) do
-                local info = {}
-                info.text = f.name
-                info.checked = (cur == f.path)
-                info.func = function()
-                    if not addon.customDraft then return end
-                    addon.customDraft.layout[key] = f.path
-                    addon:ApplyDraft()
-                    UIDropDownMenu_SetText(dd, f.name)
+            fontMenuChoices = choices
+            fontMenuSelect = function(choice)
+                if not addon.customDraft then return end
+                addon.customDraft.layout[key] = choice.path
+                addon:ApplyDraft()
+                dd.text:SetText(choice.name)
+            end
+
+            local rowHeight = 22
+            local contentHeight = #choices * rowHeight
+            local visibleHeight = math.min(contentHeight, 220)
+            fontMenu:SetHeight(visibleHeight + 8)
+            fontMenuChild:SetHeight(contentHeight)
+            fontMenuBar:SetMinMaxValues(0, math.max(0, contentHeight - visibleHeight))
+            fontMenuBar:GetThumbTexture():SetHeight(math.max(24, visibleHeight * visibleHeight / contentHeight))
+            fontMenuBar:SetValue(0)
+            fontMenuScroll:SetVerticalScroll(0)
+            for i, button in ipairs(fontMenuButtons) do
+                local choice = choices[i]
+                if choice then
+                    button.choiceIndex = i
+                    button:ClearAllPoints()
+                    button:SetPoint("TOPLEFT", fontMenuChild, "TOPLEFT", 0, -((i - 1) * rowHeight))
+                    button.text:SetText(choice.name)
+                    button:Show()
+                    button:GetScript("OnLeave")(button)
+                else
+                    button:Hide()
                 end
-                UIDropDownMenu_AddButton(info, level)
+            end
+
+            fontMenu:ClearAllPoints()
+            if dd:GetBottom() and dd:GetBottom() < visibleHeight + 20 then
+                fontMenu:SetPoint("BOTTOMLEFT", dd, "TOPLEFT", 0, 2)
+            else
+                fontMenu:SetPoint("TOPLEFT", dd, "BOTTOMLEFT", 0, -2)
+            end
+            fontMenu:Show()
+        end
+
+        dd:SetScript("OnClick", function()
+            if fontMenu and fontMenu:IsShown() and fontMenuOwner == dd then
+                fontMenu:Hide()
+            else
+                ShowFontMenu()
             end
         end)
+
         local function Refresh()
             local d = addon.customDraft
             local choices = {}
             if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
             for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
-            if not d then UIDropDownMenu_SetText(dd, choices[1].name); return end
+            if not d then dd.text:SetText(choices[1].name); return end
             local path = d.layout[key]
             local cur = choices[1]
             for _, font in ipairs(choices) do
                 if font.path == path then cur = font; break end
             end
-            UIDropDownMenu_SetText(dd, cur.name)
+            dd.text:SetText(cur.name)
         end
         Refresh()
         widgets[#widgets + 1] = Refresh
@@ -3424,6 +3573,7 @@ function addon:ToggleConfigUI()
     sectionTitle("Text · Window")
     addColor("Section headers",     "sectionHeaderText")
     addColor("Muted / hints",       "muted")
+    addFont("Muted hints font",      "mutedFont", true, true)
 
     sectionTitle("Icons")
     addToggle("Show class icons", "showClassIcons")
@@ -3437,6 +3587,7 @@ function addon:ToggleConfigUI()
     addToggle("Money: gold only",       "moneyGoldOnly")
 
     sectionTitle("Tabs")
+    addFont("Tabs text font",       "tabFont", true, true)
     addColor("Tab background",       "tabBg")
     addColor("Tab border",           "tabBorder")
     addColor("Tab text",             "tabText")
@@ -3448,6 +3599,7 @@ function addon:ToggleConfigUI()
     addColor("Hover tab text",       "tabHoverText")
 
     sectionTitle("Buttons")
+    addFont("Buttons text font", "buttonFont", true, true)
     addColor("Background",       "btnBg")
     addColor("Border",           "btnBorder")
     addColor("Hover bg",         "btnHoverBg")
@@ -3455,6 +3607,7 @@ function addon:ToggleConfigUI()
     addColor("Text",             "btnText")
 
     sectionTitle("Danger Buttons (Reset / Close)")
+    addFont("Danger buttons font", "dangerFont", true, true)
     addColor("Background",       "dangerBg")
     addColor("Border",           "dangerBorder")
     addColor("Hover bg",         "dangerHoverBg")
@@ -3641,7 +3794,7 @@ function addon:ToggleConfigUI()
     syncLine("the roster, grouped under their own account headers.", "muted")
     syncLine(" ")
     syncLine("Notes:", "title")
-    syncLine("- Deletions: right-click a character row to remove it from THIS", "muted")
+    syncLine("- Deletions: shift+right-click a character row to remove it from THIS", "muted")
     syncLine("  account's file. To remove it from ALL accounts, repeat for each.", "muted")
     syncLine("- Backup: each Ashoholic.lua is copied to .lua.bak before merging.", "muted")
     syncLine("- Re-running: launch via Ashoholic.bat any time to sync again.", "muted")
