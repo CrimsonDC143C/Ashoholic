@@ -2,7 +2,7 @@
 ## Title: Ashoholic - Ebonhold Roster
 ## Notes: Tracks characters, Soul Ash, Raid Reset Costs, and instance lockouts on Project Ebonhold. Hover a character name for saved lockouts and the 10 raids-per-hour timer. Adds a Character Roster tab to the Nexus panel when Nexus is installed.
 ## Author: Crimson, MarkusLastu
-## Version: 2.0
+## Version: 2.1
 ## SavedVariables: AshoholicDB
 ## Dependencies: ProjectEbonhold
 ## OptionalDeps: Ace3, FastSwap, Nexus, SharedMedia
