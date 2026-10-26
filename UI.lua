@@ -559,15 +559,15 @@ function addon:CreateUI()
     logo:SetWidth(26); logo:SetHeight(26)
     logo:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -9)
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-    title:SetJustifyH("LEFT")
-    title:SetJustifyV("MIDDLE")
-    if title.SetWordWrap then title:SetWordWrap(false) end
-    title:SetText("Ashoholic")
+    local windowTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    windowTitle:SetPoint("LEFT", logo, "RIGHT", 10, 0)
+    windowTitle:SetJustifyH("LEFT")
+    windowTitle:SetJustifyV("MIDDLE")
+    if windowTitle.SetWordWrap then windowTitle:SetWordWrap(false) end
+    windowTitle:SetText("Ashoholic")
 
     local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    subtitle:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 10, 2)
+    subtitle:SetPoint("BOTTOMLEFT", windowTitle, "BOTTOMRIGHT", 10, 2)
     subtitle:SetJustifyH("LEFT")
     if subtitle.SetWordWrap then subtitle:SetWordWrap(false) end
     subtitle:SetText("Ebonhold Roster")
@@ -1226,16 +1226,16 @@ function addon:CreateUI()
     accent:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 1, 1)
     panel.accent = accent
 
-    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD_L, -10)
-    title:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -PAD_R, -10)
-    title:SetJustifyH("LEFT")
-    title:SetHeight(16)
-    if title.SetWordWrap then title:SetWordWrap(false) end
-    panel.title = title
+    local lockoutTitle = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lockoutTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD_L, -10)
+    lockoutTitle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -PAD_R, -10)
+    lockoutTitle:SetJustifyH("LEFT")
+    lockoutTitle:SetHeight(16)
+    if lockoutTitle.SetWordWrap then lockoutTitle:SetWordWrap(false) end
+    panel.title = lockoutTitle
 
     local sub = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+    sub:SetPoint("TOPLEFT", lockoutTitle, "BOTTOMLEFT", 0, -2)
     sub:SetWidth(NAME_W)
     sub:SetJustifyH("LEFT")
     sub:SetHeight(13)
@@ -1243,7 +1243,7 @@ function addon:CreateUI()
     panel.sub = sub
 
     local hourCount = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hourCount:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -2)
+    hourCount:SetPoint("TOPRIGHT", lockoutTitle, "BOTTOMRIGHT", 0, -2)
     hourCount:SetWidth(TIME_W)
     hourCount:SetJustifyH("RIGHT")
     hourCount:SetHeight(13)
@@ -1365,7 +1365,7 @@ function addon:CreateUI()
         lockoutPanel.accent:SetVertexColor(a[1], a[2], a[3], a[4] or 1)
         local dim = T.accentDim or a
         lockoutPanel.rule:SetVertexColor(dim[1], dim[2], dim[3], dim[4] or 1)
-        SetFontSize(lockoutPanel.title, size)
+        ApplyFont(lockoutPanel.title, T.layout.characterFont, size)
         SetFontSize(lockoutPanel.sub, math.max(10, size - 1))
         SetFontSize(lockoutPanel.hourCount, math.max(10, size - 1))
         SetFontSize(lockoutPanel.more, math.max(10, size - 1))
@@ -2149,9 +2149,10 @@ function addon:CreateUI()
         else
             frame:SetBackdropBorderColor(0, 0, 0, 0)
         end
-        title:SetFont(ResolveFont(L.titleFont, "Fonts\\MORPHEUS.TTF"), L.titleSize)
-        title:SetText("Ashoholic")
-        title:SetTextColor(unpack(T.titleRGB))
+        local _, _, titleFlags = windowTitle:GetFont()
+        SetFontSafe(windowTitle, L.titleFont, L.titleSize, titleFlags)
+        windowTitle:SetText("Ashoholic")
+        windowTitle:SetTextColor(unpack(T.titleRGB))
         subtitle:SetText("Ebonhold Roster")
         ApplyFont(subtitle, L.mutedFont)
         if T.mutedRGB then subtitle:SetTextColor(unpack(T.mutedRGB)) end
@@ -2194,10 +2195,10 @@ function addon:CreateUI()
         -- SetFont during creation runs while the frame is hidden, which leaves
         -- the title at zero width. Apply it again once the frame is shown.
         local L = T.layout
-        local _, _, titleFlags = title:GetFont()
-        SetFontSafe(title, L.titleFont, L.titleSize, titleFlags)
-        title:SetText("Ashoholic")
-        if T.titleRGB then title:SetTextColor(unpack(T.titleRGB)) end
+        local _, _, titleFlags = windowTitle:GetFont()
+        SetFontSafe(windowTitle, L.titleFont, L.titleSize, titleFlags)
+        windowTitle:SetText("Ashoholic")
+        if T.titleRGB then windowTitle:SetTextColor(unpack(T.titleRGB)) end
         subtitle:SetText("Ebonhold Roster")
         ApplyLayout()
     end)
