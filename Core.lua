@@ -125,6 +125,10 @@ addon.VERSION = string.gsub(version, "^[vV]", "")
 addon.Version = version:find("^v") and version or ("v" .. version)
 
 local VERSION_MESSAGE_PREFIX = "ASHOHOLIC_VER"
+local VERSION_BROADCAST_COOLDOWN = 600
+local VERSION_BROADCAST_MIN_DELAY = 5
+local VERSION_BROADCAST_MAX_DELAY = 10
+local versionBroadcastScheduled = false
 
 local function NormalizeVersionNumber(value)
     value = string.gsub(value, "^0+", "")
@@ -256,16 +260,43 @@ end
 function addon:BroadcastVersion()
     if not SendAddonMessage then return end
 
+    local options = self.db.global.options
+    local now = time()
+    local lastBroadcast = tonumber(options.LastVersionBroadcastAt) or 0
+    if lastBroadcast > 0 and now - lastBroadcast < VERSION_BROADCAST_COOLDOWN then
+        return
+    end
+
+    local sent = false
+    local function SendVersion(channel)
+        local ok = pcall(SendAddonMessage, VERSION_MESSAGE_PREFIX, self.VERSION, channel)
+        if ok then sent = true end
+    end
+
     if IsInGuild and IsInGuild() then
-        pcall(SendAddonMessage, VERSION_MESSAGE_PREFIX, self.VERSION, "GUILD")
+        SendVersion("GUILD")
     end
 
     local raidMembers = GetNumRaidMembers and GetNumRaidMembers() or 0
     if raidMembers > 0 then
-        pcall(SendAddonMessage, VERSION_MESSAGE_PREFIX, self.VERSION, "RAID")
+        SendVersion("RAID")
     elseif GetNumPartyMembers and GetNumPartyMembers() > 0 then
-        pcall(SendAddonMessage, VERSION_MESSAGE_PREFIX, self.VERSION, "PARTY")
+        SendVersion("PARTY")
     end
+
+    if sent then
+        options.LastVersionBroadcastAt = now
+    end
+end
+
+function addon:ScheduleVersionBroadcast()
+    if versionBroadcastScheduled then return end
+    versionBroadcastScheduled = true
+    local delay = math.random(VERSION_BROADCAST_MIN_DELAY, VERSION_BROADCAST_MAX_DELAY)
+    C_Timer.After(delay, function()
+        versionBroadcastScheduled = false
+        addon:BroadcastVersion()
+    end)
 end
 
 local AddonDB_Defaults = {
@@ -298,6 +329,7 @@ local AddonDB_Defaults = {
             columnOrder = nil,
             columnWidths = nil,
             LatestVersionFound = "",
+            LastVersionBroadcastAt = 0,
         },
     },
 }
@@ -312,6 +344,10 @@ function addon:OnInitialize()
         pcall(RegisterAddonMessagePrefix, VERSION_MESSAGE_PREFIX)
         addon:RegisterEvent("CHAT_MSG_ADDON", "OnVersionMessage")
     end
+
+    addon:RegisterEvent("PARTY_MEMBERS_CHANGED", "ScheduleVersionBroadcast")
+    addon:RegisterEvent("RAID_ROSTER_UPDATE", "ScheduleVersionBroadcast")
+    addon:RegisterEvent("GUILD_ROSTER_UPDATE", "ScheduleVersionBroadcast")
     
     addon:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerLogin")
     addon:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnTargetedEvent")
@@ -366,7 +402,7 @@ function addon:OnInitialize()
 end
 
 function addon:OnPlayerLogin()
-    addon:BroadcastVersion()
+    addon:ScheduleVersionBroadcast()
 
     if not _G.FastSwapEventFrame and SetCVar then
         MarkAllSwapSlotsDone()
@@ -417,8 +453,26 @@ function addon:OnTargetedEvent(event)
 end
 
 function addon:ChatCommand(input)
-    local cmd = string.lower(input or "")
-    if cmd == "config" or cmd == "options" then
+    local cmd = string.lower(string.gsub(input or "", "^%s*(.-)%s*$", "%1"))
+    if cmd == "ver check" or cmd == "version check" then
+        if addon.isOutdated and addon.latestVersionFound then
+            print("|cFFFFD700Ashoholic version check:|r installed v" .. addon.VERSION ..
+                ", newer version v" .. addon.latestVersionFound .. " detected.")
+        else
+            print("|cFFFFD700Ashoholic version check:|r installed v" .. addon.VERSION ..
+                "; no newer peer version detected.")
+        end
+    elseif cmd == "ver reset" or cmd == "version reset" then
+        addon.db.global.options.LatestVersionFound = ""
+        addon.latestVersionFound = nil
+        addon.isOutdated = false
+        if AshoholicFrame and AshoholicFrame.RefreshVersionNotice then
+            AshoholicFrame:RefreshVersionNotice()
+        end
+        print("|cFFFFD700Ashoholic version notice cleared.|r")
+    elseif cmd == "ver" or cmd == "version" then
+        print("Usage: /ash ver check or /ash ver reset")
+    elseif cmd == "config" or cmd == "options" then
         addon:ToggleConfigUI()
     elseif cmd == "sync" then
         addon:PrintSyncHelp()

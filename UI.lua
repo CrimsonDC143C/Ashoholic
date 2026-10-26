@@ -592,6 +592,23 @@ function addon:CreateUI()
     local version = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     version:SetPoint("RIGHT", closeBtn, "LEFT", -40, 0)
 
+    local VERSION_RELEASE_URL = "https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip"
+    StaticPopupDialogs["ASHOHOLIC_VERSION_LINK"] = StaticPopupDialogs["ASHOHOLIC_VERSION_LINK"] or {
+        text = "Copy the latest Ashoholic download link (Ctrl+C):",
+        button1 = "Close",
+        hasEditBox = 1,
+        editBoxWidth = 280,
+        OnShow = function(popup)
+            popup.editBox:SetText(VERSION_RELEASE_URL)
+            popup.editBox:HighlightText()
+            popup.editBox:SetFocus()
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            editBox:GetParent():Hide()
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true,
+    }
+
     local updateBanner = CreateFrame("Frame", nil, frame)
     updateBanner:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -VIEW_TOP)
     updateBanner:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -RIGHT_MARGIN, -VIEW_TOP)
@@ -605,6 +622,19 @@ function addon:CreateUI()
     updateText:SetTextColor(1, 0.92, 0.78)
     updateText:SetJustifyH("CENTER")
     updateBanner:Hide()
+    updateBanner:EnableMouse(true)
+    updateBanner:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            StaticPopup_Show("ASHOHOLIC_VERSION_LINK")
+        end
+    end)
+    updateBanner:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Ashoholic update available", 1, 0.82, 0)
+        GameTooltip:AddLine("Click to copy the download link.", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    updateBanner:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     local function GetContentTop()
         return VIEW_TOP + (updateBanner:IsShown() and (UPDATE_BANNER_HEIGHT + 4) or 0)
