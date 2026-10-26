@@ -177,6 +177,21 @@ local function Gradient(tex, lo, hi)
     tex:SetGradientAlpha("VERTICAL", lo[1],lo[2],lo[3],lo[4] or 1, hi[1],hi[2],hi[3],hi[4] or 1)
 end
 
+-- The first SetFont on a file the client has not loaded yet returns false and
+-- clears the string. A second call uses the cached file. Friz is the fallback
+-- because the default UI font is already loaded.
+local function SetFontSafe(fs, path, size, flags)
+    flags = flags or ""
+    if type(path) ~= "string" or path == "" then path = "Fonts\\FRIZQT__.TTF" end
+    if not fs:SetFont(path, size, flags) then
+        fs:SetFont(path, size, flags)
+    end
+    if not fs:GetFont() then
+        fs:SetFont("Fonts\\FRIZQT__.TTF", size, flags)
+        fs:SetFont("Fonts\\FRIZQT__.TTF", size, flags)
+    end
+end
+
 function addon:ApplyTheme(key)
     if not addon.Themes.byKey[key] and
        not (addon.db.global.options.CustomThemes and addon.db.global.options.CustomThemes[key]) then
@@ -513,9 +528,16 @@ function addon:CreateUI()
 
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("LEFT", logo, "RIGHT", 10, 0)
+    title:SetJustifyH("LEFT")
+    title:SetJustifyV("MIDDLE")
+    if title.SetWordWrap then title:SetWordWrap(false) end
+    title:SetText("Ashoholic")
 
     local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     subtitle:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 10, 2)
+    subtitle:SetJustifyH("LEFT")
+    if subtitle.SetWordWrap then subtitle:SetWordWrap(false) end
+    subtitle:SetText("Ebonhold Roster")
 
     local closeBtn = CreateFlatButton(frame, 22, 22, "X", "danger")
     closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -18, -11)
@@ -2090,7 +2112,8 @@ function addon:CreateUI()
         else
             frame:SetBackdropBorderColor(0, 0, 0, 0)
         end
-        title:SetFont(L.titleFont, L.titleSize)
+        local _, _, titleFlags = title:GetFont()
+        SetFontSafe(title, L.titleFont, L.titleSize, titleFlags)
         title:SetText("Ashoholic")
         title:SetTextColor(unpack(T.titleRGB))
         subtitle:SetText("Ebonhold Roster")
@@ -2130,7 +2153,17 @@ function addon:CreateUI()
     end)
 
     frame:SetScript("OnSizeChanged", function() ApplyLayout() end)
-    frame:SetScript("OnShow",       function() ApplyLayout() end)
+    frame:SetScript("OnShow", function()
+        -- SetFont during creation runs while the frame is hidden, which leaves
+        -- the title at zero width. Apply it again once the frame is shown.
+        local L = T.layout
+        local _, _, titleFlags = title:GetFont()
+        SetFontSafe(title, L.titleFont, L.titleSize, titleFlags)
+        title:SetText("Ashoholic")
+        if T.titleRGB then title:SetTextColor(unpack(T.titleRGB)) end
+        subtitle:SetText("Ebonhold Roster")
+        ApplyLayout()
+    end)
     frame:SetScript("OnHide", function()
         StopHideTimer()
         if lockoutPanel then lockoutPanel:Hide() end
