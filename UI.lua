@@ -3923,6 +3923,11 @@ function addon:ToggleConfigUI()
         return fs
     end
 
+    syncLine("FastSwap Setup", "title")
+    syncLine("Launch Ebonhold with Ashoholic.bat at least once to install", "muted")
+    syncLine("the character-selection hook. FastSwap will not switch until", "muted")
+    syncLine("the hook is synced. Use the launcher again after game updates.", "muted")
+    syncLine(" ")
     syncLine("Multi-Account Sync Setup", "title")
     syncLine(" ")
     syncLine("By default, the addon only shows characters from the account you are", "muted")
