@@ -121,7 +121,183 @@ if type(_G.FastSwap_PerformSwap) ~= "function" then
 end
 
 local version = GetAddOnMetadata(addonName, "Version") or ""
+addon.VERSION = string.gsub(version, "^[vV]", "")
 addon.Version = version:find("^v") and version or ("v" .. version)
+
+local VERSION_MESSAGE_PREFIX = "ASHOHOLIC_VER"
+local VERSION_BROADCAST_COOLDOWN = 600
+local VERSION_BROADCAST_MIN_DELAY = 5
+local VERSION_BROADCAST_MAX_DELAY = 10
+local versionBroadcastScheduled = false
+
+local function NormalizeVersionNumber(value)
+    value = string.gsub(value, "^0+", "")
+    return value == "" and "0" or value
+end
+
+local function ParseVersion(version)
+    if type(version) ~= "string" then return nil end
+    version = string.gsub(version, "^%s*(.-)%s*$", "%1")
+    version = string.gsub(version, "^[vV]", "")
+    version = string.match(version, "^([^+]*)") or ""
+
+    local core, prerelease = version, nil
+    local dash = string.find(version, "-", 1, true)
+    if dash then
+        core = string.sub(version, 1, dash - 1)
+        prerelease = string.sub(version, dash + 1)
+        if prerelease == "" or string.find(prerelease, "%.%.") or
+           string.find(prerelease, "^%.") or string.find(prerelease, "%.$") then
+            return nil
+        end
+        for identifier in string.gmatch(prerelease, "[^%.]+") do
+            if not string.match(identifier, "^[%w%-]+$") then return nil end
+        end
+    end
+
+    if core == "" or string.find(core, "%.%.") or
+       string.find(core, "^%.") or string.find(core, "%.$") then
+        return nil
+    end
+
+    local numbers = {}
+    for component in string.gmatch(core, "[^%.]+") do
+        if not string.match(component, "^%d+$") then return nil end
+        numbers[#numbers + 1] = NormalizeVersionNumber(component)
+    end
+    if #numbers < 1 or #numbers > 3 then return nil end
+    while #numbers < 3 do numbers[#numbers + 1] = "0" end
+
+    local prereleaseParts = {}
+    if prerelease then
+        for identifier in string.gmatch(prerelease, "[^%.]+") do
+            prereleaseParts[#prereleaseParts + 1] = identifier
+        end
+        return numbers, prereleaseParts
+    end
+    return numbers, nil
+end
+
+local function CompareVersionNumbers(left, right)
+    left = NormalizeVersionNumber(left)
+    right = NormalizeVersionNumber(right)
+    if string.len(left) ~= string.len(right) then
+        return string.len(left) < string.len(right) and -1 or 1
+    end
+    if left == right then return 0 end
+    return left < right and -1 or 1
+end
+
+local function IsVersionHigher(remoteVersion, localVersion)
+    local remoteNumbers, remotePrerelease = ParseVersion(remoteVersion)
+    local localNumbers, localPrerelease = ParseVersion(localVersion)
+    if not remoteNumbers or not localNumbers then return false end
+
+    for i = 1, 3 do
+        local comparison = CompareVersionNumbers(remoteNumbers[i], localNumbers[i])
+        if comparison ~= 0 then return comparison > 0 end
+    end
+
+    if not remotePrerelease and localPrerelease then return true end
+    if remotePrerelease and not localPrerelease then return false end
+    if not remotePrerelease then return false end
+
+    local maxParts = math.max(#remotePrerelease, #localPrerelease)
+    for i = 1, maxParts do
+        local remotePart, localPart = remotePrerelease[i], localPrerelease[i]
+        if not remotePart then return false end
+        if not localPart then return true end
+        if remotePart ~= localPart then
+            local remoteNumeric = string.match(remotePart, "^%d+$") ~= nil
+            local localNumeric = string.match(localPart, "^%d+$") ~= nil
+            if remoteNumeric and localNumeric then
+                return CompareVersionNumbers(remotePart, localPart) > 0
+            elseif remoteNumeric ~= localNumeric then
+                return not remoteNumeric
+            end
+            return remotePart > localPart
+        end
+    end
+    return false
+end
+
+addon.IsVersionHigher = IsVersionHigher
+
+function addon:LoadVersionState()
+    local options = self.db.global.options
+    local latestVersion = options.LatestVersionFound
+    if IsVersionHigher(latestVersion, self.VERSION) then
+        self.latestVersionFound = latestVersion
+        self.isOutdated = true
+    else
+        options.LatestVersionFound = ""
+        self.latestVersionFound = nil
+        self.isOutdated = false
+    end
+end
+
+function addon:RememberRemoteVersion(remoteVersion)
+    if not IsVersionHigher(remoteVersion, self.VERSION) then return end
+
+    local options = self.db.global.options
+    local latestVersion = options.LatestVersionFound
+    if latestVersion ~= "" and not IsVersionHigher(remoteVersion, latestVersion) then return end
+
+    options.LatestVersionFound = remoteVersion
+    self.latestVersionFound = remoteVersion
+    self.isOutdated = true
+    if AshoholicFrame and AshoholicFrame.RefreshVersionNotice then
+        AshoholicFrame:RefreshVersionNotice()
+    end
+end
+
+function addon:OnVersionMessage(event, prefix, message, channel, sender)
+    if prefix ~= VERSION_MESSAGE_PREFIX or type(message) ~= "string" then return end
+    if sender and UnitName and sender == UnitName("player") then return end
+    self:RememberRemoteVersion(message)
+end
+
+function addon:BroadcastVersion()
+    if not SendAddonMessage then return end
+
+    local options = self.db.global.options
+    local now = time()
+    local lastBroadcast = tonumber(options.LastVersionBroadcastAt) or 0
+    if lastBroadcast > 0 and now - lastBroadcast < VERSION_BROADCAST_COOLDOWN then
+        return
+    end
+
+    local sent = false
+    local function SendVersion(channel)
+        local ok = pcall(SendAddonMessage, VERSION_MESSAGE_PREFIX, self.VERSION, channel)
+        if ok then sent = true end
+    end
+
+    if IsInGuild and IsInGuild() then
+        SendVersion("GUILD")
+    end
+
+    local raidMembers = GetNumRaidMembers and GetNumRaidMembers() or 0
+    if raidMembers > 0 then
+        SendVersion("RAID")
+    elseif GetNumPartyMembers and GetNumPartyMembers() > 0 then
+        SendVersion("PARTY")
+    end
+
+    if sent then
+        options.LastVersionBroadcastAt = now
+    end
+end
+
+function addon:ScheduleVersionBroadcast()
+    if versionBroadcastScheduled then return end
+    versionBroadcastScheduled = true
+    local delay = math.random(VERSION_BROADCAST_MIN_DELAY, VERSION_BROADCAST_MAX_DELAY)
+    C_Timer.After(delay, function()
+        versionBroadcastScheduled = false
+        addon:BroadcastVersion()
+    end)
+end
 
 local AddonDB_Defaults = {
     global = {
@@ -152,14 +328,26 @@ local AddonDB_Defaults = {
             CustomThemeOrder = {},
             columnOrder = nil,
             columnWidths = nil,
+            LatestVersionFound = "",
+            LastVersionBroadcastAt = 0,
         },
     },
 }
 
 function addon:OnInitialize()
     addon.db = LibStub("AceDB-3.0"):New("AshoholicDB", AddonDB_Defaults)
+    addon:LoadVersionState()
     addon:RegisterChatCommand("ashoholic", "ChatCommand")
     addon:RegisterChatCommand("ash", "ChatCommand")
+
+    if RegisterAddonMessagePrefix then
+        pcall(RegisterAddonMessagePrefix, VERSION_MESSAGE_PREFIX)
+        addon:RegisterEvent("CHAT_MSG_ADDON", "OnVersionMessage")
+    end
+
+    addon:RegisterEvent("PARTY_MEMBERS_CHANGED", "ScheduleVersionBroadcast")
+    addon:RegisterEvent("RAID_ROSTER_UPDATE", "ScheduleVersionBroadcast")
+    addon:RegisterEvent("GUILD_ROSTER_UPDATE", "ScheduleVersionBroadcast")
     
     addon:RegisterEvent("PLAYER_ENTERING_WORLD", "OnPlayerLogin")
     addon:RegisterEvent("ZONE_CHANGED_NEW_AREA", "OnTargetedEvent")
@@ -214,6 +402,8 @@ function addon:OnInitialize()
 end
 
 function addon:OnPlayerLogin()
+    addon:ScheduleVersionBroadcast()
+
     if not _G.FastSwapEventFrame and SetCVar then
         MarkAllSwapSlotsDone()
         if GetCVar then
@@ -263,8 +453,44 @@ function addon:OnTargetedEvent(event)
 end
 
 function addon:ChatCommand(input)
-    local cmd = string.lower(input or "")
-    if cmd == "config" or cmd == "options" then
+    input = string.gsub(input or "", "^%s*(.-)%s*$", "%1")
+    local cmd = string.lower(input)
+    if cmd == "ver check" or cmd == "version check" then
+        if addon.isOutdated and addon.latestVersionFound then
+            print("|cFFFFD700Ashoholic version check:|r installed v" .. addon.VERSION ..
+                ", newer version v" .. addon.latestVersionFound .. " detected.")
+        else
+            print("|cFFFFD700Ashoholic version check:|r installed v" .. addon.VERSION ..
+                "; no newer peer version detected.")
+        end
+    elseif cmd == "ver reset" or cmd == "version reset" then
+        addon.db.global.options.LatestVersionFound = ""
+        addon.latestVersionFound = nil
+        addon.isOutdated = false
+        if AshoholicFrame and AshoholicFrame.RefreshVersionNotice then
+            AshoholicFrame:RefreshVersionNotice()
+        end
+        print("|cFFFFD700Ashoholic version notice cleared.|r")
+    elseif cmd == "ver" or cmd == "version" then
+        print("Usage: /ash ver check, /ash ver reset, or /ash ver 2.2.0")
+    elseif string.match(cmd, "^ver%s+") or string.match(cmd, "^version%s+") then
+        local simulatedVersion = string.match(input, "^%S+%s+(.+)$")
+        if not IsVersionHigher(simulatedVersion, addon.VERSION) then
+            print("|cFFFFD700Ashoholic:|r Test version must be a valid version higher than v" .. addon.VERSION .. ".")
+            return
+        end
+
+        addon:RememberRemoteVersion(simulatedVersion)
+        if not AshoholicFrame then addon:CreateUI() end
+        if AshoholicFrame then
+            if not AshoholicFrame:IsShown() then AshoholicFrame:Show() end
+            if AshoholicFrame.RefreshVersionNotice then
+                AshoholicFrame:RefreshVersionNotice()
+            end
+        end
+        print("|cFFFFD700Ashoholic:|r Simulated a peer running v" .. simulatedVersion ..
+            ". Use /ash ver reset when finished testing.")
+    elseif cmd == "config" or cmd == "options" then
         addon:ToggleConfigUI()
     elseif cmd == "sync" then
         addon:PrintSyncHelp()
