@@ -8,6 +8,38 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 local GOLD, EMBER, MUTED, SOUL, LOC, DIM =
     "|cFFFFD24A", "|cFFFF8A2B", "|cFF8C867D", "|cFF6FE6DC", "|cFFD6CFC0", "|cFFB8B2A8"
 
+local FONTS = {
+    { name = "Morpheus",      path = "Fonts\\MORPHEUS.TTF" },
+    { name = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
+    { name = "Arial Narrow",  path = "Fonts\\ARIALN.TTF" },
+    { name = "Skurri",        path = "Fonts\\SKURRI.TTF" },
+}
+local fontPaths = {}
+for _, font in ipairs(FONTS) do fontPaths[font.path] = true end
+
+local media = LibStub and LibStub:GetLibrary("LibSharedMedia-3.0", true)
+if media then
+    for _, name in ipairs(media:List("font") or {}) do
+        local path = media:Fetch("font", name)
+        if path and not fontPaths[path] then
+            FONTS[#FONTS + 1] = { name = name, path = path }
+            fontPaths[path] = true
+        end
+    end
+end
+
+local function ResolveFont(path, fallback)
+    if path and fontPaths[path] then return path end
+    return fallback
+end
+
+local function ApplyFont(fs, path, size)
+    if not fs.ashBaseFont then
+        fs.ashBaseFont, fs.ashBaseSize, fs.ashBaseFlags = fs:GetFont()
+    end
+    fs:SetFont(ResolveFont(path, fs.ashBaseFont), size or fs.ashBaseSize, fs.ashBaseFlags)
+end
+
 local T = addon.Themes:Get(addon.Themes.default)
 local C = T
 local BUTTON_STYLES = T.btn
@@ -444,6 +476,7 @@ local function CreateFlatButton(parent, width, height, label, styleName)
     b.text:SetPoint("CENTER")
     b.text:SetText(label)
     function b:ApplyStyle(hover)
+        ApplyFont(self.text, T.layout[styleName == "danger" and "dangerFont" or "buttonFont"])
         local s = BUTTON_STYLES[styleName or "default"]
         if hover then
             self:SetBackdropColor(unpack(s.hoverBg))
@@ -526,15 +559,15 @@ function addon:CreateUI()
     logo:SetWidth(26); logo:SetHeight(26)
     logo:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -9)
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-    title:SetJustifyH("LEFT")
-    title:SetJustifyV("MIDDLE")
-    if title.SetWordWrap then title:SetWordWrap(false) end
-    title:SetText("Ashoholic")
+    local windowTitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    windowTitle:SetPoint("LEFT", logo, "RIGHT", 10, 0)
+    windowTitle:SetJustifyH("LEFT")
+    windowTitle:SetJustifyV("MIDDLE")
+    if windowTitle.SetWordWrap then windowTitle:SetWordWrap(false) end
+    windowTitle:SetText("Ashoholic")
 
     local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    subtitle:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 10, 2)
+    subtitle:SetPoint("BOTTOMLEFT", windowTitle, "BOTTOMRIGHT", 10, 2)
     subtitle:SetJustifyH("LEFT")
     if subtitle.SetWordWrap then subtitle:SetWordWrap(false) end
     subtitle:SetText("Ebonhold Roster")
@@ -863,7 +896,11 @@ function addon:CreateUI()
         else fsize = L.characterFontSize end
 
         for _, fs in ipairs(row.fonts) do
-            if fs.basePath then fs:SetFont(fs.basePath, fsize, fs.baseFlags) end
+            local fontKey = ltype == 0 and "realmFont" or
+                ltype == 1 and "accountFont" or
+                ltype == 3 and "totalsFont" or "characterFont"
+            local path = ResolveFont(L[fontKey], fs.basePath)
+            if path then fs:SetFont(path, fsize, fs.baseFlags) end
             fs:SetTextColor(T.body[1], T.body[2], T.body[3])
             if fs.baseHeight then fs:SetHeight(fsize + 2) end
         end
@@ -1189,16 +1226,16 @@ function addon:CreateUI()
     accent:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 1, 1)
     panel.accent = accent
 
-    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD_L, -10)
-    title:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -PAD_R, -10)
-    title:SetJustifyH("LEFT")
-    title:SetHeight(16)
-    if title.SetWordWrap then title:SetWordWrap(false) end
-    panel.title = title
+    local lockoutTitle = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lockoutTitle:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD_L, -10)
+    lockoutTitle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -PAD_R, -10)
+    lockoutTitle:SetJustifyH("LEFT")
+    lockoutTitle:SetHeight(16)
+    if lockoutTitle.SetWordWrap then lockoutTitle:SetWordWrap(false) end
+    panel.title = lockoutTitle
 
     local sub = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+    sub:SetPoint("TOPLEFT", lockoutTitle, "BOTTOMLEFT", 0, -2)
     sub:SetWidth(NAME_W)
     sub:SetJustifyH("LEFT")
     sub:SetHeight(13)
@@ -1206,7 +1243,7 @@ function addon:CreateUI()
     panel.sub = sub
 
     local hourCount = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hourCount:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -2)
+    hourCount:SetPoint("TOPRIGHT", lockoutTitle, "BOTTOMRIGHT", 0, -2)
     hourCount:SetWidth(TIME_W)
     hourCount:SetJustifyH("RIGHT")
     hourCount:SetHeight(13)
@@ -1328,7 +1365,7 @@ function addon:CreateUI()
         lockoutPanel.accent:SetVertexColor(a[1], a[2], a[3], a[4] or 1)
         local dim = T.accentDim or a
         lockoutPanel.rule:SetVertexColor(dim[1], dim[2], dim[3], dim[4] or 1)
-        SetFontSize(lockoutPanel.title, size)
+        ApplyFont(lockoutPanel.title, T.layout.characterFont, size)
         SetFontSize(lockoutPanel.sub, math.max(10, size - 1))
         SetFontSize(lockoutPanel.hourCount, math.max(10, size - 1))
         SetFontSize(lockoutPanel.more, math.max(10, size - 1))
@@ -2112,15 +2149,18 @@ function addon:CreateUI()
         else
             frame:SetBackdropBorderColor(0, 0, 0, 0)
         end
-        local _, _, titleFlags = title:GetFont()
-        SetFontSafe(title, L.titleFont, L.titleSize, titleFlags)
-        title:SetText("Ashoholic")
-        title:SetTextColor(unpack(T.titleRGB))
+        local _, _, titleFlags = windowTitle:GetFont()
+        SetFontSafe(windowTitle, L.titleFont, L.titleSize, titleFlags)
+        windowTitle:SetText("Ashoholic")
+        windowTitle:SetTextColor(unpack(T.titleRGB))
         subtitle:SetText("Ebonhold Roster")
+        ApplyFont(subtitle, L.mutedFont)
         if T.mutedRGB then subtitle:SetTextColor(unpack(T.mutedRGB)) end
         version:SetText(addon.Version or "")
+        ApplyFont(version, L.mutedFont)
         if T.mutedRGB then version:SetTextColor(unpack(T.mutedRGB)) end
         sliderHint:SetText("Shift+scroll to pan columns")
+        ApplyFont(sliderHint, L.mutedFont)
         if T.mutedRGB then sliderHint:SetTextColor(unpack(T.mutedRGB)) end
         hSlider:SetBackdropColor(unpack(T.sliderBg))
         hSlider:SetBackdropBorderColor(unpack(T.sliderBorder))
@@ -2132,8 +2172,7 @@ function addon:CreateUI()
         for _, btn in ipairs(headerButtons) do
             if btn.hl then btn.hl:SetVertexColor(br[1], br[2], br[3], br[4] or 0.14) end
             if btn.label then
-                local p, _, f = btn.label:GetFont()
-                btn.label:SetFont(p, L.headerFontSize, f)
+                ApplyFont(btn.label, L.headerFont, L.headerFontSize)
                 btn.label:SetText(btn.col.title)
                 btn.label:SetTextColor(unpack(T.headerRGB or {1, 0.82, 0}))
             end
@@ -2143,8 +2182,7 @@ function addon:CreateUI()
             end
         end
         for _, fs in ipairs(themedLabels) do
-            local p, _, f = fs:GetFont()
-            fs:SetFont(p, L.headerFontSize, f)
+            ApplyFont(fs, L.headerFont, L.headerFontSize)
         end
         for _, fs in ipairs(themedLabels) do fs.Retheme() end
         for _, tint in ipairs(gripTints) do tint() end
@@ -2157,10 +2195,10 @@ function addon:CreateUI()
         -- SetFont during creation runs while the frame is hidden, which leaves
         -- the title at zero width. Apply it again once the frame is shown.
         local L = T.layout
-        local _, _, titleFlags = title:GetFont()
-        SetFontSafe(title, L.titleFont, L.titleSize, titleFlags)
-        title:SetText("Ashoholic")
-        if T.titleRGB then title:SetTextColor(unpack(T.titleRGB)) end
+        local _, _, titleFlags = windowTitle:GetFont()
+        SetFontSafe(windowTitle, L.titleFont, L.titleSize, titleFlags)
+        windowTitle:SetText("Ashoholic")
+        if T.titleRGB then windowTitle:SetTextColor(unpack(T.titleRGB)) end
         subtitle:SetText("Ebonhold Roster")
         ApplyLayout()
     end)
@@ -2246,7 +2284,14 @@ function addon:ToggleConfigUI()
         cfg:SetBackdropBorderColor(0, 0, 0, 0)
     end
 
-    cfg:SetScript("OnHide", function() if addon.customDraft then addon:CancelDraft() end end)
+    cfg:SetScript("OnHide", function(self)
+        if addon.customizeDirty then
+            self:Show()
+            StaticPopup_Show("ASH_CONFIRM_CLOSE")
+            return
+        end
+        if addon.customDraft then addon:CancelDraft() end
+    end)
 
     -- Confirmation popup + Hide override: whenever the user closes the
     -- window (X button, ESC, or toggling the * button) with unsaved
@@ -2304,6 +2349,7 @@ function addon:ToggleConfigUI()
     local function Themed(fs, kind, text)
         texts[#texts + 1] = function()
             fs:SetText(text)
+            if kind == "muted" then ApplyFont(fs, T.layout.mutedFont) end
             local rgb = (kind == "muted") and T.mutedRGB or T.sectionHeaderRGB
             if rgb then fs:SetTextColor(unpack(rgb)) end
         end
@@ -2316,6 +2362,7 @@ function addon:ToggleConfigUI()
     local refreshCustomTab, refreshCustomizeTab
 
     local function StyleTab(tab)
+        ApplyFont(tab.text, T.layout.tabFont)
         if tab.hovered then
             tab:SetBackdropColor(unpack(T.tabHoverBg))
             tab:SetBackdropBorderColor(unpack(T.tabHoverBorder))
@@ -2417,63 +2464,213 @@ function addon:ToggleConfigUI()
         y = y - 28
     end
 
+    ----------------------------------------------------------------------
+    -- Custom icon dropdown
+    ----------------------------------------------------------------------
+    local iconMenu, iconMenuScroll, iconMenuChild, iconMenuButtons, iconMenuBar
+    local iconMenuChoices, iconMenuSelect, iconMenuOwner
+
+    page1:HookScript("OnHide", function()
+        if iconMenu then iconMenu:Hide() end
+    end)
+
+    local function EnsureIconMenu()
+        if iconMenu then return end
+
+        iconMenu = CreateFrame("Frame", nil, page1)
+        iconMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+        iconMenu:SetFrameLevel(100)
+        iconMenu:SetClampedToScreen(true)
+        iconMenu:EnableMouse(true)
+        iconMenu:SetWidth(360)
+        iconMenu:SetBackdrop(FLAT_BACKDROP)
+        iconMenu:SetBackdropColor(unpack(T.panel))
+        iconMenu:SetBackdropBorderColor(unpack(T.border))
+
+        iconMenuScroll = CreateFrame("ScrollFrame", nil, iconMenu)
+        iconMenuScroll:SetPoint("TOPLEFT", 4, -4)
+        iconMenuScroll:SetPoint("BOTTOMRIGHT", -26, 4)
+
+        iconMenuBar = CreateFrame("Slider", nil, iconMenu)
+        iconMenuBar:SetOrientation("VERTICAL")
+        iconMenuBar:SetPoint("TOPRIGHT", -6, -4)
+        iconMenuBar:SetPoint("BOTTOMRIGHT", -6, 4)
+        iconMenuBar:SetWidth(12)
+        iconMenuBar:SetBackdrop(FLAT_BACKDROP)
+        iconMenuBar:SetBackdropColor(unpack(T.sliderBg))
+        iconMenuBar:SetBackdropBorderColor(unpack(T.sliderBorder))
+        iconMenuBar:SetMinMaxValues(0, 0)
+        iconMenuBar:SetValueStep(1)
+        iconMenuBar:SetThumbTexture(WHITE)
+        local thumb = iconMenuBar:GetThumbTexture()
+        thumb:SetWidth(12); thumb:SetHeight(24)
+        thumb:SetVertexColor(unpack(T.accent))
+        iconMenuBar:SetScript("OnValueChanged", function(self, value)
+            iconMenuScroll:SetVerticalScroll(value)
+        end)
+
+        iconMenuScroll:SetScript("OnVerticalScroll", function(self, value)
+            if iconMenuBar:GetValue() ~= value then iconMenuBar:SetValue(value) end
+        end)
+        iconMenuScroll:EnableMouseWheel(true)
+        iconMenuScroll:SetScript("OnMouseWheel", function(self, delta)
+            local _, maxScroll = iconMenuBar:GetMinMaxValues()
+            iconMenuBar:SetValue(Clamp(self:GetVerticalScroll() - delta * 44, 0, maxScroll))
+        end)
+
+        iconMenuChild = CreateFrame("Frame", nil, iconMenuScroll)
+        iconMenuChild:SetWidth(328)
+        iconMenuScroll:SetScrollChild(iconMenuChild)
+
+        iconMenuButtons = {}
+        for i = 1, 24 do
+            local button = CreateFrame("Button", nil, iconMenuChild)
+            button:SetSize(326, 24)
+            button:SetBackdrop(FLAT_BACKDROP)
+
+            button.icon = button:CreateTexture(nil, "OVERLAY")
+            button.icon:SetSize(16, 16)
+            button.icon:SetPoint("LEFT", 8, 0)
+
+            button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            button.text:SetPoint("LEFT", button.icon, "RIGHT", 8, 0)
+            button.text:SetPoint("RIGHT", button, "RIGHT", -26, 0)
+            button.text:SetJustifyH("LEFT")
+
+            button.check = button:CreateTexture(nil, "OVERLAY")
+            button.check:SetSize(14, 14)
+            button.check:SetPoint("RIGHT", -8, 0)
+            button.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+
+            button:SetScript("OnEnter", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.hoverBg))
+                self:SetBackdropBorderColor(unpack(style.hoverBorder))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnLeave", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.bg))
+                self:SetBackdropBorderColor(unpack(style.border))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnClick", function(self)
+                local choice = iconMenuChoices and iconMenuChoices[self.choiceIndex]
+                if choice and iconMenuSelect then iconMenuSelect(choice) end
+                iconMenu:Hide()
+            end)
+
+            iconMenuButtons[i] = button
+        end
+
+        iconMenu:SetScript("OnHide", function()
+            iconMenuSelect  = nil
+            iconMenuChoices = nil
+            iconMenuOwner   = nil
+        end)
+    end
+
     local ddRefreshers = {}
-    local ddCounter = 0
     local function AddDropdown(yOff, labelText, options, dbKey)
-        ddCounter = ddCounter + 1
         local l = Themed(page1:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"), "gold", labelText)
         l:SetPoint("TOPLEFT", 20, yOff)
 
-        local dd = CreateFrame("Frame", "AshoholicDD" .. ddCounter, page1, "UIDropDownMenuTemplate")
-        dd:SetPoint("TOPLEFT", l, "BOTTOMLEFT", -15, -2)
-        UIDropDownMenu_SetWidth(dd, 340)
-        UIDropDownMenu_JustifyText(dd, "LEFT")
+        local dd = CreateFlatButton(page1, 340, 22, "", "default")
+        dd:SetPoint("TOPLEFT", 20, yOff - 18)
+        dd.text:ClearAllPoints()
+        dd.text:SetPoint("LEFT",  dd, "LEFT",  26, 0)
+        dd.text:SetPoint("RIGHT", dd, "RIGHT", -26, 0)
+        dd.text:SetJustifyH("LEFT")
+
+        -- Currently selected icon, shown on the closed button
+        local selIcon = dd:CreateTexture(nil, "OVERLAY")
+        selIcon:SetSize(16, 16)
+        selIcon:SetPoint("LEFT", dd, "LEFT", 6, 0)
+
+        -- Down-pointing triangle made from a font character
+        local arrow = dd:CreateFontString(nil, "OVERLAY")
+        arrow:SetPoint("RIGHT", -8, 0)
+        arrow:SetFont("Fonts\\ARIALN.TTF", 10, "")
+        arrow:SetText("▼")
 
         local function CurrentIdx()
             return Clamp(addon.db.global.options[dbKey] or 1, 1, #options)
         end
 
-        -- For the CURRENT-SELECTION display we still use inline |T (that path
-        -- already works for every texture). For the MENU ITEMS we let the
-        -- dropdown renderer draw the icon via info.icon, which handles the
-        -- inventory-icon and indicator-dot textures that inline |T drops.
-        local function IconFor(opt)
-            return "|T" .. opt.path .. ":16:16:0:0|t"
-        end
-
-        -- Separate texture for the CLOSED state; inline |T drops many
-        -- Interface paths on 3.3.5 (checkbox marks, some icon files, etc.)
-        local closedIcon = dd:CreateTexture(nil, "OVERLAY")
-        closedIcon:SetSize(16, 16)
-        closedIcon:SetPoint("LEFT", dd, "LEFT", 20, 1)
-
         local function Refresh()
-            local opt = options[CurrentIdx()]
-            UIDropDownMenu_SetText(dd, "        " .. opt.name)
-            closedIcon:SetTexture(opt.path)
-            if opt.crop then
-                closedIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            else
-                closedIcon:SetTexCoord(0, 1, 0, 1)
+            if T.accent then
+                arrow:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.9)
             end
+            local opt = options[CurrentIdx()]
+            dd.text:SetText(opt.name)
+            selIcon:SetTexture(opt.path)
+            if opt.crop then selIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            else             selIcon:SetTexCoord(0, 1, 0, 1) end
         end
         ddRefreshers[#ddRefreshers + 1] = Refresh
         Refresh()
 
-        UIDropDownMenu_Initialize(dd, function(self, level)
-            local cur = CurrentIdx()
-            for i, opt in ipairs(options) do
-                local info = {}
-                info.text  = opt.name
-                info.icon  = opt.path
-                info.value = i
-                info.checked = (cur == i)
-                info.func = function()
-                    addon.db.global.options[dbKey] = i
-                    Refresh()
-                    if AshoholicFrame and AshoholicFrame:IsVisible() then AshoholicFrame:Refresh() end
+        local function ShowIconMenu()
+            EnsureIconMenu()
+            iconMenuOwner   = dd
+            iconMenuChoices = options
+            iconMenuSelect = function(choice)
+                for i, opt in ipairs(options) do
+                    if opt == choice then
+                        addon.db.global.options[dbKey] = i
+                        Refresh()
+                        if AshoholicFrame and AshoholicFrame:IsVisible() then
+                            AshoholicFrame:Refresh()
+                        end
+                        break
+                    end
                 end
-                UIDropDownMenu_AddButton(info, level)
+            end
+
+            local rowHeight     = 24
+            local contentHeight = #options * rowHeight
+            local visibleHeight = math.min(contentHeight, 260)
+            iconMenu:SetHeight(visibleHeight + 8)
+            iconMenuChild:SetHeight(contentHeight)
+            iconMenuBar:SetMinMaxValues(0, math.max(0, contentHeight - visibleHeight))
+            iconMenuBar:GetThumbTexture():SetHeight(
+                math.max(24, visibleHeight * visibleHeight / contentHeight))
+            iconMenuBar:SetValue(0)
+            iconMenuScroll:SetVerticalScroll(0)
+
+            local cur = CurrentIdx()
+            for i, button in ipairs(iconMenuButtons) do
+                local opt = options[i]
+                if opt then
+                    button.choiceIndex = i
+                    button:ClearAllPoints()
+                    button:SetPoint("TOPLEFT", iconMenuChild, "TOPLEFT", 0, -((i - 1) * rowHeight))
+                    button.text:SetText(opt.name)
+                    button.icon:SetTexture(opt.path)
+                    if opt.crop then button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                    else             button.icon:SetTexCoord(0, 1, 0, 1) end
+                    if i == cur then button.check:Show() else button.check:Hide() end
+                    button:Show()
+                    button:GetScript("OnLeave")(button)
+                else
+                    button:Hide()
+                end
+            end
+
+            iconMenu:ClearAllPoints()
+            if dd:GetBottom() and dd:GetBottom() < visibleHeight + 20 then
+                iconMenu:SetPoint("BOTTOMLEFT", dd, "TOPLEFT", 0, 2)
+            else
+                iconMenu:SetPoint("TOPLEFT", dd, "BOTTOMLEFT", 0, -2)
+            end
+            iconMenu:Show()
+        end
+
+        dd:SetScript("OnClick", function()
+            if iconMenu and iconMenu:IsShown() and iconMenuOwner == dd then
+                iconMenu:Hide()
+            else
+                ShowIconMenu()
             end
         end)
     end
@@ -3203,43 +3400,182 @@ function addon:ToggleConfigUI()
     end
 
     -- FONT ----------------------------------------------------------------
-    local FONTS = {
-        { name = "Morpheus",      path = "Fonts\\MORPHEUS.TTF" },
-        { name = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
-        { name = "Arial Narrow",  path = "Fonts\\ARIALN.TTF" },
-        { name = "Skurri",        path = "Fonts\\SKURRI.TTF" },
-    }
-    local function addFont()
+    local fontMenu, fontMenuScroll, fontMenuChild, fontMenuButtons, fontMenuBar
+    local fontMenuChoices, fontMenuSelect, fontMenuOwner
+
+    page3:HookScript("OnHide", function()
+        if fontMenu then fontMenu:Hide() end
+    end)
+
+    local function EnsureFontMenu()
+        if fontMenu then return end
+        fontMenu = CreateFrame("Frame", nil, page3)
+        fontMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+        fontMenu:SetFrameLevel(100)
+        fontMenu:SetClampedToScreen(true)
+        fontMenu:EnableMouse(true)
+        fontMenu:SetWidth(230)
+        fontMenu:SetBackdrop(FLAT_BACKDROP)
+        fontMenu:SetBackdropColor(unpack(T.panel))
+        fontMenu:SetBackdropBorderColor(unpack(T.border))
+
+        fontMenuScroll = CreateFrame("ScrollFrame", nil, fontMenu)
+        fontMenuScroll:SetPoint("TOPLEFT", 4, -4)
+        fontMenuScroll:SetPoint("BOTTOMRIGHT", -26, 4)
+        fontMenuBar = CreateFrame("Slider", nil, fontMenu)
+        fontMenuBar:SetOrientation("VERTICAL")
+        fontMenuBar:SetPoint("TOPRIGHT", -6, -4)
+        fontMenuBar:SetPoint("BOTTOMRIGHT", -6, 4)
+        fontMenuBar:SetWidth(12)
+        fontMenuBar:SetBackdrop(FLAT_BACKDROP)
+        fontMenuBar:SetBackdropColor(unpack(T.sliderBg))
+        fontMenuBar:SetBackdropBorderColor(unpack(T.sliderBorder))
+        fontMenuBar:SetMinMaxValues(0, 0)
+        fontMenuBar:SetValueStep(1)
+        fontMenuBar:SetThumbTexture(WHITE)
+        local thumb = fontMenuBar:GetThumbTexture()
+        thumb:SetWidth(12)
+        thumb:SetHeight(24)
+        thumb:SetVertexColor(unpack(T.accent))
+        fontMenuBar:SetScript("OnValueChanged", function(self, value)
+            fontMenuScroll:SetVerticalScroll(value)
+        end)
+        fontMenuScroll:SetScript("OnVerticalScroll", function(self, value)
+            if fontMenuBar:GetValue() ~= value then fontMenuBar:SetValue(value) end
+        end)
+        fontMenuScroll:EnableMouseWheel(true)
+        fontMenuScroll:SetScript("OnMouseWheel", function(self, delta)
+            local _, maxScroll = fontMenuBar:GetMinMaxValues()
+            fontMenuBar:SetValue(Clamp(self:GetVerticalScroll() - delta * 44, 0, maxScroll))
+        end)
+
+        fontMenuChild = CreateFrame("Frame", nil, fontMenuScroll)
+        fontMenuChild:SetWidth(198)
+        fontMenuScroll:SetScrollChild(fontMenuChild)
+
+        fontMenuButtons = {}
+        for i = 1, #FONTS + 1 do
+            local button = CreateFrame("Button", nil, fontMenuChild)
+            button:SetSize(196, 22)
+            button:SetBackdrop(FLAT_BACKDROP)
+            button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            button.text:SetPoint("LEFT", 6, 0)
+            button.text:SetJustifyH("LEFT")
+            button:SetScript("OnEnter", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.hoverBg))
+                self:SetBackdropBorderColor(unpack(style.hoverBorder))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnLeave", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.bg))
+                self:SetBackdropBorderColor(unpack(style.border))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnClick", function(self)
+                local choice = fontMenuChoices and fontMenuChoices[self.choiceIndex]
+                if choice and fontMenuSelect then fontMenuSelect(choice) end
+                fontMenu:Hide()
+            end)
+            fontMenuButtons[i] = button
+        end
+
+        fontMenu:SetScript("OnHide", function()
+            fontMenuSelect = nil
+            fontMenuChoices = nil
+            fontMenuOwner = nil
+        end)
+    end
+
+    local function addFont(label, key, inLayout, allowDefault)
         local yPos = nextY(32)
         local l = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         l:SetPoint("TOPLEFT", 0, yPos)
-        l:SetText("Title Font")
-        local dd = CreateFrame("Frame", "AshoholicFontDD", body, "UIDropDownMenuTemplate")
-        dd:SetPoint("TOPLEFT", 200, yPos + 6)
-        UIDropDownMenu_SetWidth(dd, 180)
-        UIDropDownMenu_Initialize(dd, function(self, level)
-            local cur = addon.customDraft and addon.customDraft.layout.titleFont
-            for _, f in ipairs(FONTS) do
-                local info = {}
-                info.text = f.name
-                info.checked = (cur == f.path)
-                info.func = function()
-                    if not addon.customDraft then return end
-                    addon.customDraft.layout.titleFont = f.path
-                    addon:ApplyDraft()
-                    UIDropDownMenu_SetText(dd, f.name)
+        l:SetText(label)
+        local dd = CreateFlatButton(body, 180, 22, "", "default")
+        dd:SetPoint("TOPLEFT", 200, yPos + 2)
+        dd.text:ClearAllPoints()
+        dd.text:SetPoint("LEFT", dd, "LEFT", 8, 0)
+        dd.text:SetPoint("RIGHT", dd, "RIGHT", -26, 0)
+        dd.text:SetJustifyH("LEFT")
+        local arrow = dd:CreateFontString(nil, "OVERLAY")
+        arrow:SetPoint("RIGHT", -8, 0)
+        arrow:SetFont("Fonts\\ARIALN.TTF", 10, "")
+        arrow:SetText("▼")
+        if T.accent then
+            arrow:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.9)
+        end
+
+        local function ShowFontMenu()
+            EnsureFontMenu()
+            fontMenuOwner = dd
+            local choices = {}
+            if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
+            for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
+            fontMenuChoices = choices
+            fontMenuSelect = function(choice)
+                if not addon.customDraft then return end
+                addon.customDraft.layout[key] = choice.path
+                addon:ApplyDraft()
+                dd.text:SetText(choice.name)
+            end
+
+            local rowHeight = 22
+            local contentHeight = #choices * rowHeight
+            local visibleHeight = math.min(contentHeight, 220)
+            fontMenu:SetHeight(visibleHeight + 8)
+            fontMenuChild:SetHeight(contentHeight)
+            fontMenuBar:SetMinMaxValues(0, math.max(0, contentHeight - visibleHeight))
+            fontMenuBar:GetThumbTexture():SetHeight(math.max(24, visibleHeight * visibleHeight / contentHeight))
+            fontMenuBar:SetValue(0)
+            fontMenuScroll:SetVerticalScroll(0)
+            for i, button in ipairs(fontMenuButtons) do
+                local choice = choices[i]
+                if choice then
+                    button.choiceIndex = i
+                    button:ClearAllPoints()
+                    button:SetPoint("TOPLEFT", fontMenuChild, "TOPLEFT", 0, -((i - 1) * rowHeight))
+                    button.text:SetText(choice.name)
+                    button:Show()
+                    button:GetScript("OnLeave")(button)
+                else
+                    button:Hide()
                 end
-                UIDropDownMenu_AddButton(info, level)
+            end
+
+            fontMenu:ClearAllPoints()
+            if dd:GetBottom() and dd:GetBottom() < visibleHeight + 20 then
+                fontMenu:SetPoint("BOTTOMLEFT", dd, "TOPLEFT", 0, 2)
+            else
+                fontMenu:SetPoint("TOPLEFT", dd, "BOTTOMLEFT", 0, -2)
+            end
+            fontMenu:Show()
+        end
+
+        dd:SetScript("OnClick", function()
+            if fontMenu and fontMenu:IsShown() and fontMenuOwner == dd then
+                fontMenu:Hide()
+            else
+                ShowFontMenu()
             end
         end)
+
         local function Refresh()
-            local d = addon.customDraft
-            if not d then UIDropDownMenu_SetText(dd, FONTS[1].name); return end
-            local cur = FONTS[1]
-            for _, f in ipairs(FONTS) do
-                if f.path == d.layout.titleFont then cur = f; break end
+            if T.accent then
+                arrow:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.9)
             end
-            UIDropDownMenu_SetText(dd, cur.name)
+            local d = addon.customDraft
+            local choices = {}
+            if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
+            for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
+            if not d then dd.text:SetText(choices[1].name); return end
+            local path = d.layout[key]
+            local cur = choices[1]
+            for _, font in ipairs(choices) do
+                if font.path == path then cur = font; break end
+            end
+            dd.text:SetText(cur.name)
         end
         Refresh()
         widgets[#widgets + 1] = Refresh
@@ -3328,7 +3664,7 @@ function addon:ToggleConfigUI()
     addColor("Settings title text", "settingsTitleText")
     addColor("Gradient bottom",  "titleLo")
     addColor("Gradient top",     "titleHi")
-    addFont()
+    addFont("Title font", "titleFont", true, false)
     addSlider("Title size",      "titleSize", 10, 32, true)
 
     sectionTitle("Column Headers")
@@ -3336,6 +3672,7 @@ function addon:ToggleConfigUI()
     addColor("Header text",      "headerText")
     addColor("Hover glow",       "accentBright")
     addColor("Sort arrow",       "sortArrow")
+    addFont("Header font",       "headerFont", true, true)
     addSlider("Header font size","headerFontSize", 8, 22, true)
 
     sectionTitle("Columns")
@@ -3356,9 +3693,13 @@ function addon:ToggleConfigUI()
     addSlider("Row height",        "rowHeight", 16, 44, true)
     addSlider("Row spacing",       "rowStep",   17, 52, true)
     addSlider("Realm font size",   "realmFontSize",     8, 22, true)
+    addFont("Realm font",          "realmFont", true, true)
     addSlider("Account font size", "accountFontSize",   8, 22, true)
+    addFont("Account font",        "accountFont", true, true)
     addSlider("Character font size","characterFontSize", 8, 22, true)
+    addFont("Character font",      "characterFont", true, true)
     addSlider("Totals font size",  "totalsFontSize",    8, 22, true)
+    addFont("Totals font",         "totalsFont", true, true)
     addToggle("Alternating stripes","stripes", true)
 
     sectionTitle("Accent Bars")
@@ -3388,6 +3729,7 @@ function addon:ToggleConfigUI()
     sectionTitle("Text · Window")
     addColor("Section headers",     "sectionHeaderText")
     addColor("Muted / hints",       "muted")
+    addFont("Muted hints font",      "mutedFont", true, true)
 
     sectionTitle("Icons")
     addToggle("Show class icons", "showClassIcons")
@@ -3401,6 +3743,7 @@ function addon:ToggleConfigUI()
     addToggle("Money: gold only",       "moneyGoldOnly")
 
     sectionTitle("Tabs")
+    addFont("Tabs text font",       "tabFont", true, true)
     addColor("Tab background",       "tabBg")
     addColor("Tab border",           "tabBorder")
     addColor("Tab text",             "tabText")
@@ -3412,6 +3755,7 @@ function addon:ToggleConfigUI()
     addColor("Hover tab text",       "tabHoverText")
 
     sectionTitle("Buttons")
+    addFont("Buttons text font", "buttonFont", true, true)
     addColor("Background",       "btnBg")
     addColor("Border",           "btnBorder")
     addColor("Hover bg",         "btnHoverBg")
@@ -3419,6 +3763,7 @@ function addon:ToggleConfigUI()
     addColor("Text",             "btnText")
 
     sectionTitle("Danger Buttons (Reset / Close)")
+    addFont("Danger buttons font", "dangerFont", true, true)
     addColor("Background",       "dangerBg")
     addColor("Border",           "dangerBorder")
     addColor("Hover bg",         "dangerHoverBg")
@@ -3537,6 +3882,7 @@ function addon:ToggleConfigUI()
         tabLine:SetVertexColor(a[1], a[2], a[3], 0.9)
         for _, fn in ipairs(texts) do fn() end
         for _, tab in ipairs(tabs) do StyleTab(tab) end
+        if page1._refreshDD then page1._refreshDD() end
         if refreshCustomTab then refreshCustomTab() end
     end)
 
@@ -3605,7 +3951,7 @@ function addon:ToggleConfigUI()
     syncLine("the roster, grouped under their own account headers.", "muted")
     syncLine(" ")
     syncLine("Notes:", "title")
-    syncLine("- Deletions: right-click a character row to remove it from THIS", "muted")
+    syncLine("- Deletions: shift+right-click a character row to remove it from THIS", "muted")
     syncLine("  account's file. To remove it from ALL accounts, repeat for each.", "muted")
     syncLine("- Backup: each Ashoholic.lua is copied to .lua.bak before merging.", "muted")
     syncLine("- Re-running: launch via Ashoholic.bat any time to sync again.", "muted")
