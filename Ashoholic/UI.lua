@@ -1729,63 +1729,213 @@ function addon:ToggleConfigUI()
         y = y - 28
     end
 
+    ----------------------------------------------------------------------
+    -- Custom icon dropdown
+    ----------------------------------------------------------------------
+    local iconMenu, iconMenuScroll, iconMenuChild, iconMenuButtons, iconMenuBar
+    local iconMenuChoices, iconMenuSelect, iconMenuOwner
+
+    page1:HookScript("OnHide", function()
+        if iconMenu then iconMenu:Hide() end
+    end)
+
+    local function EnsureIconMenu()
+        if iconMenu then return end
+
+        iconMenu = CreateFrame("Frame", nil, page1)
+        iconMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+        iconMenu:SetFrameLevel(100)
+        iconMenu:SetClampedToScreen(true)
+        iconMenu:EnableMouse(true)
+        iconMenu:SetWidth(360)
+        iconMenu:SetBackdrop(FLAT_BACKDROP)
+        iconMenu:SetBackdropColor(unpack(T.panel))
+        iconMenu:SetBackdropBorderColor(unpack(T.border))
+
+        iconMenuScroll = CreateFrame("ScrollFrame", nil, iconMenu)
+        iconMenuScroll:SetPoint("TOPLEFT", 4, -4)
+        iconMenuScroll:SetPoint("BOTTOMRIGHT", -26, 4)
+
+        iconMenuBar = CreateFrame("Slider", nil, iconMenu)
+        iconMenuBar:SetOrientation("VERTICAL")
+        iconMenuBar:SetPoint("TOPRIGHT", -6, -4)
+        iconMenuBar:SetPoint("BOTTOMRIGHT", -6, 4)
+        iconMenuBar:SetWidth(12)
+        iconMenuBar:SetBackdrop(FLAT_BACKDROP)
+        iconMenuBar:SetBackdropColor(unpack(T.sliderBg))
+        iconMenuBar:SetBackdropBorderColor(unpack(T.sliderBorder))
+        iconMenuBar:SetMinMaxValues(0, 0)
+        iconMenuBar:SetValueStep(1)
+        iconMenuBar:SetThumbTexture(WHITE)
+        local thumb = iconMenuBar:GetThumbTexture()
+        thumb:SetWidth(12); thumb:SetHeight(24)
+        thumb:SetVertexColor(unpack(T.accent))
+        iconMenuBar:SetScript("OnValueChanged", function(self, value)
+            iconMenuScroll:SetVerticalScroll(value)
+        end)
+
+        iconMenuScroll:SetScript("OnVerticalScroll", function(self, value)
+            if iconMenuBar:GetValue() ~= value then iconMenuBar:SetValue(value) end
+        end)
+        iconMenuScroll:EnableMouseWheel(true)
+        iconMenuScroll:SetScript("OnMouseWheel", function(self, delta)
+            local _, maxScroll = iconMenuBar:GetMinMaxValues()
+            iconMenuBar:SetValue(Clamp(self:GetVerticalScroll() - delta * 44, 0, maxScroll))
+        end)
+
+        iconMenuChild = CreateFrame("Frame", nil, iconMenuScroll)
+        iconMenuChild:SetWidth(328)
+        iconMenuScroll:SetScrollChild(iconMenuChild)
+
+        iconMenuButtons = {}
+        for i = 1, 24 do
+            local button = CreateFrame("Button", nil, iconMenuChild)
+            button:SetSize(326, 24)
+            button:SetBackdrop(FLAT_BACKDROP)
+
+            button.icon = button:CreateTexture(nil, "OVERLAY")
+            button.icon:SetSize(16, 16)
+            button.icon:SetPoint("LEFT", 8, 0)
+
+            button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            button.text:SetPoint("LEFT", button.icon, "RIGHT", 8, 0)
+            button.text:SetPoint("RIGHT", button, "RIGHT", -26, 0)
+            button.text:SetJustifyH("LEFT")
+
+            button.check = button:CreateTexture(nil, "OVERLAY")
+            button.check:SetSize(14, 14)
+            button.check:SetPoint("RIGHT", -8, 0)
+            button.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+
+            button:SetScript("OnEnter", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.hoverBg))
+                self:SetBackdropBorderColor(unpack(style.hoverBorder))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnLeave", function(self)
+                local style = BUTTON_STYLES.default
+                self:SetBackdropColor(unpack(style.bg))
+                self:SetBackdropBorderColor(unpack(style.border))
+                self.text:SetTextColor(unpack(style.text))
+            end)
+            button:SetScript("OnClick", function(self)
+                local choice = iconMenuChoices and iconMenuChoices[self.choiceIndex]
+                if choice and iconMenuSelect then iconMenuSelect(choice) end
+                iconMenu:Hide()
+            end)
+
+            iconMenuButtons[i] = button
+        end
+
+        iconMenu:SetScript("OnHide", function()
+            iconMenuSelect  = nil
+            iconMenuChoices = nil
+            iconMenuOwner   = nil
+        end)
+    end
+
     local ddRefreshers = {}
-    local ddCounter = 0
     local function AddDropdown(yOff, labelText, options, dbKey)
-        ddCounter = ddCounter + 1
         local l = Themed(page1:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"), "gold", labelText)
         l:SetPoint("TOPLEFT", 20, yOff)
 
-        local dd = CreateFrame("Frame", "AshoholicDD" .. ddCounter, page1, "UIDropDownMenuTemplate")
-        dd:SetPoint("TOPLEFT", l, "BOTTOMLEFT", -15, -2)
-        UIDropDownMenu_SetWidth(dd, 340)
-        UIDropDownMenu_JustifyText(dd, "LEFT")
+        local dd = CreateFlatButton(page1, 340, 22, "", "default")
+        dd:SetPoint("TOPLEFT", 20, yOff - 18)
+        dd.text:ClearAllPoints()
+        dd.text:SetPoint("LEFT",  dd, "LEFT",  26, 0)
+        dd.text:SetPoint("RIGHT", dd, "RIGHT", -26, 0)
+        dd.text:SetJustifyH("LEFT")
+
+        -- Currently selected icon, shown on the closed button
+        local selIcon = dd:CreateTexture(nil, "OVERLAY")
+        selIcon:SetSize(16, 16)
+        selIcon:SetPoint("LEFT", dd, "LEFT", 6, 0)
+
+        -- Down-pointing triangle made from a font character
+        local arrow = dd:CreateFontString(nil, "OVERLAY")
+        arrow:SetPoint("RIGHT", -8, 0)
+        arrow:SetFont("Fonts\\ARIALN.TTF", 10, "")
+        arrow:SetText("▼")
 
         local function CurrentIdx()
             return Clamp(addon.db.global.options[dbKey] or 1, 1, #options)
         end
 
-        -- For the CURRENT-SELECTION display we still use inline |T (that path
-        -- already works for every texture). For the MENU ITEMS we let the
-        -- dropdown renderer draw the icon via info.icon, which handles the
-        -- inventory-icon and indicator-dot textures that inline |T drops.
-        local function IconFor(opt)
-            return "|T" .. opt.path .. ":16:16:0:0|t"
-        end
-
-        -- Separate texture for the CLOSED state; inline |T drops many
-        -- Interface paths on 3.3.5 (checkbox marks, some icon files, etc.)
-        local closedIcon = dd:CreateTexture(nil, "OVERLAY")
-        closedIcon:SetSize(16, 16)
-        closedIcon:SetPoint("LEFT", dd, "LEFT", 20, 1)
-
         local function Refresh()
-            local opt = options[CurrentIdx()]
-            UIDropDownMenu_SetText(dd, "        " .. opt.name)
-            closedIcon:SetTexture(opt.path)
-            if opt.crop then
-                closedIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            else
-                closedIcon:SetTexCoord(0, 1, 0, 1)
+            if T.accent then
+                arrow:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.9)
             end
+            local opt = options[CurrentIdx()]
+            dd.text:SetText(opt.name)
+            selIcon:SetTexture(opt.path)
+            if opt.crop then selIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            else             selIcon:SetTexCoord(0, 1, 0, 1) end
         end
         ddRefreshers[#ddRefreshers + 1] = Refresh
         Refresh()
 
-        UIDropDownMenu_Initialize(dd, function(self, level)
-            local cur = CurrentIdx()
-            for i, opt in ipairs(options) do
-                local info = {}
-                info.text  = opt.name
-                info.icon  = opt.path
-                info.value = i
-                info.checked = (cur == i)
-                info.func = function()
-                    addon.db.global.options[dbKey] = i
-                    Refresh()
-                    if AshoholicFrame and AshoholicFrame:IsVisible() then AshoholicFrame:Refresh() end
+        local function ShowIconMenu()
+            EnsureIconMenu()
+            iconMenuOwner   = dd
+            iconMenuChoices = options
+            iconMenuSelect = function(choice)
+                for i, opt in ipairs(options) do
+                    if opt == choice then
+                        addon.db.global.options[dbKey] = i
+                        Refresh()
+                        if AshoholicFrame and AshoholicFrame:IsVisible() then
+                            AshoholicFrame:Refresh()
+                        end
+                        break
+                    end
                 end
-                UIDropDownMenu_AddButton(info, level)
+            end
+
+            local rowHeight     = 24
+            local contentHeight = #options * rowHeight
+            local visibleHeight = math.min(contentHeight, 260)
+            iconMenu:SetHeight(visibleHeight + 8)
+            iconMenuChild:SetHeight(contentHeight)
+            iconMenuBar:SetMinMaxValues(0, math.max(0, contentHeight - visibleHeight))
+            iconMenuBar:GetThumbTexture():SetHeight(
+                math.max(24, visibleHeight * visibleHeight / contentHeight))
+            iconMenuBar:SetValue(0)
+            iconMenuScroll:SetVerticalScroll(0)
+
+            local cur = CurrentIdx()
+            for i, button in ipairs(iconMenuButtons) do
+                local opt = options[i]
+                if opt then
+                    button.choiceIndex = i
+                    button:ClearAllPoints()
+                    button:SetPoint("TOPLEFT", iconMenuChild, "TOPLEFT", 0, -((i - 1) * rowHeight))
+                    button.text:SetText(opt.name)
+                    button.icon:SetTexture(opt.path)
+                    if opt.crop then button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                    else             button.icon:SetTexCoord(0, 1, 0, 1) end
+                    if i == cur then button.check:Show() else button.check:Hide() end
+                    button:Show()
+                    button:GetScript("OnLeave")(button)
+                else
+                    button:Hide()
+                end
+            end
+
+            iconMenu:ClearAllPoints()
+            if dd:GetBottom() and dd:GetBottom() < visibleHeight + 20 then
+                iconMenu:SetPoint("BOTTOMLEFT", dd, "TOPLEFT", 0, 2)
+            else
+                iconMenu:SetPoint("TOPLEFT", dd, "BOTTOMLEFT", 0, -2)
+            end
+            iconMenu:Show()
+        end
+
+        dd:SetScript("OnClick", function()
+            if iconMenu and iconMenu:IsShown() and iconMenuOwner == dd then
+                iconMenu:Hide()
+            else
+                ShowIconMenu()
             end
         end)
     end
@@ -2614,10 +2764,13 @@ function addon:ToggleConfigUI()
         dd.text:SetPoint("LEFT", dd, "LEFT", 8, 0)
         dd.text:SetPoint("RIGHT", dd, "RIGHT", -26, 0)
         dd.text:SetJustifyH("LEFT")
-        local arrow = dd:CreateTexture(nil, "OVERLAY")
-        arrow:SetSize(18, 18)
-        arrow:SetPoint("RIGHT", -4, 0)
-        arrow:SetTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+        local arrow = dd:CreateFontString(nil, "OVERLAY")
+        arrow:SetPoint("RIGHT", -8, 0)
+        arrow:SetFont("Fonts\\ARIALN.TTF", 10, "")
+        arrow:SetText("▼")
+        if T.accent then
+            arrow:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.9)
+        end
 
         local function ShowFontMenu()
             EnsureFontMenu()
@@ -2674,6 +2827,9 @@ function addon:ToggleConfigUI()
         end)
 
         local function Refresh()
+            if T.accent then
+                arrow:SetTextColor(T.accent[1], T.accent[2], T.accent[3], 0.9)
+            end
             local d = addon.customDraft
             local choices = {}
             if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
@@ -2991,6 +3147,7 @@ function addon:ToggleConfigUI()
         tabLine:SetVertexColor(a[1], a[2], a[3], 0.9)
         for _, fn in ipairs(texts) do fn() end
         for _, tab in ipairs(tabs) do StyleTab(tab) end
+        if page1._refreshDD then page1._refreshDD() end
         if refreshCustomTab then refreshCustomTab() end
     end)
 
