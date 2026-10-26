@@ -179,6 +179,7 @@ local LEFT_PAD, RIGHT_MARGIN = 20, 34
 local PAD = 8
 local HEADER_HEIGHT = 24
 local VIEW_TOP = 48
+local UPDATE_BANNER_HEIGHT = 22
 local VIEW_BOTTOM = 66
 local ROWS_OFFSET = 30
 local ROW_HEIGHT, ROW_STEP = 24, 26
@@ -591,14 +592,44 @@ function addon:CreateUI()
     local version = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     version:SetPoint("RIGHT", closeBtn, "LEFT", -40, 0)
 
+    local updateBanner = CreateFrame("Frame", nil, frame)
+    updateBanner:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -VIEW_TOP)
+    updateBanner:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -RIGHT_MARGIN, -VIEW_TOP)
+    updateBanner:SetHeight(UPDATE_BANNER_HEIGHT)
+    updateBanner:SetBackdrop(FLAT_BACKDROP)
+    updateBanner:SetBackdropColor(0.38, 0.07, 0.05, 0.98)
+    updateBanner:SetBackdropBorderColor(1, 0.34, 0.18, 1)
+
+    local updateText = updateBanner:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    updateText:SetPoint("CENTER", updateBanner, "CENTER")
+    updateText:SetTextColor(1, 0.92, 0.78)
+    updateText:SetJustifyH("CENTER")
+    updateBanner:Hide()
+
+    local function GetContentTop()
+        return VIEW_TOP + (updateBanner:IsShown() and (UPDATE_BANNER_HEIGHT + 4) or 0)
+    end
+
+    local function RefreshVersionNotice()
+        if addon.isOutdated and addon.latestVersionFound then
+            updateText:SetText("Update available: v" .. addon.latestVersionFound ..
+                " (installed v" .. addon.VERSION .. ")")
+            updateBanner:Show()
+        else
+            updateBanner:Hide()
+        end
+        if frame.ApplyLayout then frame:ApplyLayout() end
+    end
+    frame.RefreshVersionNotice = RefreshVersionNotice
+
     -- Scroll + horizontal scroll content
     local scrollFrame = CreateFrame("ScrollFrame", "AshoholicScrollFrame", frame, "FauxScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -(VIEW_TOP + ROWS_OFFSET))
+    scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -(GetContentTop() + ROWS_OFFSET))
     scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -RIGHT_MARGIN, VIEW_BOTTOM)
     scrollFrame:EnableMouseWheel(false)
 
     local hScroll = CreateFrame("ScrollFrame", nil, frame)
-    hScroll:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -VIEW_TOP)
+    hScroll:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -GetContentTop())
     hScroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -RIGHT_MARGIN, VIEW_BOTTOM)
 
     local hContent = CreateFrame("Frame", nil, hScroll)
@@ -2050,8 +2081,15 @@ function addon:CreateUI()
     local function ApplyLayout()
         local fw, fh = frame:GetWidth(), frame:GetHeight()
         local vw = fw - LEFT_PAD - RIGHT_MARGIN
-        local vh = fh - VIEW_TOP - VIEW_BOTTOM
+        local contentTop = GetContentTop()
+        local vh = fh - contentTop - VIEW_BOTTOM
         local cw = math.max(BASE_WIDTH, vw)
+        scrollFrame:ClearAllPoints()
+        scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -(contentTop + ROWS_OFFSET))
+        scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -RIGHT_MARGIN, VIEW_BOTTOM)
+        hScroll:ClearAllPoints()
+        hScroll:SetPoint("TOPLEFT", frame, "TOPLEFT", LEFT_PAD, -contentTop)
+        hScroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -RIGHT_MARGIN, VIEW_BOTTOM)
         hContent:SetWidth(cw)
         hContent:SetHeight(math.max(vh, 1))
         local maxScroll = math.floor(cw - vw + 0.5)
@@ -2200,7 +2238,7 @@ function addon:CreateUI()
         windowTitle:SetText("Ashoholic")
         if T.titleRGB then windowTitle:SetTextColor(unpack(T.titleRGB)) end
         subtitle:SetText("Ebonhold Roster")
-        ApplyLayout()
+        RefreshVersionNotice()
     end)
     frame:SetScript("OnHide", function()
         StopHideTimer()
