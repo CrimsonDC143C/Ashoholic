@@ -95,7 +95,7 @@ end
 -- Column model
 --------------------------------------------------------------------------
 local COLUMN_DEFS = {
-    { key="name",     title="Name",       width=130, field="name",          justify="LEFT",   clip=true },
+    { key="name",     title="Name",       width=165, field="name",          justify="LEFT",   clip=true },
     { key="level",    title="Level",      width=50,  field="level",         justify="CENTER" },
     { key="wt",       title="10m WT 25m", width=100, field=nil,             justify="CENTER", reset="wt" },
     { key="cost",     title="Reset Cost", width=100, field="raidResetCost", justify="RIGHT",  reset="cost" },
@@ -847,18 +847,39 @@ function addon:CreateUI()
         end
 
         -- Class icon (grows to left of name; pushes name right if necessary)
+        local nameOffset = 0
         if T.showClassIcons then
             local sz = L.classIconSize
             row.classIcon:SetSize(sz, sz)
             row.classIcon:SetPoint("LEFT", row, "LEFT", COLUMN_X["name"] + PAD, 0)
-            local nameOffset = math.max(18, sz + 4)
+            nameOffset = math.max(18, sz + 4)
             row.name:SetPoint("LEFT", row, "LEFT", COLUMN_X["name"] + PAD + nameOffset, 0)
-            row.name:SetWidth(COLUMN_BY_KEY["name"].width - PAD * 2 - nameOffset)
         else
             row.classIcon:SetSize(1, 1)
             row.name:SetPoint("LEFT", row, "LEFT", COLUMN_X["name"] + PAD, 0)
-            row.name:SetWidth(COLUMN_BY_KEY["name"].width - PAD * 2)
         end
+
+        local swapW = 0
+        if row.swapBtn then
+            local btnH = Clamp((ROW_HEIGHT or 24) - 6, 14, 22)
+            local btnW = math.max(38, math.floor((L.characterFontSize or 12) * 3.2))
+            row.swapBtn:SetSize(btnW, btnH)
+            row.swapBtn:ClearAllPoints()
+            row.swapBtn:SetPoint("RIGHT", row, "LEFT", COLUMN_X["name"] + COLUMN_BY_KEY["name"].width - PAD, 0)
+            if row.swapBtn.text and row.swapBtn.text.basePath then
+                row.swapBtn.text:SetFont(
+                    row.swapBtn.text.basePath,
+                    math.max(9, (L.characterFontSize or 12) - 2),
+                    row.swapBtn.text.baseFlags
+                )
+            end
+            row.swapBtn:ApplyStyle(false)
+            if row.swapBtn:IsShown() then
+                swapW = btnW + 4
+            end
+        end
+        row.name:SetWidth(math.max(20, COLUMN_BY_KEY["name"].width - PAD * 2 - nameOffset - swapW))
+
         for n = 1, 2 do
             row.wtBtn[n]:SetSize(L.wtIconSize, L.wtIconSize)
         end
@@ -892,6 +913,65 @@ function addon:CreateUI()
         row.name:SetWidth(nameCol.width - PAD * 2 - 18)
         row.name:SetJustifyH("LEFT"); row.name:SetHeight(14)
         if row.name.SetWordWrap then row.name:SetWordWrap(false) end
+
+        -- Mouse target for the instance-lockout panel. FontStrings do not
+        -- receive hover, and this stays disabled except on character rows.
+        row.nameHit = CreateFrame("Frame", nil, row)
+        row.nameHit:EnableMouse(false)
+        row.nameHit:SetFrameLevel(row:GetFrameLevel() + 4)
+
+        local swapBtn = CreateFrame("Button", nil, row)
+        swapBtn:SetSize(38, 18)
+        swapBtn:SetPoint("RIGHT", row, "LEFT", COLUMN_X["name"] + nameCol.width - PAD, 0)
+        swapBtn:SetBackdrop(FLAT_BACKDROP)
+        swapBtn:RegisterForClicks("LeftButtonUp")
+        swapBtn.text = swapBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        swapBtn.text:SetPoint("CENTER", 0, 0)
+        swapBtn.text:SetText("Swap")
+        swapBtn.text.basePath, swapBtn.text.baseSize, swapBtn.text.baseFlags = swapBtn.text:GetFont()
+        function swapBtn:ApplyStyle(hover)
+            local s = BUTTON_STYLES and BUTTON_STYLES["default"]
+            if not s then return end
+            if hover then
+                self:SetBackdropColor(unpack(s.hoverBg))
+                self:SetBackdropBorderColor(unpack(s.hoverBorder))
+            else
+                self:SetBackdropColor(unpack(s.bg))
+                self:SetBackdropBorderColor(unpack(s.border))
+            end
+            if self.text and s.text then
+                self.text:SetTextColor(unpack(s.text))
+            end
+        end
+        swapBtn:SetScript("OnEnter", function(self)
+            self:ApplyStyle(true)
+            if self.charName then
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine("Fast Swap", 1, 0.82, 0)
+                local colorCode = (self.class and ClassColors[self.class]) or "|cFFFFFFFF"
+                GameTooltip:AddLine("|cFFFFFFFFClick|r to swap to " .. colorCode .. self.charName .. "|r", 0.9, 0.9, 0.9)
+                GameTooltip:Show()
+            end
+        end)
+        swapBtn:SetScript("OnLeave", function(self)
+            self:ApplyStyle(false)
+            GameTooltip:Hide()
+        end)
+        swapBtn:SetScript("OnClick", function(self)
+            if self.charName and self.charName ~= "" then
+                if PlaySound then
+                    PlaySound("igMainMenuOptionCheckBoxOn")
+                end
+                if FastSwap_PerformSwap then
+                    FastSwap_PerformSwap(self.charName)
+                elseif addon.PerformFastSwap then
+                    addon:PerformFastSwap(self.charName)
+                end
+            end
+        end)
+        swapBtn:Hide()
+        row.swapBtn = swapBtn
+        swapBtn:SetFrameLevel(row:GetFrameLevel() + 6)
 
         row.level    = CellText(row, "level",    "GameFontHighlight")
         row.cost     = CellText(row, "cost",     "GameFontHighlight")
@@ -1032,15 +1112,584 @@ function addon:CreateUI()
         row.cost:SetText(""); row.ash:SetText(""); row.money:SetText("")
         row.lastSeen:SetText("")
         row.location:SetText("")
+        if row.swapBtn then
+            row.swapBtn:Hide()
+            row.swapBtn.charName = nil
+            row.swapBtn.class = nil
+        end
         for n = 1, 2 do row.wtIcon[n]:Hide(); row.wtText[n]:Hide() end
         row.expand:Hide(); row.realmText:Hide(); row.topLine:Hide()
         row.ashHitbox:EnableMouse(false)
         row.ashHitbox:SetScript("OnEnter", nil)
         row.ashHitbox:SetScript("OnLeave", nil)
+        if row.nameHit then
+            row.nameHit:EnableMouse(false)
+            row.nameHit:SetScript("OnEnter", nil)
+            row.nameHit:SetScript("OnLeave", nil)
+            row.nameHit:SetScript("OnMouseUp", nil)
+            row.nameHit.lockoutData = nil
+        end
+        row:UnlockHighlight()
         -- The row itself also carries hover handlers on the account branch;
         -- clear them here so they don't bleed into character/realm/totals rows.
         row:SetScript("OnEnter", nil)
         row:SetScript("OnLeave", nil)
+    end
+
+    ----------------------------------------------------------------------
+    -- Instance lockouts. Hovering a character name attaches this panel
+    -- to whichever side of the roster has room.
+    ----------------------------------------------------------------------
+    local PANEL_W, TIME_W = 320, 78
+    local PAD_L, PAD_R, COL_GAP = 14, 12, 8
+    local NAME_W = PANEL_W - PAD_L - PAD_R - COL_GAP - TIME_W
+    local MAX_LINES = 24
+
+    local lockoutPanel
+    local lockoutLines = {}
+    local hideAfter
+
+    local panel = CreateFrame("Frame", "AshoholicLockoutPanel", UIParent)
+    panel:SetWidth(PANEL_W)
+    panel:SetHeight(48)
+    panel:SetFrameStrata("HIGH")
+    panel:SetFrameLevel((frame:GetFrameLevel() or 0) + 30)
+    panel:SetBackdrop(FLAT_BACKDROP)
+    panel:SetClampedToScreen(true)
+    panel:EnableMouse(false)
+    panel:Hide()
+    lockoutPanel = panel
+
+    local accent = panel:CreateTexture(nil, "ARTWORK")
+    accent:SetTexture(WHITE)
+    accent:SetWidth(3)
+    accent:SetPoint("TOPLEFT", panel, "TOPLEFT", 1, -1)
+    accent:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 1, 1)
+    panel.accent = accent
+
+    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD_L, -10)
+    title:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -PAD_R, -10)
+    title:SetJustifyH("LEFT")
+    title:SetHeight(16)
+    if title.SetWordWrap then title:SetWordWrap(false) end
+    panel.title = title
+
+    local sub = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+    sub:SetWidth(NAME_W)
+    sub:SetJustifyH("LEFT")
+    sub:SetHeight(13)
+    if sub.SetWordWrap then sub:SetWordWrap(false) end
+    panel.sub = sub
+
+    local hourCount = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hourCount:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -2)
+    hourCount:SetWidth(TIME_W)
+    hourCount:SetJustifyH("RIGHT")
+    hourCount:SetHeight(13)
+    if hourCount.SetWordWrap then hourCount:SetWordWrap(false) end
+    panel.hourCount = hourCount
+
+    local rule = panel:CreateTexture(nil, "ARTWORK")
+    rule:SetTexture(WHITE)
+    rule:SetHeight(1)
+    panel.rule = rule
+
+    local more = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    more:SetJustifyH("LEFT")
+    more:SetHeight(14)
+    if more.SetWordWrap then more:SetWordWrap(false) end
+    more:Hide()
+    panel.more = more
+
+    for i = 1, MAX_LINES do
+        local name = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local timeFs = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        name:SetJustifyH("LEFT")
+        timeFs:SetJustifyH("RIGHT")
+        if name.SetJustifyV then name:SetJustifyV("MIDDLE") end
+        if timeFs.SetJustifyV then timeFs:SetJustifyV("MIDDLE") end
+        if name.SetWordWrap then name:SetWordWrap(false) end
+        if timeFs.SetWordWrap then timeFs:SetWordWrap(false) end
+        name:Hide()
+        timeFs:Hide()
+        lockoutLines[i] = { name = name, time = timeFs }
+    end
+
+    local HOURLY_LINES = 11
+    local hourlyLines = {}
+    for i = 1, HOURLY_LINES do
+        local name = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local timeFs = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        name:SetJustifyH("LEFT")
+        timeFs:SetJustifyH("RIGHT")
+        if name.SetJustifyV then name:SetJustifyV("MIDDLE") end
+        if timeFs.SetJustifyV then timeFs:SetJustifyV("MIDDLE") end
+        if name.SetWordWrap then name:SetWordWrap(false) end
+        if timeFs.SetWordWrap then timeFs:SetWordWrap(false) end
+        name:Hide()
+        timeFs:Hide()
+        hourlyLines[i] = { name = name, time = timeFs }
+    end
+
+    local function SetFontSize(fs, size)
+        local path, current, flags = fs:GetFont()
+        if path and current ~= size then fs:SetFont(path, size, flags) end
+    end
+
+    local function HeaderMetrics()
+        local size = (T.layout and T.layout.characterFontSize) or 12
+        local titleH = size + 4
+        local subH = math.max(12, size + 1)
+        local lineH = math.max(16, size + 4)
+        local ruleAt = 10 + titleH + 2 + subH + 6
+        return size, titleH, subH, lineH, ruleAt, ruleAt + 7
+    end
+
+    local function TextFits(fs, maxWidth, limit, chars)
+        local w = fs:GetStringWidth()
+        if w and w > 0 then return w <= maxWidth end
+        return limit ~= nil and chars <= limit
+    end
+
+    -- Hidden font strings report a width of 0 on 3.3.5, so a long name falls
+    -- back to a character budget instead of running into the timer.
+    local function FitText(fs, text, maxWidth)
+        text = text or ""
+        fs:SetText(text)
+        local size = (T.layout and T.layout.characterFontSize) or 12
+        local limit = math.max(8, math.floor(maxWidth / math.max(6, size * 0.56)))
+        if TextFits(fs, maxWidth, limit, string.len(text)) then return end
+        local best, low, high = "...", 1, string.len(text)
+        while low <= high do
+            local mid = math.floor((low + high) / 2)
+            fs:SetText(string.sub(text, 1, mid) .. "...")
+            if TextFits(fs, maxWidth, math.max(1, limit - 3), mid) then
+                best = string.sub(text, 1, mid) .. "..."
+                low = mid + 1
+            else
+                high = mid - 1
+            end
+        end
+        fs:SetText(best)
+    end
+
+    local function FormatLockoutTime(seconds)
+        seconds = math.max(0, math.floor(seconds))
+        local days = math.floor(seconds / 86400)
+        local hours = math.floor((seconds % 86400) / 3600)
+        local minutes = math.floor((seconds % 3600) / 60)
+        if days > 0 then return string.format("%dd %dh", days, hours) end
+        if hours > 0 then return string.format("%dh %dm", hours, minutes) end
+        if minutes > 0 then return string.format("%dm", minutes) end
+        return "<1m"
+    end
+
+    local function FormatHourlyClock(seconds)
+        seconds = math.max(0, math.floor(seconds))
+        return string.format("%02d:%02d", math.floor(seconds / 60), seconds % 60)
+    end
+
+    local function TimeColor(expires)
+        if expires < 3600 then return T.wtLvlLockedRGB or { 1, 0.33, 0.33 } end
+        if expires < 86400 then return T.emberRGB or { 1, 0.54, 0.17 } end
+        return T.goldRGB or { 1, 0.82, 0 }
+    end
+
+    local function StyleLockoutPanel()
+        if not lockoutPanel then return end
+        local size, titleH, subH, lineH = HeaderMetrics()
+        lockoutPanel:SetBackdropColor(unpack(C.panel))
+        lockoutPanel:SetBackdropBorderColor(unpack(C.border))
+        local a = T.accent
+        lockoutPanel.accent:SetVertexColor(a[1], a[2], a[3], a[4] or 1)
+        local dim = T.accentDim or a
+        lockoutPanel.rule:SetVertexColor(dim[1], dim[2], dim[3], dim[4] or 1)
+        SetFontSize(lockoutPanel.title, size)
+        SetFontSize(lockoutPanel.sub, math.max(10, size - 1))
+        SetFontSize(lockoutPanel.hourCount, math.max(10, size - 1))
+        SetFontSize(lockoutPanel.more, math.max(10, size - 1))
+        lockoutPanel.title:SetHeight(titleH)
+        lockoutPanel.sub:SetHeight(subH)
+        lockoutPanel.hourCount:SetHeight(subH)
+        lockoutPanel.sub:SetTextColor(unpack(T.mutedRGB or { 0.55, 0.52, 0.49 }))
+        lockoutPanel.more:SetTextColor(unpack(T.mutedRGB or { 0.55, 0.52, 0.49 }))
+        lockoutPanel.more:SetHeight(lineH)
+        for i = 1, MAX_LINES do
+            local line = lockoutLines[i]
+            SetFontSize(line.name, math.max(10, size - 1))
+            SetFontSize(line.time, math.max(10, size - 1))
+            line.name:SetHeight(lineH)
+            line.time:SetHeight(lineH)
+        end
+        for i = 1, HOURLY_LINES do
+            local line = hourlyLines[i]
+            SetFontSize(line.name, math.max(10, size - 1))
+            SetFontSize(line.time, math.max(10, size - 1))
+            line.name:SetHeight(lineH)
+            line.time:SetHeight(lineH)
+        end
+    end
+
+    local function SideRoom()
+        local frameLeft = frame:GetLeft() or 0
+        local frameRight = frame:GetRight() or frameLeft
+        local roomLeft = frameLeft
+        local roomRight = (UIParent:GetWidth() or 0) - frameRight
+        local nexus = _G.NexusPanel
+        if nexus and nexus.IsShown and nexus:IsShown() and nexus.GetLeft and nexus.GetRight then
+            local nL, nR = nexus:GetLeft(), nexus:GetRight()
+            if nL and nR then
+                if nR <= frameLeft + 1 then
+                    roomLeft = math.max(0, frameLeft - nR)
+                elseif nL >= frameRight - 1 then
+                    roomRight = math.max(0, nL - frameRight)
+                end
+            end
+        end
+        return roomLeft, roomRight
+    end
+
+    local function PlaceLockoutPanel(row)
+        local frameTop = frame:GetTop()
+        local frameLeft = frame:GetLeft()
+        local frameRight = frame:GetRight()
+        if not frameTop or not frameLeft or not frameRight then
+            lockoutPanel:ClearAllPoints()
+            lockoutPanel:SetPoint("TOPLEFT", frame, "TOPRIGHT", -1, 0)
+            return
+        end
+        local roomLeft, roomRight = SideRoom()
+        local need = lockoutPanel:GetWidth() + 8
+        local side
+        if roomRight >= need and roomLeft >= need then
+            side = (roomRight >= roomLeft) and "RIGHT" or "LEFT"
+        elseif roomRight >= need then
+            side = "RIGHT"
+        elseif roomLeft >= need then
+            side = "LEFT"
+        else
+            side = (roomRight >= roomLeft) and "RIGHT" or "LEFT"
+        end
+
+        local ph = lockoutPanel:GetHeight()
+        local screenH = UIParent:GetHeight() or 0
+        local rowTop = (row and row:GetTop()) or frameTop
+        local y = (rowTop - frameTop) + 8
+        if frameTop + y - ph < 8 then y = 8 + ph - frameTop end
+        if frameTop + y > screenH - 8 then y = screenH - 8 - frameTop end
+
+        lockoutPanel:ClearAllPoints()
+        if side == "RIGHT" then
+            lockoutPanel:SetPoint("TOPLEFT", frame, "TOPRIGHT", -1, y)
+        else
+            lockoutPanel:SetPoint("TOPRIGHT", frame, "TOPLEFT", 1, y)
+        end
+        lockoutPanel:SetFrameLevel((frame:GetFrameLevel() or 0) + 30)
+    end
+
+    local function BuildLockoutDisplay(locks)
+        local display = {}
+        local raids, dungeons = 0, 0
+        for i = 1, #locks do
+            if locks[i].isRaid then raids = raids + 1 else dungeons = dungeons + 1 end
+        end
+        local mixed = raids > 0 and dungeons > 0
+        local labeledRaid, labeledDungeon = false, false
+        for i = 1, #locks do
+            local lock = locks[i]
+            if mixed and lock.isRaid and not labeledRaid then
+                display[#display + 1] = { header = "Raids" }
+                labeledRaid = true
+            elseif mixed and not lock.isRaid and not labeledDungeon then
+                display[#display + 1] = { header = "Dungeons" }
+                labeledDungeon = true
+            end
+            display[#display + 1] = lock
+        end
+        return display
+    end
+
+    local function StopHideTimer()
+        hideAfter = nil
+        if lockoutPanel then lockoutPanel:SetScript("OnUpdate", nil) end
+    end
+
+    local function ShowLockoutPanel(row, data)
+        if not row or not data or not lockoutPanel then return end
+        StopHideTimer()
+        StyleLockoutPanel()
+
+        local charDB = data.key and addon.db and addon.db.global
+            and addon.db.global.Characters and addon.db.global.Characters[data.key]
+        local locks = (addon.Characters and addon.Characters.ActiveLockouts
+            and addon.Characters:ActiveLockouts(charDB)) or {}
+        local hourly = (addon.Characters and addon.Characters.HourlyLockouts
+            and addon.Characters:HourlyLockouts(charDB)) or {
+                tracked = false, count = 0, limit = 10, nextFree = 0, entries = {},
+            }
+        local display = BuildLockoutDisplay(locks)
+        if #locks > 0 then
+            table.insert(display, 1, { header = "Saved lockouts" })
+        end
+
+        local cc = RAID_CLASS_COLORS and data.class and RAID_CLASS_COLORS[data.class]
+        if T.classColoredNames and cc then
+            local nameA = (T.nameRGB and T.nameRGB[4]) or 1
+            lockoutPanel.title:SetTextColor(cc.r, cc.g, cc.b, nameA)
+        else
+            lockoutPanel.title:SetTextColor(unpack(T.nameRGB or { 1, 1, 1 }))
+        end
+        lockoutPanel.title:SetText(data.name or "Character")
+        lockoutPanel.sub:SetText("Raids this hour")
+
+        local muted = T.mutedRGB or { 0.55, 0.52, 0.49 }
+        local gold = T.goldRGB or { 1, 0.82, 0 }
+        local body = T.body or { 1, 1, 1 }
+        local bad = T.wtLvlLockedRGB or { 1, 0.33, 0.33 }
+        local good = T.wtLvlUnlockedRGB or { 0.40, 0.87, 0.40 }
+        local countColor = muted
+        if hourly.tracked and hourly.count >= hourly.limit then
+            countColor = bad
+        elseif hourly.tracked and hourly.count == 0 then
+            countColor = good
+        elseif hourly.tracked then
+            countColor = gold
+        end
+        lockoutPanel.hourCount:SetText(hourly.tracked and (hourly.count .. " / " .. hourly.limit) or "-")
+        lockoutPanel.hourCount:SetTextColor(countColor[1], countColor[2], countColor[3], countColor[4] or 1)
+
+        if T.classColoredAccent and cc then
+            local classAlpha = (T.characterAccentBar and T.characterAccentBar[4]) or 1
+            lockoutPanel.accent:SetVertexColor(cc.r, cc.g, cc.b, classAlpha)
+        end
+
+        local _, titleH, subH, lineH = HeaderMetrics()
+        local cursor = 10 + titleH + 2 + subH + 4
+        local now = time()
+        local hourUsed = 0
+        local atCap = hourly.tracked and hourly.count >= hourly.limit
+
+        local function AddHourLine(label, timeText, labelColor, timeColor, expiresAt)
+            hourUsed = hourUsed + 1
+            if hourUsed > HOURLY_LINES then return end
+            local line = hourlyLines[hourUsed]
+            local y = -cursor
+            line.name:ClearAllPoints()
+            line.name:SetPoint("TOPLEFT", lockoutPanel, "TOPLEFT", PAD_L, y)
+            line.name:SetWidth(timeText and NAME_W or (PANEL_W - PAD_L - PAD_R))
+            if timeText then FitText(line.name, label, NAME_W) else line.name:SetText(label) end
+            line.name:SetTextColor(labelColor[1], labelColor[2], labelColor[3], labelColor[4] or 1)
+            line.name:Show()
+            line.time:ClearAllPoints()
+            line.time:SetPoint("TOPRIGHT", lockoutPanel, "TOPRIGHT", -PAD_R, y)
+            line.time:SetWidth(TIME_W)
+            if timeText then
+                line.time:SetText(timeText)
+                line.time:SetTextColor(timeColor[1], timeColor[2], timeColor[3], timeColor[4] or 1)
+                line.time:Show()
+                line.expiresAt = expiresAt
+            else
+                line.time:Hide()
+                line.expiresAt = nil
+            end
+            cursor = cursor + lineH
+        end
+
+        if not hourly.tracked then
+            AddHourLine("Not tracked yet", nil, muted)
+        elseif hourly.count == 0 then
+            AddHourLine("No raid entries this hour", nil, muted)
+        else
+            local nextColor = atCap and bad or gold
+            AddHourLine("Next free", FormatHourlyClock(hourly.nextFree), gold, nextColor, now + hourly.nextFree)
+            local shownHours = math.min(hourly.count, HOURLY_LINES - 1)
+            for i = 1, shownHours do
+                local entry = hourly.entries[i]
+                local entryColor = (entry.expires < 600) and bad or gold
+                AddHourLine(entry.label, FormatHourlyClock(entry.expires), body, entryColor, now + entry.expires)
+            end
+        end
+        for i = hourUsed + 1, HOURLY_LINES do
+            hourlyLines[i].name:Hide()
+            hourlyLines[i].time:Hide()
+            hourlyLines[i].expiresAt = nil
+        end
+
+        local count = #locks
+        local shown = math.min(#display, MAX_LINES)
+        while shown > 0 and display[shown].header do shown = shown - 1 end
+        local hidden = 0
+        for i = shown + 1, #display do
+            if not display[i].header then hidden = hidden + 1 end
+        end
+
+        if count == 0 then
+            lockoutPanel.rule:Hide()
+            lockoutPanel.more:Hide()
+            for i = 1, MAX_LINES do
+                lockoutLines[i].name:Hide()
+                lockoutLines[i].time:Hide()
+                lockoutLines[i].expiresAt = nil
+            end
+            lockoutPanel:SetHeight(cursor + 10)
+        else
+            local ruleAt = cursor + 4
+            local contentAt = ruleAt + 7
+            lockoutPanel.rule:ClearAllPoints()
+            lockoutPanel.rule:SetPoint("TOPLEFT", lockoutPanel, "TOPLEFT", 10, -ruleAt)
+            lockoutPanel.rule:SetPoint("TOPRIGHT", lockoutPanel, "TOPRIGHT", -10, -ruleAt)
+            lockoutPanel.rule:Show()
+
+            for i = 1, MAX_LINES do
+                local line = lockoutLines[i]
+                local entry = display[i]
+                if i <= shown and entry then
+                    local y = -(contentAt + (i - 1) * lineH)
+                    line.name:ClearAllPoints()
+                    line.name:SetPoint("TOPLEFT", lockoutPanel, "TOPLEFT", PAD_L, y)
+                    line.time:ClearAllPoints()
+                    line.time:SetPoint("TOPRIGHT", lockoutPanel, "TOPRIGHT", -PAD_R, y)
+                    line.time:SetWidth(TIME_W)
+                    if entry.header then
+                        line.name:SetWidth(PANEL_W - PAD_L - PAD_R)
+                        line.name:SetText(entry.header)
+                        line.name:SetTextColor(unpack(gold))
+                        line.time:Hide()
+                        line.expiresAt = nil
+                    else
+                        line.name:SetWidth(NAME_W)
+                        FitText(line.name, entry.label, NAME_W)
+                        line.name:SetTextColor(body[1], body[2], body[3], body[4] or 1)
+                        line.time:SetText(FormatLockoutTime(entry.expires))
+                        local c = TimeColor(entry.expires)
+                        line.time:SetTextColor(c[1], c[2], c[3], c[4] or 1)
+                        line.time:Show()
+                        line.expiresAt = now + entry.expires
+                    end
+                    line.name:Show()
+                else
+                    line.name:Hide()
+                    line.time:Hide()
+                    line.expiresAt = nil
+                end
+            end
+
+            local bodyLines = shown
+            if hidden > 0 then
+                local y = -(contentAt + shown * lineH)
+                lockoutPanel.more:ClearAllPoints()
+                lockoutPanel.more:SetPoint("TOPLEFT", lockoutPanel, "TOPLEFT", PAD_L, y)
+                lockoutPanel.more:SetText("+" .. hidden .. " more")
+                lockoutPanel.more:Show()
+                bodyLines = shown + 1
+            else
+                lockoutPanel.more:Hide()
+            end
+            lockoutPanel:SetHeight(contentAt + bodyLines * lineH + 10)
+        end
+
+        lockoutPanel.hoverRow = row
+        lockoutPanel.hoverData = data
+        PlaceLockoutPanel(row)
+        lockoutPanel:Show()
+    end
+
+    local function RefreshLockoutClocks()
+        if hideAfter or not lockoutPanel or not lockoutPanel:IsShown() then return end
+        local now = time()
+        local function stale(line)
+            return line.expiresAt and line.time:IsShown() and line.expiresAt <= now
+        end
+        for i = 1, HOURLY_LINES do if stale(hourlyLines[i]) then
+            if lockoutPanel.hoverRow and lockoutPanel.hoverData then
+                ShowLockoutPanel(lockoutPanel.hoverRow, lockoutPanel.hoverData)
+            end
+            return
+        end end
+        for i = 1, MAX_LINES do if stale(lockoutLines[i]) then
+            if lockoutPanel.hoverRow and lockoutPanel.hoverData then
+                ShowLockoutPanel(lockoutPanel.hoverRow, lockoutPanel.hoverData)
+            end
+            return
+        end end
+        for i = 1, HOURLY_LINES do
+            local line = hourlyLines[i]
+            if line.expiresAt and line.time:IsShown() then
+                line.time:SetText(FormatHourlyClock(line.expiresAt - now))
+            end
+        end
+        for i = 1, MAX_LINES do
+            local line = lockoutLines[i]
+            if line.expiresAt and line.time:IsShown() then
+                line.time:SetText(FormatLockoutTime(line.expiresAt - now))
+            end
+        end
+    end
+
+    local clockTicker = CreateFrame("Frame")
+    clockTicker.elapsed = 0
+    clockTicker:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed < 1 then return end
+        self.elapsed = 0
+        RefreshLockoutClocks()
+    end)
+    lockoutPanel:SetScript("OnHide", function(self)
+        self.hoverRow = nil
+        self.hoverData = nil
+    end)
+
+    local function LockoutUnderCursor()
+        for i = 1, #rows do
+            local row = rows[i]
+            if row:IsShown() and row.nameHit and row.nameHit.lockoutData and MouseIsOver(row.nameHit) then
+                return row
+            end
+        end
+    end
+
+    local function RequestHideLockout()
+        if not lockoutPanel or not lockoutPanel:IsShown() then return end
+        hideAfter = GetTime() + 0.08
+        lockoutPanel:SetScript("OnUpdate", function(self)
+            if not hideAfter or GetTime() < hideAfter then return end
+            hideAfter = nil
+            self:SetScript("OnUpdate", nil)
+            local hovered = LockoutUnderCursor()
+            if hovered and hovered.nameHit and hovered.nameHit.lockoutData then
+                hovered:LockHighlight()
+                ShowLockoutPanel(hovered, hovered.nameHit.lockoutData)
+            else
+                self:Hide()
+            end
+        end)
+    end
+
+    local function SyncLockoutHover()
+        local hovered = LockoutUnderCursor()
+        for i = 1, #rows do
+            if rows[i] ~= hovered then rows[i]:UnlockHighlight() end
+        end
+        if hovered and hovered.nameHit and hovered.nameHit.lockoutData then
+            hovered:LockHighlight()
+            ShowLockoutPanel(hovered, hovered.nameHit.lockoutData)
+        else
+            StopHideTimer()
+            if lockoutPanel then lockoutPanel:Hide() end
+        end
+    end
+
+    local function LayoutNameHit(row)
+        local hit = row.nameHit
+        if not hit then return end
+        hit:ClearAllPoints()
+        hit:SetHeight(ROW_HEIGHT)
+        hit:SetPoint("LEFT", row, "LEFT", COLUMN_X["name"] or 0, 0)
+        hit:SetPoint("RIGHT", row.name, "RIGHT", 0, 0)
+        hit:SetFrameLevel(row:GetFrameLevel() + 4)
+        if row.swapBtn then row.swapBtn:SetFrameLevel(row:GetFrameLevel() + 6) end
     end
 
     local function PaintRow(row, data, idx)
@@ -1194,6 +1843,26 @@ function addon:CreateUI()
                 row.name:SetTextColor(unpack(T.nameRGB or {1, 1, 1}))
             end
 
+            -- FastSwap button: show for alts, hide for the currently logged-in character
+            local currentPlayer = UnitName and UnitName("player")
+            local isCurrentChar = currentPlayer and data.name and (string.lower(currentPlayer) == string.lower(data.name))
+            local nameOffset = T.showClassIcons and math.max(18, (T.layout.classIconSize or 14) + 4) or 0
+            if row.swapBtn then
+                if not isCurrentChar and data.name and data.name ~= "" then
+                    row.swapBtn.charName = data.name
+                    row.swapBtn.class = data.class
+                    row.swapBtn:ApplyStyle(false)
+                    row.swapBtn:Show()
+                    local swapW = row.swapBtn:GetWidth() + 4
+                    row.name:SetWidth(math.max(20, COLUMN_BY_KEY["name"].width - PAD * 2 - nameOffset - swapW))
+                else
+                    row.swapBtn:Hide()
+                    row.swapBtn.charName = nil
+                    row.swapBtn.class = nil
+                    row.name:SetWidth(math.max(20, COLUMN_BY_KEY["name"].width - PAD * 2 - nameOffset))
+                end
+            end
+
             if data.level >= 80 then
                 row.level:SetText(tostring(data.level))
                 row.level:SetTextColor(unpack(T.levelRGB or {1, 0.82, 0}))
@@ -1251,6 +1920,32 @@ function addon:CreateUI()
                 row.location:SetText("Unknown")
                 row.location:SetTextColor(unpack(T.mutedRGB or {0.55, 0.52, 0.49}))
             end
+
+            LayoutNameHit(row)
+            row.nameHit.lockoutData = data
+            row.nameHit:EnableMouse(true)
+            row.nameHit:SetScript("OnEnter", function(self)
+                row:LockHighlight()
+                ShowLockoutPanel(row, self.lockoutData)
+            end)
+            row.nameHit:SetScript("OnLeave", function()
+                local hovered = LockoutUnderCursor()
+                if hovered and hovered ~= row and hovered.nameHit.lockoutData then
+                    for i = 1, #rows do
+                        if rows[i] ~= hovered then rows[i]:UnlockHighlight() end
+                    end
+                    hovered:LockHighlight()
+                    ShowLockoutPanel(hovered, hovered.nameHit.lockoutData)
+                    return
+                end
+                row:UnlockHighlight()
+                RequestHideLockout()
+            end)
+            row.nameHit:SetScript("OnMouseUp", function(_, button)
+                local fn = row:GetScript("OnClick")
+                if fn then fn(row, button) end
+            end)
+
             row:SetScript("OnClick", function(self, button)
                 if button == "RightButton" and IsShiftKeyDown() then
                     StaticPopupDialogs["ASHOHOLIC_REMOVE_CHAR"] =
@@ -1290,6 +1985,7 @@ function addon:CreateUI()
                 row:Hide()
             end
         end
+        SyncLockoutHover()
     end
 
     local function ApplyLayout()
@@ -1430,10 +2126,16 @@ function addon:CreateUI()
         for _, fs in ipairs(themedLabels) do fs.Retheme() end
         for _, tint in ipairs(gripTints) do tint() end
         for i, row in ipairs(rows) do StyleRow(row, i) end
+        StyleLockoutPanel()
     end)
 
     frame:SetScript("OnSizeChanged", function() ApplyLayout() end)
     frame:SetScript("OnShow",       function() ApplyLayout() end)
+    frame:SetScript("OnHide", function()
+        StopHideTimer()
+        if lockoutPanel then lockoutPanel:Hide() end
+        for i = 1, #rows do rows[i]:UnlockHighlight() end
+    end)
 
     function frame:ColumnHitTest(cursorX)
         local contentX = cursorX - hContent:GetLeft()
@@ -2860,7 +3562,7 @@ function addon:ToggleConfigUI()
     syncLine("account as many times as you want.", "muted")
     syncLine(" ")
     syncLine("3) Launch WoW with Ashoholic.bat.", "title")
-    syncLine("Double-click Ashoholic.bat in the Ashoholic addon folder. It:", "muted")
+    syncLine("Double-click Ashoholic.bat in this addon folder. It:", "muted")
     syncLine("  - reads every account's Ashoholic.lua", "muted")
     syncLine("  - merges the character lists", "muted")
     syncLine("  - launches the game", "muted")

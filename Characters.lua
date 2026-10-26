@@ -46,6 +46,112 @@ local function computeLockouts(charDB)
     return #lockedRaids10, #lockedRaids25, lockedRaids10, lockedRaids25
 end
 
+-- SavedInstance values are "remaining|checkedAt" from older scans, or
+-- "remaining|checkedAt|difficulty|isRaid" from current ones. Keys from the
+-- pre-overhaul roster were "Name (size)|id"; current keys are "Name (size)".
+local function LockoutLabel(instanceKey, diff)
+    local name = tostring(instanceKey or "Unknown")
+    local pipe = string.find(name, "|", 1, true)
+    if pipe and pipe > 1 then
+        name = string.sub(name, 1, pipe - 1)
+    end
+    if type(diff) ~= "string" or diff == "" then return name end
+    local lower = string.lower(diff)
+    if lower == "normal" or lower == "10 player" or lower == "25 player" then
+        return name
+    end
+    local nameLower = string.lower(name)
+    if string.find(lower, "heroic", 1, true) and not string.find(nameLower, "heroic", 1, true) then
+        return name .. " (Heroic)"
+    end
+    if string.find(name, diff, 1, true) or string.find(lower, "heroic", 1, true) then
+        return name
+    end
+    return name .. " - " .. diff
+end
+
+function ns:ActiveLockouts(charDB)
+    local list = {}
+    if type(charDB) ~= "table" or type(charDB.SavedInstance) ~= "table" then
+        return list
+    end
+    local now = time()
+    for instanceKey, info in pairs(charDB.SavedInstance) do
+        if type(info) == "string" then
+            local reset, lastcheck, diff, raidFlag = strsplit("|", info)
+            reset = tonumber(reset) or 0
+            lastcheck = tonumber(lastcheck) or 0
+            local expires = reset - (now - lastcheck)
+            if expires > 0 then
+                -- Older scans did not store the raid flag. A parenthesized
+                -- size of 10 or more is a raid on this client.
+                local isRaid = raidFlag == "1"
+                if raidFlag ~= "0" and raidFlag ~= "1" then
+                    local size = tonumber(string.match(tostring(instanceKey), "%((%d+)%)"))
+                    isRaid = size ~= nil and size >= 10
+                end
+                list[#list + 1] = {
+                    label = LockoutLabel(instanceKey, diff),
+                    expires = expires,
+                    isRaid = isRaid,
+                }
+            end
+        end
+    end
+    table.sort(list, function(a, b)
+        if a.isRaid ~= b.isRaid then return a.isRaid end
+        if a.label == b.label then return a.expires < b.expires end
+        return a.label < b.label
+    end)
+    return list
+end
+
+-- Same rolling window LockoutInfo uses: 10 raid entries, each lasting an hour
+-- from the last time that raid copy was entered or left.
+local HOURLY_LIMIT = 10
+local HOURLY_WINDOW = 3600
+local HOURLY_DIFF = { [1] = "10", [2] = "25", [3] = "10H", [4] = "25H" }
+
+function ns:HourlyLockouts(charDB)
+    local result = {
+        tracked = false,
+        count = 0,
+        limit = HOURLY_LIMIT,
+        nextFree = 0,
+        entries = {},
+    }
+    if type(charDB) ~= "table" or not charDB.hourlyTracked then return result end
+    result.tracked = true
+    local saved = charDB.hourlyEntries
+    if type(saved) ~= "table" then return result end
+    local now = time()
+    for i = 1, #saved do
+        local entry = saved[i]
+        if type(entry) == "table" and type(entry.time) == "number" then
+            local remain = entry.time + HOURLY_WINDOW - now
+            if remain > 0 then
+                local label = entry.name or "Unknown"
+                local tag = HOURLY_DIFF[tonumber(entry.difficulty)]
+                if tag and not string.find(label, tag, 1, true) then
+                    label = label .. " (" .. tag .. ")"
+                end
+                result.entries[#result.entries + 1] = {
+                    label = label,
+                    expires = remain,
+                    time = entry.time,
+                }
+            end
+        end
+    end
+    table.sort(result.entries, function(a, b)
+        if a.time == b.time then return a.label < b.label end
+        return a.time < b.time
+    end)
+    result.count = #result.entries
+    if result.count > 0 then result.nextFree = result.entries[1].expires end
+    return result
+end
+
 function ns:BuildList()
     wipe(characterList)
 

@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: FastSwap |cff00ccff[Ebonhold]|r
+## Notes: Fast character swapping via /swap, alt list UI, and Game Menu integration.
+## Author: FastSwap
+## Version: 1.0.0
+## SavedVariables: FastSwapDB
+
+FastSwap.lua

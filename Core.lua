@@ -2,6 +2,124 @@ local addonName = ...
 _G[addonName] = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0", "AceEvent-3.0")
 local addon = _G[addonName]
 
+local FASTSWAP_SLOT_PREFIX = "fastSwapSlot"
+local FASTSWAP_DONE_PREFIX = "fastSwapDone"
+local FASTSWAP_MAX_SLOTS = 100
+local FASTSWAP_DRIVER_CVAR = "Sound_VoiceChatInputDriverName"
+local FASTSWAP_CVAR = "fastSwapTarget"
+
+local function EnsureSwapCVar()
+    if RegisterCVar and GetCVar("fastSwapTarget") == nil then
+        pcall(RegisterCVar, "fastSwapTarget", "")
+    end
+end
+
+local function MarkAllSwapSlotsDone()
+    if not GetCVar or not RegisterCVar then return false end
+    local markedAny = false
+    for i = 1, FASTSWAP_MAX_SLOTS do
+        local slotName = FASTSWAP_SLOT_PREFIX .. i
+        local doneName = FASTSWAP_DONE_PREFIX .. i
+        local okSlot, slotVal = pcall(GetCVar, slotName)
+        if not okSlot or slotVal == nil then break end
+        local okDone, doneVal = pcall(GetCVar, doneName)
+        if not okDone or doneVal == nil then
+            pcall(RegisterCVar, doneName, "1")
+            markedAny = true
+        end
+        if SetCVar then
+            pcall(SetCVar, doneName, "1")
+            pcall(SetCVar, slotName, "")
+        end
+    end
+    return markedAny
+end
+
+local function AllocateSwapSlot(target)
+    if not GetCVar or not RegisterCVar then return nil end
+    MarkAllSwapSlotsDone()
+    for i = 1, FASTSWAP_MAX_SLOTS do
+        local slotName = FASTSWAP_SLOT_PREFIX .. i
+        local okSlot, slotVal = pcall(GetCVar, slotName)
+        if not okSlot or slotVal == nil then
+            pcall(RegisterCVar, slotName, tostring(target))
+            if SetCVar then pcall(SetCVar, slotName, tostring(target)) end
+            return i
+        end
+    end
+    return nil
+end
+
+local function GetOriginalDriverValue()
+    if not GetCVar then return "System Default" end
+    local ok, cur = pcall(GetCVar, FASTSWAP_DRIVER_CVAR)
+    if not ok or type(cur) ~= "string" or cur == "" then return "System Default" end
+    local existingTarget, existingOrig = string.match(cur, "^FASTSWAP:([^:]+):?(.*)")
+    if existingTarget then return (existingOrig and existingOrig ~= "") and existingOrig or "System Default" end
+    return cur
+end
+
+function addon:PerformFastSwap(target)
+    if type(_G.FastSwap_PerformSwap) == "function" and _G.FastSwap_PerformSwap ~= addon._fallbackFastSwap then
+        return _G.FastSwap_PerformSwap(target)
+    end
+
+    if type(target) ~= "string" then return end
+    target = string.gsub(target, "^%s*(.-)%s*$", "%1")
+    if target == "" then return end
+
+    if UnitAffectingCombat and UnitAffectingCombat("player") then
+        local errMsg = "Cannot fast-swap while in combat!"
+        print("|cFF00FF9AAshoholic:|r |cffff4040" .. errMsg .. "|r")
+        if UIErrorsFrame and UIErrorsFrame.AddMessage then
+            UIErrorsFrame:AddMessage(errMsg, 1.0, 0.1, 0.1, 1.0)
+        end
+        return
+    end
+
+    local currentName = UnitName and UnitName("player")
+    if currentName and string.lower(currentName) == string.lower(target) then
+        print("|cFF00FF9AAshoholic:|r |cffffd100You are already logged into " .. currentName .. ".|r")
+        return
+    end
+
+    if not SetCVar then
+        print("|cFF00FF9AAshoholic:|r |cffff4040Error: SetCVar is unavailable.|r")
+        return
+    end
+
+    AllocateSwapSlot(target)
+
+    local origValue = GetOriginalDriverValue()
+    pcall(SetCVar, FASTSWAP_DRIVER_CVAR, "FASTSWAP:" .. tostring(target) .. ":" .. tostring(origValue))
+
+    if RegisterCVar and GetCVar(FASTSWAP_CVAR) == nil then
+        pcall(RegisterCVar, FASTSWAP_CVAR, tostring(target))
+    end
+    pcall(SetCVar, FASTSWAP_CVAR, tostring(target))
+    if EbonholdLog then
+        pcall(EbonholdLog, "Ashoholic FastSwap: initiating Logout() -> target='" .. tostring(target) .. "'")
+    end
+    print("|cFF00FF9AAshoholic:|r Swapping to |cff00ff00" .. tostring(target) .. "|r...")
+
+    if AshoholicFrame and AshoholicFrame:IsShown() then
+        AshoholicFrame:Hide()
+    end
+    if GameMenuFrame and GameMenuFrame:IsShown() and HideUIPanel then
+        HideUIPanel(GameMenuFrame)
+    end
+    if Logout then
+        Logout()
+    end
+end
+
+if type(_G.FastSwap_PerformSwap) ~= "function" then
+    addon._fallbackFastSwap = function(charName)
+        return addon:PerformFastSwap(charName)
+    end
+    _G.FastSwap_PerformSwap = addon._fallbackFastSwap
+end
+
 local version = GetAddOnMetadata(addonName, "Version") or ""
 addon.Version = version:find("^v") and version or ("v" .. version)
 
@@ -79,9 +197,39 @@ function addon:OnInitialize()
     if addon.InitMinimapButton then
         addon:InitMinimapButton()
     end
+
+    -- Raid entries per hour. Independent of the isLoaded gate so the first
+    -- zone event after login is counted.
+    local hourlyWatch = CreateFrame("Frame")
+    hourlyWatch:RegisterEvent("PLAYER_ENTERING_WORLD")
+    hourlyWatch:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+    hourlyWatch:RegisterEvent("CHAT_MSG_SYSTEM")
+    hourlyWatch:SetScript("OnEvent", function(_, event, message)
+        if event == "CHAT_MSG_SYSTEM" then
+            addon:NoteHourlyInstanceReset(message)
+        else
+            addon:TrackHourlyInstances()
+        end
+    end)
 end
 
 function addon:OnPlayerLogin()
+    if not _G.FastSwapEventFrame and SetCVar then
+        MarkAllSwapSlotsDone()
+        if GetCVar then
+            local okDrv, drvVal = pcall(GetCVar, FASTSWAP_DRIVER_CVAR)
+            if okDrv and type(drvVal) == "string" then
+                local pendingTarget, origValue = string.match(drvVal, "^FASTSWAP:([^:]+):?(.*)")
+                if pendingTarget and pendingTarget ~= "" then
+                    pcall(SetCVar, FASTSWAP_DRIVER_CVAR, (origValue and origValue ~= "") and origValue or "System Default")
+                end
+            end
+            local okCustom, cur = pcall(GetCVar, FASTSWAP_CVAR)
+            if okCustom and cur and cur ~= "" then
+                pcall(SetCVar, FASTSWAP_CVAR, "")
+            end
+        end
+    end
     C_Timer.After(5, function()
         addon.isLoaded = true
         addon:UpdateCurrentCharacterData()
@@ -482,13 +630,214 @@ function addon:UpdateSavedInstances()
     wipe(charDB.SavedInstance)
 
     for i = 1, GetNumSavedInstances() do
-        local name, id, reset, difficulty, locked, extended, _, isRaid, maxPlayers = GetSavedInstanceInfo(i)
+        -- reset is seconds remaining at this moment, not an absolute timestamp.
+        -- Value fields: remaining|checkedAt|difficulty|isRaid. The key stays
+        -- "Name (size)" so world-tour detection can keep matching 10 and 25.
+        local name, id, reset, difficulty, locked, extended, _, isRaid, maxPlayers, difficultyName = GetSavedInstanceInfo(i)
         if locked and name then
             local keyName = name .. " (" .. (maxPlayers or 10) .. ")"
-            charDB.SavedInstance[keyName] = (reset or 0) .. "|" .. time()
+            local diff = ""
+            if type(difficultyName) == "string" and difficultyName ~= "" then
+                diff = difficultyName:gsub("|", "/")
+            elseif difficulty == 3 or difficulty == 4
+                or (difficulty == 2 and (maxPlayers or 5) <= 5) then
+                diff = "Heroic"
+            end
+            charDB.SavedInstance[keyName] =
+                (reset or 0) .. "|" .. time() .. "|" .. diff .. "|" .. (isRaid and "1" or "0")
         end
     end
     charDB.wtScanned = true
+end
+
+--------------------------------------------------------------------------
+-- Raids per hour. Ebonhold allows 10 raid entries in a rolling hour.
+-- A raid copy is name + difficulty + leader (or solo) + reset generation,
+-- matching LockoutInfo: re-entering the same copy does not take a new slot,
+-- and the hour restarts when that copy is entered or left.
+--------------------------------------------------------------------------
+local HOURLY_WINDOW = 3600
+
+local hourlyWasInRaid = false
+local hourlySig = nil
+local hourlyVisit = nil
+local hourlyReady = false
+
+function addon:ClearHourlyVisit()
+    hourlyVisit = nil
+    hourlyWasInRaid = false
+    hourlySig = nil
+end
+
+local function HourlyCharDB()
+    if not addon.db or not addon.db.global or not addon.db.global.Characters then return nil end
+    local realm = GetRealmName()
+    local player = UnitName("player")
+    if not player or player == "" or player == UNKNOWN then return nil end
+    local key = format("%s.%s", realm, player)
+    local charDB = addon.db.global.Characters[key]
+    if not charDB then return nil end
+    if rawget(charDB, "hourlyEntries") == nil then charDB.hourlyEntries = {} end
+    if rawget(charDB, "hourlyGen") == nil then charDB.hourlyGen = {} end
+    charDB.hourlyTracked = true
+    return charDB
+end
+
+local function HourlyPrune(charDB, now)
+    local entries = charDB.hourlyEntries
+    if type(entries) ~= "table" then return end
+    for i = #entries, 1, -1 do
+        local entry = entries[i]
+        local stamp = (type(entry) == "table" and entry.time) or 0
+        if now - stamp >= HOURLY_WINDOW then table.remove(entries, i) end
+    end
+    while #entries > 30 do table.remove(entries) end
+end
+
+local function HourlyLeader()
+    if GetNumRaidMembers and GetNumRaidMembers() > 0 then
+        for i = 1, GetNumRaidMembers() do
+            local name, rank = GetRaidRosterInfo(i)
+            if rank == 2 then
+                local unit = "raid" .. i
+                local guid = UnitGUID and UnitGUID(unit)
+                return "LEADER:" .. tostring(guid or name or "UNKNOWN")
+            end
+        end
+        return "LEADER:UNKNOWN"
+    end
+    if GetNumPartyMembers and GetNumPartyMembers() > 0 then
+        local index = GetPartyLeaderIndex and GetPartyLeaderIndex() or nil
+        if index == 0 then
+            local guid = UnitGUID and UnitGUID("player")
+            return "LEADER:" .. tostring(guid or UnitName("player") or "PLAYER")
+        end
+        if index and index > 0 then
+            local unit = "party" .. index
+            local guid = UnitGUID and UnitGUID(unit)
+            return "LEADER:" .. tostring(guid or UnitName(unit) or ("PARTY" .. index))
+        end
+        return "LEADER:UNKNOWN"
+    end
+    return "SOLO"
+end
+
+local function HourlyIdentity(charDB, name, diff, leader)
+    local key = tostring(name or "?") .. "#" .. tostring(diff or 0)
+    if charDB.hourlyGen[key] == nil then charDB.hourlyGen[key] = 0 end
+    return "copy:" .. key .. ":" .. tostring(leader or "SOLO") .. ":gen:" .. tostring(charDB.hourlyGen[key])
+end
+
+local function HourlyFind(charDB, identity)
+    local entries = charDB.hourlyEntries
+    for i = 1, #entries do
+        if entries[i] and entries[i].identity == identity then return entries[i] end
+    end
+end
+
+local function HourlyRead()
+    local inside, kind = IsInInstance()
+    if not (inside and kind == "raid") then return false end
+    local name, _, diff = GetInstanceInfo()
+    return true, name, diff
+end
+
+local function HourlyEnter(name, diff, leader)
+    local charDB = HourlyCharDB()
+    if not charDB or not name or name == "" then return end
+    leader = leader or HourlyLeader()
+    local now = time()
+    local identity = HourlyIdentity(charDB, name, diff, leader)
+    local row = HourlyFind(charDB, identity)
+    if row then
+        row.time = now
+        row.name = name
+        row.difficulty = diff or row.difficulty or 0
+        row.leader = leader
+    else
+        table.insert(charDB.hourlyEntries, 1, {
+            time = now,
+            name = name,
+            difficulty = diff or 0,
+            identity = identity,
+            leader = leader,
+        })
+    end
+    HourlyPrune(charDB, now)
+    hourlyVisit = {
+        name = name,
+        difficulty = diff or 0,
+        identity = identity,
+        leader = leader,
+    }
+end
+
+local function HourlyLeave()
+    local visit = hourlyVisit
+    hourlyVisit = nil
+    if not visit then return end
+    local charDB = HourlyCharDB()
+    if not charDB then return end
+    local now = time()
+    local row = HourlyFind(charDB, visit.identity)
+    if not row then
+        row = {
+            identity = visit.identity,
+            name = visit.name,
+            difficulty = visit.difficulty,
+            leader = visit.leader,
+        }
+        table.insert(charDB.hourlyEntries, 1, row)
+    end
+    row.time = now
+    row.name = visit.name or row.name
+    row.difficulty = visit.difficulty or row.difficulty or 0
+    HourlyPrune(charDB, now)
+end
+
+function addon:TrackHourlyInstances()
+    local charDB = HourlyCharDB()
+    if not charDB then return end
+
+    local inside, name, diff = HourlyRead()
+    local leader = inside and HourlyLeader() or nil
+    local sig = nil
+    if inside and name and name ~= "" then
+        sig = HourlyIdentity(charDB, name, diff, leader)
+    end
+
+    if not hourlyReady then
+        hourlyReady = true
+        if inside and name and name ~= "" then HourlyEnter(name, diff, leader) end
+    elseif inside then
+        if not hourlyWasInRaid then
+            if name and name ~= "" then HourlyEnter(name, diff, leader) end
+        elseif sig ~= hourlySig then
+            HourlyLeave()
+            if name and name ~= "" then HourlyEnter(name, diff, leader) end
+        elseif not hourlyVisit and name and name ~= "" then
+            HourlyEnter(name, diff, leader)
+        end
+    elseif hourlyWasInRaid then
+        HourlyLeave()
+    end
+
+    hourlyWasInRaid = inside and true or false
+    hourlySig = sig
+end
+
+function addon:NoteHourlyInstanceReset(message)
+    if type(message) ~= "string" or type(INSTANCE_RESET_SUCCESS) ~= "string" then return end
+    local pattern = string.gsub(INSTANCE_RESET_SUCCESS, "%%s", "(.+)")
+    local inst = string.match(message, pattern)
+    if not inst or inst == "" then return end
+    local charDB = HourlyCharDB()
+    if not charDB or type(charDB.hourlyGen) ~= "table" then return end
+    for key, value in pairs(charDB.hourlyGen) do
+        if string.find(key, inst, 1, true) == 1 then
+            charDB.hourlyGen[key] = (value or 0) + 1
+        end
+    end
 end
 
 function addon:ResetAllSoulAsh(chatMsg)
@@ -611,6 +960,11 @@ function addon:ResetAllCharacterData()
         currentChar.money              = 0
         currentChar.location           = ""
         currentChar.lastSeen           = 0
+        currentChar.hourlyEntries      = {}
+        currentChar.hourlyGen          = {}
+        currentChar.hourlyTracked      = true
+        if addon.ClearHourlyVisit then addon:ClearHourlyVisit() end
+        if addon.TrackHourlyInstances then addon:TrackHourlyInstances() end
     end
 
     -- 2. Delete every OTHER character on this account
@@ -961,22 +1315,12 @@ function addon:PrintSyncHelp()
     print(" ")
     print("To see characters from |cFFFFFFFFmultiple WoW accounts|r in one roster:")
     print(" ")
-    print("|cFF00FF9A1.|r Copy these files into:")
-    print("     |cFFFFFFFFInterface\\AddOns\\Ashoholic\\|r")
-    print("       • merge_ashoholic.py")
-    print("       • AshoholicSync.ps1")
-    print("       • Play Ashoholic.bat")
+    print("|cFF00FF9A1.|r Log into each account once, play briefly, then log out.")
     print(" ")
-    print("|cFF00FF9A2.|r Install Python 3: |cFFFFFFFFhttps://python.org|r")
-    print("     (tick \"Add Python to PATH\" during install)")
-    print("     Then open a command prompt and run:")
-    print("       |cFFFFFFFFpip install lupa|r")
-    print(" ")
-    print("|cFF00FF9A3.|r Log into each account once, play briefly, then log out.")
-    print(" ")
-    print("|cFF00FF9A4.|r From now on, launch WoW with |cFFFFFFFFPlay Ashoholic.bat|r")
-    print("     instead of Wow.exe. Each launch merges every account's")
-    print("     character data before WoW starts.")
+    print("|cFF00FF9A2.|r Launch the game with |cFFFFFFFFAshoholic.bat|r")
+    print("     in this addon folder (Interface\\AddOns\\Altoholic\\).")
+    print("     Each launch merges every account's character data,")
+    print("     then starts the client.")
     print(" ")
     print("You only need to do this |cFFFFFFFFonce per computer|r.")
     print("Deletions: right-click a character row to remove it from the roster.")
