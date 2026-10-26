@@ -30,6 +30,7 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 ## Screenshots
 
 ![Main Roster UI](images/main-roster.jpg)
+
 *The main dashboard with class-colored names, account grouping, and totals.*
 
 ![Theme Options](images/themes-tab.jpg)
@@ -45,8 +46,9 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 
 1.  Download [Ashoholic.zip](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip) from the button above.
 2.  Extract it into `Ebonhold\Interface\AddOns\`. The zip contains one `Ashoholic` folder, with `Ashoholic.toc` directly inside it.
-3.  Make sure you have the **ProjectEbonhold** addon enabled.
-4.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
+3.  Launch Ebonhold with `Ashoholic.bat` at least once to install the FastSwap character-selection hook. FastSwap will not switch characters until the hook has been synced. Launch with the batch file again after Ebonhold updates.
+4.  Make sure you have the **ProjectEbonhold** addon enabled.
+5.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
 
 ## Multi-Account Syncing (Optional)
 
