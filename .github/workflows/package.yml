@@ -18,17 +18,15 @@ jobs:
 
       - name: Build Ashoholic.zip
         run: |
-          version="$(sed -n 's/^## Version:[[:space:]]*//p' Altoholic.toc | tr -d '\r')"
+          version="$(sed -n 's/^## Version:[[:space:]]*//p' Ashoholic.toc | tr -d '\r')"
           if [ -z "$version" ]; then
-            echo "Version missing from Altoholic.toc" >&2
+            echo "Version missing from Ashoholic.toc" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_ENV"
-          # The repo lives in a folder named Altoholic, so the toc matches that
-          # folder. The release extracts as Ashoholic, which needs Ashoholic.toc.
           rm -rf package
           mkdir -p package/Ashoholic package/FastSwap
-          cp Altoholic.toc package/Ashoholic/Ashoholic.toc
+          cp Ashoholic.toc package/Ashoholic/Ashoholic.toc
           cp Ashoholic.bat AshoholicMerge.ps1 AshoholicSync.ps1 \
              Characters.lua Core.lua Minimap.lua Themes.lua UI.lua NexusDock.lua \
              package/Ashoholic/
