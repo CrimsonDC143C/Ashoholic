@@ -1,6 +1,6 @@
 # 🍷 Ashoholic - Ebonhold Roster
 
-[![Download Latest Release](https://img.shields.io/badge/Download-Ashoholic_v2.0-blue?style=for-the-badge)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
+[![Download Latest Release](https://img.shields.io/github/v/release/CrimsonDC143C/Ashoholic?label=Download&style=for-the-badge&color=blue)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
 
 **A highly customizable character, gold, and Soul Ash tracker for Project Ebonhold (WotLK 3.3.5).**
 
