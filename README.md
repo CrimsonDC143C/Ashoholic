@@ -23,7 +23,7 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 *   **Fully Customizable UI:** 
     *   15+ built-in themes.
     *   Full RGBA color picker for every element.
-    *   Font choices for the title, column headers, and roster row types. Install SharedMedia separately to add its registered fonts to the font menus.
+    *   Font choices for the title, column headers, and roster row types. 
     *   Drag-and-drop column reordering and resizing.
     *   Save your own custom themes.
 *   **Prestige Automation:** Hooks into the Ebonhold Prestige Service to automatically wipe your active Soul Ash tracking the moment you prestige.
@@ -46,7 +46,7 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 ## Installation
 
 1.  Download [Ashoholic.zip](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip) from the button above.
-2.  Extract it into `Ebonhold\Interface\AddOns\`. The zip contains one `Ashoholic` folder, with `Ashoholic.toc` directly inside it.
+2.  Extract it into `Ebonhold\Interface\AddOns\`. The zip contains three addon folders: `Ashoholic`, `FastSwap`, and `SharedMedia`. Each has its own `.toc` file.
 3.  Launch Ebonhold with `Ashoholic.bat` at least once to install the FastSwap character-selection hook. FastSwap will not switch characters until the hook has been synced. Launch with the batch file again after Ebonhold updates.
 4.  Make sure you have the **ProjectEbonhold** addon enabled.
 5.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
