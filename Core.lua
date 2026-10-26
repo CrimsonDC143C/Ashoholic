@@ -453,7 +453,8 @@ function addon:OnTargetedEvent(event)
 end
 
 function addon:ChatCommand(input)
-    local cmd = string.lower(string.gsub(input or "", "^%s*(.-)%s*$", "%1"))
+    input = string.gsub(input or "", "^%s*(.-)%s*$", "%1")
+    local cmd = string.lower(input)
     if cmd == "ver check" or cmd == "version check" then
         if addon.isOutdated and addon.latestVersionFound then
             print("|cFFFFD700Ashoholic version check:|r installed v" .. addon.VERSION ..
@@ -471,7 +472,24 @@ function addon:ChatCommand(input)
         end
         print("|cFFFFD700Ashoholic version notice cleared.|r")
     elseif cmd == "ver" or cmd == "version" then
-        print("Usage: /ash ver check or /ash ver reset")
+        print("Usage: /ash ver check, /ash ver reset, or /ash ver 2.2.0")
+    elseif string.match(cmd, "^ver%s+") or string.match(cmd, "^version%s+") then
+        local simulatedVersion = string.match(input, "^%S+%s+(.+)$")
+        if not IsVersionHigher(simulatedVersion, addon.VERSION) then
+            print("|cFFFFD700Ashoholic:|r Test version must be a valid version higher than v" .. addon.VERSION .. ".")
+            return
+        end
+
+        addon:RememberRemoteVersion(simulatedVersion)
+        if not AshoholicFrame then addon:CreateUI() end
+        if AshoholicFrame then
+            if not AshoholicFrame:IsShown() then AshoholicFrame:Show() end
+            if AshoholicFrame.RefreshVersionNotice then
+                AshoholicFrame:RefreshVersionNotice()
+            end
+        end
+        print("|cFFFFD700Ashoholic:|r Simulated a peer running v" .. simulatedVersion ..
+            ". Use /ash ver reset when finished testing.")
     elseif cmd == "config" or cmd == "options" then
         addon:ToggleConfigUI()
     elseif cmd == "sync" then
