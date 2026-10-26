@@ -2149,8 +2149,7 @@ function addon:CreateUI()
         else
             frame:SetBackdropBorderColor(0, 0, 0, 0)
         end
-        local _, _, titleFlags = title:GetFont()
-        SetFontSafe(title, L.titleFont, L.titleSize, titleFlags)
+        title:SetFont(ResolveFont(L.titleFont, "Fonts\\MORPHEUS.TTF"), L.titleSize)
         title:SetText("Ashoholic")
         title:SetTextColor(unpack(T.titleRGB))
         subtitle:SetText("Ebonhold Roster")
