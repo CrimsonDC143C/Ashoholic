@@ -231,6 +231,7 @@ function addon:ApplyTheme(key)
             AshoholicFrame:ApplyLayout()
         end
     end
+    if addon.RefreshHourlyWidget then addon:RefreshHourlyWidget() end
 end
 
 --------------------------------------------------------------------------

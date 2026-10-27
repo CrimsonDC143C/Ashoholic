@@ -152,6 +152,7 @@ local AddonDB_Defaults = {
             CustomThemeOrder = {},
             columnOrder = nil,
             columnWidths = nil,
+            ShowHourlyWidget = 1,
         },
     },
 }
@@ -196,6 +197,9 @@ function addon:OnInitialize()
 
     if addon.InitMinimapButton then
         addon:InitMinimapButton()
+    end
+    if addon.InitHourlyWidget then
+        addon:InitHourlyWidget()
     end
 
     -- Raid entries per hour. Independent of the isLoaded gate so the first
@@ -268,6 +272,8 @@ function addon:ChatCommand(input)
         addon:ToggleConfigUI()
     elseif cmd == "sync" then
         addon:PrintSyncHelp()
+    elseif cmd == "widget" then
+        addon:ToggleHourlyWidget()
     else
         addon:ToggleUI()
     end
@@ -824,6 +830,7 @@ function addon:TrackHourlyInstances()
 
     hourlyWasInRaid = inside and true or false
     hourlySig = sig
+    if addon.RefreshHourlyWidget then addon:RefreshHourlyWidget() end
 end
 
 function addon:NoteHourlyInstanceReset(message)
@@ -1318,7 +1325,7 @@ function addon:PrintSyncHelp()
     print("|cFF00FF9A1.|r Log into each account once, play briefly, then log out.")
     print(" ")
     print("|cFF00FF9A2.|r Launch the game with |cFFFFFFFFAshoholic.bat|r")
-    print("     in this addon folder (Interface\\AddOns\\Altoholic\\).")
+    print("     in this addon folder (Interface\\AddOns\\Ashoholic\\).")
     print("     Each launch merges every account's character data,")
     print("     then starts the client.")
     print(" ")

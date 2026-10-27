@@ -30,7 +30,7 @@ jobs:
           mkdir -p package/Ashoholic package/FastSwap
           cp Altoholic.toc package/Ashoholic/Ashoholic.toc
           cp Ashoholic.bat AshoholicMerge.ps1 AshoholicSync.ps1 \
-             Characters.lua Core.lua Minimap.lua Themes.lua UI.lua NexusDock.lua \
+             Characters.lua Core.lua HourlyWidget.lua Minimap.lua Themes.lua UI.lua NexusDock.lua \
              package/Ashoholic/
           cp -a Libraries package/Ashoholic/Libraries
           cp FastSwap/FastSwap.toc FastSwap/FastSwap.lua FastSwap/FastSwap_Glue.lua \
