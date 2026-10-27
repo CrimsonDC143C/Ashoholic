@@ -1,6 +1,6 @@
 # 🍷 Ashoholic - Ebonhold Roster
 
-[![Download Latest Release](https://img.shields.io/badge/Download-Ashoholic_v2.0-blue?style=for-the-badge)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
+[![Download Latest Release](https://img.shields.io/github/v/release/CrimsonDC143C/Ashoholic?label=Download&style=for-the-badge&color=blue)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
 
 **A highly customizable character, gold, and Soul Ash tracker for Project Ebonhold (WotLK 3.3.5).**
 
@@ -23,6 +23,7 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 *   **Fully Customizable UI:** 
     *   15+ built-in themes.
     *   Full RGBA color picker for every element.
+    *   Font choices for the title, column headers, and roster row types. 
     *   Drag-and-drop column reordering and resizing.
     *   Save your own custom themes.
 *   **Prestige Automation:** Hooks into the Ebonhold Prestige Service to automatically wipe your active Soul Ash tracking the moment you prestige.
@@ -30,6 +31,7 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 ## Screenshots
 
 ![Main Roster UI](images/main-roster.jpg)
+
 *The main dashboard with class-colored names, account grouping, and totals.*
 
 ![Theme Options](images/themes-tab.jpg)
@@ -44,9 +46,10 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 ## Installation
 
 1.  Download [Ashoholic.zip](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip) from the button above.
-2.  Extract it into `Ebonhold\Interface\AddOns\`. The zip contains one `Ashoholic` folder, with `Ashoholic.toc` directly inside it.
-3.  Make sure you have the **ProjectEbonhold** addon enabled.
-4.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
+2.  Extract it into `Ebonhold\Interface\AddOns\`. The zip contains three addon folders: `Ashoholic`, `FastSwap`, and `SharedMedia`. Each has its own `.toc` file.
+3.  Launch Ebonhold with `Ashoholic.bat` at least once to install the FastSwap character-selection hook. FastSwap will not switch characters until the hook has been synced. Launch with the batch file again after Ebonhold updates.
+4.  Make sure you have the **ProjectEbonhold** addon enabled.
+5.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
 
 ## Multi-Account Syncing (Optional)
 

@@ -18,35 +18,36 @@ jobs:
 
       - name: Build Ashoholic.zip
         run: |
-          version="$(sed -n 's/^## Version:[[:space:]]*//p' Altoholic.toc | tr -d '\r')"
+          version="$(sed -n 's/^## Version:[[:space:]]*//p' Ashoholic.toc | tr -d '\r')"
           if [ -z "$version" ]; then
-            echo "Version missing from Altoholic.toc" >&2
+            echo "Version missing from Ashoholic.toc" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_ENV"
-          # The repo lives in a folder named Altoholic, so the toc matches that
-          # folder. The release extracts as Ashoholic, which needs Ashoholic.toc.
           rm -rf package
-          mkdir -p package/Ashoholic package/FastSwap
-          cp Altoholic.toc package/Ashoholic/Ashoholic.toc
+          mkdir -p package/Ashoholic package/FastSwap package/SharedMedia
+          cp Ashoholic.toc package/Ashoholic/Ashoholic.toc
           cp Ashoholic.bat AshoholicMerge.ps1 AshoholicSync.ps1 \
              Characters.lua Core.lua HourlyWidget.lua Minimap.lua Themes.lua UI.lua NexusDock.lua \
              package/Ashoholic/
           cp -a Libraries package/Ashoholic/Libraries
           cp FastSwap/FastSwap.toc FastSwap/FastSwap.lua FastSwap/FastSwap_Glue.lua \
              FastSwap/Sync-FastSwapGlue.ps1 package/FastSwap/
-          (cd package && zip -r ../Ashoholic.zip Ashoholic FastSwap)
+          cp -a SharedMedia/. package/SharedMedia/
+          (cd package && zip -r ../Ashoholic.zip Ashoholic FastSwap SharedMedia)
           unzip -l Ashoholic.zip
           unzip -l Ashoholic.zip | grep -q 'Ashoholic/Ashoholic.toc'
           unzip -l Ashoholic.zip | grep -q 'FastSwap/FastSwap.toc'
+          unzip -l Ashoholic.zip | grep -q 'SharedMedia/SharedMedia.toc'
 
       - name: Publish Ashoholic.zip
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes="Extract Ashoholic.zip into Interface/AddOns. The archive contains an Ashoholic folder and a FastSwap folder."
+          notes="Extract Ashoholic.zip into Interface/AddOns. The archive contains an Ashoholic folder, a FastSwap folder, and a SharedMedia folder."
           if gh release view "v$version" >/dev/null 2>&1; then
             gh release upload "v$version" Ashoholic.zip --clobber
+            gh release edit "v$version" --notes "$notes"
           else
             gh release create "v$version" Ashoholic.zip \
               --title "Ashoholic v$version" \

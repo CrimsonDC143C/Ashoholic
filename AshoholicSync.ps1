@@ -75,6 +75,25 @@ if (-not $WowExe) {
 $exeName = [System.IO.Path]::GetFileNameWithoutExtension($WowExe)
 $wowRunning = $null -ne (Get-Process -Name $exeName -ErrorAction SilentlyContinue)
 
+$fastSwapSyncCandidates = @(
+    (Join-Path $PSScriptRoot "FastSwap\Sync-FastSwapGlue.ps1"),
+    (Join-Path $PSScriptRoot "..\FastSwap\Sync-FastSwapGlue.ps1")
+)
+$fastSwapSyncScript = $fastSwapSyncCandidates |
+    Where-Object { Test-Path $_ } |
+    Select-Object -First 1
+
+if ($fastSwapSyncScript) {
+    Write-Host "Synchronizing FastSwap character-selection hook..."
+    try {
+        & $fastSwapSyncScript -GameRoot $wowRoot
+    } catch {
+        Write-Warning "FastSwap hook sync failed; WoW will still launch. $_"
+    }
+} else {
+    Write-Host "FastSwap sync script not found; skipping character-selection hook update."
+}
+
 if ($wowRunning) {
     # Merge is unsafe while WoW holds the DB in memory (it overwrites the
     # file on logout). But the merge has already been done at least once
