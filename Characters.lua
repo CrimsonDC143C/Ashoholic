@@ -175,10 +175,18 @@ function ns:BuildList()
         end
     end
 
-    -- Stable ordering of accounts
+    -- Stable ordering of accounts, with the account being played first
+    local playerName = UnitName and UnitName("player")
+    local currentKey = playerName and (realm .. "." .. playerName)
+    local currentDB = currentKey and addon.db.global.Characters[currentKey]
+    local currentAccount = currentDB and (currentDB.account or "Main Account")
+
     local accountOrder = {}
     for name in pairs(accounts) do table.insert(accountOrder, name) end
-    table.sort(accountOrder, function(a,b) return a:lower() < b:lower() end)
+    table.sort(accountOrder, function(a, b)
+        if (a == currentAccount) ~= (b == currentAccount) then return a == currentAccount end
+        return a:lower() < b:lower()
+    end)
 
     local realmCommittedAsh = 0
 
@@ -249,6 +257,8 @@ function ns:BuildList()
                 lockedCount10 = count10, lockedCount25 = count25,
                 lockedRaids10 = r10, lockedRaids25 = r25,
                 wtScanned = charDB.wtScanned or false,
+                isCurrent = entry.key == currentKey,
+                raidLocks = addon.RaidData and addon.RaidData:GetLocks(charDB) or {},
             })
 
             realmMoney = realmMoney + money

@@ -129,7 +129,7 @@ end
 local COLUMN_DEFS = {
     { key="name",     title="Name",       width=165, field="name",          justify="LEFT",   clip=true },
     { key="level",    title="Level",      width=50,  field="level",         justify="CENTER" },
-    { key="wt",       title="10m WT 25m", width=100, field=nil,             justify="CENTER", reset="wt" },
+    { key="wt",       title="World Tour", width=100, field=nil,             justify="CENTER", reset="wt" },
     { key="cost",     title="Reset Cost", width=100, field="raidResetCost", justify="RIGHT",  reset="cost" },
     { key="ash",      title="Soul Ash",   width=100, field="soulAsh",       justify="RIGHT",  reset="ash" },
     { key="money",    title="Money",      width=150, field="money",         justify="RIGHT",  reset="money" },
@@ -138,25 +138,48 @@ local COLUMN_DEFS = {
 }
 local MIN_COL_W = 40
 
+-- Raids view: the same identity columns plus one column per raid, each split into one cell per difficulty.
+local RAID_CELL_W = 40
+local RAID_COLUMN_DEFS = { COLUMN_DEFS[1], COLUMN_DEFS[2], COLUMN_DEFS[3] }
+for _, group in ipairs(addon.RaidData.groups) do
+    RAID_COLUMN_DEFS[#RAID_COLUMN_DEFS + 1] = {
+        key="raid_" .. group.key, title=group.label, width=#group.variants * RAID_CELL_W,
+        field=nil, justify="CENTER", group=group,
+    }
+end
+
+local function IsRaidsView()
+    local o = addon.db and addon.db.global and addon.db.global.options
+    return o and o.RosterView == "raids"
+end
+
+-- Column order and widths are remembered separately for each view.
+local function ViewOptionKeys()
+    if IsRaidsView() then return "raidColumnOrder", "raidColumnWidths" end
+    return "columnOrder", "columnWidths"
+end
+
 local function BuildActiveColumns()
     local o = addon.db and addon.db.global and addon.db.global.options or {}
+    local defs = IsRaidsView() and RAID_COLUMN_DEFS or COLUMN_DEFS
+    local orderKey, widthKey = ViewOptionKeys()
     local byKey = {}
-    for _, d in ipairs(COLUMN_DEFS) do
+    for _, d in ipairs(defs) do
         byKey[d.key] = { key=d.key, title=d.title, width=d.width, field=d.field,
-                         justify=d.justify, clip=d.clip, reset=d.reset }
+                         justify=d.justify, clip=d.clip, reset=d.reset, group=d.group }
     end
     local cols = {}
-    if o.columnOrder then
-        for _, k in ipairs(o.columnOrder) do
+    if o[orderKey] then
+        for _, k in ipairs(o[orderKey]) do
             if byKey[k] then table.insert(cols, byKey[k]); byKey[k] = nil end
         end
     end
-    for _, d in ipairs(COLUMN_DEFS) do
+    for _, d in ipairs(defs) do
         if byKey[d.key] then table.insert(cols, byKey[d.key]) end
     end
-    if o.columnWidths then
+    if o[widthKey] then
         for _, c in ipairs(cols) do
-            if o.columnWidths[c.key] then c.width = math.max(MIN_COL_W, o.columnWidths[c.key]) end
+            if o[widthKey][c.key] then c.width = math.max(MIN_COL_W, o[widthKey][c.key]) end
         end
     end
     return cols
@@ -177,16 +200,16 @@ RebuildColumnMetrics()
 
 local LEFT_PAD, RIGHT_MARGIN = 20, 34
 local PAD = 8
-local HEADER_HEIGHT = 24
+local HEADER_HEIGHT = 40
 local VIEW_TOP = 48
 local UPDATE_BANNER_HEIGHT = 22
 local VIEW_BOTTOM = 66
-local ROWS_OFFSET = 30
+local ROWS_OFFSET = 46
 local ROW_HEIGHT, ROW_STEP = 24, 26
 
 local DEFAULT_WIDTH = LEFT_PAD + BASE_WIDTH + RIGHT_MARGIN
 local DEFAULT_HEIGHT = 470
-local MIN_WIDTH, MIN_HEIGHT = 380, 260
+local MIN_WIDTH, MIN_HEIGHT = 720, 260
 
 --------------------------------------------------------------------------
 -- Theme switching
@@ -286,6 +309,8 @@ function addon:ResetColumn(column, allAccounts)
         if allAccounts or addon:IsMyCharacter(charDB) then
             if column == "wt" then
                 if charDB.SavedInstance then wipe(charDB.SavedInstance) end
+                charDB.RaidLockouts = nil
+                charDB.RaidKills = nil
                 charDB.wtScanned = false
             elseif column == "cost"     then charDB.RaidResetCost = 50000
             elseif column == "ash"      then
@@ -496,11 +521,81 @@ local function CreateFlatButton(parent, width, height, label, styleName)
 end
 
 --------------------------------------------------------------------------
+-- Raid lockout cells and Clear IDs
+--------------------------------------------------------------------------
+local function FormatDuration(seconds)
+    seconds = math.max(0, math.floor(seconds or 0))
+    local d = math.floor(seconds / 86400)
+    local h = math.floor((seconds % 86400) / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    if d > 0 then return string.format("%dd %dh %dm", d, h, m) end
+    if h > 0 then return string.format("%dh %dm", h, m) end
+    return string.format("%dm", m)
+end
+
+local KILLED_ICON = "|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t "
+local ALIVE_ICON  = "|TInterface\\RaidFrame\\ReadyCheck-NotReady:14|t "
+
+local function PaintRaidCell(cell, locked)
+    if locked then
+        local c = T.wtLvlLockedRGB or { 1, 0.33, 0.33 }
+        cell:SetBackdropColor(c[1], c[2], c[3], 0.85)
+        cell:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+    else
+        local b = T.accentDim or T.accent
+        cell:SetBackdropColor(0, 0, 0, 0.25)
+        cell:SetBackdropBorderColor(b[1], b[2], b[3], 0.45)
+    end
+end
+
+local function ShowRaidCellTooltip(cell)
+    local group, lock, data = cell.group, cell.lock, cell.charData
+    if not group or not data then return end
+    GameTooltip:SetOwner(cell, "ANCHOR_TOP")
+    GameTooltip:AddLine(group.label .. " - " .. addon.RaidData.VariantTitle[cell.variant], 1, 0.82, 0)
+    local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[data.class]
+    if cc then GameTooltip:AddLine(data.name, cc.r, cc.g, cc.b) else GameTooltip:AddLine(data.name, 1, 1, 1) end
+
+    if not lock then
+        GameTooltip:AddLine("Not locked", 0.40, 0.87, 0.40)
+        GameTooltip:Show()
+        return
+    end
+
+    GameTooltip:AddDoubleLine("Locked", "resets in " .. FormatDuration(lock.expires), 1, 0.33, 0.33, 0.85, 0.85, 0.85)
+    if lock.id then GameTooltip:AddDoubleLine("Instance ID", tostring(lock.id), 0.7, 0.7, 0.7, 1, 1, 1) end
+    GameTooltip:AddLine(" ")
+    if lock.kills then
+        local killed = 0
+        for i = 1, #group.bosses do if lock.kills[i] then killed = killed + 1 end end
+        GameTooltip:AddDoubleLine("Bosses", killed .. " / " .. #group.bosses, 1, 0.82, 0, 1, 1, 1)
+        for i, boss in ipairs(group.bosses) do
+            if lock.kills[i] then
+                GameTooltip:AddLine(KILLED_ICON .. boss.name, 0.55, 0.95, 0.55)
+            else
+                GameTooltip:AddLine(ALIVE_ICON .. boss.name, 0.6, 0.6, 0.6)
+            end
+        end
+    else
+        GameTooltip:AddLine("Boss kills were not recorded for this lockout.", 0.55, 0.52, 0.49, true)
+    end
+    GameTooltip:Show()
+end
+
+StaticPopupDialogs["ASHOHOLIC_CLEAR_IDS"] = {
+    text = "Clear ID's for |cFFFFD700%s|r for |cFF6FE6DC%s|r Soul Ashes?\n\n|cFFFF5555This cannot be undone.|r",
+    button1 = "Clear IDs", button2 = CANCEL,
+    OnAccept = function() addon:ClearInstanceIDs() end,
+    timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
+--------------------------------------------------------------------------
 -- Main window
 --------------------------------------------------------------------------
 function addon:CreateUI()
     if AshoholicFrame then return end
     EnsureTheme()
+    RebuildColumnMetrics()
 
     local sortField, sortAsc = "name", true
     local rows = {}
@@ -591,7 +686,51 @@ function addon:CreateUI()
     settingsBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     local version = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    version:SetPoint("RIGHT", closeBtn, "LEFT", -40, 0)
+
+    -- View switch: Overview (money, soul ash, ...) or Raids (per-difficulty lockout cells)
+    local viewTabs = {}
+    local function RefreshViewTabs()
+        local raids = IsRaidsView()
+        viewTabs.overview.active = not raids
+        viewTabs.raids.active = raids
+        viewTabs.overview:ApplyStyle(false)
+        viewTabs.raids:ApplyStyle(false)
+    end
+    local function SetView(view)
+        local o = addon.db.global.options
+        if o.RosterView == view or (view == "overview" and o.RosterView == nil) then return end
+        o.RosterView = view
+        frame.resetScroll = true
+        frame:Rebuild()
+        RefreshViewTabs()
+    end
+    for _, spec in ipairs({
+        { key = "raids", label = "Raids", tip = "Per-raid lockout cells. Filled = locked." },
+        { key = "overview", label = "Overview", tip = "Reset cost, Soul Ash, money, location." },
+    }) do
+        local tab = CreateFlatButton(frame, 62, 20, spec.label, "default")
+        local baseStyle = tab.ApplyStyle
+        function tab:ApplyStyle(hover)
+            baseStyle(self, hover)
+            if self.active then
+                local a = T.accentBright
+                self:SetBackdropBorderColor(a[1], a[2], a[3], 1)
+                self.text:SetTextColor(a[1], a[2], a[3], 1)
+            end
+        end
+        tab:SetScript("OnClick", function() SetView(spec.key) end)
+        tab:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+            GameTooltip:AddLine(spec.label .. " view", 1, 0.82, 0)
+            GameTooltip:AddLine(spec.tip, 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        tab:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        viewTabs[spec.key] = tab
+    end
+    viewTabs.raids:SetPoint("RIGHT", settingsBtn, "LEFT", -12, 0)
+    viewTabs.overview:SetPoint("RIGHT", viewTabs.raids, "LEFT", -2, 0)
+    version:SetPoint("RIGHT", viewTabs.overview, "LEFT", -14, 0)
 
     local VERSION_RELEASE_URL = "https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip"
     StaticPopupDialogs["ASHOHOLIC_VERSION_LINK"] = StaticPopupDialogs["ASHOHOLIC_VERSION_LINK"] or {
@@ -702,13 +841,14 @@ function addon:CreateUI()
 
     local function SaveColumnState()
         local o = addon.db.global.options
+        local orderKey, widthKey = ViewOptionKeys()
         local order, widths = {}, {}
         for _, c in ipairs(COLUMNS) do
             table.insert(order, c.key)
             widths[c.key] = c.width
         end
-        o.columnOrder = order
-        o.columnWidths = widths
+        o[orderKey] = order
+        o[widthKey] = widths
     end
 
     local function AttachHeaderInteractions(btn, col)
@@ -751,8 +891,10 @@ function addon:CreateUI()
         if dragState.mode == "resize" then
             local delta = x - dragState.startX
             local newW = math.max(MIN_COL_W, dragState.startW + delta)
-            addon.db.global.options.columnWidths = addon.db.global.options.columnWidths or {}
-            addon.db.global.options.columnWidths[dragState.colKey] = newW
+            local _, widthKey = ViewOptionKeys()
+            local o = addon.db.global.options
+            o[widthKey] = o[widthKey] or {}
+            o[widthKey][dragState.colKey] = newW
             frame:Rebuild()
         elseif dragState.mode == "drag" then
             local idx = frame:ColumnHitTest(x)
@@ -764,7 +906,7 @@ function addon:CreateUI()
                 local insertAt = idx
                 if idx > dragState.srcIdx then insertAt = idx end
                 table.insert(order, insertAt, dragState.colKey)
-                addon.db.global.options.columnOrder = order
+                addon.db.global.options[(ViewOptionKeys())] = order
                 frame:Rebuild()
                 for i, c in ipairs(COLUMNS) do
                     if c.key == dragState.colKey then dragState.srcIdx = i; dragState.targetIdx = i; break end
@@ -802,19 +944,44 @@ function addon:CreateUI()
             hl:SetVertexColor(1, 0.6, 0.2, 0.14); hl:SetBlendMode("ADD")
             btn.hl = hl
 
-            if col.key == "wt" then
-                local function SubLabel(text, fraction, isWT)
+            if col.key == "wt" or col.group then
+                -- Two tiers: title on top, one sub-label per cell underneath.
+                local function Label(textFn, x, y, point, rel, isTitle)
                     local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    fs:SetPoint("CENTER", btn, "LEFT", col.width * fraction, 0)
+                    fs:SetPoint(point, btn, rel, x, y)
                     fs.Retheme = function()
-                        fs:SetText(text)
-                        local rgb = isWT and T.wtLabelRGB or T.headerRGB
+                        fs:SetText(textFn())
+                        local rgb = (isTitle and col.key == "wt") and T.wtLabelRGB or T.headerRGB
                         if rgb then fs:SetTextColor(unpack(rgb)) end
                     end
                     fs.Retheme()
                     themedLabels[#themedLabels + 1] = fs
                 end
-                SubLabel("10m", 0.25); SubLabel("WT", 0.50, true); SubLabel("25m", 0.75)
+
+                local subs
+                if col.group then
+                    subs = {}
+                    for i, v in ipairs(col.group.variants) do subs[i] = addon.RaidData.VariantLabel[v] end
+                    -- Fall back to the short name when the title would overflow the column
+                    Label(function()
+                        local size = (T.layout and T.layout.headerFontSize) or 12
+                        local fits = string.len(col.group.label) * size * 0.55 <= col.width - 8
+                        return fits and col.group.label or col.group.short
+                    end, 0, 8, "CENTER", "CENTER", true)
+
+                    local sep = btn:CreateTexture(nil, "ARTWORK")
+                    sep:SetTexture(WHITE)
+                    sep:SetWidth(1)
+                    sep:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, -4)
+                    sep:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 4)
+                    btn.sep = sep
+                else
+                    subs = { "10", "25" }
+                    Label(function() return "World Tour" end, 0, 8, "CENTER", "CENTER", true)
+                end
+                for i, text in ipairs(subs) do
+                    Label(function() return text end, col.width * (i - 0.5) / #subs, -8, "CENTER", "LEFT", false)
+                end
             else
                 local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 if col.justify == "LEFT" then label:SetPoint("LEFT", btn, "LEFT", PAD, 0)
@@ -914,8 +1081,71 @@ function addon:CreateUI()
     end)
     resetBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
+    -- Raid-hour widget toggle
+    local trackerBtn = CreateFlatButton(frame, 132, 24, "", "default")
+    trackerBtn:SetPoint("LEFT", resetBtn, "RIGHT", 8, 0)
+    trackerBtn:SetScript("OnClick", function()
+        addon:ToggleHourlyWidget()
+        frame:UpdateFooter()
+    end)
+    trackerBtn:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Instance Tracker", 1, 0.82, 0)
+        GameTooltip:AddLine("Shows or hides the on-screen widget with your raid entries this hour (max 10).", 1, 1, 1, true)
+        GameTooltip:AddLine("Drag the widget to move it.", 0.55, 0.52, 0.49)
+        GameTooltip:AddLine("/ash widget to show/hide the widget.", 0.55, 0.52, 0.49)
+        GameTooltip:Show()
+    end)
+    trackerBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Clear IDs for the character being played, plus the weekly cost reset countdown
+    local clearBtn = CreateFlatButton(frame, 210, 24, "Clear IDs", "default")
+    clearBtn:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 14)
+    clearBtn:SetScript("OnClick", function()
+        local charDB, player = addon:GetCurrentCharacterDB()
+        if not charDB then return end
+        StaticPopup_Show("ASHOHOLIC_CLEAR_IDS", player, FormatNumberPlain(charDB.RaidResetCost or 50000))
+    end)
+    clearBtn:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Clear IDs", 1, 0.82, 0)
+        GameTooltip:AddLine("Clears the saved instance IDs of the character you are playing, for the Soul Ash shown.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    clearBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+
+    local costResetText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    costResetText:SetPoint("RIGHT", clearBtn, "LEFT", -12, 0)
+    costResetText:SetJustifyH("RIGHT")
+
+    function frame:UpdateFooter()
+        trackerBtn.text:SetText("Raid Tracker: " .. ((addon.db.global.options.ShowHourlyWidget == 0) and "Off" or "On"))
+
+        local charDB = addon:GetCurrentCharacterDB()
+        local cost = charDB and charDB.RaidResetCost
+        clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNumberPlain(cost) .. " Soul Ash") or "Clear IDs")
+
+        local at = addon.db.global.RaidCostResetAt
+        local countdown = "--"
+        if at then
+            local remaining = at - time()
+            while remaining <= 0 do remaining = remaining + 7 * 24 * 60 * 60 end
+            countdown = FormatDuration(remaining)
+        end
+        costResetText:SetText("Next cost reset: " .. countdown)
+    end
+
+    local footerTicker = CreateFrame("Frame", nil, frame)
+    footerTicker.elapsed = 0
+    footerTicker:SetScript("OnUpdate", function(self, elapsed)
+        self.elapsed = self.elapsed + elapsed
+        if self.elapsed < 1 then return end
+        self.elapsed = 0
+        frame:UpdateFooter()
+    end)
+
     local sliderHint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sliderHint:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -26, 19)
+    sliderHint:SetPoint("BOTTOMRIGHT", hSlider, "TOPRIGHT", 0, 2)
     sliderHint:Hide()
     hSlider:SetScript("OnEnter", function() if hSlider:IsShown() then sliderHint:Show() end end)
     hSlider:SetScript("OnLeave", function() sliderHint:Hide() end)
@@ -926,6 +1156,11 @@ function addon:CreateUI()
     local function CellText(row, key, template)
         local col = COLUMN_BY_KEY[key]
         local fs = row:CreateFontString(nil, "OVERLAY", template)
+        if not col then
+            -- Column belongs to the other view; keep the string so paint code can still write to it.
+            fs:Hide()
+            return fs
+        end
         fs:SetPoint("LEFT", row, "LEFT", COLUMN_X[key] + PAD, 0)
         if col.flex then fs:SetPoint("RIGHT", row, "RIGHT", -PAD, 0)
         else fs:SetWidth(col.width - PAD * 2) end
@@ -1004,6 +1239,21 @@ function addon:CreateUI()
         for n = 1, 2 do
             row.wtBtn[n]:SetSize(L.wtIconSize, L.wtIconSize)
         end
+
+        for _, col in ipairs(COLUMNS) do
+            local list = row.raidCells and row.raidCells[col.key]
+            if list then
+                local cellW = col.width / #list
+                local w, h = math.max(8, cellW - 8), math.max(10, ROW_HEIGHT - 8)
+                for k, cell in ipairs(list) do
+                    cell:SetSize(w, h)
+                    cell:ClearAllPoints()
+                    cell:SetPoint("CENTER", row, "LEFT", COLUMN_X[col.key] + cellW * (k - 0.5), 0)
+                end
+                local d = T.accentDim
+                row.raidSeps[col.key]:SetVertexColor(d[1], d[2], d[3], 0.35)
+            end
+        end
     end
 
     local function CreateRow(i)
@@ -1018,6 +1268,21 @@ function addon:CreateUI()
         row.topLine:SetTexture(WHITE); row.topLine:SetHeight(1)
         row.topLine:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
         row.topLine:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+
+        -- Tint and edge lines that mark the character being played
+        row.curBg = row:CreateTexture(nil, "BACKGROUND")
+        row.curBg:SetAllPoints(row); row.curBg:SetTexture(WHITE)
+        row.curBg:Hide()
+        row.curTop = row:CreateTexture(nil, "ARTWORK")
+        row.curTop:SetTexture(WHITE); row.curTop:SetHeight(1)
+        row.curTop:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+        row.curTop:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+        row.curTop:Hide()
+        row.curBottom = row:CreateTexture(nil, "ARTWORK")
+        row.curBottom:SetTexture(WHITE); row.curBottom:SetHeight(1)
+        row.curBottom:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
+        row.curBottom:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+        row.curBottom:Hide()
         row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         row:SetHighlightTexture(WHITE)
         row:GetHighlightTexture():SetBlendMode("ADD")
@@ -1103,9 +1368,11 @@ function addon:CreateUI()
 
         -- Soul Ash tooltip hitbox (only enabled on account rows)
         row.ashHitbox = CreateFrame("Frame", nil, row)
-        row.ashHitbox:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMN_X["ash"], 0)
-        row.ashHitbox:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", COLUMN_X["ash"], 0)
-        row.ashHitbox:SetWidth(COLUMN_BY_KEY["ash"].width)
+        if COLUMN_X["ash"] then
+            row.ashHitbox:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMN_X["ash"], 0)
+            row.ashHitbox:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", COLUMN_X["ash"], 0)
+            row.ashHitbox:SetWidth(COLUMN_BY_KEY["ash"].width)
+        end
         row.ashHitbox:EnableMouse(false)
 
         row.wtIcon, row.wtText, row.wtBtn = {}, {}, {}
@@ -1121,6 +1388,35 @@ function addon:CreateUI()
             txt:SetPoint("CENTER")
             row.wtText[n] = txt
             row.wtBtn[n] = wtBtn
+        end
+
+        -- Raids view: one cell per difficulty, with a divider at the start of each raid
+        row.raidCells, row.raidSeps = {}, {}
+        for _, col in ipairs(COLUMNS) do
+            if col.group then
+                local list = {}
+                for k, variant in ipairs(col.group.variants) do
+                    local cell = CreateFrame("Button", nil, row)
+                    cell:SetBackdrop(FLAT_BACKDROP)
+                    cell:SetFrameLevel(row:GetFrameLevel() + 3)
+                    cell.group, cell.variant = col.group, variant
+                    cell:SetScript("OnEnter", ShowRaidCellTooltip)
+                    cell:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                    cell:SetScript("OnMouseUp", function(_, button)
+                        local fn = row:GetScript("OnClick")
+                        if fn then fn(row, button) end
+                    end)
+                    cell:Hide()
+                    list[k] = cell
+                end
+                row.raidCells[col.key] = list
+                local sep = row:CreateTexture(nil, "ARTWORK")
+                sep:SetTexture(WHITE)
+                sep:SetWidth(1)
+                sep:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMN_X[col.key], 0)
+                sep:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", COLUMN_X[col.key], 0)
+                row.raidSeps[col.key] = sep
+            end
         end
 
         row.expand = row:CreateTexture(nil, "ARTWORK")
@@ -1239,6 +1535,14 @@ function addon:CreateUI()
             row.swapBtn.class = nil
         end
         for n = 1, 2 do row.wtIcon[n]:Hide(); row.wtText[n]:Hide() end
+        row.curBg:Hide(); row.curTop:Hide(); row.curBottom:Hide()
+        for key, list in pairs(row.raidCells) do
+            for _, cell in ipairs(list) do
+                cell:Hide()
+                cell.lock, cell.charData = nil, nil
+            end
+            row.raidSeps[key]:Hide()
+        end
         row.expand:Hide(); row.realmText:Hide(); row.topLine:Hide()
         row.ashHitbox:EnableMouse(false)
         row.ashHitbox:SetScript("OnEnter", nil)
@@ -1850,8 +2154,8 @@ function addon:CreateUI()
             row.money:SetText(FormatMoney(data.money or 0, ""))
             row.money:SetTextColor(unpack(T.moneyRGB or {1, 1, 1}))
 
-            -- Soul Ash breakdown tooltip (over the ash column)
-            row.ashHitbox:EnableMouse(true)
+            -- Soul Ash breakdown tooltip (over the ash column; absent in the Raids view)
+            row.ashHitbox:EnableMouse(COLUMN_X["ash"] ~= nil)
             row.ashHitbox:SetScript("OnEnter", function(self)
                 local committed = data.committedAsh or 0
                 local spendable = data.spendableAsh or 0
@@ -1886,8 +2190,8 @@ function addon:CreateUI()
                 local scale = self:GetEffectiveScale()
                 local relX = (cx / scale) - self:GetLeft()
                 local ashStart = COLUMN_X["ash"]
-                local ashEnd   = ashStart + COLUMN_BY_KEY["ash"].width
-                if relX >= ashStart and relX < ashEnd then
+                local ashEnd   = ashStart and (ashStart + COLUMN_BY_KEY["ash"].width)
+                if ashStart and relX >= ashStart and relX < ashEnd then
                     return  -- ash tooltip handles it
                 end
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -2012,6 +2316,19 @@ function addon:CreateUI()
             SetWTCell(row, 1, s10, data.lockedRaids10, data.name, "10 - Man")
             SetWTCell(row, 2, s25, data.lockedRaids25, data.name, "25 - Man")
 
+            for _, col in ipairs(COLUMNS) do
+                local list = row.raidCells[col.key]
+                if list then
+                    for _, cell in ipairs(list) do
+                        cell.lock = data.raidLocks and data.raidLocks[addon.RaidData.LockKey(col.group, cell.variant)]
+                        cell.charData = data
+                        PaintRaidCell(cell, cell.lock ~= nil)
+                        cell:Show()
+                    end
+                    row.raidSeps[col.key]:Show()
+                end
+            end
+
             row.cost:SetText(FormatNum(data.raidResetCost, T.formatResetCost))
             row.cost:SetTextColor(unpack(T.costRGB or {1, 0.82, 0}))
             row.ash:SetText(FormatNum(data.soulAsh, T.formatSoulAsh))
@@ -2040,6 +2357,15 @@ function addon:CreateUI()
             else
                 row.location:SetText("Unknown")
                 row.location:SetTextColor(unpack(T.mutedRGB or {0.55, 0.52, 0.49}))
+            end
+
+            if data.isCurrent then
+                local a = T.accentBright or T.accent
+                row.curBg:SetVertexColor(a[1], a[2], a[3], 0.16)
+                row.curTop:SetVertexColor(a[1], a[2], a[3], 0.9)
+                row.curBottom:SetVertexColor(a[1], a[2], a[3], 0.9)
+                row.accent:SetVertexColor(a[1], a[2], a[3], 1)
+                row.curBg:Show(); row.curTop:Show(); row.curBottom:Show()
             end
 
             LayoutNameHit(row)
@@ -2107,6 +2433,7 @@ function addon:CreateUI()
             end
         end
         SyncLockoutHover()
+        frame:UpdateFooter()
     end
 
     local function ApplyLayout()
@@ -2123,6 +2450,10 @@ function addon:CreateUI()
         hScroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -RIGHT_MARGIN, VIEW_BOTTOM)
         hContent:SetWidth(cw)
         hContent:SetHeight(math.max(vh, 1))
+        if frame.resetScroll then
+            frame.resetScroll = nil
+            hSlider:SetValue(0)
+        end
         local maxScroll = math.floor(cw - vw + 0.5)
         if maxScroll > 0 then
             hSlider:SetMinMaxValues(0, maxScroll)
@@ -2231,6 +2562,8 @@ function addon:CreateUI()
         sliderHint:SetText("Shift+scroll to pan columns")
         ApplyFont(sliderHint, L.mutedFont)
         if T.mutedRGB then sliderHint:SetTextColor(unpack(T.mutedRGB)) end
+        ApplyFont(costResetText, L.mutedFont)
+        if T.mutedRGB then costResetText:SetTextColor(unpack(T.mutedRGB)) end
         hSlider:SetBackdropColor(unpack(T.sliderBg))
         hSlider:SetBackdropBorderColor(unpack(T.sliderBorder))
         hThumb:SetVertexColor(a[1],a[2],a[3], a[4] or 1)
@@ -2240,6 +2573,10 @@ function addon:CreateUI()
         local br = T.accentBright
         for _, btn in ipairs(headerButtons) do
             if btn.hl then btn.hl:SetVertexColor(br[1], br[2], br[3], br[4] or 0.14) end
+            if btn.sep then
+                local d = T.accentDim
+                btn.sep:SetVertexColor(d[1], d[2], d[3], 0.6)
+            end
             if btn.label then
                 ApplyFont(btn.label, L.headerFont, L.headerFontSize)
                 btn.label:SetText(btn.col.title)
@@ -2298,6 +2635,7 @@ function addon:CreateUI()
         ApplyLayout()
     end
 
+    RefreshViewTabs()
     ApplyLayout()
 end
 

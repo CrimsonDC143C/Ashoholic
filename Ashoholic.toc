@@ -10,6 +10,7 @@
 Libraries\Load_Libraries.xml
 
 Core.lua
+RaidData.lua
 Characters.lua
 HourlyWidget.lua
 Minimap.lua

@@ -169,8 +169,11 @@ function addon:InitHourlyWidget()
             local shown = math.min(hourly.count, 10)
             for i = 1, shown do
                 local entry = hourly.entries[i]
-                GameTooltip:AddDoubleLine(entry.label, Clock(entry.expires), 1, 1, 1, 1, 0.82, 0)
+                GameTooltip:AddDoubleLine(entry.label,
+                    date("%H:%M", entry.time) .. "  (" .. Clock(entry.expires) .. ")",
+                    1, 1, 1, 1, 0.82, 0)
             end
+            GameTooltip:AddLine("Entered at (time left in hour)", 0.55, 0.52, 0.49)
         end
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("Drag to move.  /ash widget to hide.", 0.55, 0.52, 0.49)
