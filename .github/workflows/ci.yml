@@ -1,0 +1,50 @@
+name: CI
+
+# Pull requests into main, and pushes to main. Packaging is a dry run:
+# nothing is published and no release is created.
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ashoholic-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-content:
+    name: package-content
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Package dry-run and manifest paths
+        run: python3 tools/check_package.py
+
+  offline-suite:
+    name: offline-suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Lua 5.1
+        run: sudo apt-get update && sudo apt-get install --yes lua5.1
+
+      - name: Parse every Lua file
+        # No offline gameplay suite is shipped with this addon. Lua 5.1
+        # syntax across the tracked .lua files is the check.
+        run: python3 tools/check_lua.py

@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Ashoholic.zip
+      - name: Read addon version
         run: |
           version="$(sed -n 's/^## Version:[[:space:]]*//p' Ashoholic.toc | tr -d '\r')"
           if [ -z "$version" ]; then
@@ -24,21 +24,9 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_ENV"
-          rm -rf package
-          mkdir -p package/Ashoholic package/FastSwap package/SharedMedia
-          cp Ashoholic.toc package/Ashoholic/Ashoholic.toc
-          cp Ashoholic.bat AshoholicMerge.ps1 AshoholicSync.ps1 \
-             Characters.lua Core.lua HourlyWidget.lua Minimap.lua Themes.lua UI.lua NexusDock.lua \
-             package/Ashoholic/
-          cp -a Libraries package/Ashoholic/Libraries
-          cp FastSwap/FastSwap.toc FastSwap/FastSwap.lua FastSwap/FastSwap_Glue.lua \
-             FastSwap/Sync-FastSwapGlue.ps1 package/FastSwap/
-          cp -a SharedMedia/. package/SharedMedia/
-          (cd package && zip -r ../Ashoholic.zip Ashoholic FastSwap SharedMedia)
-          unzip -l Ashoholic.zip
-          unzip -l Ashoholic.zip | grep -q 'Ashoholic/Ashoholic.toc'
-          unzip -l Ashoholic.zip | grep -q 'FastSwap/FastSwap.toc'
-          unzip -l Ashoholic.zip | grep -q 'SharedMedia/SharedMedia.toc'
+
+      - name: Build Ashoholic.zip
+        run: python3 tools/check_package.py --zip Ashoholic.zip
 
       - name: Publish Ashoholic.zip
         env:
