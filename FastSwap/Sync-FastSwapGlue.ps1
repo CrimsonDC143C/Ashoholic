@@ -176,7 +176,7 @@ if ($LaunchGame) {
         $quietSince = $null
         try {
             while ($true) {
-                $result = $watcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed -bor [System.IO.WatcherChangeTypes]::Created -bor [System.IO.WatcherChangeTypes]::Renamed, 2000)
+                $result = $watcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed -bor [System.IO.WatcherChangeTypes]::Created -bor [System.IO.WatcherChangeTypes]::Renamed, 500)
                 if (-not $result.TimedOut) {
                     Start-Sleep -Milliseconds 500
                     try {
@@ -190,14 +190,14 @@ if ($LaunchGame) {
                     $seenRunning = $true
                     $quietSince = $null
                 } elseif (-not $seenRunning) {
-                    if (((Get-Date) - $startedAt).TotalSeconds -ge 60) {
+                    if (((Get-Date) - $startedAt).TotalSeconds -ge 15) {
                         Write-Host "[FastSwap] Ebonhold did not stay running. Stopped watching."
                         break
                     }
                 } else {
                     if (-not $quietSince) {
                         $quietSince = Get-Date
-                    } elseif (((Get-Date) - $quietSince).TotalSeconds -ge 15) {
+                    } elseif (((Get-Date) - $quietSince).TotalSeconds -ge 2) {
                         Write-Host "[FastSwap] Ebonhold closed. Stopped watching."
                         break
                     }
