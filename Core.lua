@@ -640,100 +640,9 @@ function addon:UpdateSoulAshData()
     charDB.SoulAsh = charDB.RunSoulAsh + charDB.SpendableSoulAsh
 end
 
-local gatheredTexts = {}
-
-local function GatherAllTexts(frame)
-    if not frame then return end
-    if frame.GetText and frame:GetObjectType() == "Button" then
-        local t = frame:GetText()
-        if t and t ~= "" then table.insert(gatheredTexts, t) end
-    end
-    if frame.GetNumRegions then
-        for i = 1, frame:GetNumRegions() do
-            local reg = select(i, frame:GetRegions())
-            if reg and reg:GetObjectType() == "FontString" then
-                local t = reg:GetText()
-                if t and t ~= "" then table.insert(gatheredTexts, t) end
-            end
-        end
-    end
-    if frame.GetNumChildren then
-        for i = 1, frame:GetNumChildren() do
-            GatherAllTexts(select(i, frame:GetChildren()))
-        end
-    end
-end
-
-local function ExtractCostFromList(framesTexts)
-    for i, text in ipairs(framesTexts) do
-        if text and string.find(string.lower(text), "clear ids") then
-            local clean = string.gsub(text, "|T.-|t", "")
-            clean = string.gsub(clean, "|c%x%x%x%x%x%x%x%x", "")
-            clean = string.gsub(clean, "|r", "")
-            local digits = string.gsub(clean, "%D", "")
-            if digits ~= "" then return tonumber(digits) end
-            
-            for j = i + 1, math.min(i + 5, #framesTexts) do
-                local nextText = framesTexts[j]
-                if nextText then
-                    local nClean = string.gsub(nextText, "|T.-|t", "")
-                    nClean = string.gsub(nClean, "|c%x%x%x%x%x%x%x%x", "")
-                    nClean = string.gsub(nClean, "|r", "")
-                    local nDigits = string.gsub(nClean, "%D", "")
-                    if nDigits ~= "" then
-                        local noNumbers = string.gsub(nClean, "[%d%s%,%.]", "")
-                        if noNumbers == "" then return tonumber(nDigits) end
-                    end
-                end
-            end
-        end
-    end
-    return nil
-end
-
 local RAID_COST_BASE = 50000
 local RAID_COST_WEEK = 7 * 24 * 60 * 60
 local RAID_COST_CYCLE_SLACK = 12 * 60 * 60
-
-local function ParseCountdownDuration(text)
-    if not text then return nil end
-    local clean = string.gsub(text, "|T.-|t", "")
-    clean = string.gsub(clean, "|c%x%x%x%x%x%x%x%x", "")
-    clean = string.gsub(clean, "|r", "")
-    local lower = string.lower(clean)
-    if not string.match(lower, "%d+%s*[dhms]") then return nil end
-
-    local days = tonumber(string.match(lower, "(%d+)%s*d")) or 0
-    local hours = tonumber(string.match(lower, "(%d+)%s*h")) or 0
-    local mins = tonumber(string.match(lower, "(%d+)%s*m")) or 0
-    local secs = string.match(lower, "(%d+)%s*s")
-    local hasSeconds = secs ~= nil
-    secs = tonumber(secs) or 0
-
-    local duration = (days * 86400) + (hours * 3600) + (mins * 60) + secs
-    if duration > (8 * 86400) then return nil end
-    if not hasSeconds then
-        duration = duration + 60
-    end
-    return duration
-end
-
-local function ExtractResetCountdown(framesTexts)
-    for i, text in ipairs(framesTexts) do
-        if text and string.find(string.lower(text), "cost reset") then
-            local combined = text
-            if framesTexts[i + 1] then
-                combined = combined .. " " .. framesTexts[i + 1]
-            end
-            local duration = ParseCountdownDuration(combined)
-            if not duration and framesTexts[i + 2] then
-                duration = ParseCountdownDuration(combined .. " " .. framesTexts[i + 2])
-            end
-            if duration then return duration end
-        end
-    end
-    return nil
-end
 
 local function RefreshOpenRoster()
     if AshoholicFrame and AshoholicFrame:IsVisible() then
@@ -790,71 +699,19 @@ function addon:TrackRaidCostReset(observedResetAt)
     end
 end
 
-local isScrapingCost = false
-
 function addon:UpdateRaidResetCost()
-    if isScrapingCost then return end
-    isScrapingCost = true
-
-    local wasFriendsShown = FriendsFrame and FriendsFrame:IsVisible()
-    local wasRaidShown = RaidFrame and RaidFrame:IsVisible()
-
-    if FriendsFrame_LoadUI then FriendsFrame_LoadUI() end
-
-    -- Open it once in the background
-    if not wasFriendsShown and FriendsFrame then
-        FriendsFrame:Show()
+    local requestId = ProjectEbonhold and ProjectEbonhold.CS and ProjectEbonhold.CS.REQUEST_ACTION_TRACKER_INFO
+    local actionId = ProjectEbonhold and ProjectEbonhold.ActionTypes and ProjectEbonhold.ActionTypes.INSTANCE_RESET
+    if requestId and actionId and type(ProjectEbonhold.sendToServer) == "function" then
+        ProjectEbonhold.sendToServer(requestId, tostring(actionId))
     end
-    if not wasRaidShown and RaidFrame then
-        RaidFrame:Show()
-    end
-
-    local cost = nil
-    local observedResetAt = nil
-    local rf1 = _G["RaidFrameNotInRaid"]
-    local rf2 = _G["RaidFrame"]
-    
-    if (rf1 and rf1:IsVisible()) or (rf2 and rf2:IsVisible()) then
-        wipe(gatheredTexts)
-        GatherAllTexts(_G["FriendsFrame"])
-        cost = ExtractCostFromList(gatheredTexts)
-        local countdown = ExtractResetCountdown(gatheredTexts)
-        if countdown then
-            observedResetAt = time() + countdown
-        end
-    end
-
-    -- Check the weekly reset deadline even if the countdown wasn't scraped
-    -- this call, so it fires after weeks of being offline too.
-    addon:TrackRaidCostReset(observedResetAt)
-
-    -- Close it immediately back to how it was
-    if not wasRaidShown and RaidFrame then
-        RaidFrame:Hide()
-    end
-    if not wasFriendsShown and FriendsFrame then
-        FriendsFrame:Hide()
-    end
-
-    if cost then
-        local currentCharacter = UnitName("player")
-        local realm = GetRealmName()
-        local key = format("%s.%s", realm, currentCharacter)
-        local charDB = addon.db.global.Characters[key]
-        if charDB then
-            charDB.RaidResetCost = cost
-        end
-    end
-
-    isScrapingCost = false
 end
 
 --------------------------------------------------------------------------
--- Clear IDs. Ebonhold action 601 acts on the logged-in character only; its
--- acknowledgement is a changed reset count in the tracker reply (700).
+-- Clear IDs. The server tracker (700) is authoritative for cost and weekly
+-- reset time; result (701) confirms whether a clear actually succeeded.
 --------------------------------------------------------------------------
 local RESET_PROTOCOL_PREFIX = "AAM0x9"
-local lastResetCount = nil
 local pendingClearIDs = false
 
 function addon:GetCurrentCharacterDB()
@@ -874,36 +731,69 @@ function addon:OnIDsCleared()
         end
     end
     if RequestRaidInfo then RequestRaidInfo() end
+    addon:UpdateRaidResetCost()
     C_Timer.After(1.5, function()
-        addon:UpdateRaidResetCost()
         RefreshOpenRoster()
     end)
 end
 
+local function ApplyRaidResetTracker(body)
+    local actionId, count, nextResetTime = string.match(body, "^(%d+),(%d+),(%d+)$")
+    actionId = tonumber(actionId)
+    count = tonumber(count)
+    nextResetTime = tonumber(nextResetTime)
+    local resetType = ProjectEbonhold and ProjectEbonhold.ActionTypes and ProjectEbonhold.ActionTypes.INSTANCE_RESET
+    if not resetType or actionId ~= resetType or not count or not nextResetTime then return end
+
+    local config = ProjectEbonhold and ProjectEbonhold.InstanceResetConfig
+    if not config or type(config.BASE_COST) ~= "number" or type(config.COST_MULTIPLIER) ~= "number" then return end
+    local cost = config.BASE_COST
+    for _ = 1, count do
+        cost = cost * config.COST_MULTIPLIER
+        if cost >= 2147483647 then
+            cost = 2147483647
+            break
+        end
+    end
+
+    addon:TrackRaidCostReset(nextResetTime > 0 and nextResetTime or nil)
+    local charDB = addon:GetCurrentCharacterDB()
+    if charDB and charDB.RaidResetCost ~= cost then
+        charDB.RaidResetCost = cost
+        RefreshOpenRoster()
+    end
+end
+
 function addon:ClearInstanceIDs()
-    if not ProjectEbonhold or type(ProjectEbonhold.sendToServer) ~= "function" then
+    local requestId = ProjectEbonhold and ProjectEbonhold.CS and ProjectEbonhold.CS.REQUEST_INSTANCE_RESET_ALL
+    if not requestId or type(ProjectEbonhold.sendToServer) ~= "function" then
         print("|cFF00FF9AAshoholic:|r |cffff4040Clear IDs is not available right now.|r")
         return
     end
+    if pendingClearIDs then return end
     pendingClearIDs = true
-    ProjectEbonhold.sendToServer(600, "1") -- primes lastResetCount before the clear
-    ProjectEbonhold.sendToServer(601, "")
-    C_Timer.After(8, function() pendingClearIDs = false end)
+    ProjectEbonhold.sendToServer(requestId, "")
+    C_Timer.After(8, function()
+        pendingClearIDs = false
+    end)
 end
 
 local resetAckFrame = CreateFrame("Frame")
 resetAckFrame:RegisterEvent("CHAT_MSG_ADDON")
 resetAckFrame:SetScript("OnEvent", function(_, _, prefix, payload)
     if prefix ~= RESET_PROTOCOL_PREFIX or type(payload) ~= "string" then return end
-    local body = string.match(payload, "^700\t(.*)$")
-    local actionId, count = string.match(body or "", "^(%d+),(%d+),%d+$")
-    if tonumber(actionId) ~= 1 then return end
-    count = tonumber(count)
-    local previous = lastResetCount
-    lastResetCount = count
-    if pendingClearIDs and previous ~= nil and count ~= previous then
+
+    local eventId, body = string.match(payload, "^(%d+)\t(.*)$")
+    eventId = tonumber(eventId)
+    if eventId == ProjectEbonhold.SS.SEND_ACTION_TRACKER_INFO then
+        ApplyRaidResetTracker(body)
+    elseif eventId == ProjectEbonhold.SS.SEND_INSTANCE_RESET_RESULT then
+        local resultCode = tonumber(string.match(body, "^(%d+),%d+$"))
+        if not pendingClearIDs or not resultCode then return end
         pendingClearIDs = false
-        addon:OnIDsCleared()
+        if resultCode == 0 then
+            addon:OnIDsCleared()
+        end
     end
 end)
 
