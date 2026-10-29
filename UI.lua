@@ -2271,9 +2271,13 @@ function addon:CreateUI()
             -- FastSwap button: show for alts, hide for the currently logged-in character
             local currentPlayer = UnitName and UnitName("player")
             local isCurrentChar = currentPlayer and data.name and (string.lower(currentPlayer) == string.lower(data.name))
+            local currentCharDB = addon:GetCurrentCharacterDB()
+            local currentSourceAccount = currentCharDB and
+                (currentCharDB._sourceAccount or currentCharDB.account or "Main Account")
+            local isCurrentAccount = currentSourceAccount and data.sourceAccount == currentSourceAccount
             local nameOffset = T.showClassIcons and math.max(18, (T.layout.classIconSize or 14) + 4) or 0
             if row.swapBtn then
-                if not isCurrentChar and data.name and data.name ~= "" then
+                if isCurrentAccount and not isCurrentChar and data.name and data.name ~= "" then
                     row.swapBtn.charName = data.name
                     row.swapBtn.class = data.class
                     row.swapBtn:ApplyStyle(false)
