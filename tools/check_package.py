@@ -29,6 +29,7 @@ EXPLICIT = {
     "AshoholicSync.ps1": "Ashoholic/AshoholicSync.ps1",
     "Characters.lua": "Ashoholic/Characters.lua",
     "Core.lua": "Ashoholic/Core.lua",
+    "RaidData.lua": "Ashoholic/RaidData.lua",
     "HourlyWidget.lua": "Ashoholic/HourlyWidget.lua",
     "Minimap.lua": "Ashoholic/Minimap.lua",
     "Themes.lua": "Ashoholic/Themes.lua",
