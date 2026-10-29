@@ -849,6 +849,64 @@ function addon:UpdateRaidResetCost()
     isScrapingCost = false
 end
 
+--------------------------------------------------------------------------
+-- Clear IDs. Ebonhold action 601 acts on the logged-in character only; its
+-- acknowledgement is a changed reset count in the tracker reply (700).
+--------------------------------------------------------------------------
+local RESET_PROTOCOL_PREFIX = "AAM0x9"
+local lastResetCount = nil
+local pendingClearIDs = false
+
+function addon:GetCurrentCharacterDB()
+    local player = UnitName("player")
+    if not player or player == UNKNOWN or not addon.db then return nil end
+    return addon.db.global.Characters[format("%s.%s", GetRealmName(), player)], player
+end
+
+function addon:OnIDsCleared()
+    local charDB = addon:GetCurrentCharacterDB()
+    if charDB then
+        if addon.RaidData then addon.RaidData:ClearKills(charDB) end
+        if type(charDB.hourlyGen) == "table" then
+            for key, value in pairs(charDB.hourlyGen) do
+                charDB.hourlyGen[key] = (value or 0) + 1
+            end
+        end
+    end
+    if RequestRaidInfo then RequestRaidInfo() end
+    C_Timer.After(1.5, function()
+        addon:UpdateRaidResetCost()
+        RefreshOpenRoster()
+    end)
+end
+
+function addon:ClearInstanceIDs()
+    if not ProjectEbonhold or type(ProjectEbonhold.sendToServer) ~= "function" then
+        print("|cFF00FF9AAshoholic:|r |cffff4040Clear IDs is not available right now.|r")
+        return
+    end
+    pendingClearIDs = true
+    ProjectEbonhold.sendToServer(600, "1") -- primes lastResetCount before the clear
+    ProjectEbonhold.sendToServer(601, "")
+    C_Timer.After(8, function() pendingClearIDs = false end)
+end
+
+local resetAckFrame = CreateFrame("Frame")
+resetAckFrame:RegisterEvent("CHAT_MSG_ADDON")
+resetAckFrame:SetScript("OnEvent", function(_, _, prefix, payload)
+    if prefix ~= RESET_PROTOCOL_PREFIX or type(payload) ~= "string" then return end
+    local body = string.match(payload, "^700\t(.*)$")
+    local actionId, count = string.match(body or "", "^(%d+),(%d+),%d+$")
+    if tonumber(actionId) ~= 1 then return end
+    count = tonumber(count)
+    local previous = lastResetCount
+    lastResetCount = count
+    if pendingClearIDs and previous ~= nil and count ~= previous then
+        pendingClearIDs = false
+        addon:OnIDsCleared()
+    end
+end)
+
 function addon:UpdateSavedInstances()
     local realm = GetRealmName()
     local player = UnitName("player")
@@ -860,6 +918,9 @@ function addon:UpdateSavedInstances()
 
     charDB.SavedInstance = charDB.SavedInstance or {}
     wipe(charDB.SavedInstance)
+    charDB.RaidLockouts = charDB.RaidLockouts or {}
+    wipe(charDB.RaidLockouts)
+    local scanTime = time()
 
     for i = 1, GetNumSavedInstances() do
         -- reset is seconds remaining at this moment, not an absolute timestamp.
@@ -877,9 +938,18 @@ function addon:UpdateSavedInstances()
             end
             charDB.SavedInstance[keyName] =
                 (reset or 0) .. "|" .. time() .. "|" .. diff .. "|" .. (isRaid and "1" or "0")
+
+            local raidData = addon.RaidData
+            local group = isRaid and raidData and raidData:FindGroup(name)
+            local variant = group and raidData.DifficultyVariant[tonumber(difficulty)]
+            if variant then
+                charDB.RaidLockouts[raidData.LockKey(group, variant)] =
+                    { id = id, resetAt = scanTime + (reset or 0) }
+            end
         end
     end
     charDB.wtScanned = true
+    if addon.RaidData then addon.RaidData:PruneKills(charDB) end
 end
 
 --------------------------------------------------------------------------
@@ -1184,6 +1254,8 @@ function addon:ResetAllCharacterData()
     local currentChar = addon.db.global.Characters[currentKey]
     if currentChar then
         currentChar.SavedInstance      = {}
+        currentChar.RaidLockouts       = {}
+        currentChar.RaidKills          = nil
         currentChar.wtScanned          = false
         currentChar.RaidResetCost      = 50000
         currentChar.SoulAsh            = 0
