@@ -4,6 +4,9 @@
 # Ignore local sync configs
 sync_config.txt
 
+# Ignore extracted Project Ebonhold addon source
+/ProjectEbonhold/
+
 # Ignore OS generated files
 .DS_Store
 Thumbs.db
