@@ -1306,6 +1306,9 @@ function addon:BeginDraft(fromKey)
     if draft.moneyGoldOnly == nil then
         draft.moneyGoldOnly = (builtForFlags and builtForFlags.moneyGoldOnly) or false
     end
+    if draft.costResetWeekday == nil then
+        draft.costResetWeekday = (builtForFlags and builtForFlags.costResetWeekday) or false
+    end
 
     addon.Themes:EnsureLayout(draft)
 
@@ -1446,6 +1449,7 @@ function addon:SaveDraftToExisting(key)
     for _, f in ipairs({
         "classColoredNames","showClassIcons","classColoredAccent","outerBorder",
         "formatResetCost","formatSoulAsh","formatMoney","moneyGoldOnly",
+        "costResetWeekday",
         "panelAlpha","glow",
     }) do
         if def[f] == nil and existing and existing[f] ~= nil then
