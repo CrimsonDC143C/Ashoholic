@@ -205,6 +205,7 @@ local function Build(def)
     T.formatSoulAsh   = def.formatSoulAsh   or false
     T.formatMoney     = def.formatMoney     or false
     T.moneyGoldOnly   = def.moneyGoldOnly   or false
+    T.costResetWeekday = def.costResetWeekday or false
 
     T.classColoredNames = def.classColoredNames ~= false
     T.showClassIcons    = def.showClassIcons    ~= false
@@ -306,6 +307,7 @@ function Themes:GetCustoms()
         if def.formatSoulAsh      == nil then def.formatSoulAsh      = built.formatSoulAsh;      dirty = true end
         if def.formatMoney        == nil then def.formatMoney        = built.formatMoney;        dirty = true end
         if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = built.moneyGoldOnly;      dirty = true end
+        if def.costResetWeekday   == nil then def.costResetWeekday   = built.costResetWeekday;   dirty = true end
         if def.panelAlpha ~= 100 then def.panelAlpha = 100; dirty = true end
         if def.glow == nil then def.glow = 13; dirty = true
         elseif def.glow > 0 and def.glow < 1 then def.glow = def.glow * 100; dirty = true end
@@ -370,6 +372,7 @@ function Themes:SaveCustom(key, def)
     if def.formatSoulAsh      == nil then def.formatSoulAsh      = false end
     if def.formatMoney        == nil then def.formatMoney        = false end
     if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = false end
+    if def.costResetWeekday   == nil then def.costResetWeekday   = false end
     def.panelAlpha = 100
     if def.glow == nil then def.glow = 13
     elseif def.glow > 0 and def.glow < 1 then def.glow = def.glow * 100 end

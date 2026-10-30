@@ -1116,8 +1116,12 @@ function addon:CreateUI()
     clearBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     local costResetText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    costResetText:SetPoint("LEFT", trackerBtn, "RIGHT", 12, 0)
     costResetText:SetPoint("RIGHT", clearBtn, "LEFT", -12, 0)
+    costResetText:SetHeight(30)
     costResetText:SetJustifyH("RIGHT")
+    if costResetText.SetJustifyV then costResetText:SetJustifyV("MIDDLE") end
+    if costResetText.SetWordWrap then costResetText:SetWordWrap(true) end
 
     function frame:UpdateFooter()
         trackerBtn.text:SetText("Raid Tracker: " .. ((addon.db.global.options.ShowHourlyWidget == 0) and "Off" or "On"))
@@ -1127,13 +1131,18 @@ function addon:CreateUI()
         clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNum(cost, T.formatClearIDs) .. " Soul Ash") or "Clear IDs")
 
         local at = addon.db.global.RaidCostResetAt
-        local countdown = "--"
+        local resetDisplay = "--"
         if at then
-            local remaining = at - time()
+            local now = time()
+            local remaining = at - now
             while remaining <= 0 do remaining = remaining + 7 * 24 * 60 * 60 end
-            countdown = FormatDuration(remaining)
+            if T.costResetWeekday then
+                resetDisplay = date("%A %H:%M", now + remaining)
+            else
+                resetDisplay = FormatDuration(remaining)
+            end
         end
-        costResetText:SetText("Next cost reset: " .. countdown)
+        costResetText:SetText("Next cost reset: " .. resetDisplay)
     end
 
     local footerTicker = CreateFrame("Frame", nil, frame)
@@ -4157,6 +4166,9 @@ function addon:ToggleConfigUI()
     addToggle("Compact Soul Ash",       "formatSoulAsh")
     addToggle("Compact Money",          "formatMoney")
     addToggle("Money: gold only",       "moneyGoldOnly")
+
+    sectionTitle("Cost Reset")
+    addToggle("Weekday/time (local)", "costResetWeekday")
 
     sectionTitle("Tabs")
     addFont("Tabs text font",       "tabFont", true, true)
