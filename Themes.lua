@@ -70,6 +70,11 @@ local function AsPercent(v, fallback)
     return v
 end
 
+for _, def in ipairs(DEFS) do
+    def.headerText = def.headerText or def.gold or def.accent2
+    def.headerLabels = def.headerLabels or def.loc or def.body or "FFFFFF"
+end
+
 local function Build(def)
     -- Parse "bg" as a full hex string so an 8-char RRGGBBAA value carries
     -- its alpha through. 6-char hex values behave exactly as before
@@ -134,6 +139,7 @@ local function Build(def)
         titleText    = Code(def.titleText        or gold),
         settingsTitleText = Code(def.settingsTitleText or gold),
         headerText   = Code(def.headerText       or gold),   -- ONLY column headers
+        headerLabels = Code(def.headerLabels     or def.headerText or gold),
         sectionHeaderText = Code(def.sectionHeaderText or def.headerText or gold),  -- Customize section titles
         totalsText   = Code(def.totalsText       or gold),
         ember        = Code(def.ember            or "FF8A2B"),
@@ -157,6 +163,7 @@ local function Build(def)
     T.locRGB           = RGB(def.loc or "D6CFC0")
     T.dimRGB           = RGB(def.dim or "B8B2A8")
     T.headerRGB        = RGB(def.headerText or gold)
+    T.headerLabelsRGB  = RGB(def.headerLabels or def.headerText or gold)
     T.sectionHeaderRGB = RGB(def.sectionHeaderText or def.headerText or gold)
     T.totalsRGB        = RGB(def.totalsText or gold)
     T.nameRGB          = RGB(def.nameColor or "FFFFFF")
@@ -167,7 +174,6 @@ local function Build(def)
     T.accountNameRGB   = RGB(def.accountName or "FF8A2B")
     T.wtLvlLockedRGB   = RGB(def.wtLvlLocked or "FF5555")
     T.wtLvlUnlockedRGB = RGB(def.wtLvlUnlocked or "66DD66")
-
 
     T.btn = {
         default = {
