@@ -200,6 +200,7 @@ local function Build(def)
 
     -- Number format toggles (item 8)
     T.formatResetCost = def.formatResetCost or false
+    T.formatClearIDs  = def.formatClearIDs  or false
     T.formatSoulAsh   = def.formatSoulAsh   or false
     T.formatMoney     = def.formatMoney     or false
     T.moneyGoldOnly   = def.moneyGoldOnly   or false
@@ -300,6 +301,7 @@ function Themes:GetCustoms()
         if def.classColoredAccent == nil then def.classColoredAccent = built.classColoredAccent; dirty = true end
         if def.outerBorder        == nil then def.outerBorder        = built.outerBorder;        dirty = true end
         if def.formatResetCost    == nil then def.formatResetCost    = built.formatResetCost;    dirty = true end
+        if def.formatClearIDs     == nil then def.formatClearIDs     = built.formatClearIDs;     dirty = true end
         if def.formatSoulAsh      == nil then def.formatSoulAsh      = built.formatSoulAsh;      dirty = true end
         if def.formatMoney        == nil then def.formatMoney        = built.formatMoney;        dirty = true end
         if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = built.moneyGoldOnly;      dirty = true end
@@ -363,6 +365,7 @@ function Themes:SaveCustom(key, def)
     if def.classColoredAccent == nil then def.classColoredAccent = true  end
     if def.outerBorder        == nil then def.outerBorder        = true  end
     if def.formatResetCost    == nil then def.formatResetCost    = false end
+    if def.formatClearIDs     == nil then def.formatClearIDs     = false end
     if def.formatSoulAsh      == nil then def.formatSoulAsh      = false end
     if def.formatMoney        == nil then def.formatMoney        = false end
     if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = false end

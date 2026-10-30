@@ -1297,6 +1297,9 @@ function addon:BeginDraft(fromKey)
     if draft.formatResetCost == nil then
         draft.formatResetCost = (builtForFlags and builtForFlags.formatResetCost) or false
     end
+    if draft.formatClearIDs == nil then
+        draft.formatClearIDs = (builtForFlags and builtForFlags.formatClearIDs) or false
+    end
     if draft.formatSoulAsh == nil then
         draft.formatSoulAsh = (builtForFlags and builtForFlags.formatSoulAsh) or false
     end
@@ -1445,7 +1448,7 @@ function addon:SaveDraftToExisting(key)
     -- somehow dropped them. Prevents a stray "revert to default" on save.
     for _, f in ipairs({
         "classColoredNames","showClassIcons","classColoredAccent","outerBorder",
-        "formatResetCost","formatSoulAsh","formatMoney","moneyGoldOnly",
+        "formatResetCost","formatClearIDs","formatSoulAsh","formatMoney","moneyGoldOnly",
         "panelAlpha","glow",
     }) do
         if def[f] == nil and existing and existing[f] ~= nil then

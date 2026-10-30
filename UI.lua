@@ -1124,7 +1124,7 @@ function addon:CreateUI()
 
         local charDB = addon:GetCurrentCharacterDB()
         local cost = charDB and charDB.RaidResetCost
-        clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNumberPlain(cost) .. " Soul Ash") or "Clear IDs")
+        clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNum(cost, T.formatClearIDs) .. " Soul Ash") or "Clear IDs")
 
         local at = addon.db.global.RaidCostResetAt
         local countdown = "--"
@@ -4151,6 +4151,7 @@ function addon:ToggleConfigUI()
 
     sectionTitle("Number Format")
     addToggle("Compact Reset Cost",     "formatResetCost")
+    addToggle("Compact Clear IDs cost", "formatClearIDs")
     addToggle("Compact Soul Ash",       "formatSoulAsh")
     addToggle("Compact Money",          "formatMoney")
     addToggle("Money: gold only",       "moneyGoldOnly")
