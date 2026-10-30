@@ -12,7 +12,7 @@ local isGlowEnabled = true
 local COLOR_APEX = { 1.00, 0.20, 1.00 }
 
 
-local DebugPrint = function() end -- skillTree_Debug.DebugPrint
+local DebugPrint = function(...) end -- skillTree_Debug.DebugPrint
 
 
 -- A handful of nodes are flagged permanent = true in TalentDatabase (see CreateNodes).

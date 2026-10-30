@@ -21,7 +21,7 @@ Ashoholic is a World of Warcraft addon for Project Ebonhold on WotLK 3.3.5. Its 
 
 ## Validation
 
-- `python tools/check_lua.py` parses tracked Lua files with a Lua 5.1 compiler. It checks syntax, not runtime behavior, and requires `luac5.1` or a Lua 5.1 `luac` on PATH.
+- `python tools/check_lua.py` parses tracked Ashoholic Lua files with a Lua 5.1 compiler, excluding vendored companion source. It checks syntax, not runtime behavior, and requires `luac5.1` or a Lua 5.1 `luac` on PATH.
 - `python tools/check_package.py` checks tracked addon manifests, referenced files, and package contents.
 
 When changing load behavior, check the relevant `.toc` file and preserve its ordering and referenced paths.

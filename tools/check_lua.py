@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Parse every tracked Lua file with Lua 5.1.
+"""Parse tracked Ashoholic Lua files with Lua 5.1.
 
 Ashoholic has no separate offline test suite. This is the syntax check the
-offline-suite job runs. luac -p only parses; it does not execute addon code.
+offline-suite job runs. Vendored companion source is excluded. luac -p only
+parses; it does not execute addon code.
 """
 
 from __future__ import annotations
@@ -34,7 +35,8 @@ def tracked_lua() -> list[str]:
         check=True,
         capture_output=True,
     )
-    return [item for item in result.stdout.decode("utf-8").split("\0") if item]
+    files = [item for item in result.stdout.decode("utf-8").split("\0") if item]
+    return [item for item in files if not item.startswith("vendor/ProjectEbonhold/")]
 
 
 def main() -> int:
