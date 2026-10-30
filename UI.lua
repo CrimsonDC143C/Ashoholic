@@ -230,6 +230,7 @@ local function EnsureTheme()
 end
 local function RegisterThemed(fn) themed[#themed + 1] = fn; fn() end
 local function Gradient(tex, lo, hi)
+    tex:SetTexture(1, 1, 1, 1)
     tex:SetGradientAlpha("VERTICAL", lo[1],lo[2],lo[3],lo[4] or 1, hi[1],hi[2],hi[3],hi[4] or 1)
 end
 
@@ -1127,7 +1128,7 @@ function addon:CreateUI()
 
         local charDB = addon:GetCurrentCharacterDB()
         local cost = charDB and charDB.RaidResetCost
-        clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNumberPlain(cost) .. " Soul Ash") or "Clear IDs")
+        clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNum(cost, T.formatClearIDs) .. " Soul Ash") or "Clear IDs")
 
         local at = addon.db.global.RaidCostResetAt
         local resetDisplay = "--"
@@ -2280,9 +2281,13 @@ function addon:CreateUI()
             -- FastSwap button: show for alts, hide for the currently logged-in character
             local currentPlayer = UnitName and UnitName("player")
             local isCurrentChar = currentPlayer and data.name and (string.lower(currentPlayer) == string.lower(data.name))
+            local currentCharDB = addon:GetCurrentCharacterDB()
+            local currentSourceAccount = currentCharDB and
+                (currentCharDB._sourceAccount or currentCharDB.account or "Main Account")
+            local isCurrentAccount = currentSourceAccount and data.sourceAccount == currentSourceAccount
             local nameOffset = T.showClassIcons and math.max(18, (T.layout.classIconSize or 14) + 4) or 0
             if row.swapBtn then
-                if not isCurrentChar and data.name and data.name ~= "" then
+                if isCurrentAccount and not isCurrentChar and data.name and data.name ~= "" then
                     row.swapBtn.charName = data.name
                     row.swapBtn.class = data.class
                     row.swapBtn:ApplyStyle(false)
@@ -2370,9 +2375,10 @@ function addon:CreateUI()
 
             if data.isCurrent then
                 local a = T.accentBright or T.accent
+                local line = T.currentCharacterLine
                 row.curBg:SetVertexColor(a[1], a[2], a[3], 0.16)
-                row.curTop:SetVertexColor(a[1], a[2], a[3], 0.9)
-                row.curBottom:SetVertexColor(a[1], a[2], a[3], 0.9)
+                row.curTop:SetVertexColor(unpack(line))
+                row.curBottom:SetVertexColor(unpack(line))
                 row.accent:SetVertexColor(a[1], a[2], a[3], 1)
                 row.curBg:Show(); row.curTop:Show(); row.curBottom:Show()
             end
@@ -2547,6 +2553,7 @@ function addon:CreateUI()
         local L, a, g = T.layout, T.accent, T.glow
         frame:SetBackdropColor(unpack(C.panel))
         frame:SetBackdropBorderColor(unpack(C.border))
+        glow:SetTexture(1, 1, 1, 1)
         glow:SetGradientAlpha("VERTICAL", g[1],g[2],g[3],g[4], g[1],g[2],g[3],0)
         if g[4] > 0 then glow:Show() else glow:Hide() end
         Gradient(titleBar, T.titleLo, T.titleHi)
@@ -3372,7 +3379,7 @@ function addon:ToggleConfigUI()
     local ALPHA_KEYS = {
         bg=true, panel=true, border=true, bronze=true,
         rowA=true, rowB=true, rowRealm=true, rowAccount=true, rowTotal=true,
-        rowHover=true, rowTopLine=true, sortArrow=true,
+        rowHover=true, rowTopLine=true, currentCharacterLine=true, sortArrow=true,
         titleLo=true, titleHi=true,
         realmAccentBar=true, accountAccentBar=true, totalsAccentBar=true, characterAccentBar=true,
         tabBg=true, tabBorder=true, tabActiveBg=true, tabActiveBorder=true,
@@ -4104,6 +4111,7 @@ function addon:ToggleConfigUI()
     addColor("Totals row",       "rowTotal")
     addColor("Row hover",        "rowHover")
     addColor("Row top-line",     "rowTopLine")
+    addColor("Current character lines", "currentCharacterLine")
 
     sectionTitle("Rows · Sizing")
     addSlider("Row height",        "rowHeight", 16, 44, true)
@@ -4154,6 +4162,7 @@ function addon:ToggleConfigUI()
 
     sectionTitle("Number Format")
     addToggle("Compact Reset Cost",     "formatResetCost")
+    addToggle("Compact Clear IDs cost", "formatClearIDs")
     addToggle("Compact Soul Ash",       "formatSoulAsh")
     addToggle("Compact Money",          "formatMoney")
     addToggle("Money: gold only",       "moneyGoldOnly")

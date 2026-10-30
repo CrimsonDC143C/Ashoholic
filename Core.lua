@@ -1233,6 +1233,7 @@ function addon:BeginDraft(fromKey)
         "border", "bronze",
         "titleLo", "titleHi", "accentDim", "accentBright",
         "rowA", "rowB", "rowRealm", "rowAccount", "rowTotal", "rowHover", "rowTopLine",
+        "currentCharacterLine",
         "sortArrow", "realmAccentBar", "accountAccentBar", "totalsAccentBar", "characterAccentBar",
         "tabBg", "tabBorder", "tabActiveBg", "tabActiveBorder", "tabHoverBg", "tabHoverBorder",
         "dangerBg", "dangerBorder", "dangerHoverBg", "dangerHoverBorder",
@@ -1296,6 +1297,9 @@ function addon:BeginDraft(fromKey)
     end
     if draft.formatResetCost == nil then
         draft.formatResetCost = (builtForFlags and builtForFlags.formatResetCost) or false
+    end
+    if draft.formatClearIDs == nil then
+        draft.formatClearIDs = (builtForFlags and builtForFlags.formatClearIDs) or false
     end
     if draft.formatSoulAsh == nil then
         draft.formatSoulAsh = (builtForFlags and builtForFlags.formatSoulAsh) or false
@@ -1428,6 +1432,7 @@ function addon:SaveDraftToExisting(key)
         "bg","accent","accent2","body","gold","ember","muted","soul","loc","dim",
         "border","bronze","titleLo","titleHi","accentDim","accentBright",
         "rowA","rowB","rowRealm","rowAccount","rowTotal","rowHover","rowTopLine",
+        "currentCharacterLine",
         "sortArrow","realmAccentBar","accountAccentBar","totalsAccentBar","characterAccentBar",
         "tabBg","tabBorder","tabActiveBg","tabActiveBorder","tabHoverBg","tabHoverBorder",
         "dangerBg","dangerBorder","dangerHoverBg","dangerHoverBorder",
@@ -1448,7 +1453,7 @@ function addon:SaveDraftToExisting(key)
     -- somehow dropped them. Prevents a stray "revert to default" on save.
     for _, f in ipairs({
         "classColoredNames","showClassIcons","classColoredAccent","outerBorder",
-        "formatResetCost","formatSoulAsh","formatMoney","moneyGoldOnly",
+        "formatResetCost","formatClearIDs","formatSoulAsh","formatMoney","moneyGoldOnly",
         "costResetWeekday",
         "panelAlpha","glow",
     }) do
