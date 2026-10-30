@@ -1,0 +1,152 @@
+<Ui xmlns="http:/www.blizzard.com/wow/ui/">
+    <Frame name="ModernShopFrame" parent="UIParent" toplevel="true" enableMouse="true" hidden="true" frameStrata="DIALOG">
+        <Size x="900" y="600"/>
+        <Anchors>
+            <Anchor point="CENTER"/>
+        </Anchors>
+
+        <Scripts>
+            <OnLoad>
+                self:SetMovable(true)
+                self:RegisterForDrag("LeftButton")
+                self:SetScript("OnDragStart", self.StartMoving)
+                self:SetScript("OnDragStop", self.StopMovingOrSizing)
+            </OnLoad>
+        </Scripts>
+
+        <!-- LAYER: BACKGROUND (bottommost) -->
+        <Layers>
+            <Layer level="BACKGROUND">
+             <!-- Frame Creation -->
+                <!-- Horizontal Top Bar -->
+                <Texture name="ModernShopHorizontalFrameBar" file="Interface/Shop/uiframedragonflight">
+                    <Size x="850" y="24"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="50" y="0"/>
+                    </Anchors>
+                    <TexCoords left="0.81982422" right="0.85693359" top="0.14599609" bottom="0.18212891"/>
+                </Texture>
+                <!-- Horizontal Bar Below Top Bar -->
+                <Texture name="ModernShopHorizontalFrameBar2" file="Interface/Shop/services-popup-bg">
+                    <Size x="846" y="30"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="50" y="-22"/>
+                    </Anchors>
+                    <TexCoords left="0.49121094" right="0.75097656" top="0.01074219" bottom="0.05957031"/>
+                </Texture>
+                <!-- Fix up for "corners" around icon circle -->
+                <Texture name="ModernShopHorizontalCircleFix" file="Interface/Shop/services-popup-bg">
+                    <Size x="8" y="6"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="3" y="-45"/>
+                    </Anchors>
+                    <TexCoords left="0.49121094" right="0.75097656" top="0.01074219" bottom="0.05957031"/>
+                </Texture>
+                <!-- Fix up for "corners" around icon circle -->
+                <Texture name="ModernShopHorizontalCircleFix2" file="Interface/Shop/services-popup-bg">
+                    <Size x="15" y="11"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="40" y="-43"/>
+                    </Anchors>
+                    <TexCoords left="0.49121094" right="0.75097656" top="0.01074219" bottom="0.05957031"/>
+                </Texture>
+                <!-- Horizontal Bar Div between top & middle -->
+                <Texture name="ModernShopHorizontalFrameBar3" file="Interface/Shop/services-popup-bg">
+                    <Size x="892" y="4"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="4" y="-50"/>
+                    </Anchors>
+                    <TexCoords left="0.49121094" right="0.75097656" top="0.01074219" bottom="0.05957031"/>
+                </Texture>
+                <!-- Horizontal Bottom Bar -->
+                <Texture name="ModernShopHorizontalFrameBar4" file="Interface/Shop/servicesatlas">
+                    <Size x="900" y="6"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="0" y="-594"/>
+                    </Anchors>
+                    <TexCoords left="0.01318359" right="0.39892578" top="0.01220703" bottom="0.01904297"/>
+                </Texture>
+                <!--Vertical Bar 1-->
+                <Texture name="ModernShopVerticalFrameBar" file="Interface/Shop/servicesatlas">
+                    <Size x="4" y="568"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="0" y="-34"/>
+                    </Anchors>
+                     <TexCoords left="0.01123047" right="0.02001953" top="0.01220703" bottom="0.69384766"/>
+                </Texture>
+                <!--Vertical Bar 2-->
+                <Texture name="ModernShopVerticalFrameBar2" file="Interface/Shop/services-popup-bg">
+                    <Size x="4" y="546"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="200" y="-54"/>
+                    </Anchors>
+                     <TexCoords left="0.49121094" right="0.75097656" top="0.01074219" bottom="0.05957031"/>
+                </Texture>
+                <!--Vertical Bar 3-->
+                <Texture name="ModernShopVerticalFrameBar3" file="Interface/Shop/servicesatlas">
+                    <Size x="4" y="600"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="896" y="0"/>
+                    </Anchors>
+                     <TexCoords left="0.01123047" right="0.02001953" top="0.01220703" bottom="0.69384766"/>
+                    <!-- <TexCoords left="0.61230469" right="0.62207031" top="0.01269531" bottom="0.99316406"/> 0.01123047, 0.02001953, 0.01220703, 0.69384766 -->
+                </Texture>
+            <!-- End Frame Creation -->
+            <!-- Start Categories Frame Creation -->
+                <!-- Background -->
+                <Texture name="ModernShopCategoriesBackground" file="Interface/Shop/store-main">
+                    <Size x="196" y="540"/> 
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="4" y="-54"/>
+                    </Anchors>
+                    <TexCoords left="0.00341797" right="0.17919922" top="0.46630859" bottom="0.93603516"/>
+                </Texture>      
+            <!-- End Categories Frame Creation -->
+            <!-- Start Entries Frame Creation -->
+                <!-- Background -->
+                <Texture name="ModernShopEntriesBackground" file="Interface/Shop/perksactivities">
+                    <Size x="692" y="540"/> 
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="204" y="-54"/>
+                    </Anchors>
+                    <!-- <TexCoords left="0.00097656" right="0.76660156" top="0.00097656" bottom="0.99707031"/> -->
+                    <TexCoords left="0.0534668" right="0.32983398" top="0.08447266" bottom="0.32958984"/>
+                </Texture>      
+            <!-- End Entries Frame Creation -->
+            </Layer>
+
+
+        <!-- LAYER: ARTWORK (middle) -->
+
+            <!-- Circle Portrait Background (border) -->
+            <Layer level="ARTWORK">       
+                <Texture name="ModernShopPortraitBorder" file="Interface/Shop/store-main"> 
+                    <Size x="64" y="64"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="-5" y="12"/>
+                    </Anchors>
+                    <TexCoords left="0.84912109" right="0.91845703" top="0.37255859" bottom="0.44189453"/>
+                </Texture>
+            </Layer>
+
+        <!-- LAYER: OVERLAY (topmost) -->
+            <Layer level="OVERLAY">
+                <!-- Circular Icon -->
+                <Texture name="ModernShopPortraitIcon" file="Interface/Shop/smallLogo">
+                    <Size x="64" y="64"/>
+                    <Anchors>
+                        <Anchor point="CENTER" relativeTo="ModernShopPortraitBorder" relativePoint="CENTER" x="-2" y="-2"/>
+                    </Anchors>
+                </Texture>
+
+
+                <!-- Close Button -->
+                <Button name="ModernShopCloseButton" inherits="UIPanelCloseButton" parent="ModernShopFrame">
+                    <Anchors>
+                        <Anchor point="TOPRIGHT" x="-6" y="-6"/>
+                    </Anchors>
+                </Button>
+            </Layer>
+        </Layers>
+    </Frame>
+</Ui>

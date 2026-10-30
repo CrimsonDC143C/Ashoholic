@@ -4,8 +4,9 @@
 Builds the same archive as the release workflow, then deletes it unless
 --zip is given. Never publishes a release.
 
-Every file named by a tracked .toc, and every Script or Include in those
-XML files, must exist in git and in the archive with the same case.
+Every file named by a packaged .toc, and every Script or Include in those XML
+files, must exist in git and in the archive with the same case. Vendored source
+that is not part of the release archive is intentionally not traversed.
 """
 
 from __future__ import annotations
@@ -115,9 +116,13 @@ def xml_entries(xml_path: str) -> list[tuple[str, str]]:
     return found
 
 
-def manifest_files(tracked: set[str], errors: list[str]) -> list[str]:
-    """Return source paths loaded by every tracked TOC, following XML includes."""
-    tocs = sorted(path for path in tracked if path.endswith(".toc"))
+def manifest_files(
+    tracked: set[str], packaged_sources: set[str], errors: list[str]
+) -> list[str]:
+    """Return source paths loaded by packaged TOCs, following XML includes."""
+    tocs = sorted(
+        path for path in tracked if path.endswith(".toc") and path in packaged_sources
+    )
     if not tocs:
         errors.append("no tracked .toc files")
         return []
@@ -231,8 +236,8 @@ def main() -> int:
     errors: list[str] = []
     tracked = set(git_files())
     version_of_ashoholic(errors)
-    loaded = manifest_files(tracked, errors)
     mapping = package_map(tracked, errors)
+    loaded = manifest_files(tracked, set(mapping), errors)
 
     missing_from_package = sorted({path for path in loaded if path not in mapping})
     for path in missing_from_package:

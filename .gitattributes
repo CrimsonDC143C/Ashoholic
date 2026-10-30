@@ -4,3 +4,4 @@
 README.md export-ignore
 readme.txt export-ignore
 images/ export-ignore
+vendor/ProjectEbonhold/** export-ignore
