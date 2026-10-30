@@ -141,11 +141,14 @@ local MIN_COL_W = 40
 -- Raids view: the same identity columns plus one column per raid, each split into one cell per difficulty.
 local RAID_CELL_W = 40
 local RAID_COLUMN_DEFS = { COLUMN_DEFS[1], COLUMN_DEFS[2], COLUMN_DEFS[3] }
+local AVAILABLE_COLUMNS = {}
+for _, column in ipairs(COLUMN_DEFS) do AVAILABLE_COLUMNS[#AVAILABLE_COLUMNS + 1] = column end
 for _, group in ipairs(addon.RaidData.groups) do
     RAID_COLUMN_DEFS[#RAID_COLUMN_DEFS + 1] = {
         key="raid_" .. group.key, title=group.label, width=#group.variants * RAID_CELL_W,
         field=nil, justify="CENTER", group=group,
     }
+    AVAILABLE_COLUMNS[#AVAILABLE_COLUMNS + 1] = RAID_COLUMN_DEFS[#RAID_COLUMN_DEFS]
 end
 
 local function IsRaidsView()
@@ -154,19 +157,27 @@ local function IsRaidsView()
 end
 
 -- Column order and widths are remembered separately for each view.
-local function ViewOptionKeys()
-    if IsRaidsView() then return "raidColumnOrder", "raidColumnWidths" end
-    return "columnOrder", "columnWidths"
+local function ViewOptionKeys(raids)
+    if raids == nil then raids = IsRaidsView() end
+    if raids then return "raidColumnOrder", "raidColumnWidths", "raidColumnVisibility" end
+    return "columnOrder", "columnWidths", "columnVisibility"
 end
 
-local function BuildActiveColumns()
+local function BuildColumnList(raids)
     local o = addon.db and addon.db.global and addon.db.global.options or {}
-    local defs = IsRaidsView() and RAID_COLUMN_DEFS or COLUMN_DEFS
-    local orderKey, widthKey = ViewOptionKeys()
+    local defaults = raids and RAID_COLUMN_DEFS or COLUMN_DEFS
+    local orderKey, widthKey, visibilityKey = ViewOptionKeys(raids)
+    local defaultVisible = {}
+    for _, column in ipairs(defaults) do defaultVisible[column.key] = true end
     local byKey = {}
-    for _, d in ipairs(defs) do
+    for _, d in ipairs(AVAILABLE_COLUMNS) do
+        local visible = defaultVisible[d.key] or false
+        if o[visibilityKey] and o[visibilityKey][d.key] ~= nil then
+            visible = o[visibilityKey][d.key]
+        end
         byKey[d.key] = { key=d.key, title=d.title, width=d.width, field=d.field,
-                         justify=d.justify, clip=d.clip, reset=d.reset, group=d.group }
+                         justify=d.justify, clip=d.clip, reset=d.reset, group=d.group,
+                         defaultWidth=d.width, visible=d.key == "name" or visible }
     end
     local cols = {}
     if o[orderKey] then
@@ -174,7 +185,10 @@ local function BuildActiveColumns()
             if byKey[k] then table.insert(cols, byKey[k]); byKey[k] = nil end
         end
     end
-    for _, d in ipairs(defs) do
+    for _, d in ipairs(defaults) do
+        if byKey[d.key] then table.insert(cols, byKey[d.key]); byKey[d.key] = nil end
+    end
+    for _, d in ipairs(AVAILABLE_COLUMNS) do
         if byKey[d.key] then table.insert(cols, byKey[d.key]) end
     end
     if o[widthKey] then
@@ -183,6 +197,29 @@ local function BuildActiveColumns()
         end
     end
     return cols
+end
+
+local function BuildActiveColumns()
+    local columns = {}
+    for _, column in ipairs(BuildColumnList(IsRaidsView())) do
+        if column.visible then columns[#columns + 1] = column end
+    end
+    return columns
+end
+
+local function SaveVisibleColumnOrder(visibleOrder)
+    local o = addon.db.global.options
+    local orderKey = ViewOptionKeys()
+    local order, index = {}, 1
+    for _, column in ipairs(BuildColumnList(IsRaidsView())) do
+        if column.visible then
+            order[#order + 1] = visibleOrder[index]
+            index = index + 1
+        else
+            order[#order + 1] = column.key
+        end
+    end
+    o[orderKey] = order
 end
 
 local COLUMNS, COLUMN_BY_KEY, COLUMN_X, BASE_WIDTH
@@ -262,18 +299,19 @@ function addon:ApplyTheme(key)
     local needRebuild = false
     local def = addon.Themes:GetDef(key)
     if o then
-        local newWidths = def.columnWidths or {}
-        local old = o.columnWidths or {}
-        for _, c in ipairs(COLUMN_DEFS) do
-            local ov = old[c.key]   or c.width
-            local nv = newWidths[c.key] or c.width
-            if ov ~= nv then needRebuild = true; break end
-        end
-        -- Always rebuild o.columnWidths; empty table means "use per-column defaults"
-        o.columnWidths = nil
-        if next(newWidths) then
-            o.columnWidths = {}
-            for k, v in pairs(newWidths) do o.columnWidths[k] = v end
+        for _, widthKey in ipairs({ "columnWidths", "raidColumnWidths" }) do
+            local newWidths = def[widthKey] or {}
+            local old = o[widthKey] or {}
+            for _, column in ipairs(AVAILABLE_COLUMNS) do
+                if (old[column.key] or column.width) ~= (newWidths[column.key] or column.width) then
+                    needRebuild = true
+                end
+            end
+            o[widthKey] = nil
+            if next(newWidths) then
+                o[widthKey] = {}
+                for columnKey, width in pairs(newWidths) do o[widthKey][columnKey] = width end
+            end
         end
     end
 
@@ -495,7 +533,7 @@ end
 --------------------------------------------------------------------------
 -- Flat button factory
 --------------------------------------------------------------------------
-local function CreateFlatButton(parent, width, height, label, styleName)
+local function CreateFlatButton(parent, width, height, label, styleName, independentFont)
     local b = CreateFrame("Button", nil, parent)
     b:SetWidth(width); b:SetHeight(height)
     b:SetBackdrop(FLAT_BACKDROP)
@@ -503,7 +541,17 @@ local function CreateFlatButton(parent, width, height, label, styleName)
     b.text:SetPoint("CENTER")
     b.text:SetText(label)
     function b:ApplyStyle(hover)
-        ApplyFont(self.text, T.layout[styleName == "danger" and "dangerFont" or "buttonFont"])
+        if independentFont then
+            local previewFont = self.fontProvider and self.fontProvider()
+            if previewFont then
+                local _, size, flags = GameFontNormalSmall:GetFont()
+                SetFontSafe(self.text, previewFont, size, flags)
+            else
+                self.text:SetFontObject(GameFontNormalSmall)
+            end
+        else
+            ApplyFont(self.text, T.layout[styleName == "danger" and "dangerFont" or "buttonFont"])
+        end
         local s = BUTTON_STYLES[styleName or "default"]
         if hover then
             self:SetBackdropColor(unpack(s.hoverBg))
@@ -841,14 +889,18 @@ function addon:CreateUI()
 
     local function SaveColumnState()
         local o = addon.db.global.options
-        local orderKey, widthKey = ViewOptionKeys()
-        local order, widths = {}, {}
+        local _, widthKey = ViewOptionKeys()
+        local order, widths = {}, o[widthKey] or {}
         for _, c in ipairs(COLUMNS) do
             table.insert(order, c.key)
             widths[c.key] = c.width
         end
-        o[orderKey] = order
+        SaveVisibleColumnOrder(order)
         o[widthKey] = widths
+        if addon.customDraft then
+            addon.customDraft[widthKey] = {}
+            for columnKey, width in pairs(widths) do addon.customDraft[widthKey][columnKey] = width end
+        end
     end
 
     local function AttachHeaderInteractions(btn, col)
@@ -860,11 +912,32 @@ function addon:CreateUI()
         local hot = zone:CreateTexture(nil, "OVERLAY")
         hot:SetAllPoints(zone); hot:SetTexture(WHITE)
         hot:SetVertexColor(1, 0.75, 0.3, 0)
-        zone:SetScript("OnEnter", function()
+        zone:SetScript("OnEnter", function(self)
             if not dragState then hot:SetVertexColor(1,0.75,0.3,0.6) end
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(col.title .. " width", 1, 0.82, 0)
+            GameTooltip:AddLine("Left-drag to resize. Right-click to reset width.", 1, 1, 1)
+            GameTooltip:Show()
         end)
-        zone:SetScript("OnLeave", function() hot:SetVertexColor(1,0.75,0.3,0) end)
+        zone:SetScript("OnLeave", function()
+            hot:SetVertexColor(1,0.75,0.3,0)
+            GameTooltip:Hide()
+        end)
         zone:SetScript("OnMouseDown", function(self, button)
+            GameTooltip:Hide()
+            if button == "RightButton" then
+                local _, widthKey = ViewOptionKeys()
+                local o = addon.db.global.options
+                o[widthKey] = o[widthKey] or {}
+                o[widthKey][col.key] = col.defaultWidth
+                if addon.customDraft then
+                    addon.customDraft[widthKey] = addon.customDraft[widthKey] or {}
+                    addon.customDraft[widthKey][col.key] = col.defaultWidth
+                end
+                dragState = nil
+                frame:Rebuild()
+                return
+            end
             if button ~= "LeftButton" then return end
             dragState = {
                 mode = "resize",
@@ -906,7 +979,7 @@ function addon:CreateUI()
                 local insertAt = idx
                 if idx > dragState.srcIdx then insertAt = idx end
                 table.insert(order, insertAt, dragState.colKey)
-                addon.db.global.options[(ViewOptionKeys())] = order
+                SaveVisibleColumnOrder(order)
                 frame:Rebuild()
                 for i, c in ipairs(COLUMNS) do
                     if c.key == dragState.colKey then dragState.srcIdx = i; dragState.targetIdx = i; break end
@@ -1222,13 +1295,6 @@ function addon:CreateUI()
             row.swapBtn:SetSize(btnW, btnH)
             row.swapBtn:ClearAllPoints()
             row.swapBtn:SetPoint("RIGHT", row, "LEFT", COLUMN_X["name"] + COLUMN_BY_KEY["name"].width - PAD, 0)
-            if row.swapBtn.text and row.swapBtn.text.basePath then
-                row.swapBtn.text:SetFont(
-                    row.swapBtn.text.basePath,
-                    math.max(9, (L.characterFontSize or 12) - 2),
-                    row.swapBtn.text.baseFlags
-                )
-            end
             row.swapBtn:ApplyStyle(false)
             if row.swapBtn:IsShown() then
                 swapW = btnW + 4
@@ -1318,6 +1384,8 @@ function addon:CreateUI()
         function swapBtn:ApplyStyle(hover)
             local s = BUTTON_STYLES and BUTTON_STYLES["default"]
             if not s then return end
+            SetFontSafe(self.text, ResolveFont(T.layout.buttonFont, self.text.basePath),
+                math.max(9, (T.layout.characterFontSize or 12) - 2), self.text.baseFlags)
             if hover then
                 self:SetBackdropColor(unpack(s.hoverBg))
                 self:SetBackdropBorderColor(unpack(s.hoverBorder))
@@ -1377,10 +1445,14 @@ function addon:CreateUI()
 
         row.wtIcon, row.wtText, row.wtBtn = {}, {}, {}
         for n = 1, 2 do
-            local cx = COLUMN_X.wt + COLUMN_BY_KEY.wt.width * (n == 1 and 0.25 or 0.75)
             local wtBtn = CreateFrame("Button", nil, row)
             wtBtn:SetSize(22, 22)
-            wtBtn:SetPoint("CENTER", row, "LEFT", cx, 0)
+            if COLUMN_BY_KEY.wt then
+                local cx = COLUMN_X.wt + COLUMN_BY_KEY.wt.width * (n == 1 and 0.25 or 0.75)
+                wtBtn:SetPoint("CENTER", row, "LEFT", cx, 0)
+            else
+                wtBtn:Hide()
+            end
             local icon = wtBtn:CreateTexture(nil, "ARTWORK")
             icon:SetAllPoints(wtBtn)
             row.wtIcon[n] = icon
@@ -1446,6 +1518,7 @@ function addon:CreateUI()
     end
 
     local function SetWTCell(row, n, state, lockedRaids, charName, raidType)
+        if not COLUMN_BY_KEY.wt then return end
         local wtBtn, icon, txt = row.wtBtn[n], row.wtIcon[n], row.wtText[n]
         wtBtn:SetScript("OnEnter", nil)
         wtBtn:SetScript("OnLeave", nil)
@@ -2493,9 +2566,10 @@ function addon:CreateUI()
     end
     local function ResetSize()
         local o = addon.db and addon.db.global and addon.db.global.options
-        if o then o.WindowWidth = nil; o.WindowHeight = nil end
-        frame:SetWidth(Clamp(DEFAULT_WIDTH, MIN_WIDTH, maxW))
+        RebuildColumnMetrics()
+        frame:SetWidth(Clamp(LEFT_PAD + BASE_WIDTH + RIGHT_MARGIN, MIN_WIDTH, maxW))
         frame:SetHeight(Clamp(DEFAULT_HEIGHT, MIN_HEIGHT, maxH))
+        SaveSize()
     end
     for _, point in ipairs({"TOPLEFT","TOPRIGHT","BOTTOMLEFT","BOTTOMRIGHT"}) do
         local grip = CreateFrame("Button", nil, frame)
@@ -3900,7 +3974,12 @@ function addon:ToggleConfigUI()
         local l = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         l:SetPoint("TOPLEFT", 0, yPos)
         l:SetText(label)
-        local dd = CreateFlatButton(body, 180, 22, "", "default")
+        local dd = CreateFlatButton(body, 180, 22, "", "default", true)
+        dd.fontProvider = function()
+            local draft = addon.customDraft
+            if draft and draft.layout then return draft.layout[key] end
+            return T.layout[key]
+        end
         dd:SetPoint("TOPLEFT", 200, yPos + 2)
         dd.text:ClearAllPoints()
         dd.text:SetPoint("LEFT", dd, "LEFT", 8, 0)
@@ -3925,6 +4004,7 @@ function addon:ToggleConfigUI()
                 if not addon.customDraft then return end
                 addon.customDraft.layout[key] = choice.path
                 addon:ApplyDraft()
+                dd:ApplyStyle(false)
                 dd.text:SetText(choice.name)
             end
 
@@ -3937,12 +4017,14 @@ function addon:ToggleConfigUI()
             fontMenuBar:GetThumbTexture():SetHeight(math.max(24, visibleHeight * visibleHeight / contentHeight))
             fontMenuBar:SetValue(0)
             fontMenuScroll:SetVerticalScroll(0)
+            local defaultFont, previewSize, previewFlags = GameFontHighlightSmall:GetFont()
             for i, button in ipairs(fontMenuButtons) do
                 local choice = choices[i]
                 if choice then
                     button.choiceIndex = i
                     button:ClearAllPoints()
                     button:SetPoint("TOPLEFT", fontMenuChild, "TOPLEFT", 0, -((i - 1) * rowHeight))
+                    SetFontSafe(button.text, choice.path or defaultFont, previewSize, previewFlags)
                     button.text:SetText(choice.name)
                     button:Show()
                     button:GetScript("OnLeave")(button)
@@ -3976,6 +4058,7 @@ function addon:ToggleConfigUI()
             local choices = {}
             if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
             for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
+            dd:ApplyStyle(false)
             if not d then dd.text:SetText(choices[1].name); return end
             local path = d.layout[key]
             local cur = choices[1]
@@ -3988,11 +4071,36 @@ function addon:ToggleConfigUI()
         widgets[#widgets + 1] = Refresh
     end
 
-    local function addColumnSlider(label, colKey, minVal, maxVal)
+    local function addColumnSlider(column, raids)
+        local colKey = column.key
+        local _, widthKey, visibilityKey = ViewOptionKeys(raids)
         local yPos = nextY(30)
         local l = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        l:SetPoint("TOPLEFT", 0, yPos)
-        l:SetText(label .. " width")
+        l:SetPoint("TOPLEFT", 24, yPos)
+        l:SetWidth(170)
+        l:SetHeight(16)
+        l:SetJustifyH("LEFT")
+        if l.SetWordWrap then l:SetWordWrap(false) end
+        l:SetText(column.title)
+        local visible = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
+        visible:SetPoint("TOPLEFT", 0, yPos + 3)
+        visible:SetSize(20, 20)
+        if colKey == "name" then visible:Disable() end
+        visible:SetScript("OnClick", function(self)
+            local o = addon.db.global.options
+            o[visibilityKey] = o[visibilityKey] or {}
+            o[visibilityKey][colKey] = colKey == "name" or (self:GetChecked() and true or false)
+            if IsRaidsView() == raids and AshoholicFrame then
+                AshoholicFrame:Rebuild()
+            end
+        end)
+        visible:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(column.title, 1, 0.82, 0)
+            GameTooltip:AddLine(colKey == "name" and "Always visible" or "Show column", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        visible:SetScript("OnLeave", function() GameTooltip:Hide() end)
         local s = CreateFrame("Slider", nil, body)
         s:SetOrientation("HORIZONTAL")
         s:SetSize(200, 16)
@@ -4000,6 +4108,7 @@ function addon:ToggleConfigUI()
         s:SetBackdrop(FLAT_BACKDROP)
         s:SetBackdropColor(unpack(T.sliderBg))
         s:SetBackdropBorderColor(unpack(T.sliderBorder))
+        local minVal, maxVal = MIN_COL_W, math.max(300, column.defaultWidth, column.width)
         s:SetMinMaxValues(minVal, maxVal)
         s:SetValueStep(1)
         s:SetThumbTexture(WHITE)
@@ -4011,24 +4120,17 @@ function addon:ToggleConfigUI()
 
         local function GetW()
             local d = addon.customDraft
-            if not d then return 130 end
-            if d.columnWidths and d.columnWidths[colKey] then return d.columnWidths[colKey] end
+            if d and d[widthKey] and d[widthKey][colKey] then return d[widthKey][colKey] end
             -- Fall back to the widths actually applied to the live window
             local o = addon.db.global.options
-            if o.columnWidths and o.columnWidths[colKey] then return o.columnWidths[colKey] end
-            for _, c in ipairs(COLUMN_DEFS) do
-                if c.key == colKey then return c.width end
-            end
-            return 130
+            if o[widthKey] and o[widthKey][colKey] then return o[widthKey][colKey] end
+            return column.defaultWidth
         end
         local function SetW(v)
             local d = addon.customDraft
             if not d then return end
-            d.columnWidths = d.columnWidths or {}
-            d.columnWidths[colKey] = v
-            addon.db.global.options.columnWidths = addon.db.global.options.columnWidths or {}
-            addon.db.global.options.columnWidths[colKey] = v
-            if AshoholicFrame and AshoholicFrame.Rebuild then AshoholicFrame:Rebuild() end
+            d[widthKey] = d[widthKey] or {}
+            d[widthKey][colKey] = v
             addon:ApplyDraft()
         end
         local refreshing = false
@@ -4043,6 +4145,9 @@ function addon:ToggleConfigUI()
             local v = Clamp(GetW(), minVal, maxVal)
             s:SetValue(v)
             val:SetText(tostring(math.floor(v)))
+            for _, current in ipairs(BuildColumnList(raids)) do
+                if current.key == colKey then visible:SetChecked(current.visible); break end
+            end
             refreshing = false
         end
         Refresh()
@@ -4082,9 +4187,14 @@ function addon:ToggleConfigUI()
     addFont("Header font",       "headerFont", true, true)
     addSlider("Header font size","headerFontSize", 8, 22, true)
 
-    sectionTitle("Columns")
-    for _, c in ipairs(COLUMN_DEFS) do
-        addColumnSlider(c.title, c.key, 40, 300)
+    sectionTitle("Overview Columns")
+    for _, column in ipairs(BuildColumnList(false)) do
+        addColumnSlider(column, false)
+    end
+
+    sectionTitle("Raids Columns")
+    for _, column in ipairs(BuildColumnList(true)) do
+        addColumnSlider(column, true)
     end
 
     sectionTitle("Rows · Backgrounds")

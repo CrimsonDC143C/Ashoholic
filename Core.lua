@@ -1318,6 +1318,13 @@ function addon:BeginDraft(fromKey)
             for k, v in pairs(o.columnWidths) do draft.columnWidths[k] = v end
         end
     end
+    if draft.raidColumnWidths == nil then
+        local o = addon.db.global.options
+        if o.raidColumnWidths and next(o.raidColumnWidths) then
+            draft.raidColumnWidths = {}
+            for key, width in pairs(o.raidColumnWidths) do draft.raidColumnWidths[key] = width end
+        end
+    end
 
     -- Sanity-clamp layout values so a corrupted custom theme can't hide the whole roster
     local L = draft.layout
