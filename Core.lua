@@ -456,6 +456,16 @@ function addon:OnTargetedEvent(event)
     end
 end
 
+function addon:PrintMemoryUsage()
+    UpdateAddOnMemoryUsage()
+    local before = GetAddOnMemoryUsage(addonName)
+    collectgarbage("collect")
+    UpdateAddOnMemoryUsage()
+    local after = GetAddOnMemoryUsage(addonName)
+    print(string.format("|cFFFFD700Ashoholic Lua memory:|r %.1f KB before GC; %.1f KB after GC. Total Lua: %.1f KB.",
+        before, after, collectgarbage("count")))
+end
+
 function addon:ChatCommand(input)
     input = string.gsub(input or "", "^%s*(.-)%s*$", "%1")
     local cmd = string.lower(input)
@@ -500,6 +510,8 @@ function addon:ChatCommand(input)
         addon:PrintSyncHelp()
     elseif cmd == "widget" then
         addon:ToggleHourlyWidget()
+    elseif cmd == "memory" then
+        addon:PrintMemoryUsage()
     else
         addon:ToggleUI()
     end
