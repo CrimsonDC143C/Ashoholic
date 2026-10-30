@@ -230,6 +230,7 @@ local function EnsureTheme()
 end
 local function RegisterThemed(fn) themed[#themed + 1] = fn; fn() end
 local function Gradient(tex, lo, hi)
+    tex:SetTexture(1, 1, 1, 1)
     tex:SetGradientAlpha("VERTICAL", lo[1],lo[2],lo[3],lo[4] or 1, hi[1],hi[2],hi[3],hi[4] or 1)
 end
 
@@ -2542,6 +2543,7 @@ function addon:CreateUI()
         local L, a, g = T.layout, T.accent, T.glow
         frame:SetBackdropColor(unpack(C.panel))
         frame:SetBackdropBorderColor(unpack(C.border))
+        glow:SetTexture(1, 1, 1, 1)
         glow:SetGradientAlpha("VERTICAL", g[1],g[2],g[3],g[4], g[1],g[2],g[3],0)
         if g[4] > 0 then glow:Show() else glow:Hide() end
         Gradient(titleBar, T.titleLo, T.titleHi)
