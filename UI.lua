@@ -951,7 +951,7 @@ function addon:CreateUI()
                     fs:SetPoint(point, btn, rel, x, y)
                     fs.Retheme = function()
                         fs:SetText(textFn())
-                        local rgb = (isTitle and col.key == "wt") and T.wtLabelRGB or T.headerRGB
+                        local rgb = isTitle and T.headerRGB or T.headerLabelsRGB
                         if rgb then fs:SetTextColor(unpack(rgb)) end
                     end
                     fs.Retheme()
@@ -4060,23 +4060,28 @@ function addon:ToggleConfigUI()
 
     sectionTitle("Window")
     addColor("Background",       "bg")
-    addSlider("Glow strength %", "glow",       0, 50)
     addColor("Outer border",     "border")
     addToggle("Show outer border", "outerBorder")
     addColor("Inner border",     "bronze")
     addToggle("Show inner border", "innerBorder", true)
 
+    sectionTitle("Bottom Window Glow")
+    addSlider("Bottom glow strength %", "glow", 0, 50)
+
+    sectionTitle("Title Bar and Column Header Backgrounds")
+    addColor("Gradient bottom", "titleLo")
+    addColor("Gradient top",    "titleHi")
+
     sectionTitle("Title Bar")
     addColor("Main title text",     "titleText")
     addColor("Settings title text", "settingsTitleText")
-    addColor("Gradient bottom",  "titleLo")
-    addColor("Gradient top",     "titleHi")
     addFont("Title font", "titleFont", true, false)
     addSlider("Title size",      "titleSize", 10, 32, true)
 
     sectionTitle("Column Headers")
     addColor("Underline",        "accentDim")
-    addColor("Header text",      "headerText")
+    addColor("Default upper title", "headerText")
+    addColor("Default lower labels", "headerLabels")
     addColor("Hover glow",       "accentBright")
     addColor("Sort arrow",       "sortArrow")
     addFont("Header font",       "headerFont", true, true)
@@ -4129,7 +4134,6 @@ function addon:ToggleConfigUI()
     addColor("LVL text — unlocked", "wtLvlUnlocked")
     addColor("Reset Cost",       "costColor")
     addColor("Money",            "moneyColor")
-    addColor("WT label",         "wtLabel")
     addColor("Name (custom)",    "nameColor")
     addToggle("Class-colored names", "classColoredNames")
 
