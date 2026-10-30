@@ -1,0 +1,372 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<Script file="Blizzard_Library.lua"/>
+	
+	<CheckButton name="LibrarySpellButtonTemplate" inherits="CollectionsSpellButtonTemplate" virtual="true">
+		<Frames>
+			<Frame parentKey="active" setAllPoints="true">
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture parentKey="texture" file="Interface\Buttons\CheckButtonHilight" alphaMode="ADD">
+							<Size x="42" y="42"/>
+							<Anchors>
+								<Anchor point="CENTER" x="0" y="2"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						Mixin(self, SetShownMixin);
+					</OnLoad>
+				</Scripts>
+			</Frame>
+			<Button parentKey="SubscriptionOverlay" hidden="false">
+				<Size x="16" y="16" />
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="7" y="9" />
+				</Anchors>
+				<NormalTexture file="Interface\AddOns\ezCollections\Textures\SubscriptionOverlay" setAllPoints="true">
+					<TexCoords left="0.00390625" right="0.06640625" top="0.8515625" bottom="0.9765625" />
+				</NormalTexture>
+				<HighlightTexture file="Interface\AddOns\ezCollections\Textures\SubscriptionOverlay" setAllPoints="true" alphaMode="ADD" alpha="0.4">
+					<TexCoords left="0.07421875" right="0.13671875" top="0.8515625" bottom="0.9765625" />
+				</HighlightTexture>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture file="Interface\AddOns\ezCollections\Textures\MountSubscriptionOverlay" alphaMode="ADD">
+							<Size x="71" y="71" />
+							<Anchors>
+								<Anchor point="TOPRIGHT" x="15" y="16" />
+							</Anchors>
+							<TexCoords left="0.47265625" right="0.75" top="0.22265625" bottom="0.5" />
+						</Texture>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						Mixin(self, SetShownMixin);
+						function self:UpdateTooltip()
+							if ezCollections:IsActiveLibrarySubscription() then
+								GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+								GameTooltip:SetText(ezCollections.L["Tooltip.Subscription.Header"], 0, 0.75, 1, 1);
+								local remaining = ezCollections:FormatRemainingTime(ezCollections:GetActiveLibrarySubscriptionEndTime() - time());
+								if remaining then
+									GameTooltip:AddLine(remaining, GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b, 1, 1);
+								end
+								GameTooltip:Show();
+							end
+						end
+					</OnLoad>
+					<OnEnter>
+						self:UpdateTooltip();
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide" />
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnLoad>
+				CollectionsSpellButton_OnLoad(self, LibrarySpellButton_UpdateButton)
+			</OnLoad>
+			
+			<OnClick>
+				if ( IsModifiedClick() ) then
+					LibrarySpellButton_OnModifiedClick(self, button);
+				elseif (not self.isPassive) then
+					LibrarySpellButton_OnClick(self, button);
+				end
+			</OnClick>
+			
+			<OnShow function="LibrarySpellButton_OnShow"/>
+			<OnHide function="LibrarySpellButton_OnHide"/>
+			
+			<OnEnter function="LibrarySpellButton_OnEnter"/>
+		</Scripts>
+	</CheckButton>
+
+	<Frame name="Library" parent="CollectionsJournal" setAllPoints="true" hidden="true">
+		<Frames>
+			<StatusBar parentKey="progressBar" inherits="CollectionsProgressBarTemplate" />
+			
+			<!-- Searching -->
+			<EditBox name="$parentsearchBox" parentKey="searchBox" inherits="ezCollectionsSearchBoxTemplate" letters="40">
+				<Size x="115" y="20"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-107" y="-35"/>
+				</Anchors>
+				<Scripts>
+					<OnTextChanged function="Library_OnSearchTextChanged"/>
+				</Scripts>
+			</EditBox>
+			<Button name="$parentFilterButton" inherits="UIResettableDropdownButtonTemplate" text="FILTER">
+				<!--KeyValues>
+					<KeyValue key="resetFunction" value="LibraryFilterDropDown_ResetFilters" type="global"/>
+				</KeyValues-->
+				<Size x="93" y="22"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-12" y="-34"/>
+				</Anchors>
+				<Scripts>
+					<OnLoad>
+						UIResettableDropdownButtonMixin_OnLoad(self, LibraryFilterDropDown_ResetFilters);
+					</OnLoad>
+					<OnClick>
+						PlaySound("igMainMenuOptionCheckBoxOn");
+						ToggleDropDownMenu(1, nil, LibraryFilterDropDown, "LibraryFilterButton", 74, 15);
+					</OnClick>
+				</Scripts>
+			</Button>
+			<Frame name="$parentFilterDropDown" inherits="UIDropDownMenuTemplate">
+				<Scripts>
+					<OnLoad function="LibraryFilterDropDown_OnLoad"/>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentSubscriptionStatus" parentKey="SubscriptionStatus" useParentLevel="true" inherits="InsetFrameTemplate3">
+				<Size x="157" y="20"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="70" y="-35"/>
+				</Anchors>
+				<Frames>
+					<Button name="$parentSubscriptionInfo" parentKey="SubscriptionInfo" hidden="true">
+						<Size x="14" y="14" />
+						<Anchors>
+							<Anchor point="LEFT" x="5" />
+						</Anchors>
+						<NormalTexture file="Interface\AddOns\ezCollections\Textures\SubscriptionOverlay" setAllPoints="true">
+							<TexCoords left="0.00390625" right="0.06640625" top="0.8515625" bottom="0.9765625" />
+						</NormalTexture>
+						<HighlightTexture file="Interface\AddOns\ezCollections\Textures\SubscriptionOverlay" setAllPoints="true" alphaMode="ADD" alpha="0.4">
+							<TexCoords left="0.07421875" right="0.13671875" top="0.8515625" bottom="0.9765625" />
+						</HighlightTexture>
+						<Layers>
+							<Layer level="ARTWORK">
+								<FontString name="$parentTimer" parentKey="Timer" inherits="GameFontHighlightSmall" justifyH="RIGHT">
+									<Anchors>
+										<Anchor point="RIGHT" relativePoint="LEFT" x="147" y="0" />
+									</Anchors>
+								</FontString>
+								<FontString parentKey="Label" inherits="GameFontNormalSmall" justifyH="LEFT">
+									<Color r="0" g="0.75" b="1" />
+									<Anchors>
+										<Anchor point="LEFT" relativePoint="RIGHT" x="2" y="0" />
+										<Anchor point="RIGHT" relativeTo="$parentTimer" relativePoint="LEFT" x="-3" y="0" />
+									</Anchors>
+								</FontString>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnLoad>
+								Mixin(self, SetShownMixin);
+								function self:UpdateTooltip()
+									if ezCollections:IsActiveLibrarySubscription() then
+										GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+										GameTooltip:SetText(ezCollections.L["Library.Subscription.Info"], 0, 0.75, 1, 1);
+										GameTooltip:AddLine(ezCollections.ActiveLibrarySubscriptionInfo or "", HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1, 1);
+										local remaining = ezCollections:FormatRemainingTime(ezCollections:GetActiveLibrarySubscriptionEndTime() - time());
+										if remaining then
+											GameTooltip:AddLine(remaining, GRAY_FONT_COLOR.r, GRAY_FONT_COLOR.g, GRAY_FONT_COLOR.b, 1, 1);
+										end
+										GameTooltip:Show();
+									end
+								end
+							</OnLoad>
+							<OnShow>
+								self.Timer:SetText(ezCollections:IsActiveLibrarySubscription() and ezCollections:FormatRemainingTime(ezCollections:GetActiveLibrarySubscriptionEndTime() - time(), true) or "");
+								self.Label:SetText(ezCollections.L["Library.Subscription.Info"]);
+							</OnShow>
+							<OnEnter>
+								self:UpdateTooltip();
+							</OnEnter>
+							<OnLeave function="GameTooltip_Hide" />
+							<OnUpdate>
+								self.updateDelay = (self.updateDelay or 0) - elapsed;
+								if self.updateDelay &lt;= 0 then
+									self.updateDelay = 1;
+									if ezCollections:IsActiveLibrarySubscription() then
+										self.Timer:SetText(ezCollections:FormatRemainingTime(ezCollections:GetActiveLibrarySubscriptionEndTime() - time(), true) or "");
+									else
+										ezCollections.Callbacks.LibraryListUpdated();
+									end
+								end
+							</OnUpdate>
+						</Scripts>
+					</Button>
+				</Frames>
+			</Frame>
+
+			<Frame name="$parentfavoriteHelpBox" parentKey="favoriteHelpBox" inherits="ezCollectionsGlowBoxTemplate" hidden="false" frameStrata="DIALOG" >
+				<Size x="220" y="65"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMRIGHT" x="0" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="BigText" inherits="GameFontHighlight" text="TOYBOX_FAVORITE_HELP" justifyH="LEFT">
+							<Size x="176" y="0"/>
+							<Anchors>
+								<Anchor point="TOP" x="-10" y="-12"/>
+							</Anchors>
+						</FontString>
+						<Texture parentKey="ArrowUp" inherits="HelpPlateArrowUP">
+							<Size x="53" y="21"/>
+							<Anchors>
+								<Anchor point="BOTTOM" relativePoint="TOPLEFT" x="37" y="-3"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+					<Layer level="BORDER">
+						<Texture parentKey="ArrowGlowUp" inherits="HelpPlateArrow-GlowUP" alphaMode="ADD" alpha="0.5">
+							<Size x="53" y="21"/>
+							<Anchors>
+								<Anchor point="BOTTOM" relativePoint="TOPLEFT" x="37" y="-3"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="6" y="6"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								self:GetParent():Hide();
+								ezCollections:SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_TOYBOX_FAVORITE, true);
+							</OnClick>
+						</Scripts>
+					</Button>
+				</Frames>
+				<Scripts>
+					<OnLoad>
+						self:SetHeight(self.BigText:GetHeight() + 29);
+					</OnLoad>
+					<OnShow>
+						self:SetFrameStrata("DIALOG");
+					</OnShow>
+				</Scripts>
+			</Frame>
+
+			<Frame name="$parenticonsFrame" parentKey="iconsFrame" inherits="CollectionsBackgroundTemplate">
+				<Layers>
+					<Layer level="ARTWORK" textureSubLevel="1">
+						<Texture parentKey="watermark" file="Interface\AddOns\ezCollections\Textures\LibraryWatermark">
+							<Size x="107" y="98" />
+							<TexCoords left="0" right="0.8359375" top="0" bottom="0.765625" />
+							<Anchors>
+								<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT" x="-25" y="17"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<!-- Library Buttons -->
+				<Frames>
+					<CheckButton name="$parentspellButton1" parentKey="spellButton1" inherits="LibrarySpellButtonTemplate" id="1">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="40" y="-53" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton2" parentKey="spellButton2" inherits="LibrarySpellButtonTemplate" id="2">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton1" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton3" parentKey="spellButton3" inherits="LibrarySpellButtonTemplate" id="3">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton2" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton4" parentKey="spellButton4" inherits="LibrarySpellButtonTemplate" id="4">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton1" relativePoint="BOTTOMLEFT" x="0" y="-16" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton5" parentKey="spellButton5" inherits="LibrarySpellButtonTemplate" id="5">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton4" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton6" parentKey="spellButton6" inherits="LibrarySpellButtonTemplate" id="6">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton5" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton7" parentKey="spellButton7" inherits="LibrarySpellButtonTemplate" id="7">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton4" relativePoint="BOTTOMLEFT" x="0" y="-16" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton8" parentKey="spellButton8" inherits="LibrarySpellButtonTemplate" id="8">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton7" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton9" parentKey="spellButton9" inherits="LibrarySpellButtonTemplate" id="9">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton8" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton10" parentKey="spellButton10" inherits="LibrarySpellButtonTemplate" id="10">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton7" relativePoint="BOTTOMLEFT" x="0" y="-16" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton11" parentKey="spellButton11" inherits="LibrarySpellButtonTemplate" id="11">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton10" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton12" parentKey="spellButton12" inherits="LibrarySpellButtonTemplate" id="12">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton11" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton13" parentKey="spellButton13" inherits="LibrarySpellButtonTemplate" id="13">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton10" relativePoint="BOTTOMLEFT" x="0" y="-16" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton14" parentKey="spellButton14" inherits="LibrarySpellButtonTemplate" id="14">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton13" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton15" parentKey="spellButton15" inherits="LibrarySpellButtonTemplate" id="15">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton14"  x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton16" parentKey="spellButton16" inherits="LibrarySpellButtonTemplate" id="16">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton13" relativePoint="BOTTOMLEFT" x="0" y="-16" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton17" parentKey="spellButton17" inherits="LibrarySpellButtonTemplate" id="17">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton16" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+					<CheckButton name="$parentspellButton18" parentKey="spellButton18" inherits="LibrarySpellButtonTemplate" id="18">
+						<Anchors>
+							<Anchor point="TOPLEFT" relativeTo="$parentspellButton17" x="208" y="0" />
+						</Anchors>
+					</CheckButton>
+				</Frames>
+			</Frame>
+
+			<!-- Paging -->
+			<Frame parentKey="PagingFrame" inherits="CollectionsPagingFrameTemplate">
+				<Anchors>
+					<Anchor point="BOTTOM" x="21" y="43"/>
+				</Anchors>
+			</Frame>
+			<Frame name="$parentBookOptionsMenu" inherits="UIDropDownMenuTemplate" enableMouse="true" parentKey="bookOptionsMenu"/>
+		</Frames>
+		<Scripts>
+			<OnLoad function="Library_OnLoad"/>
+			<OnEvent function="Library_OnEvent"/>
+			<OnShow function="Library_OnShow"/>
+			<OnMouseWheel function="Library_OnMouseWheel"/>
+		</Scripts>
+	</Frame>
+</Ui>

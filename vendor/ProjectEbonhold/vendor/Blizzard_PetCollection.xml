@@ -1,0 +1,456 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<Script file="Blizzard_Collections.lua"/>
+
+	<Button name="CollectionsJournalTab" inherits="CharacterFrameTabButtonTemplate" virtual="true">
+		<Scripts>
+			<OnClick>
+				if self:GetID() == 6 and self:GetParent() == CollectionsJournal then
+					HideUIPanel(CollectionsJournal);
+					local config = ezCollections.Config.Windows[self:GetParent():GetName()];
+					if not config.Layout and not config.Lock then
+						WardrobeFrame:ClearAllPoints();
+						WardrobeFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", CollectionsJournal:GetLeft(), CollectionsJournal:GetBottom());
+					end
+					CollectionsJournal_SetTab(WardrobeFrame, self:GetID());
+					ShowUIPanel(WardrobeFrame);
+					ezCollections:SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EZCOLLECTIONS_TRANSMOG_TAB, true);
+					return;
+				elseif self:GetID() ~= 6 and self:GetParent() == WardrobeFrame then
+					HideUIPanel(WardrobeFrame);
+					local config = ezCollections.Config.Windows[self:GetParent():GetName()];
+					if not config.Layout and not config.Lock then
+						CollectionsJournal:ClearAllPoints();
+						CollectionsJournal:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", WardrobeFrame:GetLeft(), WardrobeFrame:GetBottom());
+					end
+					ShowUIPanel(CollectionsJournal);
+					CollectionsJournal_SetTab(CollectionsJournal, self:GetID());
+					return;
+				end
+				CollectionsJournal_SetTab(self:GetParent(), self:GetID());
+				PlaySound("igCharacterInfoTab");
+			</OnClick>
+		</Scripts>
+	</Button>
+
+	<Button name="CollectionsJournalTabCutoff" inherits="CollectionsJournalTab" virtual="true">
+		<Scripts>
+			<OnLoad>
+				self:SetFrameLevel(self:GetFrameLevel() + 4);
+				local textures =
+				{
+					_G[self:GetName().."LeftDisabled"],
+					_G[self:GetName().."MiddleDisabled"],
+					_G[self:GetName().."RightDisabled"],
+				};
+				for i, texture in ipairs(textures) do
+					texture:SetTexture([[Interface\AddOns\ezCollections\Textures\UI-Character-ActiveTabCutoff]]);
+				end
+			</OnLoad>
+		</Scripts>
+	</Button>
+
+	<Frame name="CollectionsJournal" inherits="ezCollectionsPortraitFrameTemplate" enableMouse="true" parent="UIParent" hidden="true" toplevel="true" frameStrata="HIGH" movable="true" clampedToScreen="true">
+		<Attributes>
+			<Attribute name="UIPanelLayout-defined" type="boolean" value="true"/>
+			<Attribute name="UIPanelLayout-enabled" type="boolean" value="true"/>
+			<Attribute name="UIPanelLayout-area" type="string" value="left"/>
+			<Attribute name="UIPanelLayout-pushable" type="number" value="0"/>
+			<Attribute name="UIPanelLayout-whileDead" type="boolean" value="true"/>
+			<Attribute name="UIPanelLayout-width" type="number" value="733"/>
+			<Attribute name="UIPanelLayout-xoffset" type="number" value="15"/>
+			<Attribute name="UIPanelLayout-yoffset" type="number" value="-14"/>
+		</Attributes>
+		<Size x="703" y="606"/>
+		<Anchors>
+			<Anchor point="CENTER" x="0" y="0"/>
+		</Anchors>
+		<Frames>
+			<Button inherits="ezCollectionsMovingHeaderTemplate" />
+			<Button name="$parentPortraitButton">
+				<Size x="64" y="64" />
+				<Anchors>
+					<Anchor point="CENTER" relativeTo="$parentPortrait" />
+				</Anchors>
+				<HighlightTexture file="Interface\AddOns\ezCollections\Textures\PortraitHighlight" alphaMode="ADD" alpha="0.75" />
+				<Scripts>
+					<OnLoad>
+						Mixin(self, SetShownMixin);
+						function self:UpdateVisibility()
+							local tab = ezCollections:GetCVar("petJournalTab");
+							self:SetShown(ezCollections.Config.Wardrobe.PortraitButton and (tab == 5 or tab == 6));
+						end
+					</OnLoad>
+					<OnClick>
+						HideUIPanel(CollectionsJournal);
+						local config = ezCollections.Config.Windows[self:GetParent():GetName()];
+						if not config.Layout and not config.Lock then
+							WardrobeFrame:ClearAllPoints();
+							WardrobeFrame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", CollectionsJournal:GetLeft(), CollectionsJournal:GetBottom());
+						end
+						ShowUIPanel(WardrobeFrame);
+						WardrobeFrame.PortraitHelpBox:Hide();
+						CollectionsJournal.PortraitHelpBox:Hide();
+						ezCollections:SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EZCOLLECTIONS_PORTRAIT_BUTTON, true);
+					</OnClick>
+					<OnMouseDown>
+						local offset = 0.015;
+						self:GetParent().portrait:SetTexCoord(-offset, 1 - offset, -offset, 1 - offset);
+					</OnMouseDown>
+					<OnMouseUp>
+						self:GetParent().portrait:SetTexCoord(0, 1, 0, 1);
+					</OnMouseUp>
+					<OnEnter>
+						GameTooltip:SetOwner(self, "ANCHOR_RIGHT", -10, -10);
+						GameTooltip:SetText(ezCollections.L["Transmog.Switch.Transmogrify"]);
+						GameTooltip:Show();
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide" />
+				</Scripts>
+			</Button>
+			<Frame name="$parentPortraitHelpBox" parentKey="PortraitHelpBox" inherits="ezCollectionsGlowBoxTemplate" enableMouse="true" frameStrata="DIALOG">
+				<Size x="280" y="100"/>
+				<Anchors>
+					<Anchor point="BOTTOM" relativeTo="$parentPortraitButton" relativePoint="TOP" x="108" y="22"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString parentKey="Text" inherits="GameFontHighlightLeft" justifyV="TOP">
+							<Size x="248" y="0"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="16" y="-22"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="6" y="6"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								self:GetParent():Hide();
+								ezCollections:SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EZCOLLECTIONS_PORTRAIT_BUTTON, true);
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Frame parentKey="Arrow" inherits="ezCollectionsGlowBoxArrowTemplate">
+						<Anchors>
+							<Anchor point="TOP" relativePoint="BOTTOM" x="-108" y="3"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+				<Scripts>
+					<OnLoad>
+						self.Arrow.Glow:ClearAllPoints();
+						self.Arrow.Glow:SetPoint("CENTER", self.Arrow.Arrow, "CENTER", 0, -4);
+					</OnLoad>
+					<OnShow>
+						self:SetFrameStrata("DIALOG");
+						self.Text:SetText(ezCollections.L["Tutorial.PortraitButton"]);
+						self:SetHeight(self.Text:GetHeight() + 42);
+						--if ezCollections:GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EZCOLLECTIONS_PORTRAIT_BUTTON) then
+							self:Hide();
+						--end
+					</OnShow>
+				</Scripts>
+			</Frame>
+			<Button name="$parentTab1" inherits="CollectionsJournalTabCutoff" text="MOUNTS" id="1">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="11" y="2"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentTab2" inherits="CollectionsJournalTabCutoff" text="COMPANIONS" id="2">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTab1" relativePoint="RIGHT" x="-16" y="0"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentTab3" inherits="CollectionsJournalTab" text="TOY_BOX" id="3">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTab2" relativePoint="RIGHT" x="-16" y="0"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentTab4" inherits="CollectionsJournalTab" text="HEIRLOOMS" id="4">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTab3" relativePoint="RIGHT" x="-16" y="0"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentTab5" inherits="CollectionsJournalTab" text="WARDROBE" id="5">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTab4" relativePoint="RIGHT" x="-16" y="0"/>
+				</Anchors>
+			</Button>
+			<Button name="$parentTab6" inherits="CollectionsJournalTabCutoff" text="TRANSMOGRIFY" id="6">
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTab5" relativePoint="RIGHT" x="0" y="0"/>
+				</Anchors>
+			</Button>
+			<Frame name="$parentTransmogTabHelpBox" parentKey="TransmogTabHelpBox" inherits="ezCollectionsGlowBoxTemplate" enableMouse="true" frameStrata="DIALOG">
+				<Size x="280" y="100"/>
+				<Anchors>
+					<Anchor point="LEFT" relativeTo="$parentTab6" relativePoint="RIGHT" x="12" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="OVERLAY">
+						<FontString parentKey="Text" inherits="GameFontHighlightLeft" justifyV="TOP">
+							<Size x="248" y="0"/>
+							<Anchors>
+								<Anchor point="TOPLEFT" x="16" y="-22"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="6" y="6"/>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								self:GetParent():Hide();
+								ezCollections:SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EZCOLLECTIONS_TRANSMOG_TAB, true);
+							</OnClick>
+						</Scripts>
+					</Button>
+					<Frame parentKey="Arrow" inherits="ezCollectionsGlowBoxArrowTemplate">
+						<Anchors>
+							<Anchor point="RIGHT" relativePoint="LEFT" x="36" y="16"/>
+						</Anchors>
+					</Frame>
+				</Frames>
+				<Scripts>
+					<OnLoad>
+						SetClampedTextureRotation(self.Arrow.Arrow, 90);
+						SetClampedTextureRotation(self.Arrow.Glow, 90);
+						self.Arrow.Glow:ClearAllPoints();
+						self.Arrow.Glow:SetPoint("CENTER", self.Arrow.Arrow, "CENTER", -4, 0);
+					</OnLoad>
+					<OnShow>
+						self:SetFrameStrata("DIALOG");
+						self.Text:SetText(ezCollections.L["Tutorial.TransmogTab"]);
+						self:SetHeight(self.Text:GetHeight() + 42);
+						if ezCollections:GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EZCOLLECTIONS_TRANSMOG_TAB) then
+							self:Hide();
+						end
+					</OnShow>
+				</Scripts>
+			</Frame>
+		</Frames>
+
+		<Scripts>
+			<OnLoad>
+				CollectionsJournalTitleText:SetText(COLLECTIONS);
+				SetPortraitToTexture(CollectionsJournalPortrait, [[Interface\AddOns\ezCollections\Interface\Icons\MountJournalPortrait]]);
+				CollectionsJournalTab4:SetText(ezCollections.L["Library"]);
+				PanelTemplates_SetNumTabs(self, 6);
+
+				-- Moved to ezCollections's OnInitialize to have CVars loaded
+				-- PanelTemplates_SetTab(self, tonumber(ezCollections:GetCVar("petJournalTab")) or 5);
+			</OnLoad>
+			<OnShow function="CollectionsJournal_OnShow"/>
+			<OnHide function="CollectionsJournal_OnHide"/>
+		</Scripts>
+	</Frame>
+
+	<Button name="CollectionsClickCollect" inherits="ezCollectionsUIMenuButtonStretchTemplate" hidden="true">
+		<Size x="32" y="32" />
+		<HighlightTexture file="Interface\Buttons\CheckButtonHilight" alphaMode="ADD" />
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon" file="Interface\Icons\INV_Misc_EngGizmos_19">
+					<Anchors>
+						<Anchor point="CENTER" />
+					</Anchors>
+					<TexCoords left="0.078125" right="0.921875" top="0.078125" bottom="0.921875"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="OuterGlow" file="Interface\AddOns\ezCollections\Interface\SpellActivationOverlay\IconAlert" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+					<TexCoords left="0.00781250" right="0.50781250" top="0.27734375" bottom="0.52734375"/>
+					<Animations>
+						<AnimationGroup parentKey="FadeIn">
+							<Alpha duration="0" order="1" change="-1" />
+							<Alpha duration="0.15" order="1" change="1" />
+						</AnimationGroup>
+						<AnimationGroup parentKey="FadeOut">
+							<Alpha duration="0.15" order="1" change="-1" />
+							<Scripts>
+								<OnFinished>
+									self:GetParent():Hide();
+								</OnFinished>
+							</Scripts>
+						</AnimationGroup>
+					</Animations>
+				</Texture>
+				<Texture parentKey="Ants" file="Interface\AddOns\ezCollections\Interface\SpellActivationOverlay\IconAlertAnts" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+					<Animations>
+						<AnimationGroup parentKey="FadeIn">
+							<Alpha duration="0" order="1" change="-1" />
+							<Alpha duration="0.15" order="1" change="1" />
+						</AnimationGroup>
+						<AnimationGroup parentKey="FadeOut">
+							<Alpha duration="0.15" order="1" change="-1" />
+							<Scripts>
+								<OnFinished>
+									self:GetParent():Hide();
+								</OnFinished>
+							</Scripts>
+						</AnimationGroup>
+					</Animations>
+				</Texture>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				local onEnter = self:GetScript("OnEnter");
+				local onLeave = self:GetScript("OnLeave");
+				UIMenuButtonStretchMixin_OnLoad(self);
+				self:SetScript("OnEnter", onEnter);
+				self:SetScript("OnLeave", onLeave);
+
+				self:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+
+				local scale = 1.5;
+				self.Icon:SetSize(self:GetWidth() - 10, self:GetHeight() - 10);
+				self.OuterGlow:SetSize(self:GetWidth() * scale, self:GetHeight() * scale);
+				self.Ants:SetSize(self:GetWidth() * scale * 0.85, self:GetHeight() * scale * 0.85);
+
+				self:GetHighlightTexture():ClearAllPoints();
+				self:GetHighlightTexture():SetPoint("CENTER");
+				self:GetHighlightTexture():SetSize(self:GetWidth() * 0.85, self:GetHeight() * 0.85);
+
+				function self:Attach(parent, frameLayerSource, tooltipHeader, tooltipText)
+					if self:GetParent() ~= parent then
+						self:SetParent(parent);
+						self:ClearAllPoints();
+						self:SetPoint("BOTTOMRIGHT", -9, 7);
+						if not parent.__clickCollectHooked then
+							parent.__clickCollectHooked = true;
+							parent:HookScript("OnHide", function(parent)
+								if self:GetParent() == parent then
+									self:Set(false);
+								end
+							end);
+						end
+					end
+					if frameLayerSource then
+						self:SetFrameLevel(frameLayerSource:GetFrameLevel() + 1);
+					end
+					self.tooltipHeader = tooltipHeader;
+					self.tooltipText = tooltipText;
+					self:Show();
+				end
+				function self:Set(enable)
+					if ezCollections.ClickCollect ~= nil and ezCollections.ClickCollect ~= enable then
+						ezCollections.ClickCollect = enable;
+						if enable then
+							self.Ants:Show();
+							self.Ants.FadeOut:Stop();
+							self.Ants.FadeIn:Play();
+							self.OuterGlow:Show();
+							self.OuterGlow.FadeOut:Stop();
+							self.OuterGlow.FadeIn:Play();
+							if InRepairMode() then
+								HideRepairCursor();
+							end
+							PlaySoundFile([[Sound\Interface\MagicClick.wav]]);
+						else
+							self.Ants.FadeIn:Stop();
+							self.Ants.FadeOut:Play();
+							self.OuterGlow.FadeIn:Stop();
+							self.OuterGlow.FadeOut:Play();
+							ResetCursor();
+						end
+					end
+				end
+			</OnLoad>
+			<OnClick>
+				if button ~= "LeftButton" then
+					if ezCollections.ClickCollect then
+						self:Set(false);
+					end
+					return;
+				end
+				if ezCollections.ClickCollect == nil then
+					ezCollections.ClickCollect = false;
+					hooksecurefunc("PickupContainerItem", function(bag, slot)
+						if ezCollections.ClickCollect and CursorHasItem() then
+							local type, itemID, link = GetCursorInfo();
+							ClearCursor();
+							if bag == -1 then
+								bag = 39 + slot;
+								slot = nil;
+							end
+							if ezCollections.itemUnderCursor.ID == itemID and ezCollections.itemUnderCursor.Bag == bag and ezCollections.itemUnderCursor.Slot == slot then
+								PlaySoundFile([[Sound\Interface\MagicClick.wav]]);
+								if slot then
+									ezCollections:SendAddonMessage(format("UNLOCKSKIN:%d %d %d", itemID, bag, slot - 1));
+								else
+									ezCollections:SendAddonMessage(format("UNLOCKSKIN:%d %d", itemID, bag - 1));
+								end
+							end
+						end
+					end);
+					local suppress = false;
+					local function overrideCursor()
+						if not suppress and ezCollections.ClickCollect then
+							suppress = true;
+							SetCursor(ezCollections.itemUnderCursor.ID and "CAST_CURSOR" or "CAST_ERROR_CURSOR");
+							suppress = false;
+						end
+					end
+					hooksecurefunc("SetCursor", overrideCursor);
+					hooksecurefunc("ResetCursor", overrideCursor);
+					hooksecurefunc("ShowInspectCursor", overrideCursor);
+					hooksecurefunc("ShowMerchantSellCursor", overrideCursor);
+					hooksecurefunc("ShowInventorySellCursor", overrideCursor);
+					hooksecurefunc("ShowContainerSellCursor", overrideCursor);
+					hooksecurefunc("ShowRepairCursor", function()
+						if ezCollections.ClickCollect then
+							self:Set(false);
+						end
+					end);
+					hooksecurefunc("StaticPopup_EscapePressed", function() -- Hack to allow cancelling ClickCollect with Escape
+						if ezCollections.ClickCollect then
+							self:Set(false);
+							GameMenuFrame:Show();
+						end
+					end);
+					WorldFrame:HookScript("OnMouseDown", function()
+						self:Set(false);
+					end);
+				end
+
+				PlaySound("igMainMenuOptionCheckBoxOn");
+				self:Set(not ezCollections.ClickCollect);
+			</OnClick>
+			<OnEnter>
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+				GameTooltip:SetText(self.tooltipHeader);
+				GameTooltip:AddLine(self.tooltipText, HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1);
+				GameTooltip:Show();
+			</OnEnter>
+			<OnLeave function="GameTooltip_Hide" />
+			<OnHide>
+				self:Set(false);
+				self.Ants.FadeOut:Stop();
+				self.Ants:Hide();
+				self.OuterGlow.FadeOut:Stop();
+				self.OuterGlow:Hide();
+			</OnHide>
+			<OnUpdate>
+				AnimateTexCoords(self.Ants, 256, 256, 48, 48, 22, elapsed, 0.01);
+				if ezCollections.ClickCollect then
+					SetCursor(ezCollections.itemUnderCursor.ID and "CAST_CURSOR" or "CAST_ERROR_CURSOR");
+				end
+			</OnUpdate>
+		</Scripts>
+	</Button>
+</Ui>

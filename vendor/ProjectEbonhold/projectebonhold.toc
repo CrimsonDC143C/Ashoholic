@@ -1,0 +1,209 @@
+## Interface: 30300
+## Title: Project Ebonhold
+## Notes: UI core system
+## SavedVariables: SpecCustomNames, ProjectEbonholdDB
+## SavedVariablesPerCharacter: ActionBarSaverDB
+
+projectebonhold.lua
+constants.lua
+modules\utils.lua
+modules\spellPlacement\spell_placement_data.lua
+modules\spellPlacement\spell_placement_service.lua
+modules\spellPlacement\bar_layout_service.lua
+
+modules\spellMap\spellmap_data.lua
+
+modules\actionBarSaver\actionBarSaver.lua
+modules\GlowBoxTemplate\GlowBoxTemplate.xml
+modules\guidedTour\guided_tour.lua
+
+modules\skillTree\TalentDatabase.lua
+modules\skillTree\skillTree_service.lua
+modules\skillTree\skillTreeDebug.lua
+
+modules\shop\shop.xml
+modules\shop\shop_service.lua
+modules\shop\shop.lua
+
+modules\scrap\scrap_service.lua
+modules\scrap\scrap.lua
+
+modules\perks\perks_data.lua
+modules\perks\perks_service.lua
+modules\perks\orb_of_lost_memories.lua
+modules\perks\perks.lua
+modules\perks\perks_browser.lua
+modules\perks\echo_journal.lua
+
+modules\echoTome\echo_tome_tooltip.lua
+
+modules\playerRun\player_run_service.lua
+modules\playerRun\player_run_ui.lua
+modules\playerRun\deathFrame.lua
+
+modules\spec\spec_service.lua
+modules\spec\spec.lua
+
+modules\options\options_service.lua
+modules\options\cvar_options.lua
+modules\options\options.lua
+modules\options\xp_bonus.lua
+
+modules\knowledgeBase\knowledgeBase_service.lua
+modules\knowledgeBase\knowledgeBase.lua
+
+modules\checkpoint\checkpoint_service.lua
+modules\checkpoint\checkpoint.lua
+
+modules\levelup\levelup_service.lua
+modules\levelup\levelup.lua
+
+modules\objectives\objectives_service.lua
+modules\objectives\objectives_ui.lua
+
+modules\questTracker\worldmap_data.lua
+modules\questTracker\super_tracker.lua
+modules\questTracker\quest_tracker.lua
+
+modules\totemTimer\totem_timer.lua
+
+modules\patchpopup\patchpopup.lua
+modules\patchpopup\patchpopup_service.lua
+
+modules\worldChannel\worldChannel_service.lua
+modules\worldChannel\worldChannel.lua
+
+modules\achievementBonus\achievementBonus_service.lua
+modules\achievementBonus\achievementBonus.lua
+
+modules\extraction\extraction_service.lua
+modules\extraction\extraction.lua
+
+modules\torment\hardmode_service.lua
+modules\torment\hardmode.lua
+
+modules\spellUnlearn\spell_unlearn_service.lua
+
+modules\instanceReset\instance_reset_service.lua
+modules\instanceReset\instance_reset_ui.lua
+
+modules\extBank\extBank.lua
+
+modules\overflowHealth\overflow_health_service.lua
+modules\overflowHealth\overflow_health_ui.lua
+
+modules\customTicket\customTicket.lua
+
+modules\ptrBanner\ptrBanner.lua
+
+# ==========================================================================
+# Collections (visual shell) — Layer A of ezCollections, decoupled from data.
+# The data seam lives in modules\collections\core\stub.lua (SEAM: OUTBOUND /
+# SEAM: INBOUND). Wire it to ProjectEbonhold.sendToServer / onEventReceived
+# to bring the collections online. Open with /collections (defaults to Mounts).
+# Toy Box and Library tabs are intentionally excluded.
+# ==========================================================================
+modules\collections\core\stub.lua
+modules\collections\core\ezutil.lua
+modules\collections\Interface\SharedXML\Emulation.lua
+
+# Visual/static data (atlas coordinates + model camera presets) — load before
+# templates so SetAtlasMixin can resolve atlas names during template OnLoad.
+modules\collections\Data\Atlas.lua
+modules\collections\Data\Camera.lua
+
+# Framework backports (retail UI pieces the collection frames depend on)
+modules\collections\Interface\SharedXML\Util.lua
+modules\collections\Interface\SharedXML\Pools.lua
+modules\collections\Interface\SharedXML\SharedTooltipTemplates.lua
+modules\collections\Interface\FrameXML\Constants.lua
+modules\collections\Interface\FrameXML\Localization.enUS.lua
+modules\collections\Interface\FrameXML\Localization.ruRU.lua
+modules\collections\Interface\FrameXML\Fonts.xml
+modules\collections\Interface\FrameXML\FontStyles.xml
+modules\collections\Interface\FrameXML\UIParent.lua
+modules\collections\Interface\FrameXML\TransmogUtil.lua
+modules\collections\Interface\FrameXML\CollectionsUtil.lua
+modules\collections\Interface\SharedXML\SharedUIPanelTemplates.xml
+modules\collections\Interface\FrameXML\GameTooltip.lua
+modules\collections\Interface\FrameXML\UIDropDownMenu.lua
+modules\collections\Interface\FrameXML\UIPanelTemplates.lua
+modules\collections\Interface\FrameXML\UIPanelTemplates.xml
+modules\collections\Interface\SharedXML\ModelFrames.xml
+modules\collections\Interface\SharedXML\DressUpModelFrameMixin.lua
+modules\collections\Interface\FrameXML\WardrobeOutfits.xml
+# DressUp: LUA ONLY, deliberately. The matching DressUpFrames.xml (the
+# ezCollections replacement window) is NOT loaded -- the 3.3.5 client has its
+# own Dressing Room in patch-D.mpq and we keep it. Loading the .xml collides
+# with the client on the DressUpFrame/DressUpModel global names. See the
+# ADDON_NAME guard in DressUpFrames.lua.
+modules\collections\Interface\FrameXML\DressUpFrames.lua
+modules\collections\Interface\SharedXML\HybridScrollFrame.lua
+modules\collections\Interface\SharedXML\HybridScrollFrame.xml
+modules\collections\Interface\FrameXML\StaticPopup.lua
+modules\collections\Interface\FrameXML\MainMenuBarMicroButtons.xml
+modules\collections\Interface\FrameXML\ActionButtonTemplate.xml
+
+# Shared collection templates
+modules\collections\ezCollections.xml
+
+
+# Collection tab frames (Heirloom intentionally omitted, as upstream)
+modules\collections\Interface\AddOns\Blizzard_Collections\Blizzard_CollectionTemplates.xml
+modules\collections\Interface\AddOns\Blizzard_Collections\Blizzard_Collections.xml
+modules\collections\Interface\AddOns\Blizzard_Collections\Blizzard_MountCollection.xml
+modules\collections\Interface\AddOns\Blizzard_Collections\Blizzard_PetCollection.xml
+modules\collections\Interface\AddOns\Blizzard_Collections\Blizzard_Wardrobe.xml
+
+# Collection data: static catalogs (spellID-keyed) + the server-sync service +
+# the real C_MountJournal/C_PetJournal shims (override the stub's empty ones).
+# Loaded after the frames exist so the journal OnShow request hook binds.
+modules\collections\data\mounts_data.lua
+modules\collections\data\pets_data.lua
+modules\collections\data\mounts.lua
+modules\collections\data\pets.lua
+modules\collections\data\item_to_mount.lua
+modules\collections\data\item_to_pet.lua
+modules\collections\data\locale_enUS.lua
+modules\collections\data\appearances_data.lua
+modules\collections\data\appearances.lua
+modules\collections\data\illusions.lua
+modules\collections\core\collections_service.lua
+modules\collections\core\transmog_backing.lua
+modules\collections\Interface\SharedXML\C_MountJournal.lua
+modules\collections\Interface\SharedXML\C_PetJournal.lua
+
+# Opener (slash command; load last so ToggleCollectionsJournal exists)
+modules\collections\core\opener.lua
+
+# Skill Tree's frame (previously loaded early, standalone) now creates itself
+# directly as a native child of CollectionsJournal's Skill Tree tab -- moved
+# here so CollectionsJournal exists first. TalentDatabase/skillTree_service/
+# skillTreeDebug stay in their original early slot (pure data/service, no
+# frame creation, nothing here depends on their exact load position).
+modules\skillTree\skillTree.lua
+modules\skillTree\skillTreeMicroButton.lua
+
+# Prestige: skill tree reset meta-progression (Prestige tab of /progression).
+# Data and service are frame-free; the UI creates EbonholdPrestigeFrame as a
+# native child of CollectionsJournal (same pattern as skillTree.lua), so all
+# three load after the Collections shell and before character_progression.lua
+# (which creates the hub tab that embeds it).
+modules\prestige\prestige_data.lua
+# GENERATED: the "Additional Unlock" class sets of milestones 3..12 (Tier 3,
+# vanilla PvP, arena Seasons 1-8), attached onto the Milestones table. Must
+# load right after prestige_data.lua.
+modules\prestige\prestige_data_sets.lua
+# Chat rank badge: defines CHAT_FLAG_PRESTIGEnn from the rankIcon fields above,
+# which is all both FrameXML and ElvUI need to draw it. Must load after
+# prestige_data.lua; nothing depends on it in turn.
+modules\prestige\prestige_chat.lua
+modules\prestige\prestige_service.lua
+modules\prestige\prestige.lua
+
+# Character Progression hub: /progression -- ties together Collections, Echo
+# Journal, Skill Tree and Prestige under one tabbed launcher. Loaded last so
+# all the embedded systems' globals (CollectionsJournal,
+# ProjectEbonhold.EchoJournal, skillTreeFrame, EbonholdPrestigeFrame) already
+# exist.
+modules\progression\character_progression.lua
