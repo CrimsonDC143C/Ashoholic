@@ -2366,9 +2366,10 @@ function addon:CreateUI()
 
             if data.isCurrent then
                 local a = T.accentBright or T.accent
+                local line = T.currentCharacterLine
                 row.curBg:SetVertexColor(a[1], a[2], a[3], 0.16)
-                row.curTop:SetVertexColor(a[1], a[2], a[3], 0.9)
-                row.curBottom:SetVertexColor(a[1], a[2], a[3], 0.9)
+                row.curTop:SetVertexColor(unpack(line))
+                row.curBottom:SetVertexColor(unpack(line))
                 row.accent:SetVertexColor(a[1], a[2], a[3], 1)
                 row.curBg:Show(); row.curTop:Show(); row.curBottom:Show()
             end
@@ -3369,7 +3370,7 @@ function addon:ToggleConfigUI()
     local ALPHA_KEYS = {
         bg=true, panel=true, border=true, bronze=true,
         rowA=true, rowB=true, rowRealm=true, rowAccount=true, rowTotal=true,
-        rowHover=true, rowTopLine=true, sortArrow=true,
+        rowHover=true, rowTopLine=true, currentCharacterLine=true, sortArrow=true,
         titleLo=true, titleHi=true,
         realmAccentBar=true, accountAccentBar=true, totalsAccentBar=true, characterAccentBar=true,
         tabBg=true, tabBorder=true, tabActiveBg=true, tabActiveBorder=true,
@@ -4101,6 +4102,7 @@ function addon:ToggleConfigUI()
     addColor("Totals row",       "rowTotal")
     addColor("Row hover",        "rowHover")
     addColor("Row top-line",     "rowTopLine")
+    addColor("Current character lines", "currentCharacterLine")
 
     sectionTitle("Rows · Sizing")
     addSlider("Row height",        "rowHeight", 16, 44, true)

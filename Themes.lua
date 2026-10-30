@@ -104,6 +104,7 @@ local function Build(def)
 
     T.rowHover   = HexOr(def.rowHover,   WithAlpha(Mix(accent, WHITE, 0.25), 0.06))
     T.rowTopLine = HexOr(def.rowTopLine, Mix(bg, accent, 0.70))
+    T.currentCharacterLine = HexOr(def.currentCharacterLine, WithAlpha(T.accentBright, 0.9))
     T.sortArrow  = HexOr(def.sortArrow or def.accentBright, WithAlpha(Mix(accent, WHITE, 0.25), 1))
 
     -- Per-row-type accent bars (item 10, 22)
