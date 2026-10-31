@@ -243,6 +243,7 @@ function ns:BuildList()
                 linetype = INFO_CHARACTER_LINE,
                 key = entry.key,
                 account = accName,
+                sourceAccount = charDB._sourceAccount or charDB.account or "Main Account",
                 accKey = accKey,
                 name = charDB.name,
                 level = charDB.level or 1,

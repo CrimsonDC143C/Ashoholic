@@ -70,6 +70,11 @@ local function AsPercent(v, fallback)
     return v
 end
 
+for _, def in ipairs(DEFS) do
+    def.headerText = def.headerText or def.gold or def.accent2
+    def.headerLabels = def.headerLabels or def.loc or def.body or "FFFFFF"
+end
+
 local function Build(def)
     -- Parse "bg" as a full hex string so an 8-char RRGGBBAA value carries
     -- its alpha through. 6-char hex values behave exactly as before
@@ -104,6 +109,7 @@ local function Build(def)
 
     T.rowHover   = HexOr(def.rowHover,   WithAlpha(Mix(accent, WHITE, 0.25), 0.06))
     T.rowTopLine = HexOr(def.rowTopLine, Mix(bg, accent, 0.70))
+    T.currentCharacterLine = HexOr(def.currentCharacterLine, WithAlpha(T.accentBright, 0.9))
     T.sortArrow  = HexOr(def.sortArrow or def.accentBright, WithAlpha(Mix(accent, WHITE, 0.25), 1))
 
     -- Per-row-type accent bars (item 10, 22)
@@ -133,6 +139,7 @@ local function Build(def)
         titleText    = Code(def.titleText        or gold),
         settingsTitleText = Code(def.settingsTitleText or gold),
         headerText   = Code(def.headerText       or gold),   -- ONLY column headers
+        headerLabels = Code(def.headerLabels     or def.headerText or gold),
         sectionHeaderText = Code(def.sectionHeaderText or def.headerText or gold),  -- Customize section titles
         totalsText   = Code(def.totalsText       or gold),
         ember        = Code(def.ember            or "FF8A2B"),
@@ -156,6 +163,7 @@ local function Build(def)
     T.locRGB           = RGB(def.loc or "D6CFC0")
     T.dimRGB           = RGB(def.dim or "B8B2A8")
     T.headerRGB        = RGB(def.headerText or gold)
+    T.headerLabelsRGB  = RGB(def.headerLabels or def.headerText or gold)
     T.sectionHeaderRGB = RGB(def.sectionHeaderText or def.headerText or gold)
     T.totalsRGB        = RGB(def.totalsText or gold)
     T.nameRGB          = RGB(def.nameColor or "FFFFFF")
@@ -166,7 +174,6 @@ local function Build(def)
     T.accountNameRGB   = RGB(def.accountName or "FF8A2B")
     T.wtLvlLockedRGB   = RGB(def.wtLvlLocked or "FF5555")
     T.wtLvlUnlockedRGB = RGB(def.wtLvlUnlocked or "66DD66")
-
 
     T.btn = {
         default = {
@@ -200,9 +207,11 @@ local function Build(def)
 
     -- Number format toggles (item 8)
     T.formatResetCost = def.formatResetCost or false
+    T.formatClearIDs  = def.formatClearIDs  or false
     T.formatSoulAsh   = def.formatSoulAsh   or false
     T.formatMoney     = def.formatMoney     or false
     T.moneyGoldOnly   = def.moneyGoldOnly   or false
+    T.costResetWeekday = def.costResetWeekday or false
 
     T.classColoredNames = def.classColoredNames ~= false
     T.showClassIcons    = def.showClassIcons    ~= false
@@ -300,9 +309,11 @@ function Themes:GetCustoms()
         if def.classColoredAccent == nil then def.classColoredAccent = built.classColoredAccent; dirty = true end
         if def.outerBorder        == nil then def.outerBorder        = built.outerBorder;        dirty = true end
         if def.formatResetCost    == nil then def.formatResetCost    = built.formatResetCost;    dirty = true end
+        if def.formatClearIDs     == nil then def.formatClearIDs     = built.formatClearIDs;     dirty = true end
         if def.formatSoulAsh      == nil then def.formatSoulAsh      = built.formatSoulAsh;      dirty = true end
         if def.formatMoney        == nil then def.formatMoney        = built.formatMoney;        dirty = true end
         if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = built.moneyGoldOnly;      dirty = true end
+        if def.costResetWeekday   == nil then def.costResetWeekday   = built.costResetWeekday;   dirty = true end
         if def.panelAlpha ~= 100 then def.panelAlpha = 100; dirty = true end
         if def.glow == nil then def.glow = 13; dirty = true
         elseif def.glow > 0 and def.glow < 1 then def.glow = def.glow * 100; dirty = true end
@@ -363,9 +374,11 @@ function Themes:SaveCustom(key, def)
     if def.classColoredAccent == nil then def.classColoredAccent = true  end
     if def.outerBorder        == nil then def.outerBorder        = true  end
     if def.formatResetCost    == nil then def.formatResetCost    = false end
+    if def.formatClearIDs     == nil then def.formatClearIDs     = false end
     if def.formatSoulAsh      == nil then def.formatSoulAsh      = false end
     if def.formatMoney        == nil then def.formatMoney        = false end
     if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = false end
+    if def.costResetWeekday   == nil then def.costResetWeekday   = false end
     def.panelAlpha = 100
     if def.glow == nil then def.glow = 13
     elseif def.glow > 0 and def.glow < 1 then def.glow = def.glow * 100 end

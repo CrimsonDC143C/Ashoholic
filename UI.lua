@@ -275,6 +275,7 @@ local function EnsureTheme()
 end
 local function RegisterThemed(fn) themed[#themed + 1] = fn; fn() end
 local function Gradient(tex, lo, hi)
+    tex:SetTexture(1, 1, 1, 1)
     tex:SetGradientAlpha("VERTICAL", lo[1],lo[2],lo[3],lo[4] or 1, hi[1],hi[2],hi[3],hi[4] or 1)
 end
 
@@ -1041,7 +1042,7 @@ function addon:CreateUI()
                     fs:SetPoint(point, btn, rel, x, y)
                     fs.Retheme = function()
                         fs:SetText(textFn())
-                        local rgb = (isTitle and col.key == "wt") and T.wtLabelRGB or T.headerRGB
+                        local rgb = isTitle and T.headerRGB or T.headerLabelsRGB
                         if rgb then fs:SetTextColor(unpack(rgb)) end
                     end
                     fs.Retheme()
@@ -1217,24 +1218,33 @@ function addon:CreateUI()
     clearBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     local costResetText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    costResetText:SetPoint("LEFT", trackerBtn, "RIGHT", 12, 0)
     costResetText:SetPoint("RIGHT", clearBtn, "LEFT", -12, 0)
+    costResetText:SetHeight(30)
     costResetText:SetJustifyH("RIGHT")
+    if costResetText.SetJustifyV then costResetText:SetJustifyV("MIDDLE") end
+    if costResetText.SetWordWrap then costResetText:SetWordWrap(true) end
 
     function frame:UpdateFooter()
         trackerBtn.text:SetText("Raid Tracker: " .. ((addon.db.global.options.ShowHourlyWidget == 0) and "Off" or "On"))
 
         local charDB = addon:GetCurrentCharacterDB()
         local cost = charDB and charDB.RaidResetCost
-        clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNumberPlain(cost) .. " Soul Ash") or "Clear IDs")
+        clearBtn.text:SetText(cost and ("Clear IDs: " .. FormatNum(cost, T.formatClearIDs) .. " Soul Ash") or "Clear IDs")
 
         local at = addon.db.global.RaidCostResetAt
-        local countdown = "--"
+        local resetDisplay = "--"
         if at then
-            local remaining = at - time()
+            local now = time()
+            local remaining = at - now
             while remaining <= 0 do remaining = remaining + 7 * 24 * 60 * 60 end
-            countdown = FormatDuration(remaining)
+            if T.costResetWeekday then
+                resetDisplay = date("%A %H:%M", now + remaining)
+            else
+                resetDisplay = FormatDuration(remaining)
+            end
         end
-        costResetText:SetText("Next cost reset: " .. countdown)
+        costResetText:SetText("Next cost reset: " .. resetDisplay)
     end
 
     local footerTicker = CreateFrame("Frame", nil, frame)
@@ -2414,9 +2424,13 @@ function addon:CreateUI()
             -- FastSwap button: show for alts, hide for the currently logged-in character
             local currentPlayer = UnitName and UnitName("player")
             local isCurrentChar = currentPlayer and data.name and (string.lower(currentPlayer) == string.lower(data.name))
+            local currentCharDB = addon:GetCurrentCharacterDB()
+            local currentSourceAccount = currentCharDB and
+                (currentCharDB._sourceAccount or currentCharDB.account or "Main Account")
+            local isCurrentAccount = currentSourceAccount and data.sourceAccount == currentSourceAccount
             local nameOffset = T.showClassIcons and math.max(18, (T.layout.classIconSize or 14) + 4) or 0
             if row.swapBtn then
-                if not isCurrentChar and data.name and data.name ~= "" then
+                if isCurrentAccount and not isCurrentChar and data.name and data.name ~= "" then
                     row.swapBtn.charName = data.name
                     row.swapBtn.class = data.class
                     row.swapBtn:ApplyStyle(false)
@@ -2504,9 +2518,10 @@ function addon:CreateUI()
 
             if data.isCurrent then
                 local a = T.accentBright or T.accent
+                local line = T.currentCharacterLine
                 row.curBg:SetVertexColor(a[1], a[2], a[3], 0.16)
-                row.curTop:SetVertexColor(a[1], a[2], a[3], 0.9)
-                row.curBottom:SetVertexColor(a[1], a[2], a[3], 0.9)
+                row.curTop:SetVertexColor(unpack(line))
+                row.curBottom:SetVertexColor(unpack(line))
                 row.accent:SetVertexColor(a[1], a[2], a[3], 1)
                 row.curBg:Show(); row.curTop:Show(); row.curBottom:Show()
             end
@@ -2688,6 +2703,7 @@ function addon:CreateUI()
         local L, a, g = T.layout, T.accent, T.glow
         frame:SetBackdropColor(unpack(C.panel))
         frame:SetBackdropBorderColor(unpack(C.border))
+        glow:SetTexture(1, 1, 1, 1)
         glow:SetGradientAlpha("VERTICAL", g[1],g[2],g[3],g[4], g[1],g[2],g[3],0)
         if g[4] > 0 then glow:Show() else glow:Hide() end
         Gradient(titleBar, T.titleLo, T.titleHi)
@@ -3549,7 +3565,7 @@ function addon:ToggleConfigUI()
     local ALPHA_KEYS = {
         bg=true, panel=true, border=true, bronze=true,
         rowA=true, rowB=true, rowRealm=true, rowAccount=true, rowTotal=true,
-        rowHover=true, rowTopLine=true, sortArrow=true,
+        rowHover=true, rowTopLine=true, currentCharacterLine=true, sortArrow=true,
         titleLo=true, titleHi=true,
         realmAccentBar=true, accountAccentBar=true, totalsAccentBar=true, characterAccentBar=true,
         tabBg=true, tabBorder=true, tabActiveBg=true, tabActiveBorder=true,
@@ -4277,23 +4293,28 @@ function addon:ToggleConfigUI()
 
     sectionTitle("Window")
     addColor("Background",       "bg")
-    addSlider("Glow strength %", "glow",       0, 50)
     addColor("Outer border",     "border")
     addToggle("Show outer border", "outerBorder")
     addColor("Inner border",     "bronze")
     addToggle("Show inner border", "innerBorder", true)
 
+    sectionTitle("Bottom Window Glow")
+    addSlider("Bottom glow strength %", "glow", 0, 50)
+
+    sectionTitle("Title Bar and Column Header Backgrounds")
+    addColor("Gradient bottom", "titleLo")
+    addColor("Gradient top",    "titleHi")
+
     sectionTitle("Title Bar")
     addColor("Main title text",     "titleText")
     addColor("Settings title text", "settingsTitleText")
-    addColor("Gradient bottom",  "titleLo")
-    addColor("Gradient top",     "titleHi")
     addFont("Title font", "titleFont", true, false)
     addSlider("Title size",      "titleSize", 10, 32, true)
 
     sectionTitle("Column Headers")
     addColor("Underline",        "accentDim")
-    addColor("Header text",      "headerText")
+    addColor("Default upper title", "headerText")
+    addColor("Default lower labels", "headerLabels")
     addColor("Hover glow",       "accentBright")
     addColor("Sort arrow",       "sortArrow")
     addFont("Header font",       "headerFont", true, true)
@@ -4317,6 +4338,7 @@ function addon:ToggleConfigUI()
     addColor("Totals row",       "rowTotal")
     addColor("Row hover",        "rowHover")
     addColor("Row top-line",     "rowTopLine")
+    addColor("Current character lines", "currentCharacterLine")
 
     sectionTitle("Rows · Sizing")
     addSlider("Row height",        "rowHeight", 16, 44, true)
@@ -4351,7 +4373,6 @@ function addon:ToggleConfigUI()
     addColor("LVL text — unlocked", "wtLvlUnlocked")
     addColor("Reset Cost",       "costColor")
     addColor("Money",            "moneyColor")
-    addColor("WT label",         "wtLabel")
     addColor("Name (custom)",    "nameColor")
     addToggle("Class-colored names", "classColoredNames")
 
@@ -4367,9 +4388,13 @@ function addon:ToggleConfigUI()
 
     sectionTitle("Number Format")
     addToggle("Compact Reset Cost",     "formatResetCost")
+    addToggle("Compact Clear IDs cost", "formatClearIDs")
     addToggle("Compact Soul Ash",       "formatSoulAsh")
     addToggle("Compact Money",          "formatMoney")
     addToggle("Money: gold only",       "moneyGoldOnly")
+
+    sectionTitle("Cost Reset")
+    addToggle("Weekday/time (local)", "costResetWeekday")
 
     sectionTitle("Tabs")
     addFont("Tabs text font",       "tabFont", true, true)

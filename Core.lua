@@ -1245,13 +1245,14 @@ function addon:BeginDraft(fromKey)
         "border", "bronze",
         "titleLo", "titleHi", "accentDim", "accentBright",
         "rowA", "rowB", "rowRealm", "rowAccount", "rowTotal", "rowHover", "rowTopLine",
+        "currentCharacterLine",
         "sortArrow", "realmAccentBar", "accountAccentBar", "totalsAccentBar", "characterAccentBar",
         "tabBg", "tabBorder", "tabActiveBg", "tabActiveBorder", "tabHoverBg", "tabHoverBorder",
         "dangerBg", "dangerBorder", "dangerHoverBg", "dangerHoverBorder",
         "sliderBg", "sliderBorder",
         "btnBg", "btnBorder", "btnHoverBg", "btnHoverBorder", "btnText",
         "dangerText",
-        "titleText", "settingsTitleText", "headerText", "sectionHeaderText", "totalsText",
+        "titleText", "settingsTitleText", "headerText", "headerLabels", "sectionHeaderText", "totalsText",
         "nameColor", "levelColor", "costColor", "moneyColor", "wtLabel", "accountName",
         "wtLvlLocked", "wtLvlUnlocked",
         "tabText", "tabActiveText", "tabHoverText",
@@ -1309,6 +1310,9 @@ function addon:BeginDraft(fromKey)
     if draft.formatResetCost == nil then
         draft.formatResetCost = (builtForFlags and builtForFlags.formatResetCost) or false
     end
+    if draft.formatClearIDs == nil then
+        draft.formatClearIDs = (builtForFlags and builtForFlags.formatClearIDs) or false
+    end
     if draft.formatSoulAsh == nil then
         draft.formatSoulAsh = (builtForFlags and builtForFlags.formatSoulAsh) or false
     end
@@ -1317,6 +1321,9 @@ function addon:BeginDraft(fromKey)
     end
     if draft.moneyGoldOnly == nil then
         draft.moneyGoldOnly = (builtForFlags and builtForFlags.moneyGoldOnly) or false
+    end
+    if draft.costResetWeekday == nil then
+        draft.costResetWeekday = (builtForFlags and builtForFlags.costResetWeekday) or false
     end
 
     addon.Themes:EnsureLayout(draft)
@@ -1444,12 +1451,13 @@ function addon:SaveDraftToExisting(key)
         "bg","accent","accent2","body","gold","ember","muted","soul","loc","dim",
         "border","bronze","titleLo","titleHi","accentDim","accentBright",
         "rowA","rowB","rowRealm","rowAccount","rowTotal","rowHover","rowTopLine",
+        "currentCharacterLine",
         "sortArrow","realmAccentBar","accountAccentBar","totalsAccentBar","characterAccentBar",
         "tabBg","tabBorder","tabActiveBg","tabActiveBorder","tabHoverBg","tabHoverBorder",
         "dangerBg","dangerBorder","dangerHoverBg","dangerHoverBorder",
         "sliderBg","sliderBorder",
         "btnBg","btnBorder","btnHoverBg","btnHoverBorder","btnText","dangerText",
-        "titleText","settingsTitleText","headerText","sectionHeaderText","totalsText",
+        "titleText","settingsTitleText","headerText","headerLabels","sectionHeaderText","totalsText",
         "nameColor","levelColor","costColor","moneyColor","wtLabel","accountName",
         "wtLvlLocked","wtLvlUnlocked",
         "tabText","tabActiveText","tabHoverText",
@@ -1464,7 +1472,8 @@ function addon:SaveDraftToExisting(key)
     -- somehow dropped them. Prevents a stray "revert to default" on save.
     for _, f in ipairs({
         "classColoredNames","showClassIcons","classColoredAccent","outerBorder",
-        "formatResetCost","formatSoulAsh","formatMoney","moneyGoldOnly",
+        "formatResetCost","formatClearIDs","formatSoulAsh","formatMoney","moneyGoldOnly",
+        "costResetWeekday",
         "panelAlpha","glow",
     }) do
         if def[f] == nil and existing and existing[f] ~= nil then
