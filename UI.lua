@@ -33,11 +33,19 @@ local function ResolveFont(path, fallback)
     return fallback
 end
 
+local function SetFontIfChanged(fs, path, size, flags)
+    local currentPath, currentSize, currentFlags = fs:GetFont()
+    if currentPath == path and currentSize == size and (currentFlags or "") == (flags or "") then
+        return true
+    end
+    return fs:SetFont(path, size, flags)
+end
+
 local function ApplyFont(fs, path, size)
     if not fs.ashBaseFont then
         fs.ashBaseFont, fs.ashBaseSize, fs.ashBaseFlags = fs:GetFont()
     end
-    fs:SetFont(ResolveFont(path, fs.ashBaseFont), size or fs.ashBaseSize, fs.ashBaseFlags)
+    SetFontIfChanged(fs, ResolveFont(path, fs.ashBaseFont), size or fs.ashBaseSize, fs.ashBaseFlags)
 end
 
 local T = addon.Themes:Get(addon.Themes.default)
@@ -141,11 +149,14 @@ local MIN_COL_W = 40
 -- Raids view: the same identity columns plus one column per raid, each split into one cell per difficulty.
 local RAID_CELL_W = 40
 local RAID_COLUMN_DEFS = { COLUMN_DEFS[1], COLUMN_DEFS[2], COLUMN_DEFS[3] }
+local AVAILABLE_COLUMNS = {}
+for _, column in ipairs(COLUMN_DEFS) do AVAILABLE_COLUMNS[#AVAILABLE_COLUMNS + 1] = column end
 for _, group in ipairs(addon.RaidData.groups) do
     RAID_COLUMN_DEFS[#RAID_COLUMN_DEFS + 1] = {
         key="raid_" .. group.key, title=group.label, width=#group.variants * RAID_CELL_W,
         field=nil, justify="CENTER", group=group,
     }
+    AVAILABLE_COLUMNS[#AVAILABLE_COLUMNS + 1] = RAID_COLUMN_DEFS[#RAID_COLUMN_DEFS]
 end
 
 local function IsRaidsView()
@@ -154,19 +165,27 @@ local function IsRaidsView()
 end
 
 -- Column order and widths are remembered separately for each view.
-local function ViewOptionKeys()
-    if IsRaidsView() then return "raidColumnOrder", "raidColumnWidths" end
-    return "columnOrder", "columnWidths"
+local function ViewOptionKeys(raids)
+    if raids == nil then raids = IsRaidsView() end
+    if raids then return "raidColumnOrder", "raidColumnWidths", "raidColumnVisibility" end
+    return "columnOrder", "columnWidths", "columnVisibility"
 end
 
-local function BuildActiveColumns()
+local function BuildColumnList(raids)
     local o = addon.db and addon.db.global and addon.db.global.options or {}
-    local defs = IsRaidsView() and RAID_COLUMN_DEFS or COLUMN_DEFS
-    local orderKey, widthKey = ViewOptionKeys()
+    local defaults = raids and RAID_COLUMN_DEFS or COLUMN_DEFS
+    local orderKey, widthKey, visibilityKey = ViewOptionKeys(raids)
+    local defaultVisible = {}
+    for _, column in ipairs(defaults) do defaultVisible[column.key] = true end
     local byKey = {}
-    for _, d in ipairs(defs) do
+    for _, d in ipairs(AVAILABLE_COLUMNS) do
+        local visible = defaultVisible[d.key] or false
+        if o[visibilityKey] and o[visibilityKey][d.key] ~= nil then
+            visible = o[visibilityKey][d.key]
+        end
         byKey[d.key] = { key=d.key, title=d.title, width=d.width, field=d.field,
-                         justify=d.justify, clip=d.clip, reset=d.reset, group=d.group }
+                         justify=d.justify, clip=d.clip, reset=d.reset, group=d.group,
+                         defaultWidth=d.width, visible=d.key == "name" or visible }
     end
     local cols = {}
     if o[orderKey] then
@@ -174,7 +193,10 @@ local function BuildActiveColumns()
             if byKey[k] then table.insert(cols, byKey[k]); byKey[k] = nil end
         end
     end
-    for _, d in ipairs(defs) do
+    for _, d in ipairs(defaults) do
+        if byKey[d.key] then table.insert(cols, byKey[d.key]); byKey[d.key] = nil end
+    end
+    for _, d in ipairs(AVAILABLE_COLUMNS) do
         if byKey[d.key] then table.insert(cols, byKey[d.key]) end
     end
     if o[widthKey] then
@@ -183,6 +205,29 @@ local function BuildActiveColumns()
         end
     end
     return cols
+end
+
+local function BuildActiveColumns()
+    local columns = {}
+    for _, column in ipairs(BuildColumnList(IsRaidsView())) do
+        if column.visible then columns[#columns + 1] = column end
+    end
+    return columns
+end
+
+local function SaveVisibleColumnOrder(visibleOrder)
+    local o = addon.db.global.options
+    local orderKey = ViewOptionKeys()
+    local order, index = {}, 1
+    for _, column in ipairs(BuildColumnList(IsRaidsView())) do
+        if column.visible then
+            order[#order + 1] = visibleOrder[index]
+            index = index + 1
+        else
+            order[#order + 1] = column.key
+        end
+    end
+    o[orderKey] = order
 end
 
 local COLUMNS, COLUMN_BY_KEY, COLUMN_X, BASE_WIDTH
@@ -240,7 +285,7 @@ end
 local function SetFontSafe(fs, path, size, flags)
     flags = flags or ""
     if type(path) ~= "string" or path == "" then path = "Fonts\\FRIZQT__.TTF" end
-    if not fs:SetFont(path, size, flags) then
+    if not SetFontIfChanged(fs, path, size, flags) then
         fs:SetFont(path, size, flags)
     end
     if not fs:GetFont() then
@@ -263,18 +308,19 @@ function addon:ApplyTheme(key)
     local needRebuild = false
     local def = addon.Themes:GetDef(key)
     if o then
-        local newWidths = def.columnWidths or {}
-        local old = o.columnWidths or {}
-        for _, c in ipairs(COLUMN_DEFS) do
-            local ov = old[c.key]   or c.width
-            local nv = newWidths[c.key] or c.width
-            if ov ~= nv then needRebuild = true; break end
-        end
-        -- Always rebuild o.columnWidths; empty table means "use per-column defaults"
-        o.columnWidths = nil
-        if next(newWidths) then
-            o.columnWidths = {}
-            for k, v in pairs(newWidths) do o.columnWidths[k] = v end
+        for _, widthKey in ipairs({ "columnWidths", "raidColumnWidths" }) do
+            local newWidths = def[widthKey] or {}
+            local old = o[widthKey] or {}
+            for _, column in ipairs(AVAILABLE_COLUMNS) do
+                if (old[column.key] or column.width) ~= (newWidths[column.key] or column.width) then
+                    needRebuild = true
+                end
+            end
+            o[widthKey] = nil
+            if next(newWidths) then
+                o[widthKey] = {}
+                for columnKey, width in pairs(newWidths) do o[widthKey][columnKey] = width end
+            end
         end
     end
 
@@ -496,7 +542,7 @@ end
 --------------------------------------------------------------------------
 -- Flat button factory
 --------------------------------------------------------------------------
-local function CreateFlatButton(parent, width, height, label, styleName)
+local function CreateFlatButton(parent, width, height, label, styleName, independentFont)
     local b = CreateFrame("Button", nil, parent)
     b:SetWidth(width); b:SetHeight(height)
     b:SetBackdrop(FLAT_BACKDROP)
@@ -504,7 +550,17 @@ local function CreateFlatButton(parent, width, height, label, styleName)
     b.text:SetPoint("CENTER")
     b.text:SetText(label)
     function b:ApplyStyle(hover)
-        ApplyFont(self.text, T.layout[styleName == "danger" and "dangerFont" or "buttonFont"])
+        if independentFont then
+            local previewFont = self.fontProvider and self.fontProvider()
+            if previewFont then
+                local _, size, flags = GameFontNormalSmall:GetFont()
+                SetFontSafe(self.text, previewFont, size, flags)
+            else
+                self.text:SetFontObject(GameFontNormalSmall)
+            end
+        else
+            ApplyFont(self.text, T.layout[styleName == "danger" and "dangerFont" or "buttonFont"])
+        end
         local s = BUTTON_STYLES[styleName or "default"]
         if hover then
             self:SetBackdropColor(unpack(s.hoverBg))
@@ -842,14 +898,18 @@ function addon:CreateUI()
 
     local function SaveColumnState()
         local o = addon.db.global.options
-        local orderKey, widthKey = ViewOptionKeys()
-        local order, widths = {}, {}
+        local _, widthKey = ViewOptionKeys()
+        local order, widths = {}, o[widthKey] or {}
         for _, c in ipairs(COLUMNS) do
             table.insert(order, c.key)
             widths[c.key] = c.width
         end
-        o[orderKey] = order
+        SaveVisibleColumnOrder(order)
         o[widthKey] = widths
+        if addon.customDraft then
+            addon.customDraft[widthKey] = {}
+            for columnKey, width in pairs(widths) do addon.customDraft[widthKey][columnKey] = width end
+        end
     end
 
     local function AttachHeaderInteractions(btn, col)
@@ -861,11 +921,32 @@ function addon:CreateUI()
         local hot = zone:CreateTexture(nil, "OVERLAY")
         hot:SetAllPoints(zone); hot:SetTexture(WHITE)
         hot:SetVertexColor(1, 0.75, 0.3, 0)
-        zone:SetScript("OnEnter", function()
+        zone:SetScript("OnEnter", function(self)
             if not dragState then hot:SetVertexColor(1,0.75,0.3,0.6) end
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(col.title .. " width", 1, 0.82, 0)
+            GameTooltip:AddLine("Left-drag to resize. Right-click to reset width.", 1, 1, 1)
+            GameTooltip:Show()
         end)
-        zone:SetScript("OnLeave", function() hot:SetVertexColor(1,0.75,0.3,0) end)
+        zone:SetScript("OnLeave", function()
+            hot:SetVertexColor(1,0.75,0.3,0)
+            GameTooltip:Hide()
+        end)
         zone:SetScript("OnMouseDown", function(self, button)
+            GameTooltip:Hide()
+            if button == "RightButton" then
+                local _, widthKey = ViewOptionKeys()
+                local o = addon.db.global.options
+                o[widthKey] = o[widthKey] or {}
+                o[widthKey][col.key] = col.defaultWidth
+                if addon.customDraft then
+                    addon.customDraft[widthKey] = addon.customDraft[widthKey] or {}
+                    addon.customDraft[widthKey][col.key] = col.defaultWidth
+                end
+                dragState = nil
+                frame:Rebuild()
+                return
+            end
             if button ~= "LeftButton" then return end
             dragState = {
                 mode = "resize",
@@ -907,7 +988,7 @@ function addon:CreateUI()
                 local insertAt = idx
                 if idx > dragState.srcIdx then insertAt = idx end
                 table.insert(order, insertAt, dragState.colKey)
-                addon.db.global.options[(ViewOptionKeys())] = order
+                SaveVisibleColumnOrder(order)
                 frame:Rebuild()
                 for i, c in ipairs(COLUMNS) do
                     if c.key == dragState.colKey then dragState.srcIdx = i; dragState.targetIdx = i; break end
@@ -928,12 +1009,21 @@ function addon:CreateUI()
         end
     end
 
+    local headerCache = {}
     local function BuildHeaderButtons()
+        for _, btn in pairs(headerCache) do btn:Hide() end
         wipe(headerButtons)
         wipe(themedLabels)
 
         for _, col in ipairs(COLUMNS) do
-            local btn = CreateFrame("Button", nil, hContent)
+            local btn = headerCache[col.key]
+            if btn then
+                for key, value in pairs(col) do btn.col[key] = value end
+                col = btn.col
+            else
+            btn = CreateFrame("Button", nil, hContent)
+            headerCache[col.key] = btn
+            btn.headerLabels = {}
             btn.col = col
             btn:SetHeight(HEADER_HEIGHT)
             btn:SetPoint("TOPLEFT", hContent, "TOPLEFT", COLUMN_X[col.key], 0)
@@ -956,7 +1046,9 @@ function addon:CreateUI()
                         if rgb then fs:SetTextColor(unpack(rgb)) end
                     end
                     fs.Retheme()
-                    themedLabels[#themedLabels + 1] = fs
+                    fs.columnFraction, fs.columnY = x / col.width, y
+                    fs.columnPoint, fs.columnRelative = point, rel
+                    btn.headerLabels[#btn.headerLabels + 1] = fs
                 end
 
                 local subs
@@ -1045,6 +1137,16 @@ function addon:CreateUI()
             end)
 
             AttachHeaderInteractions(btn, col)
+            end
+            btn:ClearAllPoints()
+            btn:SetPoint("TOPLEFT", hContent, "TOPLEFT", COLUMN_X[col.key], 0)
+            btn:SetWidth(col.width)
+            for _, fs in ipairs(btn.headerLabels) do
+                fs:ClearAllPoints()
+                fs:SetPoint(fs.columnPoint, btn, fs.columnRelative, col.width * fs.columnFraction, fs.columnY)
+                themedLabels[#themedLabels + 1] = fs
+            end
+            btn:Show()
             table.insert(headerButtons, btn)
         end
         UpdateSortArrows()
@@ -1163,14 +1265,15 @@ function addon:CreateUI()
     ----------------------------------------------------------------------
     -- Rows
     ----------------------------------------------------------------------
-    local function CellText(row, key, template)
+    local textColumnKeys = { "level", "cost", "ash", "money", "location", "lastSeen" }
+    local function LayoutCellText(row, fs, key)
         local col = COLUMN_BY_KEY[key]
-        local fs = row:CreateFontString(nil, "OVERLAY", template)
+        fs:ClearAllPoints()
         if not col then
-            -- Column belongs to the other view; keep the string so paint code can still write to it.
             fs:Hide()
-            return fs
+            return
         end
+        fs:Show()
         fs:SetPoint("LEFT", row, "LEFT", COLUMN_X[key] + PAD, 0)
         if col.flex then fs:SetPoint("RIGHT", row, "RIGHT", -PAD, 0)
         else fs:SetWidth(col.width - PAD * 2) end
@@ -1179,11 +1282,56 @@ function addon:CreateUI()
             fs:SetHeight(14)
             if fs.SetWordWrap then fs:SetWordWrap(false) end
         end
+    end
+
+    local function CellText(row, key, template)
+        local fs = row:CreateFontString(nil, "OVERLAY", template)
+        LayoutCellText(row, fs, key)
         return fs
+    end
+
+    local function EnsureRaidCells(row)
+        for _, col in ipairs(COLUMNS) do
+            if col.group and not row.raidCells[col.key] then
+                local list = {}
+                for k, variant in ipairs(col.group.variants) do
+                    local cell = CreateFrame("Button", nil, row)
+                    cell:SetBackdrop(FLAT_BACKDROP)
+                    cell:SetFrameLevel(row:GetFrameLevel() + 3)
+                    cell.group, cell.variant = col.group, variant
+                    cell:SetScript("OnEnter", ShowRaidCellTooltip)
+                    cell:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                    cell:SetScript("OnMouseUp", function(_, button)
+                        local fn = row:GetScript("OnClick")
+                        if fn then fn(row, button) end
+                    end)
+                    cell:Hide()
+                    list[k] = cell
+                end
+                row.raidCells[col.key] = list
+                local sep = row:CreateTexture(nil, "ARTWORK")
+                sep:SetTexture(WHITE)
+                sep:SetWidth(1)
+                sep:Hide()
+                row.raidSeps[col.key] = sep
+            end
+        end
     end
 
     local function StyleRow(row, i)
         local L = T.layout
+        for _, key in ipairs(textColumnKeys) do
+            LayoutCellText(row, row[key], key)
+        end
+        row.ashHitbox:ClearAllPoints()
+        if COLUMN_BY_KEY.ash then
+            row.ashHitbox:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMN_X.ash, 0)
+            row.ashHitbox:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", COLUMN_X.ash, 0)
+            row.ashHitbox:SetWidth(COLUMN_BY_KEY.ash.width)
+        else
+            row.ashHitbox:EnableMouse(false)
+        end
+        EnsureRaidCells(row)
         local y = -(ROWS_OFFSET + (i - 1) * ROW_STEP)
         row:SetHeight(ROW_HEIGHT)
         row:ClearAllPoints()
@@ -1207,7 +1355,7 @@ function addon:CreateUI()
                 ltype == 1 and "accountFont" or
                 ltype == 3 and "totalsFont" or "characterFont"
             local path = ResolveFont(L[fontKey], fs.basePath)
-            if path then fs:SetFont(path, fsize, fs.baseFlags) end
+            if path then SetFontIfChanged(fs, path, fsize, fs.baseFlags) end
             fs:SetTextColor(T.body[1], T.body[2], T.body[3])
             if fs.baseHeight then fs:SetHeight(fsize + 2) end
         end
@@ -1232,13 +1380,6 @@ function addon:CreateUI()
             row.swapBtn:SetSize(btnW, btnH)
             row.swapBtn:ClearAllPoints()
             row.swapBtn:SetPoint("RIGHT", row, "LEFT", COLUMN_X["name"] + COLUMN_BY_KEY["name"].width - PAD, 0)
-            if row.swapBtn.text and row.swapBtn.text.basePath then
-                row.swapBtn.text:SetFont(
-                    row.swapBtn.text.basePath,
-                    math.max(9, (L.characterFontSize or 12) - 2),
-                    row.swapBtn.text.baseFlags
-                )
-            end
             row.swapBtn:ApplyStyle(false)
             if row.swapBtn:IsShown() then
                 swapW = btnW + 4
@@ -1248,6 +1389,13 @@ function addon:CreateUI()
 
         for n = 1, 2 do
             row.wtBtn[n]:SetSize(L.wtIconSize, L.wtIconSize)
+            row.wtBtn[n]:ClearAllPoints()
+            if COLUMN_BY_KEY.wt then
+                row.wtBtn[n]:SetPoint("CENTER", row, "LEFT", COLUMN_X.wt + COLUMN_BY_KEY.wt.width * (n == 1 and 0.25 or 0.75), 0)
+                row.wtBtn[n]:Show()
+            else
+                row.wtBtn[n]:Hide()
+            end
         end
 
         for _, col in ipairs(COLUMNS) do
@@ -1261,13 +1409,45 @@ function addon:CreateUI()
                     cell:SetPoint("CENTER", row, "LEFT", COLUMN_X[col.key] + cellW * (k - 0.5), 0)
                 end
                 local d = T.accentDim
+                row.raidSeps[col.key]:ClearAllPoints()
+                row.raidSeps[col.key]:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMN_X[col.key], 0)
+                row.raidSeps[col.key]:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", COLUMN_X[col.key], 0)
                 row.raidSeps[col.key]:SetVertexColor(d[1], d[2], d[3], 0.35)
             end
         end
     end
 
+    local function HideTooltip()
+        GameTooltip:Hide()
+    end
+
+    local function ShowWTTooltip(self)
+        local state, lockedRaids = self.state, self.lockedRaids
+        if state == "unknown" then
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine("World Tour Status", 1, 0.82, 0)
+            GameTooltip:AddLine("|cFF8C867DData not scanned yet.|r")
+        elseif (state == "lvl" or state == "partial" or state == "no")
+            and lockedRaids and #lockedRaids > 0 then
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine((self.charName or "Character") .. " (" .. self.raidType .. ")", 1, 0.82, 0)
+            if state == "lvl" then
+                GameTooltip:AddLine(T.text.wtLvlLocked .. "Locked to:|r")
+            elseif state == "partial" then
+                GameTooltip:AddLine("|cFFFFCC55Partial lockouts (" .. #lockedRaids .. "/3):|r")
+            else
+                GameTooltip:AddLine("|cFFFF5555Locked to:|r")
+            end
+            for _, raid in ipairs(lockedRaids) do GameTooltip:AddLine("- " .. raid, 1, 1, 1) end
+        else
+            return
+        end
+        GameTooltip:Show()
+    end
+
     local function CreateRow(i)
         local row = CreateFrame("Button", "AshoholicRow" .. i, hContent)
+        row.handlers = {}
         row.bg = row:CreateTexture(nil, "BACKGROUND")
         row.bg:SetAllPoints(row); row.bg:SetTexture(WHITE)
         row.accent = row:CreateTexture(nil, "ARTWORK")
@@ -1328,6 +1508,8 @@ function addon:CreateUI()
         function swapBtn:ApplyStyle(hover)
             local s = BUTTON_STYLES and BUTTON_STYLES["default"]
             if not s then return end
+            SetFontSafe(self.text, ResolveFont(T.layout.buttonFont, self.text.basePath),
+                math.max(9, (T.layout.characterFontSize or 12) - 2), self.text.baseFlags)
             if hover then
                 self:SetBackdropColor(unpack(s.hoverBg))
                 self:SetBackdropBorderColor(unpack(s.hoverBorder))
@@ -1387,10 +1569,16 @@ function addon:CreateUI()
 
         row.wtIcon, row.wtText, row.wtBtn = {}, {}, {}
         for n = 1, 2 do
-            local cx = COLUMN_X.wt + COLUMN_BY_KEY.wt.width * (n == 1 and 0.25 or 0.75)
             local wtBtn = CreateFrame("Button", nil, row)
+            wtBtn:SetScript("OnEnter", ShowWTTooltip)
+            wtBtn:SetScript("OnLeave", HideTooltip)
             wtBtn:SetSize(22, 22)
-            wtBtn:SetPoint("CENTER", row, "LEFT", cx, 0)
+            if COLUMN_BY_KEY.wt then
+                local cx = COLUMN_X.wt + COLUMN_BY_KEY.wt.width * (n == 1 and 0.25 or 0.75)
+                wtBtn:SetPoint("CENTER", row, "LEFT", cx, 0)
+            else
+                wtBtn:Hide()
+            end
             local icon = wtBtn:CreateTexture(nil, "ARTWORK")
             icon:SetAllPoints(wtBtn)
             row.wtIcon[n] = icon
@@ -1402,32 +1590,6 @@ function addon:CreateUI()
 
         -- Raids view: one cell per difficulty, with a divider at the start of each raid
         row.raidCells, row.raidSeps = {}, {}
-        for _, col in ipairs(COLUMNS) do
-            if col.group then
-                local list = {}
-                for k, variant in ipairs(col.group.variants) do
-                    local cell = CreateFrame("Button", nil, row)
-                    cell:SetBackdrop(FLAT_BACKDROP)
-                    cell:SetFrameLevel(row:GetFrameLevel() + 3)
-                    cell.group, cell.variant = col.group, variant
-                    cell:SetScript("OnEnter", ShowRaidCellTooltip)
-                    cell:SetScript("OnLeave", function() GameTooltip:Hide() end)
-                    cell:SetScript("OnMouseUp", function(_, button)
-                        local fn = row:GetScript("OnClick")
-                        if fn then fn(row, button) end
-                    end)
-                    cell:Hide()
-                    list[k] = cell
-                end
-                row.raidCells[col.key] = list
-                local sep = row:CreateTexture(nil, "ARTWORK")
-                sep:SetTexture(WHITE)
-                sep:SetWidth(1)
-                sep:SetPoint("TOPLEFT", row, "TOPLEFT", COLUMN_X[col.key], 0)
-                sep:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", COLUMN_X[col.key], 0)
-                row.raidSeps[col.key] = sep
-            end
-        end
 
         row.expand = row:CreateTexture(nil, "ARTWORK")
         row.expand:SetWidth(14); row.expand:SetHeight(14)
@@ -1456,9 +1618,10 @@ function addon:CreateUI()
     end
 
     local function SetWTCell(row, n, state, lockedRaids, charName, raidType)
+        if not COLUMN_BY_KEY.wt then return end
         local wtBtn, icon, txt = row.wtBtn[n], row.wtIcon[n], row.wtText[n]
-        wtBtn:SetScript("OnEnter", nil)
-        wtBtn:SetScript("OnLeave", nil)
+        wtBtn.state, wtBtn.lockedRaids = state, lockedRaids
+        wtBtn.charName, wtBtn.raidType = charName, raidType
         local iconOk, iconNo, iconUnknown, iconPartial = GetActiveIcons()
         if state == "lvl" then
             icon:Hide()
@@ -1466,14 +1629,6 @@ function addon:CreateUI()
             if hasLockout then
                 txt:SetText("LVL")
                 txt:SetTextColor(unpack(T.wtLvlLockedRGB or {1, 0.33, 0.33}))
-                wtBtn:SetScript("OnEnter", function(self)
-                    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                    GameTooltip:AddLine((charName or "Character") .. " (" .. raidType .. ")", 1, 0.82, 0)
-                    GameTooltip:AddLine(T.text.wtLvlLocked .. "Locked to:|r")
-                    for _, r in ipairs(lockedRaids) do GameTooltip:AddLine("- " .. r, 1, 1, 1) end
-                    GameTooltip:Show()
-                end)
-                wtBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
             else
                 txt:SetText("LVL")
                 txt:SetTextColor(unpack(T.wtLvlUnlockedRGB or {0.40, 0.87, 0.40}))
@@ -1487,13 +1642,6 @@ function addon:CreateUI()
             if iconUnknown.crop then icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             else icon:SetTexCoord(0, 1, 0, 1) end
             icon:Show()
-            wtBtn:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:AddLine("World Tour Status", 1, 0.82, 0)
-                GameTooltip:AddLine("|cFF8C867DData not scanned yet.|r")
-                GameTooltip:Show()
-            end)
-            wtBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         elseif state == "partial" then
             txt:Hide()
             icon:SetTexture(iconPartial.path)
@@ -1502,16 +1650,6 @@ function addon:CreateUI()
             if iconPartial.crop then icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             else icon:SetTexCoord(0, 1, 0, 1) end
             icon:Show()
-            if lockedRaids and #lockedRaids > 0 then
-                wtBtn:SetScript("OnEnter", function(self)
-                    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                    GameTooltip:AddLine((charName or "Character") .. " (" .. raidType .. ")", 1, 0.82, 0)
-                    GameTooltip:AddLine("|cFFFFCC55Partial lockouts (" .. #lockedRaids .. "/3):|r")
-                    for _, r in ipairs(lockedRaids) do GameTooltip:AddLine("- " .. r, 1, 1, 1) end
-                    GameTooltip:Show()
-                end)
-                wtBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            end
         else
             local opt = (state == "ok") and iconOk or iconNo
             txt:Hide()
@@ -1521,16 +1659,6 @@ function addon:CreateUI()
             if opt.crop then icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             else icon:SetTexCoord(0, 1, 0, 1) end
             icon:Show()
-            if state == "no" and lockedRaids and #lockedRaids > 0 then
-                wtBtn:SetScript("OnEnter", function(self)
-                    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                    GameTooltip:AddLine((charName or "Character") .. " (" .. raidType .. ")", 1, 0.82, 0)
-                    GameTooltip:AddLine("|cFFFF5555Locked to:|r")
-                    for _, r in ipairs(lockedRaids) do GameTooltip:AddLine("- " .. r, 1, 1, 1) end
-                    GameTooltip:Show()
-                end)
-                wtBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            end
         end
     end
 
@@ -1544,7 +1672,12 @@ function addon:CreateUI()
             row.swapBtn.charName = nil
             row.swapBtn.class = nil
         end
-        for n = 1, 2 do row.wtIcon[n]:Hide(); row.wtText[n]:Hide() end
+        for n = 1, 2 do
+            row.wtIcon[n]:Hide(); row.wtText[n]:Hide()
+            local button = row.wtBtn[n]
+            button.state, button.lockedRaids = nil, nil
+            button.charName, button.raidType = nil, nil
+        end
         row.curBg:Hide(); row.curTop:Hide(); row.curBottom:Hide()
         for key, list in pairs(row.raidCells) do
             for _, cell in ipairs(list) do
@@ -2129,6 +2262,8 @@ function addon:CreateUI()
 
     local function PaintRow(row, data, idx)
         ClearRow(row)
+        row.data = data
+        local handlers = row.handlers
         local oldLtype = row._linetype
         row._linetype = data.linetype
         if oldLtype ~= data.linetype then
@@ -2143,11 +2278,13 @@ function addon:CreateUI()
             row.realmText:SetText(data.realm)
             row.realmText:SetTextColor(unpack(T.emberRGB or {1, 0.54, 0.17}))
             row.realmText:Show()
-            row:SetScript("OnClick", function()
+            handlers.realmClick = handlers.realmClick or function()
+                local data = row.data
                 addon.Characters:ToggleRealm(data.realm)
                 data.isCollapsed = not data.isCollapsed
                 frame:Refresh()
-            end)
+            end
+            row:SetScript("OnClick", handlers.realmClick)
 
         elseif data.linetype == 1 then -- Account
             row.bg:SetVertexColor(unpack(C.rowAccount))
@@ -2166,7 +2303,8 @@ function addon:CreateUI()
 
             -- Soul Ash breakdown tooltip (over the ash column; absent in the Raids view)
             row.ashHitbox:EnableMouse(COLUMN_X["ash"] ~= nil)
-            row.ashHitbox:SetScript("OnEnter", function(self)
+            handlers.ashEnter = handlers.ashEnter or function(self)
+                local data = row.data
                 local committed = data.committedAsh or 0
                 local spendable = data.spendableAsh or 0
                 local runAsh    = (data.soulAsh or 0) - spendable - committed
@@ -2190,12 +2328,14 @@ function addon:CreateUI()
                 GameTooltip:AddLine(" ")
                 GameTooltip:AddLine("|cFFFFFFFFShift+Right-Click|r to remove this account.")
                 GameTooltip:Show()
-            end)
-            row.ashHitbox:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            end
+            row.ashHitbox:SetScript("OnEnter", handlers.ashEnter)
+            row.ashHitbox:SetScript("OnLeave", HideTooltip)
 
             -- Row-wide tooltip (only fires when mouse is NOT over the ash
             -- column, so it never fights the ash breakdown above)
-            row:SetScript("OnEnter", function(self)
+            handlers.accountEnter = handlers.accountEnter or function(self)
+                local data = self.data
                 local cx = GetCursorPosition()
                 local scale = self:GetEffectiveScale()
                 local relX = (cx / scale) - self:GetLeft()
@@ -2216,10 +2356,12 @@ function addon:CreateUI()
                 GameTooltip:AddLine("|cFF8C867Dremove just that character.|r")
                 GameTooltip:AddLine("|cFF8C867DRemoved accounts come back on next sync.|r")
                 GameTooltip:Show()
-            end)
-            row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            end
+            row:SetScript("OnEnter", handlers.accountEnter)
+            row:SetScript("OnLeave", HideTooltip)
 
-            row:SetScript("OnClick", function(self, button)
+            handlers.accountClick = handlers.accountClick or function(self, button)
+                local data = self.data
                 if button == "RightButton" then
                     if IsShiftKeyDown() then
                         StaticPopup_Show("ASH_REMOVE_ACCOUNT_CONFIRM",
@@ -2232,7 +2374,8 @@ function addon:CreateUI()
                     data.isCollapsed = not data.isCollapsed
                     frame:Refresh()
                 end
-            end)
+            end
+            row:SetScript("OnClick", handlers.accountClick)
 
         elseif data.linetype == 3 then -- Totals
             row.bg:SetVertexColor(unpack(C.rowTotal))
@@ -2386,11 +2529,12 @@ function addon:CreateUI()
             LayoutNameHit(row)
             row.nameHit.lockoutData = data
             row.nameHit:EnableMouse(true)
-            row.nameHit:SetScript("OnEnter", function(self)
+            handlers.nameEnter = handlers.nameEnter or function(self)
                 row:LockHighlight()
                 ShowLockoutPanel(row, self.lockoutData)
-            end)
-            row.nameHit:SetScript("OnLeave", function()
+            end
+            row.nameHit:SetScript("OnEnter", handlers.nameEnter)
+            handlers.nameLeave = handlers.nameLeave or function()
                 local hovered = LockoutUnderCursor()
                 if hovered and hovered ~= row and hovered.nameHit.lockoutData then
                     for i = 1, #rows do
@@ -2402,13 +2546,16 @@ function addon:CreateUI()
                 end
                 row:UnlockHighlight()
                 RequestHideLockout()
-            end)
-            row.nameHit:SetScript("OnMouseUp", function(_, button)
+            end
+            row.nameHit:SetScript("OnLeave", handlers.nameLeave)
+            handlers.nameMouseUp = handlers.nameMouseUp or function(_, button)
                 local fn = row:GetScript("OnClick")
                 if fn then fn(row, button) end
-            end)
+            end
+            row.nameHit:SetScript("OnMouseUp", handlers.nameMouseUp)
 
-            row:SetScript("OnClick", function(self, button)
+            handlers.characterClick = handlers.characterClick or function(self, button)
+                local data = self.data
                 if button == "RightButton" and IsShiftKeyDown() then
                     StaticPopupDialogs["ASHOHOLIC_REMOVE_CHAR"] =
                         StaticPopupDialogs["ASHOHOLIC_REMOVE_CHAR"] or {
@@ -2427,7 +2574,8 @@ function addon:CreateUI()
                     }
                     StaticPopup_Show("ASHOHOLIC_REMOVE_CHAR", data.name, nil, data.key)
                 end
-            end)
+            end
+            row:SetScript("OnClick", handlers.characterClick)
         end
     end
 
@@ -2480,6 +2628,7 @@ function addon:CreateUI()
         end
         visibleRows = math.max(1, math.floor((vh - ROWS_OFFSET + (ROW_STEP - ROW_HEIGHT)) / ROW_STEP))
         EnsureRows(visibleRows)
+        for i, row in ipairs(rows) do StyleRow(row, i) end
         local prevScroll = scrollFrame:GetVerticalScroll()
         frame:Refresh()
         scrollFrame:SetVerticalScroll(prevScroll)
@@ -2508,9 +2657,10 @@ function addon:CreateUI()
     end
     local function ResetSize()
         local o = addon.db and addon.db.global and addon.db.global.options
-        if o then o.WindowWidth = nil; o.WindowHeight = nil end
-        frame:SetWidth(Clamp(DEFAULT_WIDTH, MIN_WIDTH, maxW))
+        RebuildColumnMetrics()
+        frame:SetWidth(Clamp(LEFT_PAD + BASE_WIDTH + RIGHT_MARGIN, MIN_WIDTH, maxW))
         frame:SetHeight(Clamp(DEFAULT_HEIGHT, MIN_HEIGHT, maxH))
+        SaveSize()
     end
     for _, point in ipairs({"TOPLEFT","TOPRIGHT","BOTTOMLEFT","BOTTOMRIGHT"}) do
         local grip = CreateFrame("Button", nil, frame)
@@ -2549,7 +2699,7 @@ function addon:CreateUI()
         end)
     end
 
-    RegisterThemed(function()
+    local function StyleRoster()
         local L, a, g = T.layout, T.accent, T.glow
         frame:SetBackdropColor(unpack(C.panel))
         frame:SetBackdropBorderColor(unpack(C.border))
@@ -2608,9 +2758,9 @@ function addon:CreateUI()
         end
         for _, fs in ipairs(themedLabels) do fs.Retheme() end
         for _, tint in ipairs(gripTints) do tint() end
-        for i, row in ipairs(rows) do StyleRow(row, i) end
         StyleLockoutPanel()
-    end)
+    end
+    RegisterThemed(StyleRoster)
 
     frame:SetScript("OnSizeChanged", function() ApplyLayout() end)
     frame:SetScript("OnShow", function()
@@ -2642,12 +2792,10 @@ function addon:CreateUI()
 
     function frame:Rebuild()
         RebuildColumnMetrics()
-        for _, btn in ipairs(headerButtons) do btn:Hide(); btn:SetParent(nil) end
+        for _, btn in ipairs(headerButtons) do btn:Hide() end
         wipe(headerButtons); wipe(themedLabels)
-        for _, row in ipairs(rows) do row:Hide(); row:SetParent(nil) end
-        wipe(rows)
         BuildHeaderButtons()
-        for _, fn in ipairs(themed) do fn() end
+        StyleRoster()
         ApplyLayout()
     end
 
@@ -3112,14 +3260,55 @@ function addon:ToggleConfigUI()
     local page2 = NewPage()
     pages[2] = page2
     local CARD_W, CARD_H, CARD_GAP, CARD_STEP = 200, 42, 10, 48
-    local trashFrame = CreateFrame("Frame", nil, UIParent)
-    trashFrame:Hide()
     local cards = {}
+    local defaultCardPool, customCardPool = {}, {}
     local dynHeader = {}
+    local refreshTimer
 
-    local function BuildCard(def, isCustom, y, x)
+    local function RunDeferredRefresh(self)
+        self:Hide()
+        refreshCustomTab()
+    end
+
+    local function DeferThemeRefresh()
+        if C_Timer and C_Timer.After then
+            C_Timer.After(0, refreshCustomTab)
+        else
+            if not refreshTimer then
+                refreshTimer = CreateFrame("Frame")
+                refreshTimer:SetScript("OnUpdate", RunDeferredRefresh)
+            end
+            refreshTimer:Show()
+        end
+    end
+
+    local function BuildCard(def, isCustom, y, x, index)
         local P = addon.Themes:Get(def.key)
-        local card = CreateFrame("Button", nil, page2)
+        local pool = isCustom and customCardPool or defaultCardPool
+        local card = pool[index]
+        if card then
+            card.definition = def
+            card.key, card.palette = def.key, P
+            card:ClearAllPoints()
+            card:SetPoint("TOPLEFT", x, y)
+            card:SetBackdropColor(unpack(P.panel))
+            card.name:SetText(def.name or def.key or "Unnamed")
+            card.name:SetTextColor(unpack(P.goldRGB))
+            local swatches = { P.accent, P.accent2, P.goldRGB, P.soulRGB, P.accentDim }
+            for position, color in ipairs(swatches) do
+                card.swatches[position]:SetVertexColor(color[1], color[2], color[3], 1)
+            end
+            if card.star then
+                if def.starred then card.star:SetVertexColor(1, 1, 1, 1)
+                else card.star:SetVertexColor(0.35, 0.35, 0.35, 0.7) end
+            end
+            card:Show()
+            cards[#cards + 1] = card
+            return card
+        end
+        card = CreateFrame("Button", nil, page2)
+        pool[index] = card
+        card.definition = def
         card.key, card.palette, card.isCustom = def.key, P, isCustom
         card:SetSize(CARD_W, CARD_H)
         card:SetPoint("TOPLEFT", x, y)
@@ -3130,13 +3319,16 @@ function addon:ToggleConfigUI()
         name:SetPoint("TOPLEFT", card, "TOPLEFT", 8, -6)
         name:SetText(def.name or def.key or "Unnamed")
         name:SetTextColor(unpack(P.goldRGB))
+        card.name = name
 
         local swatches = { P.accent, P.accent2, P.goldRGB, P.soulRGB, P.accentDim }
+        card.swatches = {}
         for n, c in ipairs(swatches) do
             local sw = card:CreateTexture(nil, "ARTWORK")
             sw:SetTexture(WHITE); sw:SetSize(18, 7)
             sw:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 8 + (n-1)*20, 6)
             sw:SetVertexColor(c[1], c[2], c[3], 1)
+            card.swatches[n] = sw
         end
 
         card.accentBar = card:CreateTexture(nil, "OVERLAY")
@@ -3189,6 +3381,7 @@ function addon:ToggleConfigUI()
                     tex:SetSize(14, 14)
                     tex:SetPoint("CENTER")
                     tex:SetTexture(texture)
+                    b.icon = tex
                     if dim then
                         tex:SetVertexColor(0.35, 0.35, 0.35, 0.7)
                     else
@@ -3201,20 +3394,15 @@ function addon:ToggleConfigUI()
                     GameTooltip:AddLine(tip, 1, 0.82, 0); GameTooltip:Show()
                 end)
                 b:HookScript("OnLeave", function() GameTooltip:Hide() end)
+                return b
             end
-            local function defer(fn)
-                if C_Timer and C_Timer.After then C_Timer.After(0, fn)
-                else local f = CreateFrame("Frame")
-                     f:SetScript("OnUpdate", function(s)
-                         s:SetScript("OnUpdate", nil); fn()
-                     end) end
-            end
-            miniBtn("", -66, "Star / unstar", function()
-                addon.Themes:ToggleStar(def.key)
-                defer(refreshCustomTab)
+            local star = miniBtn("", -66, "Star / unstar", function()
+                addon.Themes:ToggleStar(card.key)
+                DeferThemeRefresh()
             end, "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1", not def.starred)
+            card.star = star.icon
             miniBtn("E", -46, "Edit in Customize tab", function()
-                local editKey = def.key or card.key
+                local editKey = card.key
                 addon:CancelDraft()
                 addon:BeginDraft(editKey)
                 SelectTab(3)
@@ -3224,18 +3412,18 @@ function addon:ToggleConfigUI()
                     text = "Rename custom theme:",
                     button1 = OKAY, button2 = CANCEL, hasEditBox = true,
                     OnShow = function(self)
-                        self.editBox:SetText(def.name)
+                        self.editBox:SetText(addon.Themes:GetDef(self.data).name)
                         self.editBox:HighlightText(); self.editBox:SetFocus()
                     end,
                     OnAccept = function(self)
                         local txt = self.editBox:GetText()
                         if txt and txt ~= "" then
-                            addon.Themes:RenameCustom(def.key, txt); refreshCustomTab()
+                            addon.Themes:RenameCustom(self.data, txt); refreshCustomTab()
                         end
                     end,
                     timeout = 0, whileDead = true, hideOnEscape = true,
                 }
-                StaticPopup_Show("ASH_REN_CUSTOM")
+                StaticPopup_Show("ASH_REN_CUSTOM", nil, nil, card.key)
             end)
             miniBtn("X", -6, "Delete", function()
                 StaticPopupDialogs["ASH_DEL_CUSTOM"] = StaticPopupDialogs["ASH_DEL_CUSTOM"] or {
@@ -3246,7 +3434,7 @@ function addon:ToggleConfigUI()
                     end,
                     timeout = 0, whileDead = true, hideOnEscape = true,
                 }
-                StaticPopup_Show("ASH_DEL_CUSTOM", def.name, nil, def.key)
+                StaticPopup_Show("ASH_DEL_CUSTOM", card.definition.name, nil, card.key)
             end)
         end
 
@@ -3257,52 +3445,50 @@ function addon:ToggleConfigUI()
     refreshCustomTab = function()
         for _, c in ipairs(cards) do
             c:Hide()
-            c:ClearAllPoints()
-            c:SetParent(trashFrame)
-            c:Hide()
         end
         wipe(cards)
         for _, h in ipairs(dynHeader) do
             h:Hide()
             h:ClearAllPoints()
-            h:SetParent(trashFrame)
-            h:Hide()
         end
-        wipe(dynHeader)
+
+        local function Header(index, template, kind, text, y)
+            local header = dynHeader[index]
+            if not header then
+                header = Themed(page2:CreateFontString(nil, "OVERLAY", template), kind, text)
+                dynHeader[index] = header
+            end
+            header:SetPoint("TOPLEFT", 20, y)
+            header:Show()
+        end
 
         local current = addon.db.global.options.Theme
         local y = -50
 
-        local dHdr = Themed(page2:CreateFontString(nil, "OVERLAY", "GameFontNormal"), "gold", "Default Presets")
-        dHdr:SetPoint("TOPLEFT", 20, y)
-        dynHeader[#dynHeader + 1] = dHdr
+        Header(1, "GameFontNormal", "gold", "Default Presets", y)
         y = y - 20
 
         local defaultList = addon.Themes.list
         for i, def in ipairs(defaultList) do
             local x = 20 + ((i-1) % 2) * (CARD_W + CARD_GAP)
             local yy = y - math.floor((i-1)/2) * CARD_STEP
-            BuildCard(def, false, yy, x)
+            BuildCard(def, false, yy, x, i)
         end
         y = y - math.ceil(#defaultList / 2) * CARD_STEP - 20
 
-        local cHdr = Themed(page2:CreateFontString(nil, "OVERLAY", "GameFontNormal"), "gold", "Custom Presets")
-        cHdr:SetPoint("TOPLEFT", 20, y)
-        dynHeader[#dynHeader + 1] = cHdr
+        Header(2, "GameFontNormal", "gold", "Custom Presets", y)
         y = y - 20
 
         local customs = addon.Themes:ListCustoms()
         if #customs == 0 then
-            local empty = Themed(page2:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"), "muted",
-                                 "No custom presets yet. Open Customize to create one.")
-            empty:SetPoint("TOPLEFT", 20, y)
-            dynHeader[#dynHeader + 1] = empty
+            Header(3, "GameFontHighlightSmall", "muted",
+                "No custom presets yet. Open Customize to create one.", y)
             y = y - 20
         end
         for i, def in ipairs(customs) do
             local x = 20 + ((i-1) % 2) * (CARD_W + CARD_GAP)
             local yy = y - math.floor((i-1)/2) * CARD_STEP
-            BuildCard(def, true, yy, x)
+            BuildCard(def, true, yy, x, i)
         end
         y = y - math.ceil(math.max(1, #customs) / 2) * CARD_STEP - 10
 
@@ -3916,7 +4102,12 @@ function addon:ToggleConfigUI()
         local l = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         l:SetPoint("TOPLEFT", 0, yPos)
         l:SetText(label)
-        local dd = CreateFlatButton(body, 180, 22, "", "default")
+        local dd = CreateFlatButton(body, 180, 22, "", "default", true)
+        dd.fontProvider = function()
+            local draft = addon.customDraft
+            if draft and draft.layout then return draft.layout[key] end
+            return T.layout[key]
+        end
         dd:SetPoint("TOPLEFT", 200, yPos + 2)
         dd.text:ClearAllPoints()
         dd.text:SetPoint("LEFT", dd, "LEFT", 8, 0)
@@ -3941,6 +4132,7 @@ function addon:ToggleConfigUI()
                 if not addon.customDraft then return end
                 addon.customDraft.layout[key] = choice.path
                 addon:ApplyDraft()
+                dd:ApplyStyle(false)
                 dd.text:SetText(choice.name)
             end
 
@@ -3953,12 +4145,14 @@ function addon:ToggleConfigUI()
             fontMenuBar:GetThumbTexture():SetHeight(math.max(24, visibleHeight * visibleHeight / contentHeight))
             fontMenuBar:SetValue(0)
             fontMenuScroll:SetVerticalScroll(0)
+            local defaultFont, previewSize, previewFlags = GameFontHighlightSmall:GetFont()
             for i, button in ipairs(fontMenuButtons) do
                 local choice = choices[i]
                 if choice then
                     button.choiceIndex = i
                     button:ClearAllPoints()
                     button:SetPoint("TOPLEFT", fontMenuChild, "TOPLEFT", 0, -((i - 1) * rowHeight))
+                    SetFontSafe(button.text, choice.path or defaultFont, previewSize, previewFlags)
                     button.text:SetText(choice.name)
                     button:Show()
                     button:GetScript("OnLeave")(button)
@@ -3992,6 +4186,7 @@ function addon:ToggleConfigUI()
             local choices = {}
             if allowDefault then choices[#choices + 1] = { name = "Game default", path = nil } end
             for _, font in ipairs(FONTS) do choices[#choices + 1] = font end
+            dd:ApplyStyle(false)
             if not d then dd.text:SetText(choices[1].name); return end
             local path = d.layout[key]
             local cur = choices[1]
@@ -4004,11 +4199,36 @@ function addon:ToggleConfigUI()
         widgets[#widgets + 1] = Refresh
     end
 
-    local function addColumnSlider(label, colKey, minVal, maxVal)
+    local function addColumnSlider(column, raids)
+        local colKey = column.key
+        local _, widthKey, visibilityKey = ViewOptionKeys(raids)
         local yPos = nextY(30)
         local l = body:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        l:SetPoint("TOPLEFT", 0, yPos)
-        l:SetText(label .. " width")
+        l:SetPoint("TOPLEFT", 24, yPos)
+        l:SetWidth(170)
+        l:SetHeight(16)
+        l:SetJustifyH("LEFT")
+        if l.SetWordWrap then l:SetWordWrap(false) end
+        l:SetText(column.title)
+        local visible = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
+        visible:SetPoint("TOPLEFT", 0, yPos + 3)
+        visible:SetSize(20, 20)
+        if colKey == "name" then visible:Disable() end
+        visible:SetScript("OnClick", function(self)
+            local o = addon.db.global.options
+            o[visibilityKey] = o[visibilityKey] or {}
+            o[visibilityKey][colKey] = colKey == "name" or (self:GetChecked() and true or false)
+            if IsRaidsView() == raids and AshoholicFrame then
+                AshoholicFrame:Rebuild()
+            end
+        end)
+        visible:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(column.title, 1, 0.82, 0)
+            GameTooltip:AddLine(colKey == "name" and "Always visible" or "Show column", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        visible:SetScript("OnLeave", function() GameTooltip:Hide() end)
         local s = CreateFrame("Slider", nil, body)
         s:SetOrientation("HORIZONTAL")
         s:SetSize(200, 16)
@@ -4016,6 +4236,7 @@ function addon:ToggleConfigUI()
         s:SetBackdrop(FLAT_BACKDROP)
         s:SetBackdropColor(unpack(T.sliderBg))
         s:SetBackdropBorderColor(unpack(T.sliderBorder))
+        local minVal, maxVal = MIN_COL_W, math.max(300, column.defaultWidth, column.width)
         s:SetMinMaxValues(minVal, maxVal)
         s:SetValueStep(1)
         s:SetThumbTexture(WHITE)
@@ -4027,24 +4248,17 @@ function addon:ToggleConfigUI()
 
         local function GetW()
             local d = addon.customDraft
-            if not d then return 130 end
-            if d.columnWidths and d.columnWidths[colKey] then return d.columnWidths[colKey] end
+            if d and d[widthKey] and d[widthKey][colKey] then return d[widthKey][colKey] end
             -- Fall back to the widths actually applied to the live window
             local o = addon.db.global.options
-            if o.columnWidths and o.columnWidths[colKey] then return o.columnWidths[colKey] end
-            for _, c in ipairs(COLUMN_DEFS) do
-                if c.key == colKey then return c.width end
-            end
-            return 130
+            if o[widthKey] and o[widthKey][colKey] then return o[widthKey][colKey] end
+            return column.defaultWidth
         end
         local function SetW(v)
             local d = addon.customDraft
             if not d then return end
-            d.columnWidths = d.columnWidths or {}
-            d.columnWidths[colKey] = v
-            addon.db.global.options.columnWidths = addon.db.global.options.columnWidths or {}
-            addon.db.global.options.columnWidths[colKey] = v
-            if AshoholicFrame and AshoholicFrame.Rebuild then AshoholicFrame:Rebuild() end
+            d[widthKey] = d[widthKey] or {}
+            d[widthKey][colKey] = v
             addon:ApplyDraft()
         end
         local refreshing = false
@@ -4059,6 +4273,9 @@ function addon:ToggleConfigUI()
             local v = Clamp(GetW(), minVal, maxVal)
             s:SetValue(v)
             val:SetText(tostring(math.floor(v)))
+            for _, current in ipairs(BuildColumnList(raids)) do
+                if current.key == colKey then visible:SetChecked(current.visible); break end
+            end
             refreshing = false
         end
         Refresh()
@@ -4103,9 +4320,14 @@ function addon:ToggleConfigUI()
     addFont("Header font",       "headerFont", true, true)
     addSlider("Header font size","headerFontSize", 8, 22, true)
 
-    sectionTitle("Columns")
-    for _, c in ipairs(COLUMN_DEFS) do
-        addColumnSlider(c.title, c.key, 40, 300)
+    sectionTitle("Overview Columns")
+    for _, column in ipairs(BuildColumnList(false)) do
+        addColumnSlider(column, false)
+    end
+
+    sectionTitle("Raids Columns")
+    for _, column in ipairs(BuildColumnList(true)) do
+        addColumnSlider(column, true)
     end
 
     sectionTitle("Rows · Backgrounds")
