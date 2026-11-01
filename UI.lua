@@ -3854,6 +3854,8 @@ function addon:ToggleConfigUI()
 
             ColorPickerFrame:SetColorRGB(r, g, b)
             ColorPickerFrame:Show()
+            local defaultButton = _G["ColorPickerFrameDefaultButton"]
+            if defaultButton then defaultButton:Hide() end
 
             -- Install the monitor ONCE. It lives on ColorPickerFrame
             -- (not on the slider) and fires every frame while the picker
