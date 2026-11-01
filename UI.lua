@@ -366,7 +366,9 @@ function addon:ResetColumn(column, allAccounts)
                 charDB.RaidLockouts = nil
                 charDB.RaidKills = nil
                 charDB.wtScanned = false
-            elseif column == "level" then charDB.level = nil
+            -- false, not nil. AceDB's character default is level 1, so a
+            -- missing key is read back as 1 and the row looks like a level 1 alt.
+            elseif column == "level" then charDB.level = false
             elseif column == "cost"     then charDB.RaidResetCost = 50000
             elseif column == "ash"      then
                 charDB.SoulAsh=0; charDB.RunSoulAsh=0; charDB.SpendableSoulAsh=0; charDB.CommittedSoulAsh=0
@@ -1260,6 +1262,7 @@ function addon:CreateUI()
     local clearBtn = CreateFlatButton(frame, 210, 24, "Clear IDs", "default")
     clearBtn:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 14)
     clearBtn:SetScript("OnClick", function()
+        if not addon:CanClearInstanceIDs() then return end
         local charDB, player = addon:GetCurrentCharacterDB()
         if not charDB then return end
         StaticPopup_Show("ASHOHOLIC_CLEAR_IDS", player, FormatNumberPlain(charDB.RaidResetCost or 50000))
@@ -1282,6 +1285,16 @@ function addon:CreateUI()
 
     function frame:UpdateFooter()
         trackerBtn.text:SetText("Instance Tracker: " .. ((addon.db.global.options.ShowHourlyWidget == 0) and "Off" or "On"))
+
+        -- The current companion has no instance IDs to clear. Hide the control
+        -- rather than offering a button that can only report itself unavailable.
+        if not addon:CanClearInstanceIDs() then
+            clearBtn:Hide()
+            costResetText:Hide()
+            return
+        end
+        clearBtn:Show()
+        costResetText:Show()
 
         local charDB = addon:GetCurrentCharacterDB()
         local cost = charDB and charDB.RaidResetCost
@@ -2500,7 +2513,9 @@ function addon:CreateUI()
                 end
             end
 
-            if data.level >= 80 then
+            if type(data.level) ~= "number" then
+                row.level:SetText("")
+            elseif data.level >= 80 then
                 row.level:SetText(tostring(data.level))
                 row.level:SetTextColor(unpack(T.levelRGB or {1, 0.82, 0}))
             else
@@ -2513,14 +2528,14 @@ function addon:CreateUI()
             local count25 = data.lockedCount25 or (data.isLocked25 and WT_TOTAL or 0)
 
             local s10 = "ok"
-            if data.level < 80 then s10 = "lvl"
+            if type(data.level) == "number" and data.level < 80 then s10 = "lvl"
             elseif not data.wtScanned then s10 = "unknown"
             elseif count10 >= WT_TOTAL then s10 = "no"
             elseif count10 > 0 then s10 = "partial"
             end
 
             local s25 = "ok"
-            if data.level < 80 then s25 = "lvl"
+            if type(data.level) == "number" and data.level < 80 then s25 = "lvl"
             elseif not data.wtScanned then s25 = "unknown"
             elseif count25 >= WT_TOTAL then s25 = "no"
             elseif count25 > 0 then s25 = "partial"
