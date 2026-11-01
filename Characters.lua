@@ -106,8 +106,8 @@ function ns:ActiveLockouts(charDB)
     return list
 end
 
--- Same rolling window LockoutInfo uses: 10 raid entries, each lasting an hour
--- from the last time that raid copy was entered or left.
+-- Same rolling window used by the instance cap: 10 entries, each lasting an
+-- hour from the last time that instance copy was entered or left.
 local HOURLY_LIMIT = 10
 local HOURLY_WINDOW = 3600
 local HOURLY_DIFF = { [1] = "10", [2] = "25", [3] = "10H", [4] = "25H" }

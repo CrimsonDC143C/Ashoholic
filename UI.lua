@@ -136,7 +136,7 @@ end
 --------------------------------------------------------------------------
 local COLUMN_DEFS = {
     { key="name",     title="Name",       width=165, field="name",          justify="LEFT",   clip=true },
-    { key="level",    title="Level",      width=50,  field="level",         justify="CENTER" },
+    { key="level",    title="Level",      width=50,  field="level",         justify="CENTER", reset="level" },
     { key="wt",       title="World Tour", width=100, field=nil,             justify="CENTER", reset="wt" },
     { key="cost",     title="Reset Cost", width=100, field="raidResetCost", justify="RIGHT",  reset="cost" },
     { key="ash",      title="Soul Ash",   width=100, field="soulAsh",       justify="RIGHT",  reset="ash" },
@@ -154,7 +154,7 @@ for _, column in ipairs(COLUMN_DEFS) do AVAILABLE_COLUMNS[#AVAILABLE_COLUMNS + 1
 for _, group in ipairs(addon.RaidData.groups) do
     RAID_COLUMN_DEFS[#RAID_COLUMN_DEFS + 1] = {
         key="raid_" .. group.key, title=group.label, width=#group.variants * RAID_CELL_W,
-        field=nil, justify="CENTER", group=group,
+        field=nil, justify="CENTER", group=group, reset="raid_" .. group.key,
     }
     AVAILABLE_COLUMNS[#AVAILABLE_COLUMNS + 1] = RAID_COLUMN_DEFS[#RAID_COLUMN_DEFS]
 end
@@ -253,8 +253,11 @@ local ROWS_OFFSET = 46
 local ROW_HEIGHT, ROW_STEP = 24, 26
 
 local DEFAULT_WIDTH = LEFT_PAD + BASE_WIDTH + RIGHT_MARGIN
-local DEFAULT_HEIGHT = 470
 local MIN_WIDTH, MIN_HEIGHT = 720, 260
+local function DefaultWindowHeight()
+    return VIEW_TOP + UPDATE_BANNER_HEIGHT + 4 + VIEW_BOTTOM + ROWS_OFFSET
+        + 12 * ROW_STEP + ROW_HEIGHT
+end
 
 --------------------------------------------------------------------------
 -- Theme switching
@@ -341,6 +344,7 @@ end
 -- Column reset
 --------------------------------------------------------------------------
 local COLUMN_LABELS = {
+    level    = "Level",
     wt       = "10m / 25m World Tour lockouts",
     cost     = "Reset Cost",
     ash      = "Soul Ash",
@@ -348,6 +352,9 @@ local COLUMN_LABELS = {
     location = "Location",
     lastSeen = "Last Seen",
 }
+for _, group in ipairs(addon.RaidData.groups) do
+    COLUMN_LABELS["raid_" .. group.key] = group.label .. " lockouts"
+end
 
 function addon:ResetColumn(column, allAccounts)
     local chars = addon.db and addon.db.global and addon.db.global.Characters
@@ -359,12 +366,30 @@ function addon:ResetColumn(column, allAccounts)
                 charDB.RaidLockouts = nil
                 charDB.RaidKills = nil
                 charDB.wtScanned = false
+            elseif column == "level" then charDB.level = nil
             elseif column == "cost"     then charDB.RaidResetCost = 50000
             elseif column == "ash"      then
                 charDB.SoulAsh=0; charDB.RunSoulAsh=0; charDB.SpendableSoulAsh=0; charDB.CommittedSoulAsh=0
             elseif column == "money"    then charDB.money = 0
             elseif column == "location" then charDB.location = ""
             elseif column == "lastSeen" then charDB.lastSeen = 0
+            else
+                local groupKey = string.match(column, "^raid_(.+)$")
+                local group = groupKey and addon.RaidData:GetGroup(groupKey)
+                if group then
+                    for _, variant in ipairs(group.variants) do
+                        local key = addon.RaidData.LockKey(group, variant)
+                        if charDB.RaidLockouts then charDB.RaidLockouts[key] = nil end
+                        if charDB.RaidKills then charDB.RaidKills[key] = nil end
+                    end
+                    if charDB.SavedInstance then
+                        for instanceKey in pairs(charDB.SavedInstance) do
+                            if string.find(tostring(instanceKey), group.match, 1, true) then
+                                charDB.SavedInstance[instanceKey] = nil
+                            end
+                        end
+                    end
+                end
             end
         end
     end
@@ -664,7 +689,7 @@ function addon:CreateUI()
     local maxW = math.max(MIN_WIDTH, math.floor(UIParent:GetWidth()))
     local maxH = math.max(MIN_HEIGHT, math.floor(UIParent:GetHeight()))
     local startW = Clamp((opts and opts.WindowWidth)  or DEFAULT_WIDTH,  MIN_WIDTH,  maxW)
-    local startH = Clamp((opts and opts.WindowHeight) or DEFAULT_HEIGHT, MIN_HEIGHT, maxH)
+    local startH = Clamp((opts and opts.WindowHeight) or DefaultWindowHeight(), MIN_HEIGHT, maxH)
 
     local frame = CreateFrame("Frame", "AshoholicFrame", UIParent)
     frame:SetWidth(startW); frame:SetHeight(startH)
@@ -684,7 +709,13 @@ function addon:CreateUI()
     frame:Hide()
     tinsert(UISpecialFrames, "AshoholicFrame")
 
-    local glow = frame:CreateTexture(nil, "BACKGROUND")
+    local topGlow = frame:CreateTexture(nil, "BORDER")
+    topGlow:SetTexture(WHITE)
+    topGlow:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -4)
+    topGlow:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+    topGlow:SetHeight(110)
+
+    local glow = frame:CreateTexture(nil, "BORDER")
     glow:SetTexture(WHITE)
     glow:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 4, 4)
     glow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
@@ -925,7 +956,7 @@ function addon:CreateUI()
             if not dragState then hot:SetVertexColor(1,0.75,0.3,0.6) end
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(col.title .. " width", 1, 0.82, 0)
-            GameTooltip:AddLine("Left-drag to resize. Right-click to reset width.", 1, 1, 1)
+            GameTooltip:AddLine("Left-drag to resize. Alt+right-click to reset width.", 1, 1, 1)
             GameTooltip:Show()
         end)
         zone:SetScript("OnLeave", function()
@@ -934,7 +965,7 @@ function addon:CreateUI()
         end)
         zone:SetScript("OnMouseDown", function(self, button)
             GameTooltip:Hide()
-            if button == "RightButton" then
+            if button == "RightButton" and IsAltKeyDown() then
                 local _, widthKey = ViewOptionKeys()
                 local o = addon.db.global.options
                 o[widthKey] = o[widthKey] or {}
@@ -1045,6 +1076,7 @@ function addon:CreateUI()
                         local rgb = isTitle and T.headerRGB or T.headerLabelsRGB
                         if rgb then fs:SetTextColor(unpack(rgb)) end
                     end
+                    fs.isTitle = isTitle
                     fs.Retheme()
                     fs.columnFraction, fs.columnY = x / col.width, y
                     fs.columnPoint, fs.columnRelative = point, rel
@@ -1057,7 +1089,7 @@ function addon:CreateUI()
                     for i, v in ipairs(col.group.variants) do subs[i] = addon.RaidData.VariantLabel[v] end
                     -- Fall back to the short name when the title would overflow the column
                     Label(function()
-                        local size = (T.layout and T.layout.headerFontSize) or 12
+                        local size = (T.layout and T.layout.headerTitleFontSize) or 12
                         local fits = string.len(col.group.label) * size * 0.55 <= col.width - 8
                         return fits and col.group.label or col.group.short
                     end, 0, 8, "CENTER", "CENTER", true)
@@ -1098,7 +1130,7 @@ function addon:CreateUI()
 
             btn:SetScript("OnClick", function(self, mb)
                 if mb == "RightButton" then
-                    if col.reset then
+                    if col.reset and IsShiftKeyDown() then
                         ShowColumnResetScope(col.reset)
                     end
                 elseif col.field then
@@ -1114,7 +1146,7 @@ function addon:CreateUI()
                 GameTooltip:AddLine(col.title, 1, 0.82, 0)
                 if col.field then GameTooltip:AddLine("|cFFFFFFFFLeft-Click|r to sort") end
                 if col.reset then
-                    GameTooltip:AddLine("|cFFFFFFFFRight-Click|r to reset (choose scope)")
+                    GameTooltip:AddLine("|cFFFFFFFFShift+Right-Click|r to reset (choose scope)")
                 end
                 GameTooltip:AddLine("|cFFFFFFFFDrag|r to reorder  -  |cFFFFFFFFDrag edge|r to resize")
                 GameTooltip:Show()
@@ -1194,7 +1226,7 @@ function addon:CreateUI()
     trackerBtn:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine("Instance Tracker", 1, 0.82, 0)
-        GameTooltip:AddLine("Shows or hides the on-screen widget with your raid entries this hour (max 10).", 1, 1, 1, true)
+        GameTooltip:AddLine("Shows or hides the on-screen widget with your instance entries this hour (max 10).", 1, 1, 1, true)
         GameTooltip:AddLine("Drag the widget to move it.", 0.55, 0.52, 0.49)
         GameTooltip:AddLine("/ash widget to show/hide the widget.", 0.55, 0.52, 0.49)
         GameTooltip:Show()
@@ -1226,7 +1258,7 @@ function addon:CreateUI()
     if costResetText.SetWordWrap then costResetText:SetWordWrap(true) end
 
     function frame:UpdateFooter()
-        trackerBtn.text:SetText("Raid Tracker: " .. ((addon.db.global.options.ShowHourlyWidget == 0) and "Off" or "On"))
+        trackerBtn.text:SetText("Instance Tracker: " .. ((addon.db.global.options.ShowHourlyWidget == 0) and "Off" or "On"))
 
         local charDB = addon:GetCurrentCharacterDB()
         local cost = charDB and charDB.RaidResetCost
@@ -2010,7 +2042,7 @@ function addon:CreateUI()
             lockoutPanel.title:SetTextColor(unpack(T.nameRGB or { 1, 1, 1 }))
         end
         lockoutPanel.title:SetText(data.name or "Character")
-        lockoutPanel.sub:SetText("Raids this hour")
+        lockoutPanel.sub:SetText("Instances this hour")
 
         local muted = T.mutedRGB or { 0.55, 0.52, 0.49 }
         local gold = T.goldRGB or { 1, 0.82, 0 }
@@ -2068,7 +2100,7 @@ function addon:CreateUI()
         if not hourly.tracked then
             AddHourLine("Not tracked yet", nil, muted)
         elseif hourly.count == 0 then
-            AddHourLine("No raid entries this hour", nil, muted)
+            AddHourLine("No instance entries this hour", nil, muted)
         else
             local nextColor = atCap and bad or gold
             AddHourLine("Next free", FormatHourlyClock(hourly.nextFree), gold, nextColor, now + hourly.nextFree)
@@ -2659,7 +2691,7 @@ function addon:CreateUI()
         local o = addon.db and addon.db.global and addon.db.global.options
         RebuildColumnMetrics()
         frame:SetWidth(Clamp(LEFT_PAD + BASE_WIDTH + RIGHT_MARGIN, MIN_WIDTH, maxW))
-        frame:SetHeight(Clamp(DEFAULT_HEIGHT, MIN_HEIGHT, maxH))
+        frame:SetHeight(Clamp(DefaultWindowHeight(), MIN_HEIGHT, maxH))
         SaveSize()
     end
     for _, point in ipairs({"TOPLEFT","TOPRIGHT","BOTTOMLEFT","BOTTOMRIGHT"}) do
@@ -2700,12 +2732,16 @@ function addon:CreateUI()
     end
 
     local function StyleRoster()
-        local L, a, g = T.layout, T.accent, T.glow
+        local L, a, g = T.layout, T.accent, T.bottomGlow
+        local tg = T.topGlow
         frame:SetBackdropColor(unpack(C.panel))
         frame:SetBackdropBorderColor(unpack(C.border))
         glow:SetTexture(1, 1, 1, 1)
         glow:SetGradientAlpha("VERTICAL", g[1],g[2],g[3],g[4], g[1],g[2],g[3],0)
         if g[4] > 0 then glow:Show() else glow:Hide() end
+        topGlow:SetTexture(1, 1, 1, 1)
+        topGlow:SetGradientAlpha("VERTICAL", tg[1],tg[2],tg[3],0, tg[1],tg[2],tg[3],tg[4])
+        if tg[4] > 0 then topGlow:Show() else topGlow:Hide() end
         Gradient(titleBar, T.titleLo, T.titleHi)
         titleLine:SetVertexColor(a[1],a[2],a[3], a[4] or 0.9)
         inner:SetBackdropBorderColor(unpack(C.bronze))
@@ -2744,7 +2780,7 @@ function addon:CreateUI()
                 btn.sep:SetVertexColor(d[1], d[2], d[3], 0.6)
             end
             if btn.label then
-                ApplyFont(btn.label, L.headerFont, L.headerFontSize)
+                ApplyFont(btn.label, L.headerTitleFont, L.headerTitleFontSize)
                 btn.label:SetText(btn.col.title)
                 btn.label:SetTextColor(unpack(T.headerRGB or {1, 0.82, 0}))
             end
@@ -2754,7 +2790,11 @@ function addon:CreateUI()
             end
         end
         for _, fs in ipairs(themedLabels) do
-            ApplyFont(fs, L.headerFont, L.headerFontSize)
+            if fs.isTitle then
+                ApplyFont(fs, L.headerTitleFont, L.headerTitleFontSize)
+            else
+                ApplyFont(fs, L.headerLabelFont, L.headerLabelFontSize)
+            end
         end
         for _, fs in ipairs(themedLabels) do fs.Retheme() end
         for _, tint in ipairs(gripTints) do tint() end
@@ -3795,9 +3835,10 @@ function addon:ToggleConfigUI()
                     ColorPickerFrame:Hide()
                 end
             else
-                ColorPickerFrame.hasDefault   = nil
+                ColorPickerFrame.defaultColor = nil
                 ColorPickerFrame.defaultFunc  = nil
             end
+            ColorPickerFrame.hasDefault = nil
 
             -- Cache the slider before Show().
             ColorPickerFrame._ashOpSlider = findOpacitySlider()
@@ -4298,8 +4339,9 @@ function addon:ToggleConfigUI()
     addColor("Inner border",     "bronze")
     addToggle("Show inner border", "innerBorder", true)
 
-    sectionTitle("Bottom Window Glow")
-    addSlider("Bottom glow strength %", "glow", 0, 50)
+    sectionTitle("Window Glow")
+    addSlider("Top glow strength %", "topGlow", 0, 100)
+    addSlider("Bottom glow strength %", "bottomGlow", 0, 100)
 
     sectionTitle("Title Bar and Column Header Backgrounds")
     addColor("Gradient bottom", "titleLo")
@@ -4317,8 +4359,10 @@ function addon:ToggleConfigUI()
     addColor("Default lower labels", "headerLabels")
     addColor("Hover glow",       "accentBright")
     addColor("Sort arrow",       "sortArrow")
-    addFont("Header font",       "headerFont", true, true)
-    addSlider("Header font size","headerFontSize", 8, 22, true)
+    addFont("Header title font", "headerTitleFont", true, true)
+    addSlider("Header title size", "headerTitleFontSize", 8, 22, true)
+    addFont("Header label font", "headerLabelFont", true, true)
+    addSlider("Header label size", "headerLabelFontSize", 8, 22, true)
 
     sectionTitle("Overview Columns")
     for _, column in ipairs(BuildColumnList(false)) do

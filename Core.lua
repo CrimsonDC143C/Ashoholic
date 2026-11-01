@@ -390,7 +390,7 @@ function addon:OnInitialize()
         addon:InitHourlyWidget()
     end
 
-    -- Raid entries per hour. Independent of the isLoaded gate so the first
+    -- Instance entries per hour. Independent of the isLoaded gate so the first
     -- zone event after login is counted.
     local hourlyWatch = CreateFrame("Frame")
     hourlyWatch:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -855,21 +855,21 @@ function addon:UpdateSavedInstances()
 end
 
 --------------------------------------------------------------------------
--- Raids per hour. Ebonhold allows 10 raid entries in a rolling hour.
--- A raid copy is name + difficulty + leader (or solo) + reset generation,
+-- Instance entries per hour. Ebonhold allows 10 entries in a rolling hour.
+-- An instance copy is name + difficulty + leader (or solo) + reset generation,
 -- matching LockoutInfo: re-entering the same copy does not take a new slot,
 -- and the hour restarts when that copy is entered or left.
 --------------------------------------------------------------------------
 local HOURLY_WINDOW = 3600
 
-local hourlyWasInRaid = false
+local hourlyWasInInstance = false
 local hourlySig = nil
 local hourlyVisit = nil
 local hourlyReady = false
 
 function addon:ClearHourlyVisit()
     hourlyVisit = nil
-    hourlyWasInRaid = false
+    hourlyWasInInstance = false
     hourlySig = nil
 end
 
@@ -941,7 +941,7 @@ end
 
 local function HourlyRead()
     local inside, kind = IsInInstance()
-    if not (inside and kind == "raid") then return false end
+    if not (inside and (kind == "raid" or kind == "party")) then return false end
     local name, _, diff = GetInstanceInfo()
     return true, name, diff
 end
@@ -1014,7 +1014,7 @@ function addon:TrackHourlyInstances()
         hourlyReady = true
         if inside and name and name ~= "" then HourlyEnter(name, diff, leader) end
     elseif inside then
-        if not hourlyWasInRaid then
+        if not hourlyWasInInstance then
             if name and name ~= "" then HourlyEnter(name, diff, leader) end
         elseif sig ~= hourlySig then
             HourlyLeave()
@@ -1022,11 +1022,11 @@ function addon:TrackHourlyInstances()
         elseif not hourlyVisit and name and name ~= "" then
             HourlyEnter(name, diff, leader)
         end
-    elseif hourlyWasInRaid then
+    elseif hourlyWasInInstance then
         HourlyLeave()
     end
 
-    hourlyWasInRaid = inside and true or false
+    hourlyWasInInstance = inside and true or false
     hourlySig = sig
     if addon.RefreshHourlyWidget then addon:RefreshHourlyWidget() end
 end
@@ -1272,10 +1272,19 @@ function addon:BeginDraft(fromKey)
     -- panelAlpha is legacy (pre-per-color-opacity). Force it to 100 so it
     -- never compounds down the bg color's own alpha across edit cycles.
     draft.panelAlpha = 100
-    if draft.glow == nil then
-        draft.glow = (builtForFlags and builtForFlags.glow and builtForFlags.glow[4] or 0.13) * 100
-    elseif draft.glow > 0 and draft.glow < 1 then
-        draft.glow = draft.glow * 100
+    if draft.bottomGlow == nil and draft.glow ~= nil then
+        draft.bottomGlow = draft.glow
+    end
+    draft.glow = nil
+    if draft.bottomGlow == nil then
+        draft.bottomGlow = (builtForFlags and builtForFlags.bottomGlow and builtForFlags.bottomGlow[4] or 0.13) * 100
+    elseif draft.bottomGlow > 0 and draft.bottomGlow < 1 then
+        draft.bottomGlow = draft.bottomGlow * 100
+    end
+    if draft.topGlow == nil then
+        draft.topGlow = (builtForFlags and builtForFlags.topGlow and builtForFlags.topGlow[4] or 0) * 100
+    elseif draft.topGlow > 0 and draft.topGlow < 1 then
+        draft.topGlow = draft.topGlow * 100
     end
     -- NB: use explicit if/else here. Lua's `and ... or true` idiom is broken
     -- when the middle operand can be `false` — it always yields `true`.
@@ -1359,6 +1368,8 @@ function addon:BeginDraft(fromKey)
     L.characterFontSize  = math.max(8,  math.min(22, L.characterFontSize or 12))
     L.totalsFontSize     = math.max(8,  math.min(22, L.totalsFontSize or 12))
     L.headerFontSize     = math.max(8,  math.min(22, L.headerFontSize or 12))
+    L.headerTitleFontSize = math.max(8, math.min(22, L.headerTitleFontSize or L.headerFontSize))
+    L.headerLabelFontSize = math.max(8, math.min(22, L.headerLabelFontSize or L.headerFontSize))
     L.titleSize          = math.max(10, math.min(32, L.titleSize or 20))
     L.classIconSize      = math.max(10, math.min(24, L.classIconSize or 14))
     L.wtIconSize         = math.max(14, math.min(32, L.wtIconSize or 22))
@@ -1474,7 +1485,7 @@ function addon:SaveDraftToExisting(key)
         "classColoredNames","showClassIcons","classColoredAccent","outerBorder",
         "formatResetCost","formatClearIDs","formatSoulAsh","formatMoney","moneyGoldOnly",
         "costResetWeekday",
-        "panelAlpha","glow",
+        "panelAlpha","bottomGlow","topGlow",
     }) do
         if def[f] == nil and existing and existing[f] ~= nil then
             def[f] = existing[f]

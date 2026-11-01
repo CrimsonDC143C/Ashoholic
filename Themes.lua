@@ -5,6 +5,7 @@ local LAYOUT_DEFAULTS = {
     rowHeight = 24, rowStep = 26, accentWidth = 3,
     innerBorder = true, stripes = true,
     fontSize = 12, headerFontSize = 12,
+    headerTitleFontSize = 12, headerLabelFontSize = 12,
     realmFontSize = 12, accountFontSize = 12,
     characterFontSize = 12, totalsFontSize = 12,
     classIconSize = 14, wtIconSize = 22,
@@ -14,21 +15,26 @@ local LAYOUT_DEFAULTS = {
 local DEFS = {
     { key="ember",      name="Ember & Ash",     desc="Warm bronze on charcoal.",        bg="0E0D0FFA", accent="D98529", accent2="FFD24A", gold="FFD24A", ember="FF8A2B", muted="8C867D", soul="6FE6DC", loc="D6CFC0", wtLvlLocked="FF5555", wtLvlUnlocked="88DD55" },
     { key="frost",      name="Frostbound",      desc="Icy blue steel.",                 bg="0A0E14FA", accent="4FB4E8", accent2="BFE9FF", gold="9FDCFF", ember="5CC8FF", muted="7F8FA0", soul="8CF0E6", loc="C9D6E2", wtLvlLocked="FF6666", wtLvlUnlocked="70E0A0" },
-    { key="fel",        name="Fel Fire",        desc="Toxic green glow.",               bg="0A100AFA", accent="5CD630", accent2="B6FF5C", gold="B6FF5C", ember="7CE34A", muted="7F9078", soul="7DFFD0", loc="C8D8C0", glow=16, wtLvlLocked="FF5555", wtLvlUnlocked="7CE34A" },
+    { key="fel",        name="Fel Fire",        desc="Toxic green glow.",               bg="0A100AFA", accent="5CD630", accent2="B6FF5C", gold="B6FF5C", ember="7CE34A", muted="7F9078", soul="7DFFD0", loc="C8D8C0", bottomGlow=16, wtLvlLocked="FF5555", wtLvlUnlocked="7CE34A" },
     { key="void",       name="Void Walker",     desc="Deep purple shadows.",            bg="0D0A12FA", accent="9B5DE5", accent2="D8A8FF", gold="D8A8FF", ember="B27CFF", muted="8A7F99", soul="7FE6F0", loc="D2C8E0", wtLvlLocked="FF6B8A", wtLvlUnlocked="7FE8D0" },
     { key="blood",      name="Blood Crimson",   desc="Death Knight red.",               bg="100808FA", accent="D12E3A", accent2="FF8A7A", gold="FF9C8A", ember="FF4D4D", muted="947F7F", soul="6FE6DC", loc="E0C8C8", wtLvlLocked="FF4D4D", wtLvlUnlocked="6FE6DC" },
     { key="sunwell",    name="Sunwell",         desc="Gold and violet.",                bg="0F0B14FA", accent="E8B923", accent2="FFE680", gold="FFE680", ember="FFC53D", muted="9A8FA0", soul="8FE8FF", loc="E6DCC8", wtLvlLocked="FF6666", wtLvlUnlocked="B8F4A0" },
     { key="tide",       name="Tidecaller",      desc="Deep sea teal.",                  bg="08121AFA", accent="1FB5B0", accent2="7FF0E8", gold="7FF0E8", ember="33D0C8", muted="7B9399", soul="B8F4FF", loc="C5DCDD", wtLvlLocked="FF6666", wtLvlUnlocked="7FF0E8" },
     { key="grove",      name="Druid Grove",     desc="Mossy forest greens.",            bg="0C100AFA", accent="8FAF3C", accent2="D8E88A", gold="E3D98A", ember="B9CC4E", muted="8A9078", soul="7CE6C0", loc="D0D6BE", wtLvlLocked="E04A4A", wtLvlUnlocked="8FAF3C" },
-    { key="slate",      name="Slate",           desc="Neutral grey, almost no glow.",   bg="101214FA", accent="8E9AA8", accent2="E0E6EC", gold="E6EBF0", ember="B5C0CC", muted="7C858F", soul="8FE0D8", loc="CDD3D9", glow=4, wtLvlLocked="E05555", wtLvlUnlocked="8FC99F" },
+    { key="slate",      name="Slate",           desc="Neutral grey, almost no glow.",   bg="101214FA", accent="8E9AA8", accent2="E0E6EC", gold="E6EBF0", ember="B5C0CC", muted="7C858F", soul="8FE0D8", loc="CDD3D9", bottomGlow=4, wtLvlLocked="E05555", wtLvlUnlocked="8FC99F" },
     { key="rose",       name="Rose Quartz",     desc="Soft pink on plum.",              bg="120A10FA", accent="E86BA6", accent2="FFB3D4", gold="FFB8D8", ember="FF7DB5", muted="9A7F8E", soul="8FF0E8", loc="EAD0DC", wtLvlLocked="FF7090", wtLvlUnlocked="9FE0A0" },
     { key="parchment",  name="Old Parchment",   desc="Aged leather and ink.",           bg="1A140DFA", accent="B8894A", accent2="F0D9A0", gold="F0D9A0", ember="D9A55B", muted="A08F72", soul="8FD8C8", loc="E8DCC0", body="F2E8D0", layout={ titleFont="Fonts\\FRIZQT__.TTF", titleSize=18 }, wtLvlLocked="C05050", wtLvlUnlocked="6EAA5E" },
-    { key="magma",      name="Magma",           desc="Molten orange, thick accents.",   bg="120806FA", accent="FF5A1F", accent2="FFB347", gold="FFB347", ember="FF6A2B", muted="9A8070", soul="6FE6DC", loc="E8D4C0", glow=22, layout={ accentWidth=5 }, wtLvlLocked="FF5555", wtLvlUnlocked="88DD55" },
+    { key="magma",      name="Magma",           desc="Molten orange, thick accents.",   bg="120806FA", accent="FF5A1F", accent2="FFB347", gold="FFB347", ember="FF6A2B", muted="9A8070", soul="6FE6DC", loc="E8D4C0", bottomGlow=22, layout={ accentWidth=5 }, wtLvlLocked="FF5555", wtLvlUnlocked="88DD55" },
     { key="large",      name="Large Print",     desc="Bigger text, roomy rows.",        bg="0E0E10FA", accent="FFB000", accent2="FFD866", gold="FFD866", ember="FFB000", muted="9A9A9A", soul="6FE6DC", loc="E6E6E6", layout={ rowHeight=30, rowStep=33, fontSize=14, headerFontSize=14, accentWidth=4, realmFontSize=14, accountFontSize=14, characterFontSize=14, totalsFontSize=14 }, columnWidths={ name=210, level=60, wt=120, cost=130, ash=120, money=180, location=200 }, wtLvlLocked="FF5555", wtLvlUnlocked="88DD55" },
-    { key="terminal",   name="Terminal",        desc="Green phosphor. Flat.",           bg="000000FA", accent="33FF66", accent2="33FF66", gold="33FF66", ember="22CC55", muted="1F8F3F", soul="66FFAA", loc="88FFAA", body="AAFFBB", glow=0, layout={ rowHeight=20, rowStep=21, accentWidth=1, innerBorder=false, stripes=false, titleFont="Fonts\\ARIALN.TTF", titleSize=18, fontSize=11, headerFontSize=11 }, wtLvlLocked="FF5555", wtLvlUnlocked="33FF66" },
+    { key="terminal",   name="Terminal",        desc="Green phosphor. Flat.",           bg="000000FA", accent="33FF66", accent2="33FF66", gold="33FF66", ember="22CC55", muted="1F8F3F", soul="66FFAA", loc="88FFAA", body="AAFFBB", bottomGlow=0, layout={ rowHeight=20, rowStep=21, accentWidth=1, innerBorder=false, stripes=false, titleFont="Fonts\\ARIALN.TTF", titleSize=18, fontSize=11, headerFontSize=11 }, wtLvlLocked="FF5555", wtLvlUnlocked="33FF66" },
     { key="midnight",   name="Midnight",        desc="Near-black, electric blue.",      bg="05070DFA", accent="3D6BFF", accent2="9DB5FF", gold="A8BCFF", ember="6F8FFF", muted="7A83A0", soul="6FE6DC", loc="C8D0E6", layout={ rowHeight=21, rowStep=22 }, wtLvlLocked="FF6B6B", wtLvlUnlocked="6FE6A0" },
     { key="ledger",     name="Ledger",          desc="Dense, tidy, thin accents.",      bg="0B0D10FA", accent="6FA8DC", accent2="FFD966", gold="CFE2F3", ember="6FA8DC", muted="7F8C99", soul="76D7C4", loc="C9D3DC", layout={ rowHeight=20, rowStep=21, accentWidth=2, stripes=false }, wtLvlLocked="CC5555", wtLvlUnlocked="76D7C4" },
 }
+for _, def in ipairs(DEFS) do
+    if def.topGlow == nil then
+        def.topGlow = tonumber(def.bottomGlow or def.glow) or 13
+    end
+end
 
 local WHITE = { 1, 1, 1 }
 local function RGB(hex)
@@ -62,12 +68,6 @@ local function HexOr(hex, default, alpha)
     end
     local c = RGB(hex)
     return { c[1], c[2], c[3], alpha or 1 }
-end
-
-local function AsPercent(v, fallback)
-    if v == nil then return fallback end
-    if v <= 1 then return v * 100 end
-    return v
 end
 
 for _, def in ipairs(DEFS) do
@@ -124,8 +124,10 @@ local function Build(def)
     T.sliderBg     = HexOr(def.sliderBg,     WithAlpha(Mix(bg, WHITE, 0.04)))
     T.sliderBorder = HexOr(def.sliderBorder, WithAlpha(Mix(bg, accent, 0.30)))
 
-    local glowPct = AsPercent(def.glow, 13) / 100
-    T.glow = { accent[1], accent[2], accent[3], glowPct }
+    local bottomGlowPct = math.max(0, math.min(100, tonumber(def.bottomGlow or def.glow) or 13)) / 100
+    T.bottomGlow = { accent[1], accent[2], accent[3], bottomGlowPct }
+    local topGlowPct = math.max(0, math.min(100, tonumber(def.topGlow) or 0)) / 100
+    T.topGlow = { accent[1], accent[2], accent[3], topGlowPct }
 
     local gold = def.gold or "FFD24A"
     T.goldRGB         = RGB(gold)
@@ -232,6 +234,16 @@ local function Build(def)
         T.layout.totalsFontSize    = T.layout.fontSize
     end
 
+    local legacyLayout = def.layout or {}
+    T.layout.headerTitleFont = legacyLayout.headerTitleFont
+    if T.layout.headerTitleFont == nil then T.layout.headerTitleFont = legacyLayout.headerFont end
+    T.layout.headerLabelFont = legacyLayout.headerLabelFont
+    if T.layout.headerLabelFont == nil then T.layout.headerLabelFont = legacyLayout.headerFont end
+    T.layout.headerTitleFontSize = legacyLayout.headerTitleFontSize
+        or legacyLayout.headerFontSize or T.layout.headerTitleFontSize
+    T.layout.headerLabelFontSize = legacyLayout.headerLabelFontSize
+        or legacyLayout.headerFontSize or T.layout.headerLabelFontSize
+
     T.numberFormat = T.formatSoulAsh  -- legacy alias
     T.columnWidths = def.columnWidths  -- optional per-theme column widths
 
@@ -248,12 +260,39 @@ for _, def in ipairs(DEFS) do Themes.byKey[def.key] = def end
 local cache = {}
 function Themes:Invalidate(key) if key then cache[key] = nil else cache = {} end end
 
+local function NormalizeCustomGlow(def)
+    local changed = false
+    if def.bottomGlow == nil and def.glow ~= nil then
+        def.bottomGlow = tonumber(def.glow)
+        changed = true
+    end
+    if def.glowPercentVersion ~= 1 then
+        for _, key in ipairs({ "bottomGlow", "topGlow" }) do
+            local strength = tonumber(def[key])
+            if strength and strength > 0 and strength < 1 then
+                def[key] = strength * 100
+                changed = true
+            end
+        end
+        def.glowPercentVersion = 1
+        changed = true
+    end
+    if def.glow ~= nil then
+        def.glow = nil
+        changed = true
+    end
+    return changed
+end
+
 function Themes:GetDef(key)
     if not key then key = self.default end
     if self.byKey[key] then return self.byKey[key] end
     local o = addon.db and addon.db.global and addon.db.global.options
     local customs = o and o.CustomThemes
-    if customs and customs[key] then return customs[key] end
+    if customs and customs[key] then
+        NormalizeCustomGlow(customs[key])
+        return customs[key]
+    end
     return self.byKey[self.default]
 end
 
@@ -289,7 +328,7 @@ function Themes:GetCustoms()
     local o = addon.db and addon.db.global and addon.db.global.options
     local customs = (o and o.CustomThemes) or {}
     for key, def in pairs(customs) do
-        local dirty = false
+        local dirty = NormalizeCustomGlow(def)
         if not def.key or def.key ~= key then
             def.key = key
             dirty = true
@@ -315,8 +354,7 @@ function Themes:GetCustoms()
         if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = built.moneyGoldOnly;      dirty = true end
         if def.costResetWeekday   == nil then def.costResetWeekday   = built.costResetWeekday;   dirty = true end
         if def.panelAlpha ~= 100 then def.panelAlpha = 100; dirty = true end
-        if def.glow == nil then def.glow = 13; dirty = true
-        elseif def.glow > 0 and def.glow < 1 then def.glow = def.glow * 100; dirty = true end
+        if def.bottomGlow == nil then def.bottomGlow = 13; dirty = true end
         if def.layout and def.layout.stripes     == nil then def.layout.stripes     = built.layout.stripes;     dirty = true end
         if def.layout and def.layout.innerBorder == nil then def.layout.innerBorder = built.layout.innerBorder; dirty = true end
         if def.wtLvlLocked   == nil then def.wtLvlLocked   = "FF5555"; dirty = true end
@@ -367,6 +405,7 @@ function Themes:SaveCustom(key, def)
     o.CustomThemeOrder = o.CustomThemeOrder or {}
     self:EnsureLayout(def)
     def.key = key; def.isCustom = true
+    NormalizeCustomGlow(def)
 
     -- Normalize booleans so BeginDraft can inherit them reliably
     if def.classColoredNames  == nil then def.classColoredNames  = true  end
@@ -380,8 +419,7 @@ function Themes:SaveCustom(key, def)
     if def.moneyGoldOnly      == nil then def.moneyGoldOnly      = false end
     if def.costResetWeekday   == nil then def.costResetWeekday   = false end
     def.panelAlpha = 100
-    if def.glow == nil then def.glow = 13
-    elseif def.glow > 0 and def.glow < 1 then def.glow = def.glow * 100 end
+    if def.bottomGlow == nil then def.bottomGlow = 13 end
     if def.layout and def.layout.stripes     == nil then def.layout.stripes     = true end
     if def.layout and def.layout.innerBorder == nil then def.layout.innerBorder = true end
     if def.wtLvlLocked   == nil then def.wtLvlLocked   = "FF5555" end
