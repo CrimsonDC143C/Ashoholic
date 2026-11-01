@@ -796,10 +796,14 @@ resetAckFrame:SetScript("OnEvent", function(_, _, prefix, payload)
     if prefix ~= RESET_PROTOCOL_PREFIX or type(payload) ~= "string" then return end
 
     local eventId, body = string.match(payload, "^(%d+)\t(.*)$")
+    if not eventId then return end
     eventId = tonumber(eventId)
-    if eventId == ProjectEbonhold.SS.SEND_ACTION_TRACKER_INFO then
+    local serverEvents = ProjectEbonhold and ProjectEbonhold.SS
+    if not eventId or not serverEvents then return end
+    if serverEvents.SEND_ACTION_TRACKER_INFO and eventId == serverEvents.SEND_ACTION_TRACKER_INFO then
         ApplyRaidResetTracker(body)
-    elseif eventId == ProjectEbonhold.SS.SEND_INSTANCE_RESET_RESULT then
+    elseif serverEvents.SEND_INSTANCE_RESET_RESULT
+        and eventId == serverEvents.SEND_INSTANCE_RESET_RESULT then
         local resultCode = tonumber(string.match(body, "^(%d+),%d+$"))
         if not pendingClearIDs or not resultCode then return end
         pendingClearIDs = false
