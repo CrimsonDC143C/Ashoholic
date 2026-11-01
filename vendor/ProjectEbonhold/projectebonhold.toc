@@ -1,14 +1,17 @@
-## Interface: 30300
+﻿## Interface: 30300
 ## Title: Project Ebonhold
 ## Notes: UI core system
 ## SavedVariables: SpecCustomNames, ProjectEbonholdDB
-## SavedVariablesPerCharacter: ActionBarSaverDB
+## SavedVariablesPerCharacter: ActionBarSaverDB, _data
 
 projectebonhold.lua
 constants.lua
 modules\utils.lua
-modules\spellPlacement\spell_placement_data.lua
-modules\spellPlacement\spell_placement_service.lua
+
+# pretty_patchkit (GearScore / item level / gear kits) embedded as a lib: the client's
+# Project Ebonhold > Display panel reads and writes its `_data` (SavedVariablesPerCharacter
+# above). The only copy that runs: localization.lua disables the standalone addon.
+libs\pretty_patchkit\_patchkit.xml
 modules\spellPlacement\bar_layout_service.lua
 
 modules\spellMap\spellmap_data.lua
@@ -28,6 +31,12 @@ modules\shop\shop.lua
 modules\scrap\scrap_service.lua
 modules\scrap\scrap.lua
 
+modules\toolbelt\toolbelt_service.lua
+modules\toolbelt\toolbelt.lua
+
+# Guild bank pages: 16 tabs shown 6 at a time (server: Guild::HandleSetBankPage).
+modules\guildBank\guild_bank_pages.lua
+
 modules\perks\perks_data.lua
 modules\perks\perks_service.lua
 modules\perks\orb_of_lost_memories.lua
@@ -39,15 +48,39 @@ modules\echoTome\echo_tome_tooltip.lua
 
 modules\playerRun\player_run_service.lua
 modules\playerRun\player_run_ui.lua
+modules\playerRun\death_recap.lua
 modules\playerRun\deathFrame.lua
 
 modules\spec\spec_service.lua
 modules\spec\spec.lua
 
+# Three-tree talent window (replaces PlayerTalentFrame for the player's talents).
+# After spec.lua (spec tabs) and before callboard/extraction, whose panel lists
+# hook EbonholdTalentFrame at load.
+modules\talents\talent_frame.lua
+
 modules\options\options_service.lua
 modules\options\cvar_options.lua
+modules\options\projected_textures.lua
 modules\options\options.lua
 modules\options\xp_bonus.lua
+modules\options\echo_visuals.lua
+
+modules\lootBind\loot_bind.lua
+
+# Feuille de personnage : onglet Reputation retire (la reputation n'a plus
+# d'effet, 2026-09-15). Ne depend que du FrameXML, deja charge.
+modules\characterFrame\character_frame_tabs.lua
+
+# Defense Rating is Versatility on the server: item / spell tooltip text and the
+# Defense row of the character sheet; Resilience is Mastery (the Resilience row). Only needs the FrameXML, already loaded.
+modules\versatility\versatility_tooltip.lua
+modules\versatility\versatility_paperdoll.lua
+modules\versatility\mastery_paperdoll.lua
+
+# Fenetre des metiers : agrandie (liste a gauche, details a droite) + barre de
+# recherche toujours visible. Se branche sur le chargement de Blizzard_TradeSkillUI.
+modules\tradeSkill\trade_skill_frame.lua
 
 modules\knowledgeBase\knowledgeBase_service.lua
 modules\knowledgeBase\knowledgeBase.lua
@@ -58,14 +91,23 @@ modules\checkpoint\checkpoint.lua
 modules\levelup\levelup_service.lua
 modules\levelup\levelup.lua
 
-modules\objectives\objectives_service.lua
-modules\objectives\objectives_ui.lua
+modules\callboard\callboard_service.lua
+modules\callboard\MapAreaData.lua
+modules\callboard\CallboardWaystones.lua
+modules\callboard\callboard_ui.lua
+
+modules\trials\trials_service.lua
+modules\trials\trials_ui.lua
 
 modules\questTracker\worldmap_data.lua
 modules\questTracker\super_tracker.lua
 modules\questTracker\quest_tracker.lua
 
 modules\totemTimer\totem_timer.lua
+
+# Auto-run survives Quickstep: needs EbonholdIsAutoRunning / EbonholdResumeAutoRun from
+# ebonhold.dll (autorun_client.h); does nothing without them.
+modules\autorun\quickstep_autorun.lua
 
 modules\patchpopup\patchpopup.lua
 modules\patchpopup\patchpopup_service.lua
@@ -76,18 +118,37 @@ modules\worldChannel\worldChannel.lua
 modules\achievementBonus\achievementBonus_service.lua
 modules\achievementBonus\achievementBonus.lua
 
+modules\extraction\affixes_data.lua
 modules\extraction\extraction_service.lua
 modules\extraction\extraction.lua
 
+# Affix loot toast (pretty_lootalert kit) - lua before xml, the xml frames call its OnLoad
+modules\affixToast\affix_toast.lua
+modules\affixToast\affix_toast.xml
+
 modules\torment\hardmode_service.lua
+# Shared FrameXML-flavoured widgets: the tier selector (banner, page arrows, ladder of
+# panel buttons) and the section header / stat row / reward row blocks. Loaded before
+# hardmode.lua and dungeon_finder.lua, which build their panels out of them.
+modules\torment\torment_widgets.lua
+modules\torment\tier_selector.lua
 modules\torment\hardmode.lua
+modules\torment\raid_difficulty_lock.lua
+modules\torment\torment_item_tooltip.lua
+# Icon above a Torment champion's nameplate (server: TormentChampionMgr, entries 985000-989999).
+modules\torment\champion_marker.lua
+
+modules\dungeonFinder\dungeon_finder.lua
 
 modules\spellUnlearn\spell_unlearn_service.lua
 
-modules\instanceReset\instance_reset_service.lua
-modules\instanceReset\instance_reset_ui.lua
+modules\raidLockout\raid_lockout_data.lua
+modules\raidLockout\raid_lockout.lua
+
+modules\instanceTracker\instance_tracker.lua
 
 modules\extBank\extBank.lua
+modules\extBank\bank_tools.lua
 
 modules\overflowHealth\overflow_health_service.lua
 modules\overflowHealth\overflow_health_ui.lua
@@ -147,7 +208,6 @@ modules\collections\Interface\FrameXML\ActionButtonTemplate.xml
 # Shared collection templates
 modules\collections\ezCollections.xml
 
-
 # Collection tab frames (Heirloom intentionally omitted, as upstream)
 modules\collections\Interface\AddOns\Blizzard_Collections\Blizzard_CollectionTemplates.xml
 modules\collections\Interface\AddOns\Blizzard_Collections\Blizzard_Collections.xml
@@ -182,7 +242,21 @@ modules\collections\core\opener.lua
 # skillTreeDebug stay in their original early slot (pure data/service, no
 # frame creation, nothing here depends on their exact load position).
 modules\skillTree\skillTree.lua
+modules\skillTree\skillTree_classes.lua
+modules\contracts\content_icons.lua
+modules\reaper\reaper.lua
+modules\contracts\contracts.lua
+
+# Graveyard pins (Soul Ash bank, 2026-09-17): the graveyards of the zone on the world map
+# and the minimap. Data generated by tools/graveyards/export_graveyards.py; the pins read the
+# run data (offerings left this week) so they load after player_run_service.
+modules\graveyards\GraveyardData.lua
+modules\graveyards\graveyard_pins.lua
+
 modules\skillTree\skillTreeMicroButton.lua
+# Yellow bubble over the Talents button while talent points are unspent; after
+# skillTreeMicroButton.lua so it can stack above the Skill Tree bubble.
+modules\talents\talent_alert.lua
 
 # Prestige: skill tree reset meta-progression (Prestige tab of /progression).
 # Data and service are frame-free; the UI creates EbonholdPrestigeFrame as a

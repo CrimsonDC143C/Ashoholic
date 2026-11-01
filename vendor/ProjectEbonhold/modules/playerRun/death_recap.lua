@@ -115,13 +115,25 @@ local function StyleFont(fontString, size, r, g, b)
 end
 
 
+-- No table per combat-log event: entries are built in one scratch table and copied
+-- into the ring slot, whose table is reused once the ring has gone round. A tank or
+-- a player under AoE and HoTs used to make tens of throwaway tables a second.
+local function CopyEntry(from, to)
+    for k, v in pairs(from) do to[k] = v end
+    return to
+end
+
 local function PushEvent(entry)
     pushCount = pushCount + 1
-    buffer[(pushCount - 1) % BUFFER_SIZE + 1] = entry
+    local i = (pushCount - 1) % BUFFER_SIZE + 1
+    local slot = buffer[i]
+    if slot then wipe(slot) else slot = {}; buffer[i] = slot end
+    CopyEntry(entry, slot)
 end
 
 
--- Newest first, stopping at the first entry older than CAPTURE_WINDOW.
+-- Newest first, stopping at the first entry older than CAPTURE_WINDOW. Copies: the
+-- ring slots are reused, and a captured recap must not change afterwards.
 local function CollectEvents(deathTime)
     local events = {}
     local available = math.min(pushCount, BUFFER_SIZE)
@@ -130,7 +142,7 @@ local function CollectEvents(deathTime)
         local entry = buffer[(pushCount - 1 - i) % BUFFER_SIZE + 1]
         if not entry then break end
         if deathTime - entry.time > CAPTURE_WINDOW then break end
-        table.insert(events, entry)
+        table.insert(events, CopyEntry(entry, {}))
         if #events >= MAX_EVENTS then break end
     end
 
@@ -138,17 +150,18 @@ local function CollectEvents(deathTime)
 end
 
 
+local scratch = {}
 local function BuildEntry(kind, name, icon, school, sourceName)
-    return {
-        time = GetTime(),
-        kind = kind,
-        name = name,
-        icon = icon,
-        school = school,
-        sourceName = sourceName,
-        health = UnitHealth("player"),
-        healthMax = UnitHealthMax("player")
-    }
+    wipe(scratch)
+    scratch.time = GetTime()
+    scratch.kind = kind
+    scratch.name = name
+    scratch.icon = icon
+    scratch.school = school
+    scratch.sourceName = sourceName
+    scratch.health = UnitHealth("player")
+    scratch.healthMax = UnitHealthMax("player")
+    return scratch
 end
 
 

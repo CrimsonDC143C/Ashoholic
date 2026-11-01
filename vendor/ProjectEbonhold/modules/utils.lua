@@ -168,56 +168,70 @@ utils.DecodeVarInt = DecodeVarInt
 if not C_Timer then
     C_Timer = {}
 
-    
-    function C_Timer.After(delay, callback)
-        local frame = CreateFrame("Frame")
-        local elapsed = 0
+    -- One driver frame runs every pending timer, and is shown only while some are
+    -- pending. Each call used to create its own Frame, and the 3.3.5 client never
+    -- frees a frame: dozens of dead frames piled up over a session.
+    local timers = {}
+    local driver = CreateFrame("Frame")
+    driver:Hide()
 
-        frame:SetScript("OnUpdate", function(self, delta)
-            if ProjectEbonhold_IsClosing then self:SetScript("OnUpdate", nil) return end
-            delta = math.min(delta, 0.1) -- Cap delta to prevent freeze after alt-tab
-            elapsed = elapsed + delta
-            if elapsed >= delay then
-                self:SetScript("OnUpdate", nil)
-                callback()
-            end
-        end)
-
-        return frame
-    end
-
-    
-    function C_Timer.NewTimer(delay, callback)
-        return C_Timer.After(delay, callback)
-    end
-
-    
-    function C_Timer.NewTicker(interval, callback, iterations)
-        local frame = CreateFrame("Frame")
-        local elapsed = 0
-        local count = 0
-
-        frame:SetScript("OnUpdate", function(self, delta)
-            if ProjectEbonhold_IsClosing then self:SetScript("OnUpdate", nil) return end
-            delta = math.min(delta, 0.1) -- Cap delta to prevent freeze after alt-tab
-            elapsed = elapsed + delta
-            if elapsed >= interval then
-                elapsed = 0
-                count = count + 1
-                callback()
-
-                if iterations and count >= iterations then
-                    self:SetScript("OnUpdate", nil)
+    driver:SetScript("OnUpdate", function(self, delta)
+        if ProjectEbonhold_IsClosing then
+            wipe(timers)
+            self:Hide()
+            return
+        end
+        delta = math.min(delta, 0.1) -- Cap delta to prevent freeze after alt-tab
+        -- timers added by a callback start on the next frame
+        local n = #timers
+        for i = 1, n do
+            local t = timers[i]
+            if not t.cancelled then
+                t.elapsed = t.elapsed + delta
+                if t.elapsed >= t.delay then
+                    t.elapsed = 0
+                    t.count = t.count + 1
+                    if not t.ticker or (t.iterations and t.count >= t.iterations) then
+                        t.cancelled = true
+                    end
+                    -- one failing callback must not stop the others
+                    local ok, err = pcall(t.callback)
+                    if not ok then geterrorhandler()(err) end
                 end
             end
-        end)
-
-        
-        return {
-            Cancel = function()
-                frame:SetScript("OnUpdate", nil)
+        end
+        local kept = 0
+        for i = 1, #timers do
+            local t = timers[i]
+            if not t.cancelled then
+                kept = kept + 1
+                timers[kept] = t
             end
-        }
+        end
+        for i = #timers, kept + 1, -1 do timers[i] = nil end
+        if kept == 0 then self:Hide() end
+    end)
+
+    -- The handle: handle:Cancel() and handle.Cancel() both work.
+    local function Schedule(delay, callback, ticker, iterations)
+        local t = { delay = delay or 0, callback = callback, ticker = ticker, iterations = iterations, elapsed = 0, count = 0 }
+        t.Cancel = function() t.cancelled = true end
+        t.IsCancelled = function() return t.cancelled == true end
+        timers[#timers + 1] = t
+        driver:Show()
+        return t
+    end
+
+    function C_Timer.After(delay, callback)
+        return Schedule(delay, callback, false)
+    end
+
+    function C_Timer.NewTimer(delay, callback)
+        return Schedule(delay, callback, false)
+    end
+
+    function C_Timer.NewTicker(interval, callback, iterations)
+        return Schedule(interval, callback, true, iterations)
     end
 end
 
@@ -446,7 +460,23 @@ end
 
 
 local spellTooltip = CreateFrame("GameTooltip", "UtilsSpellTooltip", nil, "GameTooltipTemplate")
-spellTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+spellTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+-- A tooltip loses its owner whenever it gets hidden (Alt+Z, a cinematic), and an
+-- unowned tooltip fills no lines: every scrape re-owns it first. WorldFrame, not
+-- UIParent, because UIParent is the frame Alt+Z hides.
+local function LoadSpellTooltip(spellId)
+    spellTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+    spellTooltip:ClearLines()
+    spellTooltip:SetHyperlink('spell:' .. spellId)
+end
+
+-- The cast-time / requirement / reagent lines of a spell tooltip. Matched at the
+-- start of the line only: a description that mentions "Instant Poison" stays.
+local function IsSpellTooltipMetaLine(text)
+    return text:match("^Instant") or text:match("^Requires")
+        or text:match("^Tools:") or text:match("^Reagents:")
+end
 
 local function GetPlayerStats()
     local stats = {}
@@ -494,32 +524,52 @@ local function GetPlayerStats()
     local critSpell = GetCombatRating(CR_CRIT_SPELL or 11) or 0
     stats.critrating = math.max(critMelee, critRanged, critSpell)
 
+    -- Average weapon swing for @wepN@ / @owepN@ / @rwepN@. UnitDamage / UnitRangedDamage return the
+    -- server's UNIT_FIELD_MIN/MAXDAMAGE (OFFHAND, RANGED) as is: weapon range + AP/14 x weapon speed
+    -- (+ ammo for ranged), times the damage-done %. That is exactly what SPELL_EFFECT_WEAPON_PERCENT_DAMAGE
+    -- multiplies (Unit::CalculateDamage, not normalized). The off-hand fields already carry the core's
+    -- off-hand halving (UNIT_MOD_DAMAGE_OFFHAND TOTAL_PCT 0.5), and read 0 without an off-hand weapon.
+    -- In Cat/Bear form the core swaps in paw damage and these fields follow, so @wep@ stays right in form.
+    local minMain, maxMain, minOff, maxOff = UnitDamage("player")
+    stats.wep = ((minMain or 0) + (maxMain or 0)) / 2
+    stats.owep = ((minOff or 0) + (maxOff or 0)) / 2
+    local _, minRanged, maxRanged = UnitRangedDamage("player")
+    stats.rwep = ((minRanged or 0) + (maxRanged or 0)) / 2
+
     return stats
 end
 
 
 
-local function EvalStatTerm(stats, statName, multiplier, stacks)
-    local statAliases = {
-        strength = "str",
-        agility = "agi",
-        intellect = "int",
-        spirit = "spi",
-        spellpower = "sp",
-        attackpower = "ap",
-        attack_power = "ap",
-        spell_power = "sp",
-        level = "lvl",
-        stam = "stamina",
-        crit = "critrating",
-    }
+local statAliases = {
+    strength = "str",
+    agility = "agi",
+    intellect = "int",
+    spirit = "spi",
+    spellpower = "sp",
+    attackpower = "ap",
+    attack_power = "ap",
+    spell_power = "sp",
+    level = "lvl",
+    stam = "stamina",
+    crit = "critrating",
+}
 
+local function EvalStatTerm(stats, statName, multiplier, stacks)
     multiplier = tonumber(multiplier) or 0
     statName = string.lower(statName or "")
     statName = statAliases[statName] or statName
 
     if statName == "flat" then
         return multiplier * stacks
+    elseif statName == "base" then
+        -- @base15+sp0.04@: the damage floor, counted once whatever the number
+        -- of copies; CombineParts keeps max(floor, rest), like the server's std::max
+        return multiplier
+    elseif statName == "wep" or statName == "owep" or statName == "rwep" then
+        -- @wep150@ / @owep100@ / @rwep80@: N% of the average main-hand / off-hand / ranged swing, per copy,
+        -- in whole points like the server's int32 damage
+        return math.floor(stats[statName] * multiplier / 100 * stacks + 0.5)
     elseif statName == "critrating" then
         -- Server grants whole steps (floor(rating / 150)), so the token multiplier is
         -- 1/step. Snap 1/multiplier to the nearest 5 to absorb truncated tokens like
@@ -534,10 +584,44 @@ local function EvalStatTerm(stats, statName, multiplier, stacks)
     return 0
 end
 
+-- How each stat is named in the Shift breakdown. Anything not listed is
+-- shown with a capital first letter (Armor, Str...).
+local breakdownNames = {
+    sp = "SP",
+    ap = "AP",
+    critrating = "Crit",
+    wep = "Weapon",
+    owep = "Off-hand",
+    rwep = "Ranged",
+}
+local function BreakdownName(key)
+    return breakdownNames[key] or (key:sub(1, 1):upper() .. key:sub(2))
+end
+
+-- Total of evaluated parts: "base" is a floor (max(base, everything else),
+-- the script's std::max), every other part is summed.
+local function CombineParts(parts)
+    local floor, rest, hasFloor = 0, 0, false
+    for _, p in ipairs(parts) do
+        if p.key == "base" then
+            floor = math.max(floor, p.value)
+            hasFloor = true
+        else
+            rest = rest + p.value
+        end
+    end
+    if hasFloor then
+        return math.max(floor, rest)
+    end
+    return rest
+end
+
+-- Returns the total and the list of evaluated components
+-- ({ label, value } each, in formula order) so a tooltip can show the maths.
 local function CalculateStatFormula(formula, stacks)
     stacks = stacks or 1
     local stats = GetPlayerStats()
-    local total = 0
+    local parts = {}
 
     for component in formula:gmatch("[^+]+") do
         component = component:gsub("%s+", "")
@@ -547,16 +631,109 @@ local function CalculateStatFormula(formula, stacks)
         if stat1 then
             local val1 = EvalStatTerm(stats, stat1, mult1, stacks)
             local val2 = EvalStatTerm(stats, stat2, mult2, stacks)
-            total = total + math.min(val1, val2)
+            local val = math.min(val1, val2)
+            table.insert(parts, { label = string.format("min(%s, %s)", BreakdownName(statAliases[string.lower(stat1)] or string.lower(stat1)), BreakdownName(statAliases[string.lower(stat2)] or string.lower(stat2))), value = val })
+        elseif component:match("^[%d%.]+$") then
+            -- @2+flat1@: a bare number is a constant added once, whatever the
+            -- number of copies (2 + 1 per copy)
+            table.insert(parts, { label = "fixed", value = tonumber(component) or 0, key = "fixed", once = true })
         else
             local statName, multiplier = component:match("^(%a+)([%d%.]+)$")
             if statName and multiplier then
-                total = total + EvalStatTerm(stats, statName, multiplier, stacks)
+                local val = EvalStatTerm(stats, statName, multiplier, stacks)
+                local key = string.lower(statName)
+                key = statAliases[key] or key
+                local label
+                if key == "flat" then
+                    label = key
+                elseif key == "base" then
+                    label = "minimum"
+                else
+                    label = BreakdownName(key)
+                end
+                table.insert(parts, { label = label, value = val, key = key, once = (key == "base") })
             end
         end
     end
 
-    return total
+    return CombineParts(parts), parts
+end
+
+local function FormatNumber(v)
+    if math.abs(v - math.floor(v + 0.5)) < 0.05 then
+        return tostring(math.floor(v + 0.5))
+    end
+    return string.format("%.1f", v)
+end
+
+-- "(base 15 + SP 40 + AP 10)", the split of one @formula@ read as a sum,
+-- shown only while Shift is held. Each term wears its stat colour, the
+-- operators stay grey. `parts` is the list CalculateStatFormula returned
+-- (or an aggregate built the same way).
+local GREY = "|cff9d9d9d"
+local breakdownColors = {
+    base = "|cffff7d0a", -- orange
+    flat = "|cffff7d0a",
+    fixed = "|cffff7d0a",
+    sp   = "|cff69ccf0", -- blue
+    ap   = "|cffff3333", -- red
+    wep  = "|cffc79c6e", -- tan (weapon)
+    owep = "|cffc79c6e",
+    rwep = "|cffc79c6e",
+}
+
+local function FormatFormulaBreakdown(total, parts)
+    if not parts or #parts == 0 then return "" end
+    -- the summed terms first, the floor after them: "(SP 40 + AP 10, minimum 25)"
+    local chunks, floors = {}, {}
+    for _, p in ipairs(parts) do
+        local color = breakdownColors[p.key] or GREY
+        local chunk = color .. p.label .. " " .. FormatNumber(p.value) .. "|r"
+        table.insert(p.key == "base" and floors or chunks, chunk)
+    end
+    local text = table.concat(chunks, " " .. GREY .. "+|r ")
+    if #floors > 0 then
+        text = (text ~= "" and (text .. GREY .. ",|r ") or "") .. table.concat(floors, " ")
+    end
+    return " " .. GREY .. "(|r" .. text .. GREY .. ")|r"
+end
+
+-- Renders one @formula@ token of an echo description.
+-- @ppmN@ is hidden unless Shift is held, where it reads "N PPM".
+-- Stat formulas show the computed value, plus the breakdown on Shift.
+-- `override` = { total, parts } when the caller aggregated several copies.
+local function RenderFormulaToken(formula, stacks, override)
+    local ppm = formula:match("^%s*[Pp][Pp][Mm]%s*([%d%.]+)%s*$")
+    if ppm then
+        if IsShiftKeyDown() then
+            return "|cff2cfe32" .. ppm .. " PPM|r"
+        end
+        return ""
+    end
+
+    local total, parts
+    if override then
+        total, parts = override.total, override.parts
+    else
+        total, parts = CalculateStatFormula(formula, stacks)
+    end
+    -- the server deals whole points (int32 of AP x ratio), so a stat-scaled amount drops its
+    -- decimals ("3120.4" on Last Drop, 2026-10-27); a small value stays as it was ("0.25 sec")
+    local shown = total
+    if override or total >= 10 then
+        shown = math.floor(total)
+    end
+    local text = "|cff2cfe32" .. shown .. "|r"
+    if IsShiftKeyDown() then
+        text = text .. FormatFormulaBreakdown(total, parts)
+    end
+    return text
+end
+
+-- A hidden @ppm@ leaves "a chance  to" behind; collapse the gap. The final
+-- gsub("%s+", " ") already does that for spaces, this handles the punctuation.
+local function TidyHiddenTokens(text)
+    return (text:gsub("%s+([,%.;:])", "%1"))
 end
 
 
@@ -566,21 +743,17 @@ local function ExtractSpellFormulas(spellId)
         return nil, nil
     end
 
-    spellTooltip:ClearLines()
-    spellTooltip:SetHyperlink('spell:' .. spellId)
+    LoadSpellTooltip(spellId)
 
     local formulas = {}
     local description = ""
-    
+
     for i = 2, spellTooltip:NumLines() do
         local line = _G["UtilsSpellTooltipTextLeft" .. i]
         if line then
             local text = line:GetText()
             if text and text ~= "" and not text:match("^%s*$") then
-                if not text:match("Instant") and
-                   not text:match("Requires") and
-                   not text:match("Tools:") and
-                   not text:match("Reagents:") then
+                if not IsSpellTooltipMetaLine(text) then
                     
                     
                     for formula in text:gmatch("@(.-)@") do
@@ -603,18 +776,14 @@ end
 function utils.GetSpellSearchText(spellId)
     if not spellId or not GetSpellInfo(spellId) then return "" end
 
-    spellTooltip:ClearLines()
-    spellTooltip:SetHyperlink('spell:' .. spellId)
+    LoadSpellTooltip(spellId)
 
     local parts = {}
     for i = 2, spellTooltip:NumLines() do
         local line = _G["UtilsSpellTooltipTextLeft" .. i]
         local text = line and line:GetText()
         if text and text ~= "" and not text:match("^%s*$") then
-            if not text:match("Instant") and
-                not text:match("Requires") and
-                not text:match("Tools:") and
-                not text:match("Reagents:") then
+            if not IsSpellTooltipMetaLine(text) then
                 table.insert(parts, text)
             end
         end
@@ -634,28 +803,22 @@ function utils.GetSpellDescription(spellId, maxLength, stacks)
     end
 
     
-    spellTooltip:ClearLines()
-    spellTooltip:SetHyperlink('spell:' .. spellId)
+    LoadSpellTooltip(spellId)
 
     local description = ""
-    for i = 2, spellTooltip:NumLines() do 
+    for i = 2, spellTooltip:NumLines() do
         local line = _G["UtilsSpellTooltipTextLeft" .. i]
         if line then
             local text = line:GetText()
             if text and text ~= "" and not text:match("^%s*$") then
-                
-                if
-                    not text:match("Instant") and
-                    not text:match("Requires") and
-                    not text:match("Tools:") and
-                    not text:match("Reagents:") then
+
+                if not IsSpellTooltipMetaLine(text) then
                     
                     text = text:gsub("@(.-)@", function(formula)
-                        local calculatedValue = CalculateStatFormula(formula, stacks)
-                        return "|cff2cfe32" .. calculatedValue .. "|r"
+                        return RenderFormulaToken(formula, stacks)
                     end)
 
-                    description = description .. text .. " "
+                    description = description .. TidyHiddenTokens(text) .. " "
                 end
             end
         end
@@ -675,6 +838,28 @@ end
 
 
 
+-- Echo descriptions change with Shift (PPM + formula breakdown), so re-run the
+-- hovered frame's OnEnter when a Shift key moves while a tooltip is up. The
+-- owner of the tooltip is not always the frame that owns the OnEnter (perk
+-- cards anchor the tooltip on their icon), so walk up from the mouse focus.
+local shiftWatcher = CreateFrame("Frame")
+shiftWatcher:RegisterEvent("MODIFIER_STATE_CHANGED")
+shiftWatcher:SetScript("OnEvent", function(_, _, key)
+    if key ~= "LSHIFT" and key ~= "RSHIFT" then return end
+    if not GameTooltip:IsShown() then return end
+    local frame = GetMouseFocus()
+    local depth = 0
+    while frame and frame ~= WorldFrame and frame ~= UIParent and depth < 4 do
+        local onEnter = frame.GetScript and frame:GetScript("OnEnter")
+        if onEnter then
+            onEnter(frame)
+            return
+        end
+        frame = frame:GetParent()
+        depth = depth + 1
+    end
+end)
+
 -- Perk family art, shared by the choice cards, the run panel and the journal.
 -- Short aliases map onto the same texture as their "... DPS" spelling.
 utils.PerkFamilyIcons = {
@@ -687,6 +872,41 @@ utils.PerkFamilyIcons = {
     ["Melee DPS"]     = "Interface\\AddOns\\ProjectEbonhold\\assets\\perk_families\\melee_dps",
     ["Ranged"]        = "Interface\\AddOns\\ProjectEbonhold\\assets\\perk_families\\ranged_dps",
     ["Ranged DPS"]    = "Interface\\AddOns\\ProjectEbonhold\\assets\\perk_families\\ranged_dps",
+}
+
+-- Spec families ("Class - Spec") -> the icon of that spec's talent tab (TalentTab.dbc).
+-- Drawn as the badge in the top-left corner of a choice card.
+utils.PerkSpecIcons = {
+    ["Warrior - Arms"]              = "Interface\\Icons\\Ability_Rogue_Eviscerate",
+    ["Warrior - Fury"]              = "Interface\\Icons\\Ability_Warrior_InnerRage",
+    ["Warrior - Protection"]        = "Interface\\Icons\\INV_Shield_06",
+    ["Paladin - Holy"]              = "Interface\\Icons\\Spell_Holy_HolyBolt",
+    ["Paladin - Protection"]        = "Interface\\Icons\\Spell_Holy_DevotionAura",
+    ["Paladin - Retribution"]       = "Interface\\Icons\\Spell_Holy_AuraOfLight",
+    ["Hunter - Beast Mastery"]      = "Interface\\Icons\\Ability_Hunter_BeastTaming",
+    ["Hunter - Marksmanship"]       = "Interface\\Icons\\Ability_Marksmanship",
+    ["Hunter - Survival"]           = "Interface\\Icons\\Ability_Hunter_SwiftStrike",
+    ["Rogue - Assassination"]       = "Interface\\Icons\\Ability_Rogue_Eviscerate",
+    ["Rogue - Combat"]              = "Interface\\Icons\\Ability_BackStab",
+    ["Rogue - Subtlety"]            = "Interface\\Icons\\Ability_Stealth",
+    ["Priest - Discipline"]         = "Interface\\Icons\\Spell_Holy_WordFortitude",
+    ["Priest - Holy"]               = "Interface\\Icons\\Spell_Holy_GuardianSpirit",
+    ["Priest - Shadow"]             = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
+    ["Death Knight - Blood"]        = "Interface\\Icons\\Spell_Deathknight_BloodPresence",
+    ["Death Knight - Frost"]        = "Interface\\Icons\\Spell_Deathknight_FrostPresence",
+    ["Death Knight - Unholy"]       = "Interface\\Icons\\Spell_Deathknight_UnholyPresence",
+    ["Shaman - Elemental"]          = "Interface\\Icons\\Spell_Nature_Lightning",
+    ["Shaman - Enhancement"]        = "Interface\\Icons\\Spell_Nature_LightningShield",
+    ["Shaman - Restoration"]        = "Interface\\Icons\\Spell_Nature_MagicImmunity",
+    ["Mage - Arcane"]               = "Interface\\Icons\\Spell_Holy_MagicalSentry",
+    ["Mage - Fire"]                 = "Interface\\Icons\\Spell_Fire_FireBolt02",
+    ["Mage - Frost"]                = "Interface\\Icons\\Spell_Frost_FrostBolt02",
+    ["Warlock - Affliction"]        = "Interface\\Icons\\Spell_Shadow_DeathCoil",
+    ["Warlock - Demonology"]        = "Interface\\Icons\\Spell_Shadow_Metamorphosis",
+    ["Warlock - Destruction"]       = "Interface\\Icons\\Spell_Shadow_RainOfFire",
+    ["Druid - Balance"]             = "Interface\\Icons\\Spell_Nature_StarFall",
+    ["Druid - Feral Combat"]        = "Interface\\Icons\\Ability_Racial_BearForm",
+    ["Druid - Restoration"]         = "Interface\\Icons\\Spell_Nature_HealingTouch",
 }
 
 -- Families as inline tooltip icons. A family with no art falls back to its
@@ -735,37 +955,52 @@ function utils.GetStackedSpellDescription(spellInstances, maxLength)
         
         if instanceFormulas then
             for formulaIndex, formula in ipairs(instanceFormulas) do
-                totalsByFormula[formulaIndex] = (totalsByFormula[formulaIndex] or 0) + 
-                                                CalculateStatFormula(formula, instanceStacks)
+                local total, parts = CalculateStatFormula(formula, instanceStacks)
+                local agg = totalsByFormula[formulaIndex]
+                if not agg then
+                    agg = { total = 0, parts = {}, byLabel = {} }
+                    totalsByFormula[formulaIndex] = agg
+                end
+                for _, p in ipairs(parts) do
+                    local slot = agg.byLabel[p.label]
+                    if not slot then
+                        slot = { label = p.label, value = 0, key = p.key }
+                        agg.byLabel[p.label] = slot
+                        table.insert(agg.parts, slot)
+                    end
+                    -- "base" (floor) and bare constants count once across all copies, not per copy
+                    if p.once then
+                        slot.value = math.max(slot.value, p.value)
+                    else
+                        slot.value = slot.value + p.value
+                    end
+                end
+                agg.total = CombineParts(agg.parts)
             end
         end
     end
 
     
-    spellTooltip:ClearLines()
-    spellTooltip:SetHyperlink('spell:' .. firstSpellId)
+    LoadSpellTooltip(firstSpellId)
 
     local description = ""
     local formulaIndex = 1
-    
+
     for i = 2, spellTooltip:NumLines() do
         local line = _G["UtilsSpellTooltipTextLeft" .. i]
         if line then
             local text = line:GetText()
             if text and text ~= "" and not text:match("^%s*$") then
-                if not text:match("Instant") and
-                   not text:match("Requires") and
-                   not text:match("Tools:") and
-                   not text:match("Reagents:") then
+                if not IsSpellTooltipMetaLine(text) then
                     
                     
                     text = text:gsub("@(.-)@", function(formula)
-                        local total = totalsByFormula[formulaIndex] or 0
+                        local agg = totalsByFormula[formulaIndex] or { total = 0, parts = {} }
                         formulaIndex = formulaIndex + 1
-                        return "|cff2cfe32" .. math.floor(total) .. "|r"
+                        return RenderFormulaToken(formula, 1, agg)
                     end)
 
-                    description = description .. text .. " "
+                    description = description .. TidyHiddenTokens(text) .. " "
                 end
             end
         end

@@ -33,6 +33,7 @@ protocol (`ProjectEbonhold.sendToServer(CS.*, body)` /
 | `REQUEST_SUMMON_PET` | 1111 | `spellId` (phase 2) |
 | `REQUEST_APPLY_TRANSMOG` | 1112 | `slot:item slot:item …` (phase 2) |
 | `REQUEST_CLEAR_TRANSMOG` | 1113 | `slot` or `""` (phase 2) |
+| `REQUEST_FORM_LOOK_SET` | 1115 | `1` = show transmog in Shadowform / druid combat forms, `0` = form look |
 
 **Server → client**
 
@@ -46,6 +47,7 @@ protocol (`ProjectEbonhold.sendToServer(CS.*, body)` /
 | `SEND_PET_LEARNED` | 1105 | `spellId` | delta |
 | `SEND_APPEARANCE_LEARNED` | 1106 | `itemId` | delta |
 | `SEND_TRANSMOG_SLOT_UPDATE` | 1107 | `slot:item[:illusion]` (item `-1`=cleared) | delta |
+| `SEND_FORM_LOOK_STATE` | 1109 | `1` or `0` (login, `REQUEST_COLLECTIONS`, after every `REQUEST_FORM_LOOK_SET`) | snapshot |
 
 Snapshots replace the whole set; deltas mutate one entry. Bodies are space-
 separated decimals; records use `:`. Large bodies auto-chunk in transport.

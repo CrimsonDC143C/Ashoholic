@@ -191,9 +191,10 @@ local function SelectRandomFavoriteMount()
 end
 
 local function FindFavoriteMacro()
-    LoadAddOn("Blizzard_MacroUI");
+    -- No LoadAddOn("Blizzard_MacroUI") here: it only supplied the two constants, and
+    -- UPDATE_MACROS (fired at every login) made it load the whole macro UI each time.
     local lowPriority;
-    for i = 1, MAX_ACCOUNT_MACROS + MAX_CHARACTER_MACROS do
+    for i = 1, (MAX_ACCOUNT_MACROS or 36) + (MAX_CHARACTER_MACROS or 18) do
         local body = GetMacroBody(i);
         if body == _macroBody then
             return i;

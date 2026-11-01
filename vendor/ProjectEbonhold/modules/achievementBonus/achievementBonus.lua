@@ -19,8 +19,20 @@ function AchievementBonusUI:HookAchievementFrame()
     if self.isHooked then return end
 
     
+    -- Blizzard_AchievementUI is load-on-demand: hook when it loads instead of
+    -- polling every second for the whole session until it does.
     if not AchievementFrame then
-        C_Timer.After(1, function() self:HookAchievementFrame() end)
+        if not self.loadWatcher then
+            local watcher = CreateFrame("Frame")
+            watcher:RegisterEvent("ADDON_LOADED")
+            watcher:SetScript("OnEvent", function(frame, _, name)
+                if name == "Blizzard_AchievementUI" or AchievementFrame then
+                    frame:UnregisterEvent("ADDON_LOADED")
+                    self:HookAchievementFrame()
+                end
+            end)
+            self.loadWatcher = watcher
+        end
         return
     end
 
@@ -34,7 +46,56 @@ function AchievementBonusUI:HookAchievementFrame()
         self:RefreshAllAchievements()
     end)
 
+    hooksecurefunc("AchievementObjectives_DisplayCriteria", function(_, id)
+        self:AddCriteriaCounts(id)
+    end)
+
     self.isHooked = true
+end
+
+-- A counted criterion (ten dungeons, 500 points...) without the progress-bar flag in
+-- Achievement_Criteria.dbc is drawn as a bare "- label" line: append "(3/10)" to it.
+-- Walks the criteria in the same order as AchievementObjectives_DisplayCriteria, so
+-- the n-th text criterion is the n-th AchievementFrameCriteria frame.
+function AchievementBonusUI:AddCriteriaCounts(id)
+    if not id then return end
+    local barFlag = ACHIEVEMENT_CRITERIA_PROGRESS_BAR or 1
+    local metaType = CRITERIA_TYPE_ACHIEVEMENT or 8
+    local textStrings, oldWidth, newWidth = 0, 0, 0
+    local pending = {}
+    for i = 1, GetAchievementNumCriteria(id) do
+        local criteriaString, criteriaType, completed, quantity, reqQuantity, _, flags, assetID =
+            GetAchievementCriteriaInfo(id, i)
+        if not (criteriaType == metaType and assetID) and bit.band(flags or 0, barFlag) ~= barFlag then
+            textStrings = textStrings + 1
+            local criteria = _G["AchievementFrameCriteria" .. textStrings]
+            if not criteria then return end
+            local width = criteria:GetWidth()
+            oldWidth = math.max(oldWidth, width)
+            if not completed and reqQuantity and reqQuantity > 1 then
+                local text = string.format("- %s (%d/%d)", criteriaString, quantity or 0, reqQuantity)
+                table.insert(pending, { criteria = criteria, text = text })
+                criteria.name:SetText(text)
+                width = criteria.name:GetStringWidth() + criteria.check:GetWidth()
+            end
+            newWidth = math.max(newWidth, width)
+        end
+    end
+    if #pending == 0 then return end
+
+    -- Several short criteria are laid out in columns sized on the old widths: when the
+    -- longer text would no longer fit its column, keep Blizzard's text rather than overlap.
+    local maxWidth = ACHIEVEMENTUI_MAXCONTENTWIDTH or 330
+    local oldColumns = oldWidth > 0 and math.floor(maxWidth / oldWidth) or 1
+    if textStrings > 1 and oldColumns > 1 and math.floor(maxWidth / newWidth) < oldColumns then
+        for _, entry in ipairs(pending) do
+            entry.criteria.name:SetText((entry.text:gsub(" %(%d+/%d+%)$", "")))
+        end
+        return
+    end
+    for _, entry in ipairs(pending) do
+        entry.criteria:SetWidth(entry.criteria.name:GetStringWidth() + entry.criteria.check:GetWidth())
+    end
 end
 
 function AchievementBonusUI:UpdateAchievementButton(button)

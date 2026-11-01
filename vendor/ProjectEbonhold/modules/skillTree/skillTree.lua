@@ -12,29 +12,39 @@ local isGlowEnabled = true
 local COLOR_APEX = { 1.00, 0.20, 1.00 }
 
 
-local DebugPrint = function(...) end -- skillTree_Debug.DebugPrint
+local DebugPrint = function() end -- skillTree_Debug.DebugPrint
 
 
 -- A handful of nodes are flagged permanent = true in TalentDatabase (see CreateNodes).
--- Explain the rule once, the first time the player learns one of those nodes, instead
--- of popping a per-node confirmation dialog every time.
-local function MaybeShowPermanentNodeIntro()
+-- Explain the rule once, the first time the player tries to take one of those nodes, instead
+-- of popping a per-node confirmation dialog every time. Asked BEFORE the rank is taken
+-- (2026-10-22: shown after, it explained a choice already made): onConfirm runs only on
+-- Confirm, and only a Confirm burns the flag, so a Cancel asks again next time.
+local function ConfirmPermanentNode(onConfirm)
     ProjectEbonholdDB = ProjectEbonholdDB or {}
-    if ProjectEbonholdDB.seenPermanentNodeIntro then return end
-    ProjectEbonholdDB.seenPermanentNodeIntro = true
+    if ProjectEbonholdDB.seenPermanentNodeIntro then
+        onConfirm()
+        return
+    end
 
     StaticPopupDialogs["SKILLTREE_PERMANENT_INTRO"] = StaticPopupDialogs["SKILLTREE_PERMANENT_INTRO"] or {
-        text = "|cffFFD700Carry over Prestige|r\n\n" ..
+        text = "|cffFFD700Permanent node|r\n\n" ..
             "Every rank you apply in the Skill Tree is |cffFF0000permanent|r: it can never be unlearned or refunded. A |cffFF4444Prestige|r is the only thing that clears the tree, and it wipes almost all of it.\n\n" ..
-            "The node you just picked is marked |cffFFD700Carry over Prestige|r: it is one of the few that SURVIVE a Prestige, keeping its ranks for free forever.\n\n" ..
+            "The node you are about to take wears an |cffFFD700octagon|r frame: it is one of the few that SURVIVE a Prestige, keeping its ranks for free forever.\n\n" ..
             "Choose those points carefully!",
-        button1 = "Got It",
+        button1 = "Confirm",
+        button2 = CANCEL,
+        OnAccept = function(self, data)
+            ProjectEbonholdDB = ProjectEbonholdDB or {}
+            ProjectEbonholdDB.seenPermanentNodeIntro = true
+            if data then data() end
+        end,
         timeout = 0,
         whileDead = true,
         hideOnEscape = true,
         showAlert = true,
     }
-    local popup = StaticPopup_Show("SKILLTREE_PERMANENT_INTRO")
+    local popup = StaticPopup_Show("SKILLTREE_PERMANENT_INTRO", nil, nil, onConfirm)
     if popup then
         popup:SetFrameStrata("TOOLTIP")
     end
@@ -47,6 +57,103 @@ local VIEW_W, VIEW_H = 900, 600
 
 local TALENT_POINTS_TOTAL = 0
 local TALENT_POINT_TOTAL_BASE = 0
+local FormatThousands -- defined further down, needed by the currency helpers below
+
+-- The three other currencies (skill tree rework, 2026-09). The ashes keep their two
+-- variables above; these hold "spendable" (banked minus what the selected build commits)
+-- and "banked" for shards, essence and artisan souls. Fed by the server, never derived.
+local CURRENCY_POOLS = {
+    shard   = { spendable = 0, banked = 0 },
+    essence = { spendable = 0, banked = 0 },
+    artisan = { spendable = 0, banked = 0 },
+}
+-- Display data per currency. The tooltip keeps ONE colour for every cost line (green when
+-- affordable, red otherwise); only the icon and the name change with the currency.
+local CURRENCY_INFO = {
+    ash     = { name = "Soul Ashes",   icon = "Interface\\Icons\\inv_soulash" },
+    shard   = { name = "Soul Shards",  icon = "Interface\\Icons\\inv_10_jewelcrafting3_soulcage_frost" },
+    essence = { name = "Soul Essence", icon = "Interface\\Icons\\inv_misc_supersoulash" },
+    artisan = { name = "Artisan Soul", icon = "Interface\\Icons\\ability_argus_soulbombdebufflarge" },
+}
+local CURRENCY_ORDER = { "ash", "shard", "essence", "artisan" }
+-- What each currency buys and where it comes from, for the bar's tooltip. Shared with the
+-- Call Board's reward tooltips (ProjectEbonhold.CurrencyHelp) so both say the same thing.
+local CURRENCY_HELP = {
+    ash     = { buys = "The currency of the Soul Ash Tree: every ordinary node, the flat stats, the mechanics and the infinite wells.",
+                earn = "Every point of experience you gain during a run turns into Soul Ashes. When the run ends, they are banked on your account for good." },
+    shard   = { buys = "The Milestones of the tree: the percentage bonuses on the stats of your gear.",
+                earn = "Paid when every boss of a dungeon or raid in your bracket is dead, by dungeon champions in Torment, and by some Hero's Call Board contracts. Like Soul Ashes, they accumulate during the run and are banked at an offering or when it ends. Consumed by a Prestige." },
+    essence = { buys = "The Prestige sector of the tree: talents, echoes, resurrections, experience.",
+                earn = "Minted when you Prestige: every 750 Soul Shards consumed become 1 Soul Essence. Never reset." },
+    artisan = { buys = "The Professions sector of the tree: gathering, crafting and the Torment recipes.",
+                earn = "Earned at the Hero's Call Board: every crafting contract you claim pays one. Never reset." },
+}
+ProjectEbonhold.CurrencyHelp = CURRENCY_HELP
+local function getNodeCurrency(btn)
+    return (btn and btn.currency) or "ash"
+end
+local function currencyIcon(currency)
+    return "|T" .. (CURRENCY_INFO[currency] or CURRENCY_INFO.ash).icon .. ":16|t"
+end
+local function currencyName(currency)
+    return (CURRENCY_INFO[currency] or CURRENCY_INFO.ash).name
+end
+-- Spendable amount of one currency; the ashes route to TALENT_POINTS_TOTAL.
+local function poolGet(currency)
+    if currency == "ash" or not CURRENCY_POOLS[currency] then return TALENT_POINTS_TOTAL end
+    return CURRENCY_POOLS[currency].spendable
+end
+local function poolAdd(currency, delta)
+    if currency == "ash" or not CURRENCY_POOLS[currency] then
+        TALENT_POINTS_TOTAL = TALENT_POINTS_TOTAL + delta
+    else
+        CURRENCY_POOLS[currency].spendable = CURRENCY_POOLS[currency].spendable + delta
+    end
+end
+-- Soul Ashes held by class-constellation nodes selected but not applied yet: a server pool
+-- packet overwrites the pool, so it has to be taken off again (skillTree_classes.lua).
+local function pendingClassCost()
+    local CT = ProjectEbonhold.ClassTree
+    return (CT and CT.PendingCost and CT.PendingCost()) or 0
+end
+-- The most overspent currency, as a negative number (0 when every pool is fine): what the
+-- Apply button and its glow really need to know.
+-- (defined after currencyIcon / poolGet: a local referenced before its declaration
+-- silently resolves to a nil global, which is why this tooltip never showed.)
+-- Tooltip of ONE currency (each column of the bar has its own): what it buys, how
+-- it is earned, spendable / banked.
+local function showPoolTooltip(owner, c)
+    local info, help = CURRENCY_INFO[c], CURRENCY_HELP[c]
+    GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+    GameTooltip:AddLine(currencyIcon(c) .. " " .. info.name, 1, 0.82, 0)
+    GameTooltip:AddLine(help.earn, 0.6, 0.85, 0.6, true)
+    GameTooltip:Show()
+end
+local OTHER_CURRENCIES = { "shard", "essence", "artisan" }
+local function worstRemaining()
+    local worst = TALENT_POINTS_TOTAL
+    for _, c in ipairs(OTHER_CURRENCIES) do
+        if CURRENCY_POOLS[c].spendable < worst then worst = CURRENCY_POOLS[c].spendable end
+    end
+    return worst
+end
+-- One bar for the four pools, icons included.
+-- One column per currency at a FIXED position: each column reserves the width of
+-- its largest plausible amount, then POOL_GAP pixels before the next one, so an
+-- amount growing or shrinking never shifts the columns next to it.
+local POOL_GAP = 75
+local POOL_COLUMN_W = { ash = 130, shard = 90, essence = 90, artisan = 90 }
+local function poolText(c)
+    return currencyIcon(c) .. " |cffFFFFFF" .. FormatThousands(poolGet(c)) .. "|r"
+end
+local function refreshPoolsBar()
+    -- skillTreeFrame is declared further down; the named frame is reached through _G here
+    local f = _G.skillTreeFrame
+    if not f or not f.poolTexts then return end
+    for i, c in ipairs(CURRENCY_ORDER) do
+        f.poolTexts[i]:SetText(poolText(c))
+    end
+end
 
 
 local savedLoadouts = {}
@@ -93,7 +200,9 @@ local function ensureSearchGlow(btn)
     glow:SetFrameLevel(btn:GetFrameLevel() + 3)
     glow:Hide()
 
-    local w, h = btn:GetWidth(), btn:GetHeight()
+    -- Stored size, not GetWidth: the node may be culled (hidden), and reading the
+    -- geometry of a hidden frame wakes its layout up again (see the culling below)
+    local w, h = btn._size or btn:GetWidth(), btn._size or btn:GetHeight()
 
     local halo = glow:CreateTexture(nil, "OVERLAY")
     halo:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_glow")
@@ -149,6 +258,20 @@ local function setSearchGlowShown(btn, shown)
     end
 end
 
+-- Lower-cased names of every spell of a node, one per line, built on the first search:
+-- each keystroke used to call GetSpellInfo for every rank of every node (~17 000 calls).
+local function nodeSearchText(btn)
+    if btn._searchText then return btn._searchText end
+    local parts, complete = {}, true
+    for _, spellId in ipairs(btn.spells or {}) do
+        local name = GetSpellInfo(spellId)
+        if name then parts[#parts + 1] = string.lower(name) else complete = false end
+    end
+    local text = table.concat(parts, "\n")
+    if complete then btn._searchText = text end
+    return text
+end
+
 local function FilterTreeNodes(searchText)
     local lowerSearch = string.lower(searchText or "")
     local isEmpty = (lowerSearch == "")
@@ -157,16 +280,7 @@ local function FilterTreeNodes(searchText)
             btn:SetAlpha(1.0)
             setSearchGlowShown(btn, false)
         else
-            local matches = false
-            if btn.spells then
-                for _, spellId in ipairs(btn.spells) do
-                    local name = GetSpellInfo(spellId)
-                    if name and string.find(string.lower(name), lowerSearch, 1, true) then
-                        matches = true
-                        break
-                    end
-                end
-            end
+            local matches = string.find(nodeSearchText(btn), lowerSearch, 1, true) ~= nil
             btn:SetAlpha(matches and 1.0 or 0.15)
             setSearchGlowShown(btn, matches)
         end
@@ -180,6 +294,10 @@ local activeApexNodeId = nil
 
 
 local function HasRealChanges()
+    -- A pending class-constellation buy is a change like any pending rank.
+    local CT = ProjectEbonhold.ClassTree
+    if CT and CT.HasPending and CT.HasPending() then return true end
+
     if not lastValidatedState or not lastValidatedState.nodeRanks then
         return next(nodeRanks) ~= nil or next(nodeChoices) ~= nil
     end
@@ -259,8 +377,40 @@ end
 
 -- Infinite nodes use the same square icon style as every other node; their
 -- identity comes from the golden border, the spinner and the stack badge.
+-- Every node is a round medallion: the icon is cut into a circle and wrapped in the
+-- gold ring (assets/class_ring.tga) tinted with its FAMILY colour (sector of the
+-- builder, class colour for the constellations). Experiment of 2026-09-06.
+local FAMILY_RINGS = true
+-- true: every ring keeps the texture's own gold (family colours read as "locked" in
+-- red/grey hues); false: ring tinted with the family colour.
+local RINGS_ALL_GOLD = true
+local function familyColor(btn)
+    local tree = TalentDatabase and TalentDatabase[0]
+    local hex
+    if btn.classId then
+        local hub = tree and tree.classHubs and tree.classHubs[btn.classId]
+        hex = hub and hub.color
+    else
+        hex = tree and tree.sectorColors and btn.sector and tree.sectorColors[btn.sector]
+    end
+    if hex then
+        local r, g, b = hex:match("(%x%x)(%x%x)(%x%x)")
+        if r then return tonumber(r, 16) / 255, tonumber(g, 16) / 255, tonumber(b, 16) / 255 end
+    end
+    return 1, 1, 1
+end
 local function setNodeIconTexture(btn, path)
-    btn.icon:SetTexture(path)
+    -- SetPortraitToTexture builds a new round texture on every call, and every refresh
+    -- (each click) used to rebuild all ~1 700 of them: only a changed icon is redrawn.
+    -- Every write to btn.icon goes through here, so the cache cannot go stale.
+    if btn._iconPath == path then return end
+    btn._iconPath = path
+    if btn.infinite or FAMILY_RINGS then
+        btn.icon:SetTexCoord(0, 1, 0, 1)
+        SetPortraitToTexture(btn.icon, path)
+    else
+        btn.icon:SetTexture(path)
+    end
 end
 
 
@@ -320,7 +470,7 @@ end
 --
 -- Same rule as ProjectEbonhold.FormatThousands: %.0f, never tostring() (scientific notation
 -- past 14 significant digits) and never %d (truncated to 32 bits on this client).
-local function FormatThousands(n)
+FormatThousands = function(n)
     local s = string.format("%.0f", math.floor(tonumber(n) or 0))
     while true do
         local replaced
@@ -330,10 +480,10 @@ local function FormatThousands(n)
     return s
 end
 
-local function addCostToTooltip(tooltip, label, cost, canAfford)
+local function addCostToTooltip(tooltip, label, cost, canAfford, currency)
     local costColor = canAfford and "|cff00FF00" or "|cffFF0000"
-    local soulIcon = "|TInterface\\AddOns\\ProjectEbonhold\\assets\\inv_soulash:16|t"
-    tooltip:AddLine(costColor .. label .. soulIcon .. " " .. FormatThousands(cost) .. " Soul Ashes|r", 1, 1, 1)
+    currency = currency or "ash"
+    tooltip:AddLine(costColor .. label .. currencyIcon(currency) .. " " .. FormatThousands(cost) .. " " .. currencyName(currency) .. "|r", 1, 1, 1)
 end
 
 
@@ -364,10 +514,25 @@ local function addInfiniteSpellTooltip(tooltip, btn, spellName, rank)
 
     if not btn.computedDesc or not btn.gainsPerRank then return end
 
+    -- gain.lin: +lin per rank, times gain.bump at every 10th rank, shown as a percentage
+    -- (Endless Harvest) - mirrors SoulPointsHandler::HarvestMultiplier. gain.geo: multiplicative
+    -- per rank, same bump (kept for any older data file). FormatThousands, not %d: the doubling
+    -- passes the client's 32-bit %d within reach of the uncapped ranks.
+    local function pctMult(gain, r)
+        local bump = (gain.bump or 1) ^ math.floor(r / 10)
+        if gain.lin then return (1 + gain.lin * r) * bump end
+        return (gain.geo ^ r) * bump
+    end
+    local function pctText(gain, r)
+        return "+" .. FormatThousands((pctMult(gain, r) - 1) * 100 + 0.5) .. "%"
+    end
     local effRank = math.max(rank, 1)
     local values = {}
     for _, gain in ipairs(btn.gainsPerRank) do
-        local value = gain.ramp and infiniteRampTotal(effRank) or (gain.amount * effRank)
+        local value
+        if gain.lin or gain.geo then value = pctText(gain, effRank)
+        elseif gain.ramp then value = infiniteRampTotal(effRank)
+        else value = gain.amount * effRank end
         table.insert(values, "|cff00FF00" .. value .. "|r")
     end
 
@@ -379,7 +544,9 @@ local function addInfiniteSpellTooltip(tooltip, btn, spellName, rank)
     if rank >= 1 and rank < INFINITE_NODE_MAX_RANK then
         local deltas = {}
         for _, gain in ipairs(btn.gainsPerRank) do
-            if gain.ramp then
+            if gain.lin or gain.geo then
+                table.insert(deltas, "|cff00FF00" .. pctText(gain, rank + 1) .. "|r " .. (gain.label or ""))
+            elseif gain.ramp then
                 local delta = infiniteRampTotal(rank + 1) - infiniteRampTotal(rank)
                 table.insert(deltas, "|cff00FF00+" .. delta .. "|r " .. (gain.label or ""))
             end
@@ -428,6 +595,107 @@ local function hasPrerequisites(nodeId)
     return true
 end
 
+-- Everything a locked node needs before it can be learned: every unbought / unmaxed ancestor
+-- (the server wants ALL prerequisites at max rank, recursively) plus the node's next rank.
+-- Returns { nodes = { {id, fromRank, toRank}, ... } (parents first), cost = { [currency] = n },
+-- count = number of ranks bought on the way } or nil, reason when the path cannot be bought
+-- blind (a choice node or a second apex on the way).
+local function computeUnlockPath(nodeId)
+    local target = nodesById[nodeId]
+    if not target or target.classId then return nil, "not an ash node" end
+    local order, seen, cost, count = {}, {}, {}, 0
+    local function add(btn, fromRank, toRank)
+        local cur = getNodeCurrency(btn)
+        for r = fromRank + 1, toRank do
+            cost[cur] = (cost[cur] or 0) + getNodeCost(btn, r)
+            count = count + 1
+        end
+        table.insert(order, { id = btn.id, fromRank = fromRank, toRank = toRank })
+    end
+    local function visit(id, depth)
+        if seen[id] or depth > 200 then return true end
+        seen[id] = true
+        for _, parentId in ipairs(parentsOf[id] or {}) do
+            local ok, why = visit(parentId, depth + 1)
+            if not ok then return false, why end
+        end
+        local btn = nodesById[id]
+        if not btn then return false, "unknown node " .. id end
+        local rank, maxRank = getNodeRank(id), getMaxRank(id)
+        if btn.isMultipleChoice then
+            -- a choice cannot be made for the player: it has to be picked by hand first
+            if not isNodeActive(id) then return false, "choose an option on the way first" end
+        elseif btn.infinite then
+            if rank < 1 then add(btn, 0, 1) end
+        elseif rank < maxRank then
+            if btn.isApex and activeApexNodeId and activeApexNodeId ~= id then
+                return false, "another Apex talent is already active"
+            end
+            add(btn, rank, maxRank)
+        end
+        return true
+    end
+    for _, parentId in ipairs(parentsOf[nodeId] or {}) do
+        local ok, why = visit(parentId, 1)
+        if not ok then return nil, why end
+    end
+    -- the node itself: one rank, like a normal click
+    if target.isMultipleChoice then return nil, "choose an option first" end
+    if target.isApex and activeApexNodeId and activeApexNodeId ~= nodeId then
+        return nil, "another Apex talent is already active"
+    end
+    add(target, getNodeRank(nodeId), getNodeRank(nodeId) + 1)
+    return { nodes = order, cost = cost, count = count }
+end
+
+-- True when every currency of the path fits in its pool.
+local function canAffordPath(path)
+    if not path then return false end
+    for cur, n in pairs(path.cost) do
+        if poolGet(cur) < n then return false end
+    end
+    return true
+end
+
+-- Locked node tooltip: which previous node(s) still need their max rank, with the
+-- (no longer shown: the "Unlock the path" line replaced it, kept for /debug use)
+-- rank they are at ("Requires Essence of Might (3/5)"), like Blizzard's talent prereqs.
+local function addPrereqLines(tooltip, nodeId)
+    local parts = {}
+    for _, parentId in ipairs(parentsOf[nodeId] or {}) do
+        local parentBtn = nodesById[parentId]
+        local rank, maxRank = getNodeRank(parentId), getMaxRank(parentId)
+        if parentBtn and rank < maxRank then
+            local name = parentBtn.spells and parentBtn.spells[1] and GetSpellInfo(parentBtn.spells[math.min(#parentBtn.spells, math.max(1, rank))]) or ("node " .. parentId)
+            table.insert(parts, name .. " (" .. rank .. "/" .. maxRank .. ")")
+        end
+    end
+    if #parts > 0 then
+        tooltip:AddLine("Requires " .. table.concat(parts, ", "), 1, 0.3, 0.3)
+    end
+end
+
+
+-- Locked node tooltip: the whole path to it, its price, and the click hint when affordable.
+local function addUnlockPathLines(tooltip, nodeId)
+    local path, why = computeUnlockPath(nodeId)
+    if not path then
+        if why then tooltip:AddLine("Path: " .. why, 0.6, 0.6, 0.6, false) end
+        return
+    end
+    local parts = {}
+    for _, cur in ipairs(CURRENCY_ORDER) do
+        if path.cost[cur] then
+            local ok = poolGet(cur) >= path.cost[cur]
+            table.insert(parts, (ok and "|cff00FF00" or "|cffFF4040") .. FormatThousands(path.cost[cur]) .. "|r " .. currencyIcon(cur))
+        end
+    end
+    -- no wrapping: the tooltip widens instead of breaking the price onto its own line
+    tooltip:AddLine("Unlock path (" .. path.count .. (path.count > 1 and " ranks" or " rank") .. "): " .. table.concat(parts, "  "), 1, 1, 1, false)
+    if canAffordPath(path) then
+        tooltip:AddLine("|cff00FF00Left-click to unlock the whole path|r", 1, 1, 1, false)
+    end
+end
 
 local function GetRemainingTalentPoints()
     return TALENT_POINTS_TOTAL
@@ -465,16 +733,17 @@ end
 local function UpdateGlowEffect()
     if validateBtn and validateBtn.glowTexture and hasUnsavedChanges and
         isGlowEnabled then
-        local remainingPoints = GetRemainingTalentPoints()
+        local remainingPoints = worstRemaining()
 
         if remainingPoints >= 0 then
             validateBtn.glowTimer = validateBtn.glowTimer + 0.05
             local alpha = (math.sin(validateBtn.glowTimer * 1.5) + 1) * 0.4
             validateBtn.glowTexture:SetAlpha(alpha)
-        else
+        elseif validateBtn.glowTexture:GetAlpha() > 0 then
             validateBtn.glowTexture:SetAlpha(0)
         end
-    elseif validateBtn and validateBtn.glowTexture then
+    elseif validateBtn and validateBtn.glowTexture and validateBtn.glowTexture:GetAlpha() > 0 then
+        -- only when it changes: this runs 20 times a second while the tree is open
         validateBtn.glowTexture:SetAlpha(0)
     end
 end
@@ -500,7 +769,7 @@ local function MarkUnsavedChanges()
     DebugPrint("validateBtn exists: %s", tostring(validateBtn ~= nil))
 
 
-    local remainingPoints = GetRemainingTalentPoints()
+    local remainingPoints = worstRemaining()
 
 
 
@@ -618,6 +887,11 @@ local function RevertToValidatedState()
     nodeChoices = {}
     for nodeId, choice in pairs(lastValidatedState.nodeChoices) do
         nodeChoices[nodeId] = choice
+    end
+
+
+    if ProjectEbonhold.ClassTree and ProjectEbonhold.ClassTree.RevertPending then
+        ProjectEbonhold.ClassTree.RevertPending()
     end
 
 
@@ -1005,10 +1279,18 @@ end
 function ValidateAndSendLoadout()
     DebugPrint("Validating current loadout...")
 
+    -- Class constellations first: the server debits them one node at a time, so the loadout
+    -- that follows is validated against the pool they leave behind - exactly the budget the
+    -- player was shown while selecting.
+    local CT = ProjectEbonhold.ClassTree
+    local classNodesSent = (CT and CT.FlushPending and CT.FlushPending()) or 0
+    if classNodesSent > 0 then
+        DebugPrint("|cffFFFF00%d class node(s) sent to server|r", classNodesSent)
+    end
 
     if not HasAnyTalents() then
         DebugPrint("|cffFF0000Validation failed: No talents selected|r")
-        return false
+        return classNodesSent > 0
     end
 
 
@@ -1107,6 +1389,15 @@ end
 LoadClassData()
 
 
+-- Refreshes the loadout dropdown on the next frame (RefreshLoadoutDropdown is the
+-- global defined below, resolved at call time).
+local loadoutDropdownSoon = CreateFrame("Frame")
+loadoutDropdownSoon:Hide()
+loadoutDropdownSoon:SetScript("OnUpdate", function(self)
+    self:Hide()
+    RefreshLoadoutDropdown()
+end)
+
 function Addon.ApplyLoadoutsFromServer(parsedData)
     if not parsedData then
         DebugPrint("|cffFF0000Invalid loadout data received from server|r")
@@ -1114,8 +1405,16 @@ function Addon.ApplyLoadoutsFromServer(parsedData)
     end
 
 
-    TALENT_POINTS_TOTAL = parsedData.spendableSoulPoints or 0
+    TALENT_POINTS_TOTAL = (parsedData.spendableSoulPoints or 0) - pendingClassCost()
     TALENT_POINT_TOTAL_BASE = parsedData.totalCommitedSoulPoints or 0
+    if parsedData.pools then
+        for c, v in pairs(parsedData.pools) do
+            if CURRENCY_POOLS[c] then
+                CURRENCY_POOLS[c].spendable = v.spendable or 0
+                CURRENCY_POOLS[c].banked = v.banked or 0
+            end
+        end
+    end
 
     -- Committed total exposed for the Prestige module (modules\prestige).
     -- The committed pool just changed server-side, so the prestige gate
@@ -1191,15 +1490,12 @@ function Addon.ApplyLoadoutsFromServer(parsedData)
 
 
     MarkAsValidated()
-    refreshAccessibility()
+    -- defined further down (after refreshAccessibility); resolved at call time
+    ProjectEbonhold.SkillTree.RefreshTreeIfShown()
 
 
-
-    local driver = CreateFrame("Frame")
-    driver:SetScript("OnUpdate", function(self, elapsed)
-        self:SetScript("OnUpdate", nil)
-        RefreshLoadoutDropdown()
-    end)
+    -- next frame (one shared frame: this used to create a new one per packet)
+    loadoutDropdownSoon:Show()
 
     DebugPrint("|cff00FF00Loadouts received from server!|r")
     DebugPrint("|cffFFFF00Total spendable points: " ..
@@ -1275,12 +1571,19 @@ skillTreeFrame:SetFrameStrata("HIGH")  -- matches CollectionsJournal's own strat
                                         -- regardless of frame level)
 
 
+-- Set when a server push skipped the full node pass because the tree could not be
+-- seen (see refreshTreeIfShown); cleared by refreshAccessibility.
+local treeStale = false
+
 local glowUpdateTimer = 0
 local GLOW_UPDATE_INTERVAL = 0.05
 skillTreeFrame:SetScript("OnUpdate",
     function(self, elapsed)
         if ProjectEbonhold_IsClosing then return end
         if not UIParent:IsShown() then return end
+        -- OnShow already refreshes; this only catches a skipped pass if the tree
+        -- became visible some other way
+        if treeStale then refreshAccessibility() end
         elapsed = math.min(elapsed, 0.1) -- Cap elapsed to prevent freeze after alt-tab
         glowUpdateTimer = glowUpdateTimer + elapsed
         if glowUpdateTimer >= GLOW_UPDATE_INTERVAL then
@@ -1350,16 +1653,35 @@ local function CreateBottomBar()
     end
 
 
-    local soulIcon = bottomBar:CreateTexture(nil, "OVERLAY")
-    soulIcon:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\inv_soulash")
-    soulIcon:SetSize(16, 16)
-    soulIcon:SetPoint("LEFT", bottomBar, "LEFT", 10, 0)
-
-    local pointsText = bottomBar:CreateFontString(nil, "OVERLAY",
-        "GameFontNormal")
-    pointsText:SetPoint("LEFT", soulIcon, "RIGHT", 5, 0)
-    pointsText:SetText("|cffFFD700Soul Ashes: |r|cffFFFFFF" ..
-        FormatThousands(GetRemainingTalentPoints()) .. "|r")
+    -- The four pools in one line, POOL_GAP apart (icon + amount), each with its own
+    -- hover tooltip saying what it buys and how it is earned.
+    skillTreeFrame.poolTexts = {}
+    local prev
+    for i, c in ipairs(CURRENCY_ORDER) do
+        local hover = CreateFrame("Frame", nil, bottomBar)
+        hover:SetHeight(20)
+        if prev then
+            hover:SetPoint("LEFT", prev, "RIGHT", POOL_GAP, 0)
+        else
+            hover:SetPoint("LEFT", bottomBar, "LEFT", 10, 0)
+        end
+        local t = hover:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        t:SetPoint("LEFT", hover, "LEFT", 0, 0)
+        t:SetJustifyH("LEFT")
+        t:SetText(poolText(c))
+        hover:SetWidth(POOL_COLUMN_W[c] or 90)
+        t.hover = hover
+        hover:EnableMouse(true)
+        hover:SetScript("OnEnter", function(self) showPoolTooltip(self, c) end)
+        hover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        skillTreeFrame.poolTexts[i] = t
+        prev = hover
+    end
+    -- Anchor for what follows the pools (dropdown, Apply button): ends with the last column
+    local pointsText = CreateFrame("Frame", nil, bottomBar)
+    pointsText:SetPoint("LEFT", bottomBar, "LEFT", 10, 0)
+    pointsText:SetPoint("RIGHT", prev, "RIGHT", 0, 0)
+    pointsText:SetHeight(20)
     skillTreeFrame.pointsText = pointsText
 
 
@@ -1448,11 +1770,14 @@ local function CreateBottomBar()
     loadoutDropdown = dropdown
 
 
-    applyButton = CreateFrame("Button", "skillTreeApplyButton", bottomBar,
-        "UIPanelButtonTemplate2")
-    applyButton:SetSize(130, 22)
-    applyButton:SetPoint("LEFT", pointsText, "RIGHT", 22, 2)
-    applyButton:SetText("Apply Changes")
+    -- Same red sliced button as the Prestige / Echo dialogs (utils.CreateCustomButton),
+    -- glued to the search box on the right of the bar. The custom button exposes
+    -- SetText/SetTextColor but no GetFontString: aliased so the existing enable /
+    -- disable code keeps working unchanged.
+    applyButton = utils.CreateSimpleCustomButton(bottomBar, "Apply Changes", nil, 130, 26)
+    applyButton.GetFontString = function(self) return self.text end
+    applyButton:SetPoint("RIGHT", treeSearchBox or pointsText, treeSearchBox and "LEFT" or "RIGHT", treeSearchBox and -20 or 22, 0)
+    applyButton.__anchorToSearch = true
 
     -- First-spend warning (shown ONCE per account): applying commits the spent
     -- Soul Ashes for good (nothing can be unlearned afterwards), so the very
@@ -1461,7 +1786,7 @@ local function CreateBottomBar()
         text = "You are about to spend Soul Ashes on your Skill Tree.\n\n" ..
             "This is |cffFF0000final|r: once applied, a rank can never be unlearned and its " ..
             "Soul Ashes are never refunded. Only a |cffFF4444Prestige|r resets the tree, and " ..
-            "nodes marked |cffFFD700Carry over Prestige|r survive even that.",
+            "the octagon-framed nodes survive even that.",
         button1 = "Apply",
         button2 = CANCEL,
         OnAccept = function()
@@ -1509,7 +1834,7 @@ local function CreateBottomBar()
     local progressBarHeight = 42
     local progressFrame = CreateFrame("Frame", nil, skillTreeFrame)
     progressFrame:SetSize(progressBarWidth, progressBarHeight)
-    progressFrame:SetPoint("TOP", skillTreeFrame, "TOP", 0, -15)
+    progressFrame:SetPoint("TOP", skillTreeFrame, "TOP", 0, -20)
     progressFrame:SetFrameLevel(skillTreeFrame:GetFrameLevel() + 15)
 
 
@@ -2044,6 +2369,10 @@ local function CreateBottomBar()
         treeSearchBox = CreateFrame("EditBox", "skillTreeSearchBox", bottomBar, "ezCollectionsSearchBoxTemplate")
         treeSearchBox:SetSize(170, 22)
         treeSearchBox:SetPoint("RIGHT", revertBtn, "LEFT", -10, 0)
+        if applyButton and applyButton.__anchorToSearch then
+            applyButton:ClearAllPoints()
+            applyButton:SetPoint("RIGHT", treeSearchBox, "LEFT", -20, 0)
+        end
         treeSearchBox:SetAutoFocus(false)
         treeSearchBox:SetMaxLetters(50)
         treeSearchBox:SetFrameLevel(bottomBar:GetFrameLevel() + 5)
@@ -2064,9 +2393,47 @@ local function CreateBottomBar()
 end
 
 
+-- Sunken inset around the tree, same InsetFrameTemplate as the Echo Journal's
+-- panels: the marble Bg is hidden and the Journeys paper (bundled in assets/,
+-- cropped to its opaque region x 0-794, y 0-434 of 1024x512) fills it. The
+-- viewport sits inside it, below the Soul Ashes progress bar and above the pools
+-- bar, so nodes never spill over the window's frame any more.
+local treeInset = CreateFrame("Frame", "skillTreeInset", skillTreeFrame, "InsetFrameTemplate")
+-- Fills the whole tab below the journal's title strip; the progress bar and the
+-- pools bar float over the paper (they carry their own frame levels).
+treeInset:SetPoint("TOPLEFT", skillTreeFrame, "TOPLEFT", 0, -16)
+treeInset:SetPoint("BOTTOMRIGHT", skillTreeFrame, "BOTTOMRIGHT", 0, 0)
+if treeInset.Bg then treeInset.Bg:Hide() end
+local treePaper = treeInset:CreateTexture(nil, "BACKGROUND")
+treePaper:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\journeysframebackground")
+treePaper:SetTexCoord(0, 794 / 1024, 0, 434 / 512)
+treePaper:SetPoint("TOPLEFT", treeInset, "TOPLEFT", 2, -2)
+treePaper:SetPoint("BOTTOMRIGHT", treeInset, "BOTTOMRIGHT", -2, 2)
+
+-- The paper now reaches the journal's top-left corner, where CollectionsJournal
+-- draws its portrait medallion - a texture of the PARENT, so any child frame paints
+-- over it. The medallion and its ring are redrawn here, above the paper, at the
+-- template's exact geometry (ezCollectionsPortraitFrameTemplate: portrait 61 px at
+-- (-6, 8), ring 78 px at (-14, 11), UI-Frame atlas coords 0.0078-0.6172).
+local portraitCover = CreateFrame("Frame", nil, skillTreeFrame)
+portraitCover:SetFrameLevel(skillTreeFrame:GetFrameLevel() + 30)
+portraitCover:SetSize(1, 1)
+portraitCover:SetPoint("TOPLEFT", CollectionsJournal, "TOPLEFT", 0, 0)
+local portraitIcon = portraitCover:CreateTexture(nil, "ARTWORK")
+portraitIcon:SetSize(61, 61)
+portraitIcon:SetPoint("TOPLEFT", CollectionsJournal, "TOPLEFT", -6, 8)
+SetPortraitToTexture(portraitIcon, "Interface\\AddOns\\ProjectEbonhold\\modules\\collections\\Interface\\Icons\\INV_7xp_Inscription_TalentTome01")
+local portraitRing = portraitCover:CreateTexture(nil, "OVERLAY")
+portraitRing:SetTexture("Interface\\AddOns\\ProjectEbonhold\\modules\\collections\\Interface\\FrameGeneral\\UI-Frame")
+portraitRing:SetTexCoord(0.0078125, 0.6171875, 0.0078125, 0.6171875)
+portraitRing:SetSize(78, 78)
+portraitRing:SetPoint("TOPLEFT", CollectionsJournal, "TOPLEFT", -14, 11)
+
 local Scroll = CreateFrame("ScrollFrame", "skillTreeScroll", skillTreeFrame)
-Scroll:SetPoint("TOPLEFT", 10, -15)
-Scroll:SetPoint("BOTTOMRIGHT", -10, 50)
+-- The viewport itself stays clear of the progress bar (top) and the pools bar (bottom)
+Scroll:SetPoint("TOPLEFT", treeInset, "TOPLEFT", 4, -50)
+Scroll:SetPoint("BOTTOMRIGHT", treeInset, "BOTTOMRIGHT", -4, 44)
+Scroll:SetFrameLevel(treeInset:GetFrameLevel() + 1)
 Scroll:EnableMouse(true)
 Scroll:EnableMouseWheel(true)
 
@@ -2081,20 +2448,216 @@ Scroll:SetScrollChild(Canvas)
 -- by design (mouse wheel = zoom), not something a wider window alone fixes.
 -- Starting more zoomed out shows more of the tree without needing to scroll first.
 local zoomLevel = 0.6
-local MIN_ZOOM = 0.5
+local MIN_ZOOM = 0.09         -- low enough to see the whole tree with its ten constellations (~5900 canvas units tall)
 local MAX_ZOOM = 2.0
-local ZOOM_STEP = 0.1
+local ZOOM_STEP = 1.12        -- multiplicative: even steps at every zoom level
+-- Empty canvas kept around the tree so that any node can be brought to the centre
+-- of the viewport at every zoom level (sized once from the viewport, see ComputeLayout).
+local layoutPad
 
 
 local ComputeLayout
 
 
-local function ApplyZoom(scale)
+-- Viewport culling --------------------------------------------------------------------
+-- A ScrollFrame draws and re-lays out EVERY shown descendant of its scroll child, in view
+-- or not: with ~1 700 nodes and ~1 650 links the whole tree was paid for on every frame
+-- and every drag step, whatever the zoom. Only what touches the viewport (plus a margin
+-- for the halos) stays shown; a hidden region costs nothing on scroll or render, and
+-- Show / Hide themselves are cheap.
+--
+-- The test runs on canvas coordinates kept here, NEVER on frame geometry: GetLeft /
+-- GetRect / GetWidth on a hidden node wakes its layout up until its next Show + Hide.
+-- Nodes and links sit in a grid of CULL_CELL canvas units; a move only touches the
+-- columns and rows of cells that enter or leave the view.
+-- Measured on the live TalentDatabase (1 689 nodes, 1 659 links), default view at 60 %:
+-- 177 nodes in view, 234 shown with these values (289 with 160 / 64), 1 689 before.
+local CULL_CELL = 96       -- canvas units per cell (one step of the node grid is 48)
+local CULL_MARGIN = 48     -- kept around the viewport: start halo (26), search glow (36), badge
+local CULL_KEY = 4096      -- cell key = column * CULL_KEY + row
+local cullBuckets = {}     -- key -> node buttons and link textures touching that cell
+local cullX0, cullX1, cullY0, cullY1 = 1, 0, 1, 0   -- cells shown now (empty range)
+local cullEnabled = false
+
+-- Box in canvas units: x0..x1 across, d0..d1 DEPTH (downwards, = -offsetY). Starts hidden.
+local function cullRegister(obj, x0, d0, x1, d1)
+    for ix = math.max(0, math.floor(x0 / CULL_CELL)), math.max(0, math.floor(x1 / CULL_CELL)) do
+        for iy = math.max(0, math.floor(d0 / CULL_CELL)), math.max(0, math.floor(d1 / CULL_CELL)) do
+            local key = ix * CULL_KEY + iy
+            local bucket = cullBuckets[key]
+            if not bucket then
+                bucket = {}
+                cullBuckets[key] = bucket
+            end
+            bucket[#bucket + 1] = obj
+        end
+    end
+    obj._cullN = 0
+    obj:Hide()
+end
+
+-- delta +1: the cell enters the view, -1: it leaves. An object stays shown while at
+-- least one of its cells is in view.
+local function cullTouch(bucket, delta)
+    if not bucket then return end
+    for i = 1, #bucket do
+        local obj = bucket[i]
+        local n = obj._cullN + delta
+        obj._cullN = n
+        if delta > 0 then
+            if n == 1 then obj:Show() end
+        elseif n == 0 then
+            obj:Hide()
+        end
+    end
+end
+
+-- Every cell of [x0..x1] x [y0..y1] that is NOT in [ox0..ox1] x [oy0..oy1].
+local function cullWalk(x0, x1, y0, y1, ox0, ox1, oy0, oy1, delta)
+    for ix = x0, x1 do
+        local base = ix * CULL_KEY
+        if ix < ox0 or ix > ox1 then
+            for iy = y0, y1 do cullTouch(cullBuckets[base + iy], delta) end
+        else
+            for iy = y0, math.min(y1, oy0 - 1) do cullTouch(cullBuckets[base + iy], delta) end
+            for iy = math.max(y0, oy1 + 1), y1 do cullTouch(cullBuckets[base + iy], delta) end
+        end
+    end
+end
+
+-- Shows what the viewport touches at canvas scroll (h, v) and the current zoom, hides the
+-- rest. h, v default to the scroll frame's own offsets (canvas units, see below).
+local function UpdateCulling(h, v)
+    if not cullEnabled then return end
+    if not h then h, v = Scroll:GetHorizontalScroll(), Scroll:GetVerticalScroll() end
+    local w, d = (Scroll:GetWidth() or 0) / zoomLevel, (Scroll:GetHeight() or 0) / zoomLevel
+    local x0 = math.max(0, math.floor((h - CULL_MARGIN) / CULL_CELL))
+    local x1 = math.max(0, math.floor((h + w + CULL_MARGIN) / CULL_CELL))
+    local y0 = math.max(0, math.floor((v - CULL_MARGIN) / CULL_CELL))
+    local y1 = math.max(0, math.floor((v + d + CULL_MARGIN) / CULL_CELL))
+    if x0 == cullX0 and x1 == cullX1 and y0 == cullY0 and y1 == cullY1 then return end
+    -- entering cells first: an object on both sides of the edge is never hidden then shown
+    cullWalk(x0, x1, y0, y1, cullX0, cullX1, cullY0, cullY1, 1)
+    cullWalk(cullX0, cullX1, cullY0, cullY1, x0, x1, y0, y1, -1)
+    cullX0, cullX1, cullY0, cullY1 = x0, x1, y0, y1
+end
+
+local function EnableCulling()
+    cullEnabled = true
+    cullX0, cullX1, cullY0, cullY1 = 1, 0, 1, 0
+    UpdateCulling()
+end
+
+-- Rank texts ("3/5") are hidden when zoomed out so far they cannot be read: below
+-- RANK_TEXT_MIN_ZOOM a 9 pt string is under 4 px tall. Every shown font string is laid
+-- out again in full on each zoom step, and each one is a draw call of its own.
+local RANK_TEXT_MIN_ZOOM = 0.45
+local rankTextShown = zoomLevel >= RANK_TEXT_MIN_ZOOM
+local function applyRankTextLOD()
+    local want = zoomLevel >= RANK_TEXT_MIN_ZOOM
+    if want == rankTextShown then return end
+    rankTextShown = want
+    for _, btn in pairs(nodesById) do
+        if btn.rankText then
+            if want then btn.rankText:Show() else btn.rankText:Hide() end
+        end
+    end
+end
+
+
+-- Zoom around an anchor point of the viewport (ax, ay in Scroll units from its
+-- TOPLEFT, y downwards): the canvas point under the anchor stays under it. Zooming
+-- in anchors on the mouse, zooming out on the centre of the view, so the picture
+-- never jumps. Without an anchor the view is left where it is.
+--
+-- Every camera computation here is done in CANVAS units (the node offsets).
+-- Measured in game (3.3.5, scaled scroll child): the ScrollFrame's OFFSETS are in the
+-- child's units (canvas units) while its RANGES are in screen units - so the range
+-- is divided by the zoom before clamping. Do not "fix" one without the other.
+local function GetScrollCanvas()
+    return Scroll:GetHorizontalScroll(), Scroll:GetVerticalScroll()
+end
+local pendingScroll = CreateFrame("Frame")
+pendingScroll:Hide()
+-- refreshRange: re-read the child rect first. Only a zoom changes the range, so a drag
+-- step skips it (the refresh walks the bounds of the whole shown subtree).
+local function SetScrollEngine(h, v, refreshRange)
+    if refreshRange then Scroll:UpdateScrollChildRect() end
+    local hMax = (Scroll:GetHorizontalScrollRange() or 0) / zoomLevel
+    local vMax = (Scroll:GetVerticalScrollRange() or 0) / zoomLevel
+    Scroll:SetHorizontalScroll(math.max(0, math.min(hMax, h)))
+    Scroll:SetVerticalScroll(math.max(0, math.min(vMax, v)))
+    UpdateCulling()
+end
+pendingScroll:SetScript("OnUpdate", function(self)
+    self:Hide()
+    if self.h then SetScrollEngine(self.h, self.v, true) end
+end)
+-- Camera to (h, v) canvas units, clamped. The engine refreshes its range one frame
+-- after a rescale and clamps every SetScroll against the range it currently holds:
+-- applied now AND once more next frame, so the view lands where it was computed.
+local function SetScrollClamped(h, v)
+    SetScrollEngine(h, v, true)
+    pendingScroll.h, pendingScroll.v = h, v
+    pendingScroll:Show()
+end
+
+-- /stcam : dumps the camera state to the chat (diagnostic, harmless to leave in).
+SLASH_EBONHOLDSTCAM1 = "/stcam"
+SlashCmdList["EBONHOLDSTCAM"] = function()
+    Scroll:UpdateScrollChildRect()
+    local es, ce = Scroll:GetEffectiveScale(), Canvas:GetEffectiveScale()
+    local function p(fmt, ...) DEFAULT_CHAT_FRAME:AddMessage("|cff88ccff[stcam]|r " .. string.format(fmt, ...)) end
+    p("zoom=%.3f pad=%s", zoomLevel, tostring(layoutPad))
+    p("scroll frame: %.0fx%.0f effscale=%.3f left=%.0f top=%.0f", Scroll:GetWidth() or -1, Scroll:GetHeight() or -1, es, Scroll:GetLeft() or -1, Scroll:GetTop() or -1)
+    p("canvas: %.0fx%.0f scale=%.3f effscale=%.3f left=%.0f top=%.0f", Canvas:GetWidth() or -1, Canvas:GetHeight() or -1, Canvas:GetScale(), ce, Canvas:GetLeft() or -1, Canvas:GetTop() or -1)
+    p("scroll: h=%.0f v=%.0f range h=%.0f v=%.0f", Scroll:GetHorizontalScroll(), Scroll:GetVerticalScroll(), Scroll:GetHorizontalScrollRange(), Scroll:GetVerticalScrollRange())
+    local n = 0
+    for _, nd in ipairs(TreeNodes) do if nd.isStart and not nd.classId then n = n + 1 if n <= 2 then p("start %d ox=%.0f oy=%.0f", nd.id, nd._ox or -1, nd._oy or -1) end end end
+end
+
+local zoomTextTimer = CreateFrame("Frame")
+zoomTextTimer:Hide()
+zoomTextTimer:SetScript("OnUpdate", function(self, elapsed)
+    self.left = self.left - elapsed
+    if self.left <= 0 then
+        self:Hide()
+        if skillTreeFrame.zoomText then skillTreeFrame.zoomText:SetText("") end
+    end
+end)
+
+local function ApplyZoom(scale, ax, ay)
+    local oldZoom = zoomLevel
     zoomLevel = math.max(MIN_ZOOM, math.min(MAX_ZOOM, scale))
+    if zoomLevel == oldZoom then return end
+
+    -- Canvas point under the anchor, before the scale changes
+    local cx, cy
+    if ax and ay then
+        local h, v = GetScrollCanvas()
+        cx = h + ax / oldZoom
+        cy = v + ay / oldZoom
+    end
+
+    -- Cull for the view this zoom is about to show BEFORE rescaling: SetScale lays out
+    -- again every shown descendant (font strings in full), hidden ones are skipped.
+    -- (ComputeLayout used to run here too: it only re-derived the same canvas size and
+    -- node offsets, layoutPad being fixed once.)
+    if cx then
+        UpdateCulling(math.max(0, cx - ax / zoomLevel), math.max(0, cy - ay / zoomLevel))
+    end
+    applyRankTextLOD()
     Canvas:SetScale(zoomLevel)
 
-
-    ComputeLayout()
+    if cx then
+        -- The engine refreshes the scroll range one frame after a rescale and clamps
+        -- every SetScroll against the range it currently holds: apply now AND once more
+        -- next frame, so the view lands where it was computed whichever range was stale.
+        SetScrollClamped(cx - ax / zoomLevel, cy - ay / zoomLevel)
+    else
+        Scroll:UpdateScrollChildRect()
+        UpdateCulling()
+    end
 
 
     if not skillTreeFrame.zoomText then
@@ -2103,26 +2666,33 @@ local function ApplyZoom(scale)
     end
     skillTreeFrame.zoomText:SetText(string.format("Zoom: %d%%", zoomLevel * 100))
 
-
-    local currentTime = GetTime()
-    skillTreeFrame.zoomTimestamp = currentTime
-    C_Timer.After(1, function()
-        if skillTreeFrame.zoomText and skillTreeFrame.zoomTimestamp == currentTime then
-            skillTreeFrame.zoomText:SetText("")
-        end
-    end)
+    -- Cleared one second after the LAST step. One reused frame: C_Timer.After makes a
+    -- new permanent Frame per call, one per wheel notch.
+    zoomTextTimer.left = 1
+    zoomTextTimer:Show()
 end
 
 
 Scroll:SetScript("OnMouseWheel", function(self, delta)
-    local newZoom = zoomLevel + (delta * ZOOM_STEP)
-    ApplyZoom(newZoom)
+    local wanted = delta > 0 and zoomLevel * ZOOM_STEP or zoomLevel / ZOOM_STEP
+    local ax, ay
+    if delta > 0 then
+        -- zoom in: towards the mouse
+        local mx, my = GetCursorPosition()
+        local es = self:GetEffectiveScale()
+        ax = mx / es - self:GetLeft()
+        ay = self:GetTop() - my / es
+    else
+        -- zoom out: around the centre of what is on screen
+        ax, ay = self:GetWidth() / 2, self:GetHeight() / 2
+    end
+    ApplyZoom(wanted, ax, ay)
 end)
 
 
 
 
-ComputeLayout = function()
+ComputeLayout = function(keepScroll)
     local NODE_SIZE = 1
 
     local minX, maxX, minY, maxY
@@ -2133,27 +2703,39 @@ ComputeLayout = function()
         if not maxY or n.y > maxY then maxY = n.y end
     end
 
-    local margin = 300
     local SPACING_SCALE = 0.8
+    -- Padding = one viewport at the smallest zoom, on every side: at any zoom the
+    -- canvas is at least as big as the viewport and the tree can be centred, and the
+    -- scroll range shrinks naturally as one zooms out (the canvas is NOT inflated by
+    -- 1/zoom any more - that pinned the tree to the top-left corner when zoomed out).
+    -- Computed once so node offsets never move after the buttons are placed.
+    if not layoutPad then
+        local vw, vh = Scroll:GetWidth() or 0, Scroll:GetHeight() or 0
+        if vw < 10 then vw = 1200 end
+        if vh < 10 then vh = 800 end
+        -- Half a viewport at the smallest zoom is exactly what centring an edge node needs.
+        layoutPad = math.max(vw, vh) / (2 * MIN_ZOOM)
+    end
+    local margin = layoutPad
     local scaledWidth = (maxX - minX) * SPACING_SCALE
     local scaledHeight = (maxY - minY) * SPACING_SCALE
-    local baseCanvasW = scaledWidth + NODE_SIZE + margin * 2
-    local baseCanvasH = scaledHeight + NODE_SIZE + margin * 2
-
-    -- Compensate canvas size for zoom level to ensure scrolling works when zoomed out
-    -- When zoomed out (zoomLevel < 1), we need a larger canvas to maintain scroll range
-    local zoomCompensation = 1 / zoomLevel
-    local canvasW = baseCanvasW * zoomCompensation
-    local canvasH = baseCanvasH * zoomCompensation
-    Canvas:SetSize(canvasW, canvasH)
+    Canvas:SetSize(scaledWidth + NODE_SIZE + margin * 2, scaledHeight + NODE_SIZE + margin * 2)
 
     for _, n in ipairs(TreeNodes) do
         n._ox = margin + (n.x - minX) * SPACING_SCALE
         n._oy = -(margin + (maxY - n.y) * SPACING_SCALE)
     end
+    -- Same transform for anything else placed in node space (the class hubs).
+    ProjectEbonhold.SkillTree = ProjectEbonhold.SkillTree or {}
+    ProjectEbonhold.SkillTree.ToCanvas = function(x, y)
+        return margin + (x - minX) * SPACING_SCALE, -(margin + (maxY - y) * SPACING_SCALE)
+    end
 
-    Scroll:SetHorizontalScroll(Scroll:GetHorizontalScrollRange() / 2)
-    Scroll:SetVerticalScroll(Scroll:GetVerticalScrollRange() / 2)
+    Scroll:UpdateScrollChildRect()
+    if not keepScroll then
+        Scroll:SetHorizontalScroll(Scroll:GetHorizontalScrollRange() / (2 * zoomLevel))
+        Scroll:SetVerticalScroll(Scroll:GetVerticalScrollRange() / (2 * zoomLevel))
+    end
 end
 
 
@@ -2166,7 +2748,7 @@ local function CenterOnStartNodes(attempt)
 
     local sumX, sumY, count = 0, 0, 0
     for _, n in ipairs(TreeNodes) do
-        if n.isStart and n._ox and n._oy then
+        if n.isStart and not n.classId and n._ox and n._oy then
             sumX = sumX + n._ox
             sumY = sumY + n._oy
             count = count + 1
@@ -2175,25 +2757,25 @@ local function CenterOnStartNodes(attempt)
 
     if count == 0 then return end
 
+    -- Force the range to reflect the canvas' current size/scale instead of waiting
+    -- for the next layout pass (otherwise a fresh canvas reports 0 for a frame or two).
+    Scroll:UpdateScrollChildRect()
     local hMax = Scroll:GetHorizontalScrollRange()
     local vMax = Scroll:GetVerticalScrollRange()
 
-    -- The scroll range isn't ready yet: try again shortly (up to a limit).
-    if hMax == 0 and vMax == 0 and attempt < 20 then
+    -- The scroll range isn't ready yet: try again shortly (up to a limit). With the
+    -- padded canvas, scroll (0,0) shows empty space, so giving up is not an option.
+    if hMax == 0 and vMax == 0 and attempt < 100 then
         C_Timer.After(0.05, function() CenterOnStartNodes(attempt + 1) end)
         return
     end
 
-    -- Canvas is scaled by zoomLevel, so node offsets must be scaled to match
-    -- the scroll coordinate space (_oy is negative, hence the sign flip).
-    local centerX = (sumX / count) * zoomLevel
-    local centerY = (-sumY / count) * zoomLevel
+    -- Scroll offsets are in canvas units (see ApplyZoom): the viewport's half size is
+    -- converted from screen units (_oy is negative, hence the sign flip).
+    local centerX = sumX / count
+    local centerY = -sumY / count
 
-    local h = math.min(hMax, math.max(0, centerX - Scroll:GetWidth() / 2))
-    local v = math.min(vMax, math.max(0, centerY - Scroll:GetHeight() / 2))
-
-    Scroll:SetHorizontalScroll(h)
-    Scroll:SetVerticalScroll(v)
+    SetScrollClamped(centerX - Scroll:GetWidth() / (2 * zoomLevel), centerY - Scroll:GetHeight() / (2 * zoomLevel))
 end
 
 
@@ -2248,7 +2830,10 @@ local function PlayIntroAnimation()
     introFrame:SetScript("OnUpdate", function(self, dt)
         elapsed = elapsed + math.min(dt, 0.1)
         for _, it in ipairs(items) do
-            it.btn:SetAlpha(smooth((elapsed - it.delay) / FADE))
+            -- culled nodes are skipped (they get their final alpha below)
+            if it.btn._cullN ~= 0 then
+                it.btn:SetAlpha(smooth((elapsed - it.delay) / FADE))
+            end
         end
         if elapsed >= total then
             for _, it in ipairs(items) do it.btn:SetAlpha(1) end
@@ -2281,35 +2866,28 @@ local function applyNodeVisual(btn)
         btn.borderFrame:SetBackdropBorderColor(unpack(COLOR_APEX))
     end
 
-    if btn.infinite then
-        if not btn.infiniteSpinner then
-            -- Rotating ring marking infinite (uncapped) nodes — same texture and
-            -- animation as the checkpoint map pins (checkpoint.lua)
-            local spinner = btn:CreateTexture(nil, "OVERLAY")
-            spinner:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\progression_bar")
-            spinner:SetTexCoord(0.023438, 0.210938, 0.283203, 0.478516)
-            spinner:SetBlendMode("ADD")
-            spinner:SetPoint("CENTER", btn, "CENTER", 0, 0)
-            -- Sized relative to the button so 2x infinite nodes keep their proportions
-            spinner:SetSize(btn:GetWidth() * 1.7, btn:GetHeight() * 1.7)
-            btn.infiniteSpinner = spinner
-
-            local ag = spinner:CreateAnimationGroup()
-            ag:SetLooping("REPEAT")
-            local rotation = ag:CreateAnimation("Rotation")
-            rotation:SetDegrees(360)
-            rotation:SetDuration(8)
-            ag:Play()
-            btn.infiniteSpinnerAnim = ag
+    if btn.infinite or FAMILY_RINGS then
+        if not btn.infiniteRing then
+            -- Round medallion: same gold ring as the class hubs (assets/class_ring.tga).
+            -- Replaces the square backdrop.
+            btn.borderFrame:SetBackdrop(nil)
+            local ring = btn:CreateTexture(nil, "OVERLAY")
+            ring:SetPoint("CENTER", btn, "CENTER", 0, 0)
+            -- Permanent nodes (kept through prestige) wear an octagon instead of the
+            -- ring; sized so its inscribed circle still clears the round icon.
+            btn.ringShape = btn.permanent and "class_octagon" or "class_ring"
+            local k = btn.permanent and 1.26 or 1.16
+            ring:SetSize(btn._size * k, btn._size * k)
+            btn.infiniteRing = ring
         end
-        btn.infiniteSpinner:Show()
+        btn.infiniteRing:Show()
     end
 
     if btn.state == "active" then
         local currentRank = nodeRanks[btn.id] or 0
         local maxRank = nodeMaxRank(btn)
 
-        if currentRank >= maxRank then
+        if btn.classId or currentRank >= maxRank then
             btn.borderFrame:SetBackdropBorderColor(unpack(COLOR_ORANGE))
         else
             btn.borderFrame:SetBackdropBorderColor(unpack(COLOR_GREEN))
@@ -2339,28 +2917,52 @@ local function applyNodeVisual(btn)
         btn.icon:SetAlpha(1.0)
     end
 
-    if btn.infiniteSpinner then
-        local dimmed = btn.state ~= "active" and btn.state ~= "ready"
-        btn.infiniteSpinner:SetAlpha(dimmed and 0.3 or 0.9)
+    -- Learned below max rank (1/3) with the next rank unaffordable: still a learned node,
+    -- so it keeps its colors like a 1/1 - only the rank text tells it is not maxed.
+    local learnedNoPoints = btn.state == "nopoints" and not btn.classId and not btn.infinite
+        and (nodeRanks[btn.id] or 0) > 0
+    if learnedNoPoints then
+        btn.borderFrame:SetBackdropBorderColor(unpack(COLOR_ORANGE))
+        btn.icon:SetDesaturated(false)
+        btn.icon:SetAlpha(1.0)
     end
 
-    -- Infinite nodes: standard square node look plus a golden glow border (same
-    -- pattern as the apex magenta glow) to set them apart.
-    if btn.infinite then
-        if not btn.infiniteBorderTexture then
-            btn.infiniteBorderTexture = btn:CreateTexture(nil, "OVERLAY")
-            btn.infiniteBorderTexture:SetTexture(
-                "Interface\\Buttons\\UI-ActionButton-Border")
-            btn.infiniteBorderTexture:SetBlendMode("ADD")
-            btn.infiniteBorderTexture:SetPoint("TOPLEFT", btn, "TOPLEFT", -16, 16)
-            btn.infiniteBorderTexture:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT",
-                16, -16)
-            btn.infiniteBorderTexture:SetVertexColor(1.0, 0.82, 0.1)
+    -- Starting nodes: a soft static halo, always on, the shape of the node's frame
+    -- (assets/*_glow.tga: blurred ring / octagon).
+    if btn.isStart then
+        if not btn.startGlow then
+            local glow = btn:CreateTexture(nil, "BACKGROUND")
+            glow:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\" .. (btn.permanent and "class_octagon_glow" or "class_ring_glow"))
+            glow:SetBlendMode("ADD")
+            glow:SetPoint("CENTER", btn, "CENTER", 0, 0)
+            local k = (btn.permanent and 1.26 or 1.16) * 1.5
+            glow:SetSize(btn._size * k, btn._size * k)
+            glow:SetAlpha(0.7)
+            btn.startGlow = glow
         end
-        btn.infiniteBorderTexture:Show()
-        -- Only true "locked" dims the glow: "nopoints" is the resting state of an
-        -- infinite node (next stack priced in the millions), not an error state.
-        btn.infiniteBorderTexture:SetAlpha(btn.state == "locked" and 0.25 or 0.8)
+        btn.startGlow:Show()
+    end
+
+    if btn.infiniteRing then
+        -- Ring = state: the gold ring tinted orange once learned at max rank, tinted
+        -- green while it can still be taken (unlocked, or learned below max); a plain
+        -- grey ring (assets/class_ring_grey.tga - a tint on gold only made it dark gold)
+        -- when locked or unaffordable.
+        local currentRank, maxRank = nodeRanks[btn.id] or 0, nodeMaxRank(btn)
+        local ringFile, r, g, b = btn.ringShape, 1, 1, 1
+        if (btn.state == "active" and (btn.classId or btn.infinite or currentRank >= maxRank))
+            or learnedNoPoints then
+            r, g, b = unpack(COLOR_ORANGE)
+        elseif btn.state == "active" or btn.state == "ready" then
+            r, g, b = unpack(COLOR_GREEN)
+        else
+            ringFile = btn.ringShape .. "_grey"
+        end
+        if btn.ringFile ~= ringFile then
+            btn.ringFile = ringFile
+            btn.infiniteRing:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\" .. ringFile)
+        end
+        btn.infiniteRing:SetVertexColor(r, g, b)
     end
 
 
@@ -2376,13 +2978,24 @@ local function applyNodeVisual(btn)
     local currentRank = nodeRanks[btn.id] or 0
 
 
-    if btn.state == "locked" then
-        btn.rankText:Hide()
-    else
-        btn.rankText:Show()
+    -- Ranks are always shown, locked nodes included (in grey there) - unless zoomed out
+    -- past reading them (applyRankTextLOD).
+    do
+        if rankTextShown then btn.rankText:Show() else btn.rankText:Hide() end
 
 
-        if btn.isMultipleChoice then
+        if btn.classId then
+            -- owned OR selected for the next Apply: a pending class node reads like a pending rank
+            local owned = ProjectEbonhold.ClassTree and ProjectEbonhold.ClassTree.Has(btn.id)
+            btn.rankText:SetText(owned and "1/1" or "0/1")
+            if owned then
+                btn.rankText:SetTextColor(unpack(COLOR_ORANGE))
+            elseif btn.state == "ready" then
+                btn.rankText:SetTextColor(unpack(COLOR_GREEN))
+            else
+                btn.rankText:SetTextColor(0.6, 0.6, 0.6, 1.0)
+            end
+        elseif btn.isMultipleChoice then
             if nodeChoices[btn.id] and nodeChoices[btn.id] ~= 0 then
                 btn.rankText:SetText("✓")
                 btn.rankText:SetTextColor(unpack(COLOR_ORANGE))
@@ -2396,14 +3009,12 @@ local function applyNodeVisual(btn)
             local maxRank = nodeMaxRank(btn)
             btn.rankText:SetText(currentRank .. "/" .. maxRank)
 
-            if currentRank > 0 then
-                if currentRank >= maxRank then
-                    btn.rankText:SetTextColor(unpack(COLOR_ORANGE))
-                else
-                    btn.rankText:SetTextColor(unpack(COLOR_GREEN))
-                end
-            elseif btn.state == "nopoints" then
-                btn.rankText:SetTextColor(1.0, 0.82, 0.0, 1.0)
+            -- Same code as the ring: orange at max rank, green while it can be taken
+            -- (or learned below max), grey when locked or unaffordable.
+            if (currentRank > 0 and currentRank >= maxRank) or learnedNoPoints then
+                btn.rankText:SetTextColor(unpack(COLOR_ORANGE))
+            elseif btn.state == "locked" or btn.state == "nopoints" then
+                btn.rankText:SetTextColor(0.6, 0.6, 0.6, 1.0)
             else
                 btn.rankText:SetTextColor(unpack(COLOR_GREEN))
             end
@@ -2441,64 +3052,57 @@ local function applyNodeVisual(btn)
     end
 end
 
+-- Centre of a node in canvas offsets, from the values stored at creation (CreateNodes):
+-- never from GetPoint / GetWidth, the node may be culled.
 local function NodeCenterOffsets(btn)
-    local w, h = btn:GetWidth(), btn:GetHeight()
-    local _, _, _, ox, oy = btn:GetPoint(1)
-    return ox + w * 0.5, oy - h * 0.5
+    return btn._cx, btn._cy
 end
 
-local function MakeAnimatedRotatingLine(x1, y1, x2, y2, thickness, duration)
+-- One link = one static texture. Straight links are a plain WHITE8x8 bar. Tilted links
+-- keep their quad axis-aligned (the bounding box of the segment) and the 8-value
+-- SetTexCoord maps link_line.tga onto the tilted bar inside it: the texture is white with
+-- a 1-texel transparent border, so the rest of the box samples the clamped border and
+-- stays invisible (32 texels, 30 opaque, hence the factor). Same geometry as before.
+--
+-- This replaces one Rotation animation group per link (~1 650): the animation was what
+-- tilted the quad, so it had to stay alive (paused) for the life of the link. (An older
+-- version kept it PLAYING with SetEndDelay(999999): past 2048 s on screen the float32
+-- animation clock stopped advancing and CSimpleAnimGroup::OnUpdate hung the client.)
+local LINK_TEX_TILTED = "Interface\\AddOns\\ProjectEbonhold\\assets\\link_line"
+local LINK_TEX_FACTOR = 32 / 30
+local function MakeLinkTexture(x1, y1, x2, y2, thickness)
     local dx, dy = x2 - x1, y2 - y1
-    local dist = math.sqrt(dx * dx + dy * dy)
-    if dist < 1 then return nil end
-
-    local targetAngleDeg = math.deg(math.atan2(dy, dx))
-    local animDuration = duration or 1
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len < 1 then return nil end
+    local w = thickness or 2
 
     local tex = Canvas:CreateTexture(nil, "BACKGROUND")
-    tex:SetTexture("Interface\\Buttons\\WHITE8x8")
     tex:SetBlendMode("BLEND")
-    tex:SetAlpha(0)
-    tex:SetSize(dist, thickness or 2)
+    tex:SetPoint("CENTER", Canvas, "TOPLEFT", (x1 + x2) / 2, (y1 + y2) / 2)
 
-    local cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-    tex:SetPoint("CENTER", Canvas, "TOPLEFT", cx, cy)
+    if math.abs(dy) < 0.5 or math.abs(dx) < 0.5 then
+        tex:SetTexture("Interface\\Buttons\\WHITE8x8")
+        if math.abs(dy) < 0.5 then tex:SetSize(len, w) else tex:SetSize(w, len) end
+        return tex
+    end
 
-    local ag = tex:CreateAnimationGroup()
-    local rot = ag:CreateAnimation("Rotation")
-    rot:SetDegrees(targetAngleDeg)
-    rot:SetDuration(animDuration)
-    rot:SetOrder(1)
-    rot:SetOrigin("CENTER", 0, 0)
-    rot:SetEndDelay(999999) -- Keep the final rotation state indefinitely
-    ag:SetLooping("NONE")
-
-    -- Use animation's OnFinished callback instead of unreliable OnUpdate timing
-    rot:SetScript("OnFinished", function()
-        tex:SetAlpha(1)
-    end)
-
-    -- Fallback: ensure texture becomes visible even if callback fails
-    local driver = CreateFrame("Frame")
-    driver.elapsed = 0
-    driver.animDuration = animDuration
-    driver.tex = tex
-    driver:SetScript("OnUpdate", function(self, elapsed)
-        elapsed = math.min(elapsed, 0.1)
-        self.elapsed = self.elapsed + elapsed
-        -- Use a slightly longer timeout as safety margin
-        if self.elapsed >= self.animDuration + 0.1 then
-            if self.tex:GetAlpha() < 1 then
-                self.tex:SetAlpha(1)
-            end
-            self:SetScript("OnUpdate", nil)
-            self:Hide()
-        end
-    end)
-
-    ag:Play()
-
-    return tex, { tex }, driver, ag
+    -- c, s: direction of the link (canvas offsets, y up). u runs along the link, v across
+    -- it (downwards on the texture); a box corner at (qx, qy) from the centre samples:
+    local c, s = dx / len, dy / len
+    local hw = (len * math.abs(c) + w * math.abs(s)) / 2
+    local hh = (len * math.abs(s) + w * math.abs(c)) / 2
+    local ku, kv = 1 / (len * LINK_TEX_FACTOR), 1 / (w * LINK_TEX_FACTOR)
+    local function uv(qx, qy)
+        return 0.5 + (qx * c + qy * s) * ku, 0.5 - (qy * c - qx * s) * kv
+    end
+    local ulx, uly = uv(-hw, hh)
+    local llx, lly = uv(-hw, -hh)
+    local urx, ury = uv(hw, hh)
+    local lrx, lry = uv(hw, -hh)
+    tex:SetTexture(LINK_TEX_TILTED)
+    tex:SetTexCoord(ulx, uly, llx, lly, urx, ury, lrx, lry)
+    tex:SetSize(hw * 2, hh * 2)
+    return tex
 end
 
 local function BuildNeighborsAndParents()
@@ -2519,10 +3123,8 @@ local function BuildNeighborsAndParents()
 end
 
 local function displayTalentPoints()
-    if skillTreeFrame.pointsText then
-        skillTreeFrame.pointsText:SetText(
-            "|cffFFD700Soul Ashes: |r|cffFFFFFF" .. FormatThousands(GetRemainingTalentPoints()) ..
-            "|r")
+    if skillTreeFrame.poolTexts then
+        refreshPoolsBar()
     end
 end
 
@@ -2538,7 +3140,7 @@ local function canAffordTalent(nodeId)
     local nextRank = currentRank + 1
     local nodeCost = getNodeCost(btn, nextRank)
 
-    return GetRemainingTalentPoints() >= nodeCost
+    return poolGet(getNodeCurrency(btn)) >= nodeCost
 end
 
 local function canUpgradeNode(nodeId)
@@ -2649,10 +3251,36 @@ local function upgradeNodeRank(nodeId)
     local nodeCost = getNodeCost(btn, nextRank)
 
     nodeRanks[nodeId] = nextRank
-    TALENT_POINTS_TOTAL = TALENT_POINTS_TOTAL - nodeCost
+    poolAdd(getNodeCurrency(btn), -nodeCost)
 
     DebugPrint("Node %d upgraded to rank %d (cost: %s, remaining: %s)",
         nodeId, nextRank, FormatThousands(nodeCost), FormatThousands(TALENT_POINTS_TOTAL))
+    MarkUnsavedChanges()
+    return true
+end
+
+-- Buys a locked node and everything leading to it in one go, when the pools cover the
+-- whole path. Same bookkeeping as upgradeNodeRank, node by node, parents first, so the
+-- pending loadout is exactly what the server would accept (all prerequisites maxed).
+local function unlockPath(nodeId)
+    local path, why = computeUnlockPath(nodeId)
+    if not path then
+        DebugPrint("|cffFF0000Cannot unlock the path: " .. (why or "?") .. "|r")
+        return false
+    end
+    if not canAffordPath(path) then
+        DebugPrint("|cffFF0000Not enough to unlock the whole path!|r")
+        return false
+    end
+    for _, step in ipairs(path.nodes) do
+        local btn = nodesById[step.id]
+        for r = step.fromRank + 1, step.toRank do
+            poolAdd(getNodeCurrency(btn), -getNodeCost(btn, r))
+        end
+        nodeRanks[step.id] = step.toRank
+        if btn.isApex then activeApexNodeId = step.id end
+    end
+    DebugPrint("|cff00FF00Path unlocked: " .. #path.nodes .. " nodes, " .. path.count .. " ranks.|r")
     MarkUnsavedChanges()
     return true
 end
@@ -2667,7 +3295,7 @@ local function downgradeNodeRank(nodeId)
 
     if btn.isMultipleChoice then
         local refund = getNodeCost(btn, 1)
-        TALENT_POINTS_TOTAL = TALENT_POINTS_TOTAL + refund
+        poolAdd(getNodeCurrency(btn), refund)
 
         nodeChoices[nodeId] = 0
         nodeRanks[nodeId] = 0
@@ -2675,7 +3303,7 @@ local function downgradeNodeRank(nodeId)
 
 
         if btn.spells and #btn.spells > 0 then
-            btn.icon:SetTexture(getSpellIconSafe(btn.spells[1]))
+            setNodeIconTexture(btn, getSpellIconSafe(btn.spells[1]))
         end
 
         DebugPrint("Node %d choice removed (refund: %s, remaining: %s)",
@@ -2688,7 +3316,7 @@ local function downgradeNodeRank(nodeId)
     local currentRank = nodeRanks[nodeId] or 0
     if currentRank > 0 then
         local refund = getNodeCost(btn, currentRank)
-        TALENT_POINTS_TOTAL = TALENT_POINTS_TOTAL + refund
+        poolAdd(getNodeCurrency(btn), refund)
 
         nodeRanks[nodeId] = currentRank - 1
 
@@ -2700,14 +3328,21 @@ local function downgradeNodeRank(nodeId)
     return true
 end
 
+-- "active", or learned below max with the next rank unaffordable (same rule as applyNodeVisual):
+-- a 1/3 node that cannot buy its 2nd rank is still learned, its links stay lit.
+local function linkLearned(n)
+    return n.state == "active" or (n.state == "nopoints" and not n.classId and not n.infinite
+        and (nodeRanks[n.id] or 0) > 0)
+end
+
 local function updateLinkColors()
     for _, L in ipairs(lines) do
         local a, b = L.a, L.b
         local color
-        if a.state == "active" and b.state == "active" then
+        if linkLearned(a) and linkLearned(b) then
             color = COLOR_ORANGE
-        elseif (a.state == "active" and b.state == "ready") or
-            (b.state == "active" and a.state == "ready") then
+        elseif (linkLearned(a) and b.state == "ready") or
+            (linkLearned(b) and a.state == "ready") then
             color = COLOR_GREEN
         else
             color = COLOR_GRAY
@@ -2818,7 +3453,7 @@ local function ShowChoiceButtons(btn)
         choiceBtn:SetScript("OnClick", function()
             if btn.state ~= "locked" and canAffordTalent(btn.id) then
                 local nodeCost = getNodeCost(btn, 1)
-                TALENT_POINTS_TOTAL = TALENT_POINTS_TOTAL - nodeCost
+                poolAdd(getNodeCurrency(btn), -nodeCost)
 
                 btn.selectedSpell = i
                 nodeChoices[btn.id] = i
@@ -2829,7 +3464,7 @@ local function ShowChoiceButtons(btn)
                 MarkUnsavedChanges()
 
 
-                btn.icon:SetTexture(getSpellIconSafe(spellID))
+                setNodeIconTexture(btn, getSpellIconSafe(spellID))
 
 
                 for j, otherBtn in ipairs(btn.choiceButtons) do
@@ -2924,7 +3559,9 @@ local function updateNodeDisplay(btn, nodeId)
         btn.rankText:SetShadowColor(0, 0, 0, 1)
     end
 
-    if btn.isMultipleChoice then
+    if btn.classId then
+        btn.rankText:SetText(ProjectEbonhold.ClassTree and ProjectEbonhold.ClassTree.Has(nodeId) and "1/1" or "0/1")
+    elseif btn.isMultipleChoice then
         btn.rankText:SetText(currentRank > 0 and "✓" or "")
     elseif btn.infinite then
         -- Current stack count lives in the corner badge, never "N/max"
@@ -2934,14 +3571,29 @@ local function updateNodeDisplay(btn, nodeId)
     end
 end
 
+-- Bridge for skillTree_classes.lua: the class constellations are edited with the SAME
+-- pending model as the rest of the tree (pool, unsaved-changes flag, chain lookup), so
+-- they need the locals this file owns.
+ProjectEbonhold = ProjectEbonhold or {}
+ProjectEbonhold.SkillTree = ProjectEbonhold.SkillTree or {}
+ProjectEbonhold.SkillTree.PoolAdd = function(currency, delta) poolAdd(currency, delta) end
+ProjectEbonhold.SkillTree.MarkUnsavedChanges = function() MarkUnsavedChanges() end
+ProjectEbonhold.SkillTree.ParentsOf = function(nodeId) return parentsOf[nodeId] end
+ProjectEbonhold.SkillTree.RefreshTree = function() refreshAccessibility() end
+
 function refreshAccessibility()
+    treeStale = false
     updateTalentPoints()
 
 
+    local classTree = ProjectEbonhold.ClassTree
     for nid, btn in pairs(nodesById) do
         local hasProgress = isNodeActive(nid)
 
-        if hasProgress then
+        if btn.classId then
+            -- Class constellation: ownership + class level, never the loadout
+            btn.state = classTree and classTree.NodeState(btn, parentsOf[nid], poolGet("ash")) or "locked"
+        elseif hasProgress then
             local currentRank = getNodeRank(nid)
             local maxRank = getMaxRank(nid)
 
@@ -2977,12 +3629,36 @@ function refreshAccessibility()
     displayTalentPoints()
 
 
+    -- Only the nodes whose look can have changed: state, rank, choice, class ownership
+    -- are everything applyNodeVisual / updateNodeDisplay read that is not fixed at
+    -- creation. Each visual call dirties the node's draw batches, and this runs on every
+    -- click and every pool packet, for ~1 700 nodes.
     for nid, btn in pairs(nodesById) do
-        applyNodeVisual(btn)
-        updateNodeDisplay(btn, nid)
+        local rank, choice = nodeRanks[nid] or 0, nodeChoices[nid] or 0
+        local owned = (btn.classId and classTree and classTree.Has(nid)) and true or false
+        if btn._vState ~= btn.state or btn._vRank ~= rank or btn._vChoice ~= choice or btn._vOwned ~= owned then
+            btn._vState, btn._vRank, btn._vChoice, btn._vOwned = btn.state, rank, choice, owned
+            applyNodeVisual(btn)
+            updateNodeDisplay(btn, nid)
+        end
     end
     updateLinkColors()
+    if ProjectEbonhold.ClassTree then ProjectEbonhold.ClassTree.RefreshHubs() end
 end
+
+-- For server pushes (soul points, loadouts, class tree data): the full pass above
+-- walks ~1 700 nodes and ~1 650 links, and nothing outside the tree reads node
+-- states. While the tree cannot be seen only the pool bar is updated; the tree's
+-- OnShow runs the full pass when it opens.
+local function refreshTreeIfShown()
+    if skillTreeFrame:IsVisible() then
+        refreshAccessibility()
+    else
+        treeStale = true
+        displayTalentPoints()
+    end
+end
+ProjectEbonhold.SkillTree.RefreshTreeIfShown = refreshTreeIfShown
 
 -- Cooperative chunking for the deferred first-open build (see InitTree):
 -- when running inside the init coroutine, yields every `stride` calls so
@@ -2998,17 +3674,30 @@ local function MaybeYield(stride)
     end
 end
 
+-- The square backdrop border of a node is replaced by the round ring (applyNodeVisual)
+-- whenever FAMILY_RINGS is on, which it always is. Such a node used to build a whole
+-- backdrop (9 textures, 16 anchors) on an extra frame, only for applyNodeVisual to drop
+-- it: it gets this stub instead, so the colour calls spread over the file stay valid.
+local function noBorderOp() end
+local NO_BORDER_FRAME = { SetBackdrop = noBorderOp, SetBackdropBorderColor = noBorderOp }
+
 local function CreateNodes()
     wipe(nodesById)
+    wipe(cullBuckets)
+    cullEnabled = false
     for _, n in ipairs(TreeNodes) do
         local btn = CreateFrame("Button", "skillTreeNode" .. n.id, Canvas)
         -- Infinite nodes render bigger than normal nodes, re-centered on the same grid point
         if n.infinite then
             btn:SetSize(40, 40)
             btn:SetPoint("TOPLEFT", Canvas, "TOPLEFT", n._ox - 6, n._oy + 11)
+            btn._size, btn._cx, btn._cy = 40, n._ox + 14, n._oy - 9
         else
-            btn:SetSize(28, 28)
-            btn:SetPoint("TOPLEFT", Canvas, "TOPLEFT", n._ox, n._oy)
+            -- 30 px button + the icon's 1 px overhang = a 32 x 32 icon, re-centred on
+            -- the 28 px grid point the layout was drawn for
+            btn:SetSize(30, 30)
+            btn:SetPoint("TOPLEFT", Canvas, "TOPLEFT", n._ox - 1, n._oy + 1)
+            btn._size, btn._cx, btn._cy = 30, n._ox + 14, n._oy - 14
         end
         btn.id = n.id
         btn.isStart = n.isStart and true or false
@@ -3018,10 +3707,15 @@ local function CreateNodes()
         btn.choiceButtons = {}
 
 
-        btn.borderFrame = CreateFrame("Frame", nil, btn)
-        btn.borderFrame:SetPoint("TOPLEFT", btn, "TOPLEFT", -4, 4)
-        btn.borderFrame:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 4, -4)
-        btn.borderFrame:SetFrameLevel(btn:GetFrameLevel())
+        local ringed = n.infinite or FAMILY_RINGS
+        if ringed then
+            btn.borderFrame = NO_BORDER_FRAME
+        else
+            btn.borderFrame = CreateFrame("Frame", nil, btn)
+            btn.borderFrame:SetPoint("TOPLEFT", btn, "TOPLEFT", -4, 4)
+            btn.borderFrame:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 4, -4)
+            btn.borderFrame:SetFrameLevel(btn:GetFrameLevel())
+        end
 
 
         btn.spells = n.spells
@@ -3035,6 +3729,10 @@ local function CreateNodes()
         btn.computedDesc = n.computedDesc
 
         btn.soulPointsCosts = n.soulPointsCosts
+        btn.sector = n.sector
+        -- Class constellation node: bought for good, gated by the class level (skillTree_classes.lua)
+        btn.classId = n.classId
+        btn.currency = n.currency or "ash"
 
         btn.soulPointsCost = btn.soulPointsCosts and btn.soulPointsCosts[1] or 0
 
@@ -3063,17 +3761,21 @@ local function CreateNodes()
                     currentSpellID)
             end
             btn.icon = btn:CreateTexture(nil, "ARTWORK")
-            btn.icon:SetAllPoints(btn)
+            -- 1 px larger than the button on every side, so the medallion fills its ring
+            btn.icon:SetPoint("TOPLEFT", btn, "TOPLEFT", -1, 1)
+            btn.icon:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 1, -1)
             btn.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
             setNodeIconTexture(btn, iconTex or
                 "Interface\\Icons\\INV_Misc_QuestionMark")
         end
-        btn.borderFrame:SetBackdrop({
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            edgeSize = 16,
-            insets = { left = 0, right = 0, top = 0, bottom = 0 }
-        })
-        btn.borderFrame:SetBackdropBorderColor(1, 1, 1, 1)
+        if not ringed then
+            btn.borderFrame:SetBackdrop({
+                edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                edgeSize = 16,
+                insets = { left = 0, right = 0, top = 0, bottom = 0 }
+            })
+            btn.borderFrame:SetBackdropBorderColor(1, 1, 1, 1)
+        end
 
         local function refreshNodeTooltip(node)
             if not node:IsMouseOver() then return end
@@ -3081,6 +3783,17 @@ local function CreateNodes()
 
             if NextRankTooltip then NextRankTooltip:Hide() end
             if CurrentRankTooltip then CurrentRankTooltip:Hide() end
+
+            -- Un noeud de classe a sa PROPRE infobulle, construite dans OnEnter (niveau de
+            -- classe, noeud precedent, prix). La reconstruire ici avec le chemin de l'arbre
+            -- commun la remplacait par une infobulle generique : le rang et le prix restaient,
+            -- la ligne rouge du niveau de classe disparaissait. On rejoue OnEnter, une seule
+            -- source pour les deux chemins.
+            if node.classId then
+                local onEnter = node:GetScript("OnEnter")
+                if onEnter then onEnter(node) end
+                return
+            end
 
 
             if node.spells and not node.isMultipleChoice then
@@ -3109,15 +3822,12 @@ local function CreateNodes()
                                 and ("\n|cff00FF00Stacks: " .. currentRank .. "|r")
                                 or ("\n|cff00FF00Rank: " .. currentRank .. "/" .. maxRank .. "|r"),
                                 1, 1, 1)
-                            if node.permanent then
-                                CurrentRankTooltip:AddLine("Carry over Prestige", 1, 0.82, 0)
-                            end
 
                             if currentRank < maxRank then
                                 local nextRank = currentRank + 1
                                 local soulCost = getNodeCost(node, nextRank)
-                                local canAfford = TALENT_POINTS_TOTAL >= soulCost
-                                addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford)
+                                local canAfford = poolGet(getNodeCurrency(node)) >= soulCost
+                                addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford, getNodeCurrency(node))
                             end
 
                             CurrentRankTooltip:Show()
@@ -3142,13 +3852,10 @@ local function CreateNodes()
                                 and "\n|cffFFFFFFStacks: 0|r"
                                 or ("\n|cffFFFFFFRank: 0/" .. maxRank .. "|r"),
                                 1, 1, 1)
-                            if node.permanent then
-                                CurrentRankTooltip:AddLine("Carry over Prestige", 1, 0.82, 0)
-                            end
 
                             local soulCost = getNodeCost(node, 1)
-                            local canAfford = TALENT_POINTS_TOTAL >= soulCost
-                            addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford)
+                            local canAfford = poolGet(getNodeCurrency(node)) >= soulCost
+                            addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford, getNodeCurrency(node))
 
                             CurrentRankTooltip:Show()
                         end
@@ -3158,7 +3865,10 @@ local function CreateNodes()
 
                 if node.state == "active" then
                     if node.infinite then
-                        -- Infinite nodes: no permanent/unlearn hint
+                        -- Infinite nodes: no unlearn hint, but say they survive a Prestige
+                        -- (SkillTreeHandler::RemoveAllExceptInfiniteAndPermanent keeps every rank).
+                        CurrentRankTooltip:AddLine(
+                            "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
                     elseif (getNodeRank(node.id) or 0) <= getValidatedRank(node.id) then
                         -- Every rank held is applied: locked in for good, so no
                         -- unlearn hint (and no need to state the obvious)
@@ -3168,13 +3878,65 @@ local function CreateNodes()
                     end
                     CurrentRankTooltip:Show();
                 elseif node.state == "ready" then
+                    if node.infinite then
+                        CurrentRankTooltip:AddLine(
+                            "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
+                    end
                     CurrentRankTooltip:AddLine(
                         "|cff00FF00Left-click to learn|r", 1, 1, 1, true)
+                    CurrentRankTooltip:Show();
+                elseif node.state == "locked" then
+                    addUnlockPathLines(CurrentRankTooltip, node.id)
                     CurrentRankTooltip:Show();
                 end
             end
         end
         btn:SetScript("OnEnter", function(self)
+            if self.classId and self.spells and self.spells[1] and ProjectEbonhold.ClassTree then
+                -- Same shape as every other node: spell, rank line, cost line, click hint.
+                local CT = ProjectEbonhold.ClassTree
+                local owned = CT.Has(self.id) and 1 or 0
+                CurrentRankTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                CurrentRankTooltip:SetHyperlink('spell:' .. self.spells[1])
+                CurrentRankTooltip:AddLine((owned > 0 and "\n|cff00FF00Rank: 1/1|r" or "\n|cffFFFFFFRank: 0/1|r"), 1, 1, 1)
+                if owned == 0 then
+                    local soulCost = self.soulPointsCosts and self.soulPointsCosts[1] or 0
+                    addCostToTooltip(CurrentRankTooltip, "", soulCost, poolGet("ash") >= soulCost, "ash")
+                    -- Everything that blocks the purchase, red, on ONE line:
+                    -- previous node of the series and/or the class level.
+                    -- Calcule sans regarder self.state : l'etat passe a "active" des qu'un
+                    -- noeud de la serie est SELECTIONNE, et la ligne disparaissait alors du
+                    -- noeud suivant alors qu'il etait toujours bloque. Un parent selectionne
+                    -- compte comme pris (CT.Has), un parent absent reste affiche.
+                    local reqs = {}
+                    for _, parentId in ipairs(parentsOf[self.id] or {}) do
+                        local pb = nodesById[parentId]
+                        if pb and not CT.Has(parentId) then
+                            table.insert(reqs, pb.spells and pb.spells[1] and GetSpellInfo(pb.spells[1]) or ("node " .. parentId))
+                        end
+                    end
+                    -- Class level actually needed for THIS node: at least its position in the
+                    -- series (every previous node must be owned, one slot each), and at least
+                    -- one more than what is owned now if the slots are all used.
+                    local level, count = CT.Level(self.classId), CT.OwnedCount(self.classId)
+                    local depth, cur, guard = 0, self.id, 0
+                    while parentsOf[cur] and parentsOf[cur][1] and guard < 100 do
+                        depth, cur, guard = depth + 1, parentsOf[cur][1], guard + 1
+                    end
+                    local needed = math.max(depth + 1, (count >= level) and (count + 1) or 0)
+                    if needed > level then
+                        table.insert(reqs, CT.ClassName(self.classId) .. " class level " .. needed)
+                    end
+                    if #reqs > 0 then
+                        CurrentRankTooltip:AddLine("Requires " .. table.concat(reqs, ", "), 1, 0.3, 0.3)
+                    end
+                    if self.state == "ready" then
+                        CurrentRankTooltip:AddLine("|cff00FF00Left-click to learn|r", 1, 1, 1, true)
+                    end
+                end
+                CurrentRankTooltip:Show()
+                return
+            end
             if self.spells then
                 if self.isMultipleChoice and #self.spells > 1 then
                     ShowChoiceButtons(self)
@@ -3205,19 +3967,16 @@ local function CreateNodes()
                                     and ("\n|cff00FF00Stacks: " .. currentRank .. "|r")
                                     or ("\n|cff00FF00Rank: " .. currentRank .. "/" .. maxRank .. "|r"),
                                     1, 1, 1)
-                                if self.permanent then
-                                    CurrentRankTooltip:AddLine("Carry over Prestige", 1, 0.82, 0)
-                                end
 
                                 if maxRank > 1 and currentRank < maxRank then
                                     local nextRank = currentRank + 1
                                     local soulCost = getNodeCost(self, nextRank)
-                                    local canAfford = TALENT_POINTS_TOTAL >= soulCost
-                                    addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford)
+                                    local canAfford = poolGet(getNodeCurrency(self)) >= soulCost
+                                    addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford, getNodeCurrency(self))
                                 elseif maxRank == 1 then
                                     local soulCost = getNodeCost(self, 1)
-                                    local canAfford = TALENT_POINTS_TOTAL >= soulCost
-                                    addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford)
+                                    local canAfford = poolGet(getNodeCurrency(self)) >= soulCost
+                                    addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford, getNodeCurrency(self))
                                 end
 
                                 CurrentRankTooltip:Show()
@@ -3242,13 +4001,10 @@ local function CreateNodes()
                                     and "\n|cffFFFFFFStacks: 0|r"
                                     or ("\n|cffFFFFFFRank: 0/" .. maxRank .. "|r"),
                                     1, 1, 1)
-                                if self.permanent then
-                                    CurrentRankTooltip:AddLine("Carry over Prestige", 1, 0.82, 0)
-                                end
 
                                 local soulCost = getNodeCost(self, 1)
-                                local canAfford = TALENT_POINTS_TOTAL >= soulCost
-                                addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford)
+                                local canAfford = poolGet(getNodeCurrency(self)) >= soulCost
+                                addCostToTooltip(CurrentRankTooltip, "", soulCost, canAfford, getNodeCurrency(self))
 
                                 CurrentRankTooltip:Show()
                             end
@@ -3260,7 +4016,12 @@ local function CreateNodes()
 
                     if self.state == "active" then
                         if self.infinite then
-                            -- Infinite nodes: no permanent/unlearn hint
+                            -- Infinite nodes: no unlearn hint, but say they survive a Prestige
+                            -- (SkillTreeHandler::RemoveAllExceptInfiniteAndPermanent keeps every rank).
+                            CurrentRankTooltip:AddLine(
+                                "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
+                            CurrentRankTooltip:AddLine(
+                                "|cff00FF00Shift-click to learn 10 stacks|r", 1, 1, 1, true)
                         elseif (getNodeRank(self.id) or 0) <= getValidatedRank(self.id) then
                             -- Every rank held is applied: locked in for good, so
                             -- no unlearn hint (and no need to state the obvious)
@@ -3270,8 +4031,19 @@ local function CreateNodes()
                         end
                         CurrentRankTooltip:Show();
                     elseif self.state == "ready" then
+                        if self.infinite then
+                            CurrentRankTooltip:AddLine(
+                                "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
+                        end
                         CurrentRankTooltip:AddLine(
                             "|cff00FF00Left-click to learn|r", 1, 1, 1, true)
+                        if self.infinite then
+                            CurrentRankTooltip:AddLine(
+                                "|cff00FF00Shift-click to learn 10 stacks|r", 1, 1, 1, true)
+                        end
+                        CurrentRankTooltip:Show();
+                    elseif self.state == "locked" then
+                        addUnlockPathLines(CurrentRankTooltip, self.id)
                         CurrentRankTooltip:Show();
                     end
                 end
@@ -3285,6 +4057,13 @@ local function CreateNodes()
             end
         end)
         btn:SetScript("OnLeave", function(self)
+            -- The delayed close below only concerns the choice buttons of a choice
+            -- node: no frame (kept forever) for each of the other nodes hovered.
+            if #self.choiceButtons == 0 then
+                NextRankTooltip:Hide()
+                CurrentRankTooltip:Hide()
+                return
+            end
             if not self.hideFrame then
                 self.hideFrame = CreateFrame("Frame")
             end
@@ -3329,6 +4108,14 @@ local function CreateNodes()
                 return
             end
 
+            if self.classId then
+                if ProjectEbonhold.ClassTree then
+                    ProjectEbonhold.ClassTree.OnClick(self, button)
+                    refreshNodeTooltip(self)
+                end
+                return
+            end
+
             if button == "LeftButton" then
                 if self.isMultipleChoice then
                     if #self.choiceButtons == 0 then
@@ -3339,34 +4126,53 @@ local function CreateNodes()
                 end
 
 
-                if canUpgradeNode(nodeId) then
-                    local success = upgradeNodeRank(nodeId)
-                    if success then
-                        refreshAccessibility()
+                local btnSelf = self
+                -- Shift-click on an infinite node buys up to 10 stacks, as many as the pool covers
+                local count = (self.infinite and IsShiftKeyDown()) and 10 or 1
+                -- Run now, or after the permanent-node confirmation: the state is read again
+                -- at that moment, in case the pools moved while the popup was open.
+                local function learn()
+                    if UnitAffectingCombat("player") then return end
+                    if canUpgradeNode(nodeId) then
+                        local success = upgradeNodeRank(nodeId)
+                        for _ = 2, count do
+                            if not success or not canUpgradeNode(nodeId) then break end
+                            upgradeNodeRank(nodeId)
+                        end
+                        if success then
+                            refreshAccessibility()
+                            local currentRank = nodeRanks[nodeId] or 0
+                            local maxRank = nodeMaxRank(btnSelf)
+                            DebugPrint("|cff00FF00Talent upgraded to rank " ..
+                                currentRank .. "/" .. maxRank .. "!|r")
+
+                            refreshNodeTooltip(btnSelf)
+                        end
+                    else
                         local currentRank = nodeRanks[nodeId] or 0
-                        local maxRank = nodeMaxRank(self)
-                        DebugPrint("|cff00FF00Talent upgraded to rank " ..
-                            currentRank .. "/" .. maxRank .. "!|r")
+                        local maxRank = nodeMaxRank(btnSelf)
 
-                        refreshNodeTooltip(self)
-
-                        if self.permanent and not self.infinite then
-                            MaybeShowPermanentNodeIntro()
+                        if currentRank >= maxRank then
+                            DebugPrint(
+                                "|cffFF0000Talent is already at maximum rank (" ..
+                                maxRank .. ")!|r")
+                        elseif btnSelf.state == "locked" then
+                            -- deep node: buy everything leading to it, if the pools allow it
+                            if unlockPath(nodeId) then
+                                refreshAccessibility()
+                                refreshNodeTooltip(btnSelf)
+                            end
+                        elseif not canAffordTalent(nodeId) then
+                            DebugPrint("|cffFF0000Not enough Soul Ashes!|r")
                         end
                     end
-                else
-                    local currentRank = nodeRanks[nodeId] or 0
-                    local maxRank = nodeMaxRank(self)
+                end
 
-                    if currentRank >= maxRank then
-                        DebugPrint(
-                            "|cffFF0000Talent is already at maximum rank (" ..
-                            maxRank .. ")!|r")
-                    elseif not canAffordTalent(nodeId) then
-                        DebugPrint("|cffFF0000Not enough Soul Ashes!|r")
-                    elseif self.state == "locked" then
-                        DebugPrint("|cffFF0000Prerequisites not met!|r")
-                    end
+                if self.permanent and not self.infinite
+                    and (canUpgradeNode(nodeId) or self.state == "locked") then
+                    ConfirmPermanentNode(learn)
+                else
+                    learn()
                 end
             elseif button == "RightButton" then
                 if self.isMultipleChoice and #self.choiceButtons > 0 then
@@ -3429,6 +4235,8 @@ local function CreateNodes()
 
         nodesById[n.id] = btn
         applyNodeVisual(btn)
+        -- hidden until the viewport reaches it (EnableCulling, end of the build)
+        cullRegister(btn, btn._cx, -btn._cy, btn._cx, -btn._cy)
         MaybeYield(15) -- node buttons are the heaviest single pieces
     end
 end
@@ -3459,20 +4267,13 @@ local function CreateLinks()
             local bx, by = NodeCenterOffsets(b)
 
 
-            local mainTex, allSegments, driver, animGroup =
-                MakeAnimatedRotatingLine(ax, ay, bx, by, 3)
-            if mainTex then
-                lines[#lines + 1] = {
-                    tex = mainTex,
-                    segments = allSegments,
-                    driver = driver,
-                    animGroup = animGroup,
-                    a = a,
-                    b = b
-                }
+            local tex = MakeLinkTexture(ax, ay, bx, by, 3)
+            if tex then
+                lines[#lines + 1] = { tex = tex, a = a, b = b }
+                cullRegister(tex, math.min(ax, bx), math.min(-ay, -by), math.max(ax, bx), math.max(-ay, -by))
             end
         end
-        MaybeYield(10) -- each link spawns several segment textures
+        MaybeYield(40) -- one plain texture per link
     end
     updateLinkColors()
 end
@@ -3489,24 +4290,10 @@ local function GetCursorScaled()
     return x / s, y / s
 end
 
-Scroll:SetScript("OnMouseDown", function(self, button)
-    if button == "LeftButton" or button == "RightButton" then
-        dragging = true
-        startX, startY = GetCursorScaled()
-        startH = self:GetHorizontalScroll()
-        startV = self:GetVerticalScroll()
-    end
-end)
-
-Scroll:SetScript("OnMouseUp", function(self, button)
-    if button == "LeftButton" or button == "RightButton" then
-        dragging = false
-    end
-end)
-
 local scrollUpdateTimer = 0
 local SCROLL_UPDATE_INTERVAL = 0.016
-Scroll:SetScript("OnUpdate", function(self, elapsed)
+local lastDragX, lastDragY
+local function DragUpdate(self, elapsed)
     if ProjectEbonhold_IsClosing then return end
     if not dragging or not UIParent:IsShown() then return end
     elapsed = math.min(elapsed, 0.1) -- Cap elapsed to prevent freeze after alt-tab
@@ -3520,15 +4307,38 @@ Scroll:SetScript("OnUpdate", function(self, elapsed)
 
 
     if math.abs(dx) < 2 and math.abs(dy) < 2 then return end
+    -- A held but still mouse sets nothing: each SetScroll re-anchors the canvas, which
+    -- lays out every shown node again, even to the same place.
+    if x == lastDragX and y == lastDragY then return end
+    lastDragX, lastDragY = x, y
 
-    local hMax = self:GetHorizontalScrollRange()
-    local vMax = self:GetVerticalScrollRange()
+    -- Screen drag -> canvas units, so the tree follows the mouse 1:1 at every zoom
+    SetScrollEngine(startH - dx / zoomLevel, startV + dy / zoomLevel)
+end
 
-    local newH = math.min(hMax, math.max(0, startH - dx))
-    local newV = math.min(vMax, math.max(0, startV + dy))
+-- The OnUpdate only exists while a button is held: it no longer runs (to return at
+-- once) on every frame the tree is open.
+Scroll:SetScript("OnMouseDown", function(self, button)
+    if button == "LeftButton" or button == "RightButton" then
+        dragging = true
+        startX, startY = GetCursorScaled()
+        startH, startV = GetScrollCanvas()
+        lastDragX, lastDragY = nil, nil
+        self:SetScript("OnUpdate", DragUpdate)
+    end
+end)
 
-    self:SetHorizontalScroll(newH)
-    self:SetVerticalScroll(newV)
+Scroll:SetScript("OnMouseUp", function(self, button)
+    if button == "LeftButton" or button == "RightButton" then
+        dragging = false
+        self:SetScript("OnUpdate", nil)
+    end
+end)
+
+-- Closing the window mid-drag ends the drag (the mouse-up may never reach us)
+Scroll:SetScript("OnHide", function(self)
+    dragging = false
+    self:SetScript("OnUpdate", nil)
 end)
 
 
@@ -3536,63 +4346,18 @@ local isTreeInitialized = false
 local isTreeInitializing = false
 local pendingIntroAnimation = false
 
--- Full-cover "loading" overlay shown while the deferred build runs: the
--- half-built tree stays hidden behind it and clicks can't reach it. Uses
--- ezCollections' own LoadingSpinnerTemplate (the golden rotating stream
--- circle, see SharedUIPanelTemplates.xml) rather than a bare text line.
-local loaderFrame
-local function ShowTreeLoader()
-    if not loaderFrame then
-        loaderFrame = CreateFrame("Frame", nil, skillTreeFrame)
-        loaderFrame:SetAllPoints(skillTreeFrame)
-        loaderFrame:EnableMouse(true)
-        local bg = loaderFrame:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-        bg:SetVertexColor(0, 0, 0, 0.9)
-
-        loaderFrame.spinner = CreateFrame("Frame", nil, loaderFrame, "LoadingSpinnerTemplate")
-        loaderFrame.spinner:SetSize(64, 64)
-        loaderFrame.spinner:SetPoint("CENTER", loaderFrame, "CENTER", 0, 24)
-
-        loaderFrame.text = loaderFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        loaderFrame.text:SetPoint("TOP", loaderFrame.spinner, "BOTTOM", 0, -12)
-        loaderFrame.dots, loaderFrame.timer = 0, 0
-        loaderFrame:SetScript("OnUpdate", function(self, elapsed)
-            self.timer = self.timer + elapsed
-            if self.timer >= 0.35 then
-                self.timer = 0
-                self.dots = (self.dots + 1) % 4
-                self.text:SetText("Loading Skill Tree" .. string.rep(".", self.dots))
-            end
-        end)
-    end
-    loaderFrame:SetFrameLevel(skillTreeFrame:GetFrameLevel() + 100)
-    loaderFrame.text:SetText("Loading Skill Tree")
-    loaderFrame.spinner.AnimFrame.Anim:Play()
-    loaderFrame:Show()
-end
-
-local function HideTreeLoader()
-    if loaderFrame then
-        loaderFrame.spinner.AnimFrame.Anim:Stop()
-        loaderFrame:Hide()
-    end
-end
-
 -- Deferred first-open build: the whole tree construction runs inside a
 -- coroutine resumed once per game frame (CreateNodes/CreateLinks yield
 -- every few items via MaybeYield, the cheap steps yield between phases).
--- The client keeps rendering, the loader overlay animates, and the tree is
--- revealed with the usual intro animation once everything exists -- instead
--- of one multi-second freeze on the first click of the Skill Tree tab.
+-- The client keeps rendering and the tree is revealed with the usual intro
+-- animation once everything exists -- instead of one multi-second freeze on
+-- the first click of the Skill Tree tab.
 local function InitTree()
     if isTreeInitialized or isTreeInitializing then
         DebugPrint("Tree already initialized/initializing, skipping...")
         return
     end
     isTreeInitializing = true
-    ShowTreeLoader()
 
     DebugPrint("Initializing tree (deferred)...", ProjectEbonhold)
 
@@ -3600,6 +4365,7 @@ local function InitTree()
         DebugPrint("Requesting loadout from server...")
         ProjectEbonhold.RequestLoadoutFromServer()
     end
+    if ProjectEbonhold.ClassTree then ProjectEbonhold.ClassTree.Request() end
 
     local co = coroutine.create(function()
         Canvas:SetScale(zoomLevel)  -- match the starting zoomLevel; ComputeLayout only sizes the canvas, doesn't apply the render scale
@@ -3609,11 +4375,16 @@ local function InitTree()
         coroutine.yield()
         CreateNodes()
         CreateLinks()
+        if ProjectEbonhold.ClassTree then
+            ProjectEbonhold.ClassTree.CreateHubs(Canvas, ProjectEbonhold.SkillTree.ToCanvas)
+        end
         CreateBottomBar()
         coroutine.yield()
         refreshAccessibility()
         CheckInitialState()
         RefreshLoadoutDropdown()
+        -- everything was registered hidden: show what the starting view touches
+        EnableCulling()
     end)
 
     local driver = CreateFrame("Frame")
@@ -3623,7 +4394,6 @@ local function InitTree()
 
         self:SetScript("OnUpdate", nil)
         isTreeInitializing = false
-        HideTreeLoader()
 
         if not ok then
             -- Same net state as the old synchronous version erroring midway
@@ -3651,7 +4421,54 @@ local function InitTree()
     end)
 end
 
+-- ── First-open tour ──────────────────────────────────────────────────────────
+-- Two steps, once per account, the first time the tree is opened with Soul Ashes to spend
+-- (2026-10-22): what the tree spends, that every rank is for good. Built on the shared GlowBox
+-- tour factory (modules/guidedTour). Waits while another tour is on screen.
+local treeTour = ProjectEbonhold.GuidedTour.Create({
+    parent = function() return skillTreeFrame end,
+    dbKey = "seenSkillTreeTour",
+    steps = {
+        {
+            title = "Your Skill Tree",
+            text = "The tree spends the |cffffd700Soul Ashes|r kept on your account. They arrive " ..
+                "when you make an |cffffd700offering|r at a Spirit Healer, or when a run ends. " ..
+                "This is what you have to spend; hover it to see what it buys.",
+            zone = function()
+                local t = skillTreeFrame.poolTexts and skillTreeFrame.poolTexts[1]
+                return t and t.hover
+            end,
+            boxAnchor = { "BOTTOMLEFT", "TOPLEFT", 0, 14 },
+        },
+        {
+            title = "Every rank is for good",
+            text = "Click a node to take a rank, then |cffffd700Apply Changes|r. Once applied, a " ..
+                "rank is |cffff4040permanent|r: it can never be unlearned or refunded. Only a " ..
+                "|cffff4444Prestige|r clears the tree.",
+            zone = function() return Scroll end,
+            boxAnchor = { "TOPRIGHT", "TOPRIGHT", -20, -20 },
+        },
+    },
+})
+
+local function MaybeStartTreeTour()
+    if treeTour:HasSeen() or treeTour:IsActive() then return end
+    C_Timer.After(1.0, function()
+        -- after the camera has settled on the starting nodes
+        if not skillTreeFrame:IsShown() or not isTreeInitialized then return end
+        if (TALENT_POINTS_TOTAL or 0) <= 0 then return end
+        if ProjectEbonhold.GuidedTour.AnyActive() then return end
+        treeTour:MaybeStart()
+    end)
+end
+
+skillTreeFrame:HookScript("OnHide", function()
+    -- closed mid-tour: pause it, the next opening with points starts it again
+    if treeTour:IsActive() then treeTour:Stop(false) end
+end)
+
 skillTreeFrame:SetScript("OnShow", function()
+    MaybeStartTreeTour()
     if not isTreeInitialized then
         -- Deferred build (or already in progress): the completion handler
         -- above takes care of the intro animation and refreshes.
@@ -3662,15 +4479,17 @@ skillTreeFrame:SetScript("OnShow", function()
     if pendingIntroAnimation then
         pendingIntroAnimation = false
         PlayIntroAnimation()
+    else
+        -- Every opening lands on the starting nodes, whatever the last view was.
+        CenterOnStartNodes()
     end
 
     refreshAccessibility()
 
-    C_Timer.After(0.1, function()
-        if _G.skillTreeBottomBar and _G.skillTreeBottomBar.updateLevelRestriction then
-            _G.skillTreeBottomBar.updateLevelRestriction()
-        end
-    end)
+    -- (was a C_Timer.After(0.1): one new permanent Frame per opening of the tree)
+    if _G.skillTreeBottomBar and _G.skillTreeBottomBar.updateLevelRestriction then
+        _G.skillTreeBottomBar.updateLevelRestriction()
+    end
 end)
 
 
@@ -3680,21 +4499,28 @@ ProjectEbonhold.SkillTree.OnApplyChangesResult = OnApplyChangesResult
 
 
 ProjectEbonhold.SkillTree.UpdateTotalSoulPoints =
-    function(spendablePoints, committedPoints)
-        TALENT_POINTS_TOTAL = spendablePoints
+    function(spendablePoints, committedPoints, pools)
+        -- The server value is the truth for what is BANKED; the class nodes still waiting
+        -- for an Apply stay deducted, like the unapplied ranks of the tree.
+        TALENT_POINTS_TOTAL = spendablePoints - pendingClassCost()
         TALENT_POINT_TOTAL_BASE = committedPoints
+        if pools then
+            for c, v in pairs(pools) do
+                if CURRENCY_POOLS[c] then
+                    CURRENCY_POOLS[c].spendable = v.spendable or 0
+                    CURRENCY_POOLS[c].banked = v.banked or 0
+                end
+            end
+        end
 
-        if skillTreeFrame and skillTreeFrame.pointsText then
-            skillTreeFrame.pointsText:SetText(
-                "|cffFFD700Soul Ashes: |r|cffFFFFFF" .. FormatThousands(GetRemainingTalentPoints()) ..
-                "|r")
+        if skillTreeFrame and skillTreeFrame.poolTexts then
+            refreshPoolsBar()
         end
         if skillTreeFrame and skillTreeFrame.progressBar and skillTreeFrame.progressBar.UpdateProgressBar then
             skillTreeFrame.progressBar.UpdateProgressBar()
         end
 
-        refreshAccessibility()
-        DebugPrint(
-            "|cff00FF00Soul Ashes updated - Spendable: %s, Committed: %s|r",
-            FormatThousands(TALENT_POINTS_TOTAL), FormatThousands(TALENT_POINT_TOTAL_BASE))
+        refreshTreeIfShown()
+        -- the points can land after the window opened
+        if skillTreeFrame and skillTreeFrame:IsShown() then MaybeStartTreeTour() end
     end

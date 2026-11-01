@@ -148,6 +148,9 @@ end
 function OrbService.RerollOffer()
   if not OrbService.CanRerollOffer() then return end
 
+  if ProjectEbonhold.PerkService and ProjectEbonhold.PerkService.MarkOrbReroll then
+    ProjectEbonhold.PerkService.MarkOrbReroll()
+  end
   ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_ORB_REROLL, "")
 
   -- Optimistic, same reason as SendSpend: the count is only ever written from SEND_ORB_CHARGES,
@@ -685,11 +688,8 @@ local function CreateBubble()
     -- player is about to pick from (and the journal's guided tour box beside it).
     GameTooltip:AddLine("Forget one stack of an Echo, and draw a new choice in its place.",
       1, 1, 1, true)
-    -- Just the quest giver. The full source list (Prestige, Daily Dungeons, Weekly Raids, Daily
-    -- Runs, Callboard) lives in the journal's guided tour: a hover tooltip only has to answer
-    -- "where do I get more", and a name the player can walk to answers it better than five
-    -- categories they then have to go looking for.
-    GameTooltip:AddLine("More from |cffFFD100Maerys, the Ashen Archivist|r.", 0.6, 0.6, 0.6, true)
+    -- Where to get more, in one line: the full list lives in the journal's guided tour.
+    GameTooltip:AddLine("More from the |cffFFD100Hero's Call Board|r and the |cffFFD100Dungeon Finder|r.", 0.6, 0.6, 0.6, true)
     GameTooltip:AddLine(" ")
     -- No "what these are worth at 80" paragraph here: that is teaching, and it belongs to the
     -- journal's guided tour (echo_journal's echoesTour, "Orb of Lost Memories" step), which the

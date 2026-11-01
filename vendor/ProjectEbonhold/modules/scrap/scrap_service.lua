@@ -69,9 +69,7 @@ end
 
 -- Non-junk items are sold when both their quality (white/green/blue) and
 -- their item type (weapon, armor, consumable, ...) are enabled.
-local function MatchesSellFilters(link)
-    local _, _, quality, _, _, itemType = GetItemInfo(link)
-
+local function MatchesSellFilters(quality, itemType)
     local qualityFlag = quality and QUALITY_FLAG[quality]
     if not qualityFlag or not GetSetting(qualityFlag) then return false end
 
@@ -84,46 +82,56 @@ end
 -- Returns the list of {bag, slot, link, value} the current rules would sell.
 -- Items without cached item info or without a vendor price are never included,
 -- so UseContainerItem can never accidentally "use" an item instead of selling it.
-local function GetSellableItems()
+-- Calls fn(bag, slot, link, value) for every slot the rules would sell. One
+-- GetItemInfo per slot (it was called three times) and no table per item.
+local function ForEachSellable(fn)
     local db = GetScrapDB()
-    local items = {}
-
     for bag = 0, 4 do
         for slot = 1, GetContainerNumSlots(bag) do
             local link = GetContainerItemLink(bag, slot)
             local itemID = GetItemID(link)
             if itemID and not db.neverSell[itemID] then
-                local quality = select(3, GetItemInfo(link))
-                local vendorPrice = select(11, GetItemInfo(link))
+                local _, _, quality, _, _, itemType, _, _, _, _, vendorPrice = GetItemInfo(link)
 
-                if vendorPrice and vendorPrice > 0 then
+                -- Legendary and above (5+) are never bulk-sold; the server refuses them too.
+                if vendorPrice and vendorPrice > 0 and quality and quality < 5 then
                     local shouldSell = db.alwaysSell[itemID]
                         or GetSetting("sellEverything")
                         or (quality == 0 and SellsPoorQuality())
-                        or MatchesSellFilters(link)
+                        or MatchesSellFilters(quality, itemType)
 
                     if shouldSell then
                         local _, count = GetContainerItemInfo(bag, slot)
-                        table.insert(items, {
-                            bag = bag,
-                            slot = slot,
-                            link = link,
-                            value = vendorPrice * (count or 1),
-                        })
+                        fn(bag, slot, link, vendorPrice * (count or 1))
                     end
                 end
             end
         end
     end
+end
 
+local function GetSellableItems()
+    local items = {}
+    ForEachSellable(function(bag, slot, link, value)
+        table.insert(items, { bag = bag, slot = slot, link = link, value = value })
+    end)
     return items
 end
 
+-- Count and total value only (the merchant button, the Toolbelt's Vendor preview).
+local countN, countValue = 0, 0
+local function AddToCount(_, _, _, value)
+    countN = countN + 1
+    countValue = countValue + value
+end
+local function CountSellable()
+    countN, countValue = 0, 0
+    ForEachSellable(AddToCount)
+    return countN, countValue
+end
+
 local function GetSellableValue()
-    local total = 0
-    for _, item in ipairs(GetSellableItems()) do
-        total = total + item.value
-    end
+    local _, total = CountSellable()
     return total
 end
 
@@ -270,7 +278,9 @@ end)
 
 _G.ScrapService = {
     SellJunk = SellJunk,
+    BuildSellRulesBody = BuildSellRulesBody, -- the Toolbelt's Vendor entry sells by the same rules
     GetSellableItems = GetSellableItems,
     GetSellableValue = GetSellableValue,
+    CountSellable = CountSellable,
     ToggleItemRule = ToggleItemRule,
 }

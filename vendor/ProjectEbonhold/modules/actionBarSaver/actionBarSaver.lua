@@ -105,11 +105,15 @@ function ABS.Init()
     ABS.StartPeriodicSaver()
 end
 
+-- Set by anything that can change what SaveProfile writes (a slot, a macro, the
+-- spellbook indexes, the level): the 5 s pass skips the 144-slot rewrite otherwise.
+local saveDirty = true
+
 function ABS.StartPeriodicSaver()
-    -- Safety: Do not auto-save at Level 1. This prevents overwriting a high-level profile 
+    -- Safety: Do not auto-save at Level 1. This prevents overwriting a high-level profile
     -- with empty bars when the character is reset/prestiged.
-    if UnitLevel("player") > 1 then
-        ABS:SaveProfile("AutoSave")
+    if saveDirty and UnitLevel("player") > 1 then
+        saveDirty = not ABS:SaveProfile("AutoSave")
     end
     TimerAfter(5, ABS.StartPeriodicSaver)
 end
@@ -122,13 +126,16 @@ function ABS.IsEnabled()
 end
 
 -- 1:1 Logic: Save Profile (adapted for automation)
+-- Returns true when the set is complete; false when it was skipped or an item name
+-- was not in the cache yet (the periodic saver then tries again).
 function ABS:SaveProfile(name)
-    if not ABS.IsEnabled() or not ABS.db then return end
-    if IsBarOverridden() then return end
+    if not ABS.IsEnabled() or not ABS.db then return false end
+    if IsBarOverridden() then return false end
 
 	self.db.sets[playerClass][name] = self.db.sets[playerClass][name] or {}
 	local set = self.db.sets[playerClass][name]
-	
+	local complete = true
+
 	for actionID=1, MAX_ACTION_BUTTONS do
 		set[actionID] = nil
 		
@@ -139,20 +146,27 @@ function ABS:SaveProfile(name)
 			elseif( type == "equipmentset" ) then
 				set[actionID] = string.format("%s|%s|%s", type, id, "")
 			elseif( type == "item" ) then
-				set[actionID] = string.format("%s|%d|%s|%s", type, id, "", (GetItemInfo(id)) or "")
+				local itemName = GetItemInfo(id)
+				if not itemName then complete = false end
+				set[actionID] = string.format("%s|%d|%s|%s", type, id, "", itemName or "")
 			elseif( type == "spell" and id > 0 ) then
 				local spell, rank = GetSpellName(id, BOOKTYPE_SPELL)
 				if( spell ) then
 					set[actionID] = string.format("%s|%d|%s|%s|%s|%s", type, id, "", spell, rank or "", extraID or "")
+				else
+					complete = false
 				end
 			elseif( type == "macro" ) then
 				local name, icon, macro = GetMacroInfo(id)
 				if( name and icon and macro ) then
 					set[actionID] = string.format("%s|%d|%s|%s|%s|%s", type, actionID, "", self:CompressText(name), icon, self:CompressText(macro))
+				else
+					complete = false
 				end
 			end
 		end
 	end
+	return complete
 end
 
 -- 1:1 Logic: Restore Profile
@@ -228,12 +242,27 @@ function ABS:RestoreAction(i, type, actionID, binding, ...)
 end
 
 
+-- SPELLS_CHANGED comes in bursts (login, stances, pets, talents): one restore per
+-- burst, 0.5 s after its first event, reading the state of the whole burst.
+local restorePending = false
+local function RestoreSoon()
+    if restorePending then return end
+    restorePending = true
+    TimerAfter(0.5, function()
+        restorePending = false
+        ABS:RestoreProfile("AutoSave", playerClass)
+    end)
+end
+
 local frame = CreateFrame("Frame")
-frame:SetScript("OnEvent", function(self, event, arg1)  
-    if event == "ADDON_LOADED" and arg1 == "ProjectEbonhold" then
-        ABS.Init()
+frame:SetScript("OnEvent", function(self, event, arg1)
+    if event == "ADDON_LOADED" then
+        if arg1 == "ProjectEbonhold" then ABS.Init() end
     elseif event == "PLAYER_LEVEL_UP" or event == "SPELLS_CHANGED" or event == "LEARNED_SPELL_IN_TAB" then
-        TimerAfter(0.5, function() ABS:RestoreProfile("AutoSave", playerClass) end)
+        saveDirty = true
+        RestoreSoon()
+    else -- ACTIONBAR_SLOT_CHANGED, UPDATE_MACROS
+        saveDirty = true
     end
 end)
 
@@ -241,3 +270,5 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LEVEL_UP")
 frame:RegisterEvent("SPELLS_CHANGED")
 frame:RegisterEvent("LEARNED_SPELL_IN_TAB")
+frame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+frame:RegisterEvent("UPDATE_MACROS")

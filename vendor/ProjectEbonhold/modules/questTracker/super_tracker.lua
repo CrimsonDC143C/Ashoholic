@@ -264,20 +264,23 @@ local function RefreshPOIs()
     if WorldMapFrame and WorldMapFrame:IsShown() then return end
     if not QuestMapUpdateAllQuests then return end
 
-    SetMapToCurrentZone()
-    QuestMapUpdateAllQuests()
-
-    local bounds = CurrentZoneBounds()
-    poiCache = {}
-    poiOrder = {}
-    if not bounds then return end
-
     -- Addon-side watched set, NOT the client's watch list: the Ebonhold
     -- client evicts the previous watch on every add (1-quest cap), so the
     -- tracker keeps its own list (see quest_tracker.lua WatchedDB) -- the
     -- waypoint candidates must come from the same source.
     local watched = ProjectEbonholdDB and ProjectEbonholdDB.questTracker
         and ProjectEbonholdDB.questTracker.watchedQuests or {}
+
+    SetMapToCurrentZone()
+    wipe(poiCache)
+    wipe(poiOrder)
+    -- nothing watched: the POI pass below could only come out empty, so skip the
+    -- client's recompute of every quest's POIs (this runs every 2 s)
+    if next(watched) == nil then return end
+    QuestMapUpdateAllQuests()
+
+    local bounds = CurrentZoneBounds()
+    if not bounds then return end
     for questIndex = 1, GetNumQuestLogEntries() do
         local title, _, _, _, isHeader, _, isComplete, _, questID = GetQuestLogTitle(questIndex)
         if not isHeader and questID and questID > 0 and watched[questID] then
@@ -412,20 +415,24 @@ arrow:Hide()
 
 -- rotate a square texture's displayed image by `radians` counter-clockwise
 -- (3.3.5 has no Texture:SetRotation; use the 8-arg SetTexCoord affine form)
+-- (corners written out: this runs every frame while the target is off-screen)
 local function RotateTex(tex, radians)
     local c, s = math.cos(radians), math.sin(radians)
-    local function corner(x, y)
-        return 0.5 + x * c + y * s, 0.5 + x * s - y * c
-    end
-    local ULx, ULy = corner(-0.5,  0.5)
-    local LLx, LLy = corner(-0.5, -0.5)
-    local URx, URy = corner( 0.5,  0.5)
-    local LRx, LRy = corner( 0.5, -0.5)
-    tex:SetTexCoord(ULx, ULy, LLx, LLy, URx, URy, LRx, LRy)
+    local hc, hs = 0.5 * c, 0.5 * s
+    tex:SetTexCoord(
+        0.5 - hc + hs, 0.5 - hs - hc,   -- UL (-0.5,  0.5)
+        0.5 - hc - hs, 0.5 - hs + hc,   -- LL (-0.5, -0.5)
+        0.5 + hc + hs, 0.5 + hs - hc,   -- UR ( 0.5,  0.5)
+        0.5 + hc - hs, 0.5 + hs + hc)   -- LR ( 0.5, -0.5)
 end
 local ARROW_BASE = -math.pi / 2   -- artwork points up; rotate so 0 rad = right
 
+-- The pin is placed every frame; its icon and distance only change now and then.
+local lastIconKind, lastIconComplete, lastDistYd
+
 local function SetPinIcon(kind, complete)
+    if kind == lastIconKind and complete == lastIconComplete then return end
+    lastIconKind, lastIconComplete = kind, complete
     if kind == "waypoint" then
         icon:SetTexture("Interface\\Cursor\\Crosshairs")
         icon:SetVertexColor(1, 0.85, 0.2)
@@ -494,8 +501,9 @@ pin.driver:SetScript("OnUpdate", function(self, dt)
         if not poi then HidePin() return end
         tx, ty, kind, complete = poi.wx, poi.wy, "quest", poi.complete
     end
+    -- one position read per frame (it was read twice)
+    local pwx, pwy, pz = GetPlayerWorld()
     if not tz then
-        local _, _, pz = GetPlayerWorld()
         tz = pz or 0                            -- POIs have no Z: player height
     end
 
@@ -506,7 +514,6 @@ pin.driver:SetScript("OnUpdate", function(self, dt)
     -- zoom/angle (reads 15 yd zoomed out, 0 yd zoomed in on the same spot).
     -- Measure PLAYER->target instead; keep the camera figure only as a
     -- fallback when the player position is unavailable.
-    local pwx, pwy = GetPlayerWorld()
     if pwx then
         local ddx, ddy = tx - pwx, ty - pwy
         dist = math.sqrt(ddx * ddx + ddy * ddy)
@@ -582,7 +589,11 @@ pin.driver:SetScript("OnUpdate", function(self, dt)
     SetPinIcon(kind, complete)
 
     if dist and dist >= HIDE_DIST_TEXT then
-        distText:SetText(string.format("%d yd", dist))
+        local yd = math.floor(dist)             -- what "%d" printed
+        if yd ~= lastDistYd then
+            lastDistYd = yd
+            distText:SetText(string.format("%d yd", yd))
+        end
         distText:Show()
     else
         distText:Hide()

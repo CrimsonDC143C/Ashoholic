@@ -38,6 +38,25 @@ local function computeRealHealth(unit, overflow)
     return (cur / max) * realMax, realMax
 end
 
+-- Real current / max health of a unit, or nil when it has no hidden pool.
+-- Public, for other unit frames that want the real numbers.
+function OH:GetRealHealth(unit)
+    local overflow = self:GetOverflow(unit)
+    if not overflow then return nil end
+    return computeRealHealth(unit, overflow)
+end
+
+-- Every stock unit frame that can show a capped creature: target, focus and
+-- the four boss frames (encounter units).
+local FRAMES = {
+    { "TargetFrame", "target" },
+    { "FocusFrame", "focus" },
+    { "Boss1TargetFrame", "boss1" },
+    { "Boss2TargetFrame", "boss2" },
+    { "Boss3TargetFrame", "boss3" },
+    { "Boss4TargetFrame", "boss4" },
+}
+
 local function getHealthBar(frame)
     return frame and (frame.healthbar or frame.HealthBar) or nil
 end
@@ -51,6 +70,8 @@ local function updateHealthText(frame, unit)
 
     local overflow = UnitExists(unit) and OH:GetOverflow(unit) or nil
     if not overflow then
+        -- Shown at the cap with no answer yet: ask (once per unit, see service).
+        OH:Request(unit)
         -- Overflow ended (cache cleared) while we were overriding the text:
         -- hand it back to Blizzard once so our last value doesn't linger.
         if healthBar.overflowTextActive then
@@ -73,29 +94,54 @@ local function updateHealthText(frame, unit)
 end
 
 local function refreshAll()
-    if TargetFrame and TargetFrame:IsShown() then
-        updateHealthText(TargetFrame, "target")
-    end
-    if FocusFrame and FocusFrame:IsShown() then
-        updateHealthText(FocusFrame, "focus")
+    for _, entry in ipairs(FRAMES) do
+        local frame = _G[entry[1]]
+        if frame and frame:IsShown() then
+            updateHealthText(frame, entry[2])
+        end
     end
 end
+OH.Refresh = refreshAll
 
 -- Main driver: re-apply our text right after Blizzard rewrites it (health
 -- changes, target swaps, mouseover show), so the two never flicker.
 hooksecurefunc("TextStatusBar_UpdateTextString", function(bar)
-    if bar == getHealthBar(TargetFrame) then
-        updateHealthText(TargetFrame, "target")
-    elseif bar == getHealthBar(FocusFrame) then
-        updateHealthText(FocusFrame, "focus")
+    for _, entry in ipairs(FRAMES) do
+        local frame = _G[entry[1]]
+        if frame and bar == getHealthBar(frame) then
+            updateHealthText(frame, entry[2])
+            return
+        end
     end
 end)
 
--- Low-frequency fallback: catches the first application after the server
--- pushes overflow data when no health update has fired yet.
-local function anyOverrideActive()
-    local tb, fb = getHealthBar(TargetFrame), getHealthBar(FocusFrame)
-    return (tb and tb.overflowTextActive) or (fb and fb.overflowTextActive)
+-- Unit tooltip (mouseover, nameplates): add the real numbers under the bar,
+-- since a nameplate has no health text of its own.
+GameTooltip:HookScript("OnTooltipSetUnit", function(tooltip)
+    local _, unit = tooltip:GetUnit()
+    if not unit then return end
+    local current, realMax = OH:GetRealHealth(unit)
+    if not current then
+        OH:Request(unit)
+        return
+    end
+    tooltip:AddLine(HEALTH .. ": " .. formatBigNumber(current) .. " / " .. formatBigNumber(realMax), 1, 1, 1)
+    tooltip:Show()
+end)
+
+-- Low-frequency fallback: applies an answer that arrived with no health
+-- update since. Idle unless a shown frame holds a capped unit or a leftover
+-- override to undo. Sends nothing by itself: Request dedups per unit.
+local function anyFrameNeedsWork()
+    for _, entry in ipairs(FRAMES) do
+        local frame = _G[entry[1]]
+        local bar = getHealthBar(frame)
+        if bar and bar.overflowTextActive then return true end
+        if frame and frame:IsShown() and (UnitHealthMax(entry[2]) or 0) >= OH.VISIBLE_HEALTH_CAP then
+            return true
+        end
+    end
+    return false
 end
 
 local driver = CreateFrame("Frame")
@@ -105,7 +151,6 @@ driver:SetScript("OnUpdate", function(_, elapsed)
     if accum < 0.5 then return end
     accum = 0
 
-    -- Idle unless there is overflow data or a leftover override to undo
-    if next(OH.cache) == nil and not anyOverrideActive() then return end
+    if not anyFrameNeedsWork() then return end
     refreshAll()
 end)

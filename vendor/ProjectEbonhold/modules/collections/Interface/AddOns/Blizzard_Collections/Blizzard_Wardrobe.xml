@@ -3675,7 +3675,10 @@
 				end
 			</OnLoad>
 			<OnEvent>
-				if ... == "player" then
+				-- Only while a collections window is open: each Refresh re-streams the model
+				-- through the DressUpModel path ClientExt.dll hooks, and UNIT_PORTRAIT_UPDATE
+				-- fires on every gear swap and shapeshift. The journal's OnShow refreshes it.
+				if ... == "player" and ((CollectionsJournal and CollectionsJournal:IsShown()) or (WardrobeFrame and WardrobeFrame:IsShown())) then
 					self:Refresh();
 				end
 			</OnEvent>

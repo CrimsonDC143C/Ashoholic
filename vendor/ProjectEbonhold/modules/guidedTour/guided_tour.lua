@@ -5,6 +5,7 @@
 --   local tour = ProjectEbonhold.GuidedTour.Create({
 --       parent = function() return someFrame end, -- frame or function; default UIParent
 --       dbKey  = "seenSomethingTour",             -- ProjectEbonholdDB once-flag
+--       boxBeside = function() return someFrame end, -- optional: keep left boxes clear of it
 --       steps  = function() return { { title, text, zone, boxAnchor }, ... } end,
 --   })
 --   tour:MaybeStart()   -- shows once per dbKey
@@ -34,6 +35,11 @@ end
 local Tour = {}
 Tour.__index = Tour
 
+-- GlowBoxTemplate names its corner textures "$parentGlowTopLeft"... and hangs the edges on
+-- those NAMES: an unnamed box shares them with every other unnamed one, and its border
+-- stretches to another (hidden, taller) box's corners. Each box gets its own name.
+local boxCount = 0
+
 -- Frames are built lazily on the first displayed step, so a tour can be
 -- declared at file load before its parent frame exists.
 function Tour:EnsureFrames()
@@ -59,7 +65,8 @@ function Tour:EnsureFrames()
     self.highlight = hl
 
     local width = self.cfg.boxWidth or 280
-    local box = CreateFrame("Frame", nil, parent, "GlowBoxTemplate")
+    boxCount = boxCount + 1
+    local box = CreateFrame("Frame", "EbonholdGuidedTourBox" .. boxCount, parent, "GlowBoxTemplate")
     box:SetFrameStrata("FULLSCREEN_DIALOG")
     box:SetFrameLevel(hl:GetFrameLevel() + 10)
     box:SetWidth(width)
@@ -122,7 +129,8 @@ function Tour:ShowStep(i)
     local box = self.box
     box.Title:SetText(step.title)
     box.Text:SetText(step.text)
-    box.StepText:SetText(i .. "/" .. #steps)
+    -- a one-step tip (the Run HUD's) needs no "1/1"
+    box.StepText:SetText(#steps > 1 and (i .. "/" .. #steps) or "")
     local last = (i == #steps)
     box.NextBtn:SetText(last and "Got it" or "Next")
     box.NextBtn:SetScript("OnClick", function()
@@ -133,7 +141,19 @@ function Tour:ShowStep(i)
         + box.Text:GetStringHeight() + 12 + 20 + 12)
     box:ClearAllPoints()
     local a = step.boxAnchor
-    box:SetPoint(a[1], self.highlight, a[2], a[3], a[4])
+    local x = a[3]
+    -- cfg.boxBeside (frame or function): a box hung on the LEFT of a highlight is pushed
+    -- further left, past that frame's left edge, so it never covers the frame when the
+    -- highlighted zone sits on its right (the Run HUD's shard and resurrection counters).
+    local beside = self.cfg.boxBeside
+    if type(beside) == "function" then beside = beside() end
+    if beside and a[2]:find("LEFT") then
+        local hlLeft, frameLeft = self.highlight:GetLeft(), beside:GetLeft()
+        if hlLeft and frameLeft and hlLeft > frameLeft then
+            x = x - (hlLeft - frameLeft)
+        end
+    end
+    box:SetPoint(a[1], self.highlight, a[2], x, a[4])
     box:Show()
 end
 
@@ -153,6 +173,9 @@ function Tour:Stop(markSeen)
         ProjectEbonholdDB[self.cfg.dbKey] = true
     end
     if wasActive and self.cfg.onEnd then self.cfg.onEnd(markSeen) end
+    if wasActive then
+        for _, fn in ipairs(GuidedTour.endListeners) do fn(self) end
+    end
 end
 
 function Tour:IsActive()
@@ -172,6 +195,25 @@ function Tour:MaybeStart()
     return self.step ~= nil
 end
 
+-- Every tour made here, so a UI that shows tips on its own (the Run HUD's) can wait while
+-- another tour is on screen instead of stacking a second GlowBox over it.
+GuidedTour.all = {}
+GuidedTour.endListeners = {}
+
 function GuidedTour.Create(cfg)
-    return setmetatable({ cfg = cfg }, Tour)
+    local tour = setmetatable({ cfg = cfg }, Tour)
+    table.insert(GuidedTour.all, tour)
+    return tour
+end
+
+function GuidedTour.AnyActive()
+    for _, tour in ipairs(GuidedTour.all) do
+        if tour:IsActive() then return true end
+    end
+    return false
+end
+
+-- fn(tour) runs each time a tour that was on screen closes (finished, X, or paused)
+function GuidedTour.OnAnyEnd(fn)
+    table.insert(GuidedTour.endListeners, fn)
 end

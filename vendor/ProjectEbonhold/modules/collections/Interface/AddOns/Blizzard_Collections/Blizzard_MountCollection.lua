@@ -283,26 +283,31 @@ function MountJournal_UpdateMountDisplay()
 				MountJournal.MountDisplay.ModelFrame:Hide();
 				MountJournal.MountDisplay.ModelFrame:SetPosition(0, 0, 0);
 				MountJournal.MountDisplay.ModelFrame.zoomLevel = 0;
+				-- CLEARED FIRST: SetCreature() is a no-op when the creature is not
+				-- in the local cache, so without this the pane kept the PREVIOUS
+				-- model (the first cached mount shown, e.g. the raptor) for every
+				-- mount clicked afterwards.
+				MountJournal.MountDisplay.ModelFrame:ClearModel();
 				MountJournal.MountDisplay.ModelFrame:Show();
 				MountJournal.MountDisplay.ModelFrame:SetCreature(creatureDisplayID);
 
 				-- [shell] SetCreature() draws nothing when the creature is not
 				-- in the local cache (creaturecache.wdb), which the client
 				-- cannot fill on its own. Ask the server for it and redraw once
-				-- the answer lands; both calls no-op after the first time (the
-				-- request is deduped per session, the cache is persisted).
+				-- the answer lands. Asked unconditionally (GetModel() is not a
+				-- reliable "did it load" test on this client): the request is
+				-- deduped per session, so a cached creature costs at most one
+				-- tiny packet, ever.
 				if ProjectEbonhold and ProjectEbonhold.RequestCreatureCache then
 					local model = MountJournal.MountDisplay.ModelFrame;
-					local loaded = model:GetModel();
-					if not loaded or loaded == "" or loaded == "none" then
-						if ProjectEbonhold.RequestCreatureCache(creatureDisplayID) then
-							local shown = spellID;
-							C_Timer.After(1.0, function()
-								if MountJournal.MountDisplay.lastDisplayed == shown and model:IsShown() then
-									model:SetCreature(creatureDisplayID);
-								end
-							end);
-						end
+					if ProjectEbonhold.RequestCreatureCache(creatureDisplayID) then
+						local shown = spellID;
+						C_Timer.After(1.0, function()
+							if MountJournal.MountDisplay.lastDisplayed == shown and model:IsShown() then
+								model:ClearModel();
+								model:SetCreature(creatureDisplayID);
+							end
+						end);
 					end
 				end
 			end

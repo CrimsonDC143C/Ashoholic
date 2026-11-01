@@ -42,6 +42,32 @@ function HardmodeService.GetCurrentDifficulty()
   return currentDifficulty
 end
 
+-- Tier of the instance the player stands in when it is not their own (a Dungeon Finder run at
+-- the Torment its leader picked). nil outside such an instance. Pushed by the server on every
+-- map change (SEND_INSTANCE_TORMENT), so a /reload inside the run shows the player's own tier
+-- until the next map change - the server-side rules are unaffected either way.
+local instanceDifficulty = nil
+
+--- Tier of the current instance when it differs from the player's own; nil otherwise.
+function HardmodeService.GetInstanceDifficulty()
+  return instanceDifficulty
+end
+
+--- The tier of the content the player is actually in: the instance's when it differs, else their own.
+function HardmodeService.GetEffectiveDifficulty()
+  return instanceDifficulty or currentDifficulty
+end
+
+-- 0 = player, 1 = GM account with .gm off, 2 = .gm on (SEND_HARDMODE_GM_STATE). Display only:
+-- a GM in .gm on may step past the Torment gates, and the server decides that from its own
+-- state on every switch, so a client that fakes "2" just gets the usual refusal back.
+local gmState = 0
+
+--- 0 = player, 1 = GM account with .gm off, 2 = GM with .gm on.
+function HardmodeService.GetGmState()
+  return gmState
+end
+
 function HardmodeService.IsHardmodeActive()
   return currentDifficulty > 1
 end
@@ -160,7 +186,10 @@ end
 --- Tell the server to change difficulty (1 = Normal). The Soul Ash gate is re-checked
 --- server-side on every switch path, so sending a locked tier simply comes back as a FAIL.
 function HardmodeService.SetDifficulty(tier)
-  tier = math.max(1, math.min(tier, 6))
+  -- Upper bound follows the ladder the panel draws (hardmode.lua publishes it); the server
+  -- re-validates the tier against its own table anyway.
+  local maxTier = ProjectEbonhold.TormentTierData and #ProjectEbonhold.TormentTierData or tier
+  tier = math.max(1, math.min(tier, maxTier))
   ProjectEbonhold.sendToServer(
     ProjectEbonhold.CS.REQUEST_HARDMODE_SET_DIFFICULTY,
     tostring(tier)
@@ -183,15 +212,25 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_HARDMODE_DATA,
     if ProjectEbonhold.HardmodeUI and ProjectEbonhold.HardmodeUI.Refresh then
       ProjectEbonhold.HardmodeUI.Refresh()
     end
-    -- Refresh intensity icons (6th icon depends on hardmode)
-    if ProjectEbonhold.PlayerRunUI and ProjectEbonhold.PlayerRunUI.UpdateIntensity then
-      local intensityData = _G["EbonholdIntensityData"] or { intensity = 0 }
-      ProjectEbonhold.PlayerRunUI.UpdateIntensity(intensityData)
+    if ProjectEbonhold.PlayerRunUI and ProjectEbonhold.PlayerRunUI.RefreshTormentText then
+      ProjectEbonhold.PlayerRunUI.RefreshTormentText()
     end
     -- The death frame hides every resurrection option in Hardcore, and it is drawn before this
     -- reply lands on a /reload, so it has to be rebuilt once the tier is known.
     if ProjectEbonhold.DeathFrame and ProjectEbonhold.DeathFrame.Refresh then
       ProjectEbonhold.DeathFrame.Refresh()
+    end
+  end
+)
+
+--- GM state for the Torment gates: "0", "1" or "2" (see GetGmState).
+ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_HARDMODE_GM_STATE,
+  function(body)
+    local state = tonumber(body) or 0
+    if state == gmState then return end
+    gmState = state
+    if ProjectEbonhold.HardmodeUI and ProjectEbonhold.HardmodeUI.Refresh then
+      ProjectEbonhold.HardmodeUI.Refresh()
     end
   end
 )
@@ -225,11 +264,6 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_HARDMODE_SET_RESULT,
     if ProjectEbonhold.HardmodeUI and ProjectEbonhold.HardmodeUI.Refresh then
       ProjectEbonhold.HardmodeUI.Refresh()
     end
-    -- Refresh intensity icons (6th icon depends on hardmode)
-    if ProjectEbonhold.PlayerRunUI and ProjectEbonhold.PlayerRunUI.UpdateIntensity then
-      local intensityData = _G["EbonholdIntensityData"] or { intensity = 0 }
-      ProjectEbonhold.PlayerRunUI.UpdateIntensity(intensityData)
-    end
     -- The death frame hides every resurrection option in Hardcore, and it is drawn before this
     -- reply lands on a /reload, so it has to be rebuilt once the tier is known.
     if ProjectEbonhold.DeathFrame and ProjectEbonhold.DeathFrame.Refresh then
@@ -256,6 +290,56 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_HARDCORE_TIER_UNLOCKED,
 
     if ProjectEbonhold.HardmodeUI and ProjectEbonhold.HardmodeUI.ShowTierUnlocked then
       ProjectEbonhold.HardmodeUI.ShowTierUnlocked(ranks)
+    end
+  end
+)
+
+--- Full name of a tier: "Normal", or "Torment <roman>".
+local function TierFullName(tier)
+  if not tier or tier <= 1 then return "Normal" end
+  local ts = ProjectEbonhold.TierSelector
+  return "Torment " .. ((ts and ts.ShortName and ts.ShortName(tier)) or tostring(tier - 1))
+end
+
+-- Last mismatch already announced, so zoning inside the same run (a raid wing, a ship) does
+-- not repeat the warning. A /reload clears it and the warning is shown once more, which is
+-- wanted: the player has just lost every on-screen trace of it.
+local announcedInstanceTier = nil
+
+--- Red raid-warning + chat line telling the player the content runs at another Torment than
+--- theirs. The rules that apply inside are the INSTANCE's, so this is worth interrupting for.
+local function AnnounceForeignTier(tier)
+  local own = TierFullName(currentDifficulty)
+  local here = TierFullName(tier)
+  local line = "This instance runs at " .. here .. " - your own Torment is " .. own .. "."
+
+  if RaidNotice_AddMessage and RaidBossEmoteFrame and ChatTypeInfo then
+    RaidNotice_AddMessage(RaidBossEmoteFrame, line, ChatTypeInfo["RAID_WARNING"])
+  end
+  if DEFAULT_CHAT_FRAME then
+    DEFAULT_CHAT_FRAME:AddMessage("|cffFF4444[Torment]|r " .. line
+      .. " Its difficulty and its rewards are the ones of " .. here .. " until you leave.", 1, 1, 1)
+  end
+end
+
+--- Tier of the instance just entered when it is not the player's own ("0" = none)
+ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_INSTANCE_TORMENT,
+  function(body)
+    local tier = tonumber(body) or 0
+    instanceDifficulty = tier > 0 and tier or nil
+    if instanceDifficulty then
+      if announcedInstanceTier ~= instanceDifficulty then
+        announcedInstanceTier = instanceDifficulty
+        AnnounceForeignTier(instanceDifficulty)
+      end
+    else
+      announcedInstanceTier = nil
+    end
+    if ProjectEbonhold.HardmodeUI and ProjectEbonhold.HardmodeUI.Refresh then
+      ProjectEbonhold.HardmodeUI.Refresh()
+    end
+    if ProjectEbonhold.PlayerRunUI and ProjectEbonhold.PlayerRunUI.RefreshTormentText then
+      ProjectEbonhold.PlayerRunUI.RefreshTormentText()
     end
   end
 )

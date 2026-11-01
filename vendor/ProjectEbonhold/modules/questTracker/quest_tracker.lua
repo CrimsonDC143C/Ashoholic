@@ -40,6 +40,27 @@ local C_LINE_DONE    = { 0.50, 0.50, 0.50 }
 local C_COMPLETE     = { 0.40, 0.85, 0.40 }
 local C_FAILED       = { 1.00, 0.30, 0.30 }
 
+-- The level-80 journey (server: Ashendor::EndgameJourney, quests 610010-610016)
+-- stands out from ordinary quests: its own colour and a still orange wash in
+-- the tracker and the quest log (no frame, no "!" badge: owner, 13/10), always
+-- shown on top, and no Abandon button (the server refuses it too). Keep the
+-- range in step with EndgameJourney.h.
+local JOURNEY_FIRST, JOURNEY_LAST = 610010, 610016
+-- Orange (owner, 12/10: "pas en bleu mais en orange"), brighter than the quest
+-- log's "hard quest" orange (1, 0.5, 0.25). No frame around it (owner, 13/10:
+-- the border was "ultra moche").
+local C_JOURNEY       = { 1.00, 0.55, 0.05 }
+local C_JOURNEY_HOVER = { 1.00, 0.78, 0.45 }
+
+-- The Argent Tournament's summons (server: tournament_quest_scripts.cpp, given at 80
+-- like the journey) is shown the same way, or nobody notices it (owner, 17/10).
+local TOURNAMENT_CALL = 611000
+
+local function IsJourneyQuest(questID)
+    return questID and ((questID >= JOURNEY_FIRST and questID <= JOURNEY_LAST) or questID == TOURNAMENT_CALL) or false
+end
+QT.IsJourneyQuest = IsJourneyQuest
+
 -- ----------------------------------------------------------------- state ----
 local tracker                       -- root frame
 local blocks = {}                   -- reusable block frames
@@ -47,6 +68,7 @@ local itemButtons = {}              -- secure quest item buttons, by block index
 local dirty = true
 local sinceRender = 0
 local pendingSecure = false         -- item-button work deferred past combat
+local shownAchievements = 0         -- achievement blocks drawn by the last Render
 
 local function DB()
     ProjectEbonholdDB = ProjectEbonholdDB or {}
@@ -106,6 +128,7 @@ local function CreateTracker()
     tracker:SetWidth(WIDTH)
     tracker:SetHeight(30)
     -- WatchFrame keeps its addon-managed position (playerRun pins it); ride it.
+    -- AnchorTracker (each render) moves it under the instance tracker while that one is shown.
     tracker:SetPoint("TOPRIGHT", WatchFrame or UIParent, "TOPRIGHT", 0, 0)
 
     -- ---- main header: "Objectives" + gradient underline + collapse chevron
@@ -181,11 +204,16 @@ local function CreateTracker()
 end
 
 -- ----------------------------------------------------------- quest blocks ---
+local function IsJourneyBlock(block)
+    return block.kind == "quest" and IsJourneyQuest(block.questID)
+end
 local function OnBlockEnter(self)
-    self.title:SetTextColor(unpack(C_TITLE_HOVER))
+    self.title:SetTextColor(unpack(IsJourneyBlock(self) and C_JOURNEY_HOVER or C_TITLE_HOVER))
 end
 local function OnBlockLeave(self)
-    if self.isSuper then
+    if IsJourneyBlock(self) then
+        self.title:SetTextColor(unpack(C_JOURNEY))
+    elseif self.isSuper then
         self.title:SetTextColor(unpack(C_TITLE_SUPER))
     else
         self.title:SetTextColor(unpack(C_TITLE))
@@ -313,6 +341,25 @@ local function GetBlock(i)
         superBar:Hide()
         block.superBar = superBar
 
+        -- level-80 journey emphasis: the same wash and bar in the journey orange
+        local journeyBg = block:CreateTexture(nil, "BACKGROUND")
+        journeyBg:SetTexture("Interface\\Buttons\\WHITE8X8")
+        journeyBg:SetPoint("TOPLEFT", block, "TOPLEFT", -4, 3)
+        journeyBg:SetPoint("BOTTOMRIGHT", block, "BOTTOMRIGHT", 2, -3)
+        journeyBg:SetGradientAlpha("HORIZONTAL", C_JOURNEY[1], C_JOURNEY[2], C_JOURNEY[3], 0.35,
+            C_JOURNEY[1], C_JOURNEY[2], C_JOURNEY[3], 0)
+        journeyBg:Hide()
+        block.journeyBg = journeyBg
+
+        local journeyBar = block:CreateTexture(nil, "BORDER")
+        journeyBar:SetTexture("Interface\\Buttons\\WHITE8X8")
+        journeyBar:SetWidth(2)
+        journeyBar:SetPoint("TOPLEFT", journeyBg, "TOPLEFT", 0, 0)
+        journeyBar:SetPoint("BOTTOMLEFT", journeyBg, "BOTTOMLEFT", 0, 0)
+        journeyBar:SetVertexColor(C_JOURNEY[1], C_JOURNEY[2], C_JOURNEY[3], 1)
+        journeyBar:Hide()
+        block.journeyBar = journeyBar
+
         block.lines = {}
         blocks[i] = block
     end
@@ -410,7 +457,8 @@ local function CollectQuests()
     local seen = {}
     for questIndex = 1, GetNumQuestLogEntries() do
         local title, _, _, _, isHeader, _, isComplete, _, questID = GetQuestLogTitle(questIndex)
-        if title and not isHeader and questID and watched[questID] then
+        -- a level-80 journey step is always shown, tracked or not
+        if title and not isHeader and questID and (watched[questID] or IsJourneyQuest(questID)) then
             seen[questID] = true
             do
                 local objectives = {}
@@ -458,7 +506,15 @@ local function CollectQuests()
             if not seen[questID] then watched[questID] = nil end
         end
     end
-    return out
+    -- the journey step goes on top of the list (stable for the rest)
+    local journeyFirst = {}
+    for _, entry in ipairs(out) do
+        if IsJourneyQuest(entry.questID) then table.insert(journeyFirst, entry) end
+    end
+    for _, entry in ipairs(out) do
+        if not IsJourneyQuest(entry.questID) then table.insert(journeyFirst, entry) end
+    end
+    return journeyFirst
 end
 
 local function CollectAchievements()
@@ -500,17 +556,34 @@ local function CollectAchievements()
     return out
 end
 
+-- Inside a dungeon or raid the instance tracker (modules/instanceTracker) sits under the run
+-- frame; the objectives go right under it. Only rewrites the anchor when it changes.
+local function AnchorTracker()
+    local it = _G["ProjectEbonholdInstanceTracker"]
+    local below = (it and it:IsShown()) and it or nil
+    if tracker.anchoredBelow == below and tracker.anchorSet then return end
+    tracker.anchoredBelow, tracker.anchorSet = below, true
+    tracker:ClearAllPoints()
+    if below then
+        tracker:SetPoint("TOPRIGHT", below, "BOTTOMRIGHT", 0, -10)
+    else
+        tracker:SetPoint("TOPRIGHT", WatchFrame or UIParent, "TOPRIGHT", 0, 0)
+    end
+end
+
 local function Render()
     if not IsEnabled() then
         if tracker then tracker:Hide() end
         return
     end
     CreateTracker()
+    AnchorTracker()
     if not tracker:IsShown() then tracker:Show() end
 
     local db = DB()
     local quests = CollectQuests()
     local achievements = CollectAchievements()
+    shownAchievements = #achievements
     local ST = ProjectEbonhold.SuperTracker
     local canSecure = not InCombatLockdown()
     if not canSecure then pendingSecure = true end
@@ -609,6 +682,18 @@ local function Render()
                     block.superBg:Hide()
                     block.superBar:Hide()
                 end
+                -- a journey quest keeps its own colour, tracked or not, under an
+                -- orange wash instead of the gold one
+                if IsJourneyBlock(block) then
+                    block.title:SetTextColor(unpack(C_JOURNEY))
+                    block.superBg:Hide()
+                    block.superBar:Hide()
+                    block.journeyBg:Show()
+                    block.journeyBar:Show()
+                else
+                    block.journeyBg:Hide()
+                    block.journeyBar:Hide()
+                end
 
                 for j, obj in ipairs(entry.objectives) do
                     local line = GetLine(block, j)
@@ -675,6 +760,8 @@ local function Render()
         block.pin:Hide()
         block.superBg:Hide()
         block.superBar:Hide()
+        block.journeyBg:Hide()
+        block.journeyBar:Hide()
         block.title:SetText(string.format("+ %d more objectives", overflow))
         block.title:SetTextColor(unpack(C_LINE_DONE))
         for _, l in ipairs(block.lines) do l:Hide() end
@@ -716,6 +803,13 @@ ev:SetScript("OnEvent", function(self, event)
         -- merges it on every render.)
         dirty = false
         Render()
+        return
+    end
+    -- CRITERIA_UPDATE fires on every criteria tick of every achievement (damage dealt,
+    -- hits...), so almost constantly in combat. Quests never depend on it: it only
+    -- matters while an achievement is tracked or still drawn.
+    if event == "CRITERIA_UPDATE" and shownAchievements == 0
+        and not (GetTrackedAchievements and GetTrackedAchievements()) then
         return
     end
     if event == "PLAYER_REGEN_ENABLED" and not pendingSecure then return end
@@ -784,20 +878,95 @@ end
 -- The quest log's little check marks reflect the CLIENT's watch list (max 1
 -- entry), which made tracked state unreadable -- show them from the
 -- addon-side set instead, so what has a check is exactly what sits in the
--- objectives bar.
+-- objectives bar. The 3.3.5 log is a HybridScrollFrame: its rows are
+-- QuestLogScrollFrame.buttons (QuestLogScrollFrameButtonN, check = btn.check),
+-- not the pre-3.3 QuestLogTitleN globals this hook used to read (it never
+-- matched a row). The title width depends on the check, so a row whose check
+-- flips is re-fitted by the stock QuestLogTitleButton_Resize.
 if QuestLog_Update and hooksecurefunc then
     hooksecurefunc("QuestLog_Update", function()
         local watched = WatchedDB()
-        for i = 1, (QUESTS_DISPLAYED or 25) do
-            local btn = _G["QuestLogTitle" .. i]
-            local check = _G["QuestLogTitle" .. i .. "Check"]
-            if btn and check and btn:IsShown() then
+        local buttons = QuestLogScrollFrame and QuestLogScrollFrame.buttons
+        if not buttons then return end
+        for _, btn in ipairs(buttons) do
+            local check = btn.check
+            if check and btn:IsShown() then
                 local questIndex = btn:GetID()
                 local _, _, _, _, isHeader, _, _, _, questID = GetQuestLogTitle(questIndex)
                 if not isHeader and questID and questID > 0 then
-                    if watched[questID] then check:Show() else check:Hide() end
+                    local want = watched[questID] and true or false
+                    if want ~= (check:IsShown() and true or false) then
+                        if want then check:Show() else check:Hide() end
+                        if QuestLogTitleButton_Resize then QuestLogTitleButton_Resize(btn) end
+                    end
                 end
             end
+        end
+    end)
+end
+
+-- Journey quests in the quest log. Stock QuestLog_Update colours each title by
+-- difficulty through the button's NORMAL FONT OBJECT (the button re-applies it
+-- on every hover/highlight change, so a plain SetTextColor would not hold): a
+-- font object of our own does. .r/.g/.b feed the stock hover-out and the
+-- selection bar. The 3.3.5 log is a HybridScrollFrame: QuestLogScrollFrame.buttons.
+local journeyFont
+local function JourneyFont()
+    if not journeyFont then
+        journeyFont = CreateFont("ProjectEbonholdJourneyQuestFont")
+        journeyFont:SetFontObject(QuestDifficulty_Standard or GameFontNormal)
+        journeyFont:SetTextColor(unpack(C_JOURNEY))
+    end
+    return journeyFont
+end
+
+if QuestLog_Update and hooksecurefunc then
+    hooksecurefunc("QuestLog_Update", function()
+        local buttons = QuestLogScrollFrame and QuestLogScrollFrame.buttons
+        if not buttons then return end
+        local r, g, b = unpack(C_JOURNEY)
+        for _, btn in ipairs(buttons) do
+            -- rows are recycled on scroll: every row loses the glow, the journey row gets it back
+            local isJourney = false
+            if btn:IsShown() then
+                local _, _, _, _, isHeader, _, _, _, questID = GetQuestLogTitle(btn:GetID())
+                isJourney = not isHeader and IsJourneyQuest(questID)
+            end
+            if isJourney and not btn.journeyGlow then
+                local glow = btn:CreateTexture(nil, "BACKGROUND")
+                glow:SetTexture("Interface\\Buttons\\WHITE8X8")
+                glow:SetAllPoints(btn)
+                glow:SetGradientAlpha("HORIZONTAL", r, g, b, 0.45, r, g, b, 0)
+                btn.journeyGlow = glow
+            end
+            if btn.journeyGlow then
+                if isJourney then btn.journeyGlow:Show() else btn.journeyGlow:Hide() end
+            end
+            if btn:IsShown() then
+                local _, _, _, _, isHeader, _, _, _, questID = GetQuestLogTitle(btn:GetID())
+                if not isHeader and IsJourneyQuest(questID) then
+                    btn:SetNormalFontObject(JourneyFont())
+                    btn.r, btn.g, btn.b = r, g, b
+                    if QuestLogHighlightFrame and QuestLogHighlightFrame:GetParent() == btn then
+                        QuestLogSkillHighlight:SetVertexColor(r, g, b)  -- selected: keep the white text
+                    else
+                        if btn.tag then btn.tag:SetTextColor(r, g, b) end
+                        if btn.groupMates then btn.groupMates:SetTextColor(r, g, b) end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- A journey step cannot be abandoned: the stock control panel enables Abandon
+-- for any selected quest, so it is switched off again for a journey step.
+if QuestLogControlPanel_UpdateState and hooksecurefunc then
+    hooksecurefunc("QuestLogControlPanel_UpdateState", function()
+        local selection = GetQuestLogSelection and GetQuestLogSelection() or 0
+        if selection > 0 and QuestLogFrameAbandonButton then
+            local _, _, _, _, _, _, _, _, questID = GetQuestLogTitle(selection)
+            if IsJourneyQuest(questID) then QuestLogFrameAbandonButton:Disable() end
         end
     end)
 end

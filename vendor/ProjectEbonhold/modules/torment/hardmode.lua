@@ -1,11 +1,11 @@
 local addon, Addon         = ...
 
 ------------------------------------------------------------
--- HARDCORE DIFFICULTY PANEL  (UI)
+-- TORMENT DIFFICULTY PANEL  (UI)
 --
--- All tier data is hardcoded client-side.
--- Server only stores / returns the current tier number.
--- Slider goes 1 (Normal) → 5 (max Hardcore).
+-- All tier data is hardcoded client-side, generated from the same formulas as the server
+-- migration (tools/torment/emit_torment_addon.py). Server only stores / returns the tier number.
+-- Tier selector goes 1 (Normal) → Torment 30 (stepper + ladder pips).
 ------------------------------------------------------------
 
 -- Colours
@@ -20,288 +20,188 @@ local COLOR_ORANGE         = { 1.00, 0.55, 0.00 }
 local SECTION_INSET        = 15
 local SECTION_WIDTH        = 350
 local PANEL_WIDTH          = 400
-local PANEL_MIN_H          = 460
+local PANEL_MIN_H          = 300
 
 -- Reward icons (standard WoW texture paths)
 local ICON_GOLD            = "Interface\\Icons\\INV_Misc_Coin_01"
-local ICON_QUEST_XP        = "Interface\\Icons\\INV_Misc_Book_07"
-local ICON_KILL_XP         = "Interface\\Icons\\Ability_DualWield"
-local ICON_SOUL_ASH        = "Interface\\AddOns\\ProjectEbonhold\\assets\\inv_soulash"
+-- No ICON_SOUL_ASH row any more: Torment does not move Soul Ashes at all, so a permanently
+-- greyed "+0%" tile only invited the question of what would ever light it up.
 local ICON_REAGENT         = "Interface\\Icons\\INV_Misc_Herb_07"
-local ICON_LOOT            = "Interface\\Icons\\INV_Misc_Bag_10"
+local ICON_EXTRA_ITEM      = "Interface\\Icons\\INV_Misc_Bag_10"
 
 ------------------------------------------------------------
--- HARDCODED TIER DATA  (1 = Normal, 2-5 = Hardcore)
+-- TIER DATA  (1 = Normal, tier T+1 = Torment T)
 ------------------------------------------------------------
 
-local TIER_DATA            = {
-  [1] = {
-    name       = "Normal",
-    scaling    = {
-      hp_multiplier    = 1.0,
-      melee_multiplier = 1.0,
-      spell_multiplier = 1.0,
-    },
-    -- Sample auras that creatures can gain (spellIds)
-    auras      = {},
-    rewards    = {
-      gold_multiplier        = 1.0,
-      quest_xp_multiplier    = 1.0,
-      creature_xp_multiplier = 1.0,
-      soul_ash_multiplier    = 1.0,
-      reagent_multiplier     = 1.0,
-    },
-    debuffs    = {},
-    bonusAuras = {},
-    extraLoot  = {},
-  },
-
-  [2] = {
-    name       = "Hardcore I",
-    scaling    = {
-      hp_multiplier          = 2.7,
-      melee_multiplier       = 3.5,
-      spell_multiplier       = 3.5,
-      aura_max               = 1,
-      dungeon_boss_hp_mul    = 3.5,
-      dungeon_boss_melee_mul = 2.75,
-      dungeon_boss_spell_mul = 3.1,
-      raid_boss_hp_mul       = 4.25,
-      raid_boss_melee_mul    = 2.75,
-      raid_boss_spell_mul    = 3.5,
-      dungeon_add_hp_mul     = 3.5,
-      dungeon_add_melee_mul  = 3.5,
-      dungeon_add_spell_mul  = 2.7,
-      raid_add_hp_mul        = 3.5,
-      raid_add_melee_mul     = 2.75,
-      raid_add_spell_mul     = 3.5,
-    },
-    auras      = {
-      { spellId = 900905 }, -- Tier 1 Creature Empowerment
-      { spellId = 900914 }, -- Tier 2 Creature Empowerment
-      { spellId = 900913 }, -- Tier 2 Creature Empowerment
-    },
-    rewards    = {
-      gold_multiplier        = 1.25,
-      quest_xp_multiplier    = 1.25,
-      creature_xp_multiplier = 1.15,
-      soul_ash_multiplier    = 1.25,
-      reagent_multiplier     = 1.25,
-      affix_chance_tier      = 1,
-      extra_loot_count       = 1,
-    },
-    debuffs    = {
-      { spellId = 900900 }, -- Tier 2 Debuff Players
-    },
-    bonusAuras = {
-      { spellId = 900922 }, -- Tier 2 Bonus Aura
-    },
-    extraLoot  = {
-      { bagType = "dungeon" },
-    },
-  },
-
-  [3] = {
-    name       = "Hardcore II",
-    scaling    = {
-      hp_multiplier          = 4.1,
-      melee_multiplier       = 6.25,
-      spell_multiplier       = 6.25,
-      aura_max               = 3,
-      dungeon_boss_hp_mul    = 4.1,
-      dungeon_boss_melee_mul = 3.0,
-      dungeon_boss_spell_mul = 4.0,
-      raid_boss_hp_mul       = 6.25,
-      raid_boss_melee_mul    = 3.0,
-      raid_boss_spell_mul    = 4.0,
-      dungeon_add_hp_mul     = 6.25,
-      dungeon_add_melee_mul  = 3.1,
-      dungeon_add_spell_mul  = 3.1,
-      raid_add_hp_mul        = 4.1,
-      raid_add_melee_mul     = 3.0,
-      raid_add_spell_mul     = 4.0,
-    },
-    auras      = {
-      { spellId = 900905 }, -- Tier 1 Creature Empowerment
-      { spellId = 900906 }, -- Tier 2 Creature Empowerment
-      { spellId = 900907 }, -- Tier 3 Possible Aura
-      { spellId = 900914 }, -- Tier 2 Creature Empowerment
-      { spellId = 900913 }, -- Tier 2 Creature Empowerment
-    },
-    rewards    = {
-      gold_multiplier        = 1.5,
-      quest_xp_multiplier    = 1.5,
-      creature_xp_multiplier = 1.3,
-      soul_ash_multiplier    = 1.5,
-      reagent_multiplier     = 1.5,
-      affix_chance_tier      = 2,
-      extra_loot_count       = 2,
-    },
-    debuffs    = {
-      { spellId = 900900 }, -- Tier 2 Debuff Players
-      { spellId = 900908 }, -- Tier 3 Debuff Players
-    },
-    extraLoot  = {
-      { bagType = "dungeon" },
-      { bagType = "raid" },
-    },
-  },
-
-  [4] = {
-    name       = "Hardcore III",
-    scaling    = {
-      hp_multiplier          = 6.7,
-      melee_multiplier       = 8.0,
-      spell_multiplier       = 8.0,
-      aura_max               = 4,
-      dungeon_boss_hp_mul    = 8.0,
-      dungeon_boss_melee_mul = 3.5,
-      dungeon_boss_spell_mul = 4.5,
-      raid_boss_hp_mul       = 8.25,
-      raid_boss_melee_mul    = 3.5,
-      raid_boss_spell_mul    = 4.5,
-      dungeon_add_hp_mul     = 8.0,
-      dungeon_add_melee_mul  = 8.0,
-      dungeon_add_spell_mul  = 6.7,
-      raid_add_hp_mul        = 8.0,
-      raid_add_melee_mul     = 3.5,
-      raid_add_spell_mul     = 4.5,
-    },
-    auras      = {
-      { spellId = 900905 }, -- Tier 1 Creature Empowerment
-      { spellId = 900906 }, -- Tier 2 Creature Empowerment
-      { spellId = 900907 }, -- Tier 3 Possible Aura
-      { spellId = 900904 }, -- Tier 3 Creature Empowerment
-      { spellId = 900914 }, -- Tier 2 Creature Empowerment
-      { spellId = 900913 }, -- Tier 2 Creature Empowerment
-    },
-    rewards    = {
-      gold_multiplier        = 2.0,
-      quest_xp_multiplier    = 2.0,
-      creature_xp_multiplier = 1.75,
-      soul_ash_multiplier    = 2.0,
-      reagent_multiplier     = 1.75,
-      affix_chance_tier      = 3,
-      extra_loot_count       = 3,
-    },
-    debuffs    = {
-      { spellId = 900900 }, -- Tier 2 Debuff Players
-      { spellId = 900908 }, -- Tier 3 Debuff Players
-      { spellId = 900901 }, -- Tier 4 Debuff Players
-    },
-    extraLoot  = {
-      { bagType = "dungeon" },
-      { bagType = "raid" },
-    },
-  },
-
-  [5] = {
-    name       = "Hardcore IV",
-    scaling    = {
-      hp_multiplier          = 7.0,
-      melee_multiplier       = 8.5,
-      spell_multiplier       = 8.5,
-      aura_max               = 5,
-      dungeon_boss_hp_mul    = 8.5,
-      dungeon_boss_melee_mul = 4.0,
-      dungeon_boss_spell_mul = 5.0,
-      raid_boss_hp_mul       = 8.5,
-      raid_boss_melee_mul    = 4.0,
-      raid_boss_spell_mul    = 5.0,
-      dungeon_add_hp_mul     = 8.25,
-      dungeon_add_melee_mul  = 8.25,
-      dungeon_add_spell_mul  = 7.5,
-      raid_add_hp_mul        = 8.25,
-      raid_add_melee_mul     = 4.5,
-      raid_add_spell_mul     = 5.0,
-    },
-    auras      = {
-      { spellId = 900905 }, -- Tier 1 Creature Empowerment
-      { spellId = 900906 }, -- Tier 2 Creature Empowerment
-      { spellId = 900907 }, -- Tier 3 Possible Aura
-      { spellId = 900904 }, -- Tier 3 Creature Empowerment
-      { spellId = 900914 }, -- Tier 2 Creature Empowerment
-      { spellId = 900913 }, -- Tier 2 Creature Empowerment
-    },
-    rewards    = {
-      gold_multiplier        = 2.5,
-      quest_xp_multiplier    = 2.5,
-      creature_xp_multiplier = 2.0,
-      soul_ash_multiplier    = 2.5,
-      reagent_multiplier     = 2.0,
-      affix_chance_tier      = 4,
-      extra_loot_count       = 4,
-    },
-    debuffs    = {
-      { spellId = 900900 }, -- Tier 2 Debuff Players
-      { spellId = 900908 }, -- Tier 3 Debuff Players
-      { spellId = 900901 }, -- Tier 4 Debuff Players
-    },
-    extraLoot  = {
-      { bagType = "dungeon" },
-      { bagType = "raid" },
-    },
-  },
-
-  [6] = {
-    name       = "Hardcore V",
-    scaling    = {
-      hp_multiplier          = 14.0,
-      melee_multiplier       = 16.0,
-      spell_multiplier       = 16.0,
-      aura_max               = 5,
-      dungeon_boss_hp_mul    = 14.0,
-      dungeon_boss_melee_mul = 8.0,
-      dungeon_boss_spell_mul = 10.0,
-      raid_boss_hp_mul       = 16.0,
-      raid_boss_melee_mul    = 8.0,
-      raid_boss_spell_mul    = 10.0,
-      dungeon_add_hp_mul     = 16.0,
-      dungeon_add_melee_mul  = 16.0,
-      dungeon_add_spell_mul  = 14.0,
-      raid_add_hp_mul        = 16.0,
-      raid_add_melee_mul     = 8.0,
-      raid_add_spell_mul     = 10.0,
-    },
-    auras      = {
-      { spellId = 900905 }, -- Tier 1 Creature Empowerment
-      { spellId = 900906 }, -- Tier 2 Creature Empowerment
-      { spellId = 900907 }, -- Tier 3 Possible Aura
-      { spellId = 900904 }, -- Tier 3 Creature Empowerment
-      { spellId = 900914 }, -- Tier 2 Creature Empowerment
-      { spellId = 900913 }, -- Tier 2 Creature Empowerment
-    },
-    rewards    = {
-      gold_multiplier        = 3.0,
-      quest_xp_multiplier    = 3.0,
-      creature_xp_multiplier = 2.5,
-      soul_ash_multiplier    = 3.0,
-      reagent_multiplier     = 3.0,
-      affix_chance_tier      = 5,
-      icc_affixes            = true,
-      extra_loot_count       = 4,
-    },
-    debuffs    = {
-      { spellId = 900900 }, -- Tier 2 Debuff Players
-      { spellId = 900908 }, -- Tier 3 Debuff Players
-      { spellId = 900901 }, -- Tier 4 Debuff Players
-    },
-    extraLoot  = {
-      { bagType = "dungeon" },
-      { bagType = "raid" },
-    },
-  },
+-- >>> GENERATED BY tools/torment/emit_torment_addon.py -- DO NOT EDIT BY HAND >>>
+-- hp column x2 on every Torment (2026-09-15, sql/updates/custom/manual/Torment/2026_09_15_torment_hp_x2.sql),
+-- applied by the generator (HP_HAND_FACTOR), not by hand.
+-- Open-world health x4 on top (OPEN_WORLD_HP_FACTOR, 2026-09-30): replaces the removed
+-- normal -> elite promotion. Dungeon and raid health keep the row's base value.
+-- Tier 1 is Normal; tier T+1 is Torment T. Torment 1-10 is the ladder (gear brackets,
+-- unlock achievements, reward curves); Torment 11-30 is cosmetic - health and damage only,
+-- and instance-only, so the open world never runs above Torment 10.
+--
+-- Soul Ashes stay at x1 on every tier: climbing Torment no longer pays ashes, the Content
+-- Bracket does. Extra items: one more pass of the loot table, best item kept.
+--
+-- Row: { name, hp, damage, aura_max, aura_chance, gold, questXp, killXp, reagent,
+--        affix_chance, { rank I..V weights }, extra_item_chance, extra_item_count, boss_damage,
+--        open-world hp, open-world melee, open-world spell, dungeon trash hp }  (own curves)
+--        -- item affixes V2, tools/affixes/catalog.py
+local TORMENT_ROWS = {
+  { "Normal", 1.0, 1.0, 0, 0, 1.0, 1.0, 1.0, 1.0, 5.0, { 40, 25, 18, 11, 6 }, 0.0, 0, 1.0, 1.0, 1.0, 1.0, 1.0 },
+  { "Torment I", 1.6917, 1.3622, 1, 20, 1.3, 1.3, 1.25, 1.35, 10.0, { 40, 25, 18, 11, 6 }, 30.0, 0, 4.2557, 4.8, 2.5455, 2.1, 6.912 },
+  { "Torment II", 2.3848, 1.8556, 2, 26, 1.6, 1.6, 1.5, 1.7, 15.0, { 40, 25, 18, 11, 6 }, 60.0, 0, 6.037, 8.4, 2.2424, 1.85, 12.096 },
+  { "Torment III", 3.3619, 2.5277, 2, 32, 1.9, 1.9, 1.75, 2.05, 20.0, { 40, 25, 18, 11, 6 }, 90.0, 0, 8.564, 12.0, 3.2121, 2.65, 17.28 },
+  { "Torment IV", 4.7394, 3.4433, 3, 38, 2.2, 2.2, 2.0, 2.4, 25.0, { 40, 25, 18, 11, 6 }, 20.0, 1, 12.1486, 15.6, 4.4805, 3.7994, 22.464 },
+  { "Torment V", 6.6813, 4.6904, 3, 44, 2.5, 2.5, 2.25, 2.75, 30.0, { 40, 25, 18, 11, 6 }, 50.0, 1, 17.2337, 19.2, 6.2496, 5.4473, 27.648 },
+  { "Torment VI", 9.4189, 6.3893, 4, 50, 2.8, 2.8, 2.5, 3.1, 35.0, { 40, 25, 18, 11, 6 }, 80.0, 1, 24.4472, 22.8, 8.7174, 7.8099, 32.832 },
+  { "Torment VII", 16.483, 11.1813, 4, 56, 3.1, 3.1, 2.75, 3.45, 40.0, { 40, 25, 18, 11, 6 }, 10.0, 2, 42.7826, 26.4, 12.1596, 11.1973, 38.016 },
+  { "Torment VIII", 28.8453, 19.5672, 5, 62, 3.4, 3.4, 3.0, 3.8, 45.0, { 40, 25, 18, 11, 6 }, 40.0, 2, 74.8696, 30.0, 16.961, 16.0539, 43.2 },
+  { "Torment IX", 50.4792, 34.2427, 5, 68, 3.7, 3.7, 3.25, 4.15, 50.0, { 40, 25, 18, 11, 6 }, 70.0, 2, 131.0219, 33.6, 23.6582, 23.0169, 48.384 },
+  { "Torment X", 88.3386, 59.9247, 6, 74, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 229.2883, 37.2, 33.0, 33.0, 53.568 },
+  { "Torment XI", 128.091, 86.8908, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 332.468, 53.94, 47.85, 47.85, 77.6736 },
+  { "Torment XII", 185.7319, 125.9917, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 482.0786, 78.213, 69.3825, 69.3825, 112.6267 },
+  { "Torment XIII", 269.3112, 182.6879, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 699.0139, 113.4088, 100.6046, 100.6046, 163.3087 },
+  { "Torment XIV", 390.5013, 264.8975, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 1013.5702, 164.4428, 145.8767, 145.8767, 236.7977 },
+  { "Torment XV", 566.2269, 384.1013, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 1469.6768, 238.4421, 211.5212, 211.5212, 343.3566 },
+  { "Torment XVI", 821.0289, 556.9469, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 2131.0313, 345.7411, 306.7058, 306.7058, 497.8671 },
+  { "Torment XVII", 1190.492, 807.5731, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 3089.9954, 501.3245, 444.7234, 444.7234, 721.9073 },
+  { "Torment XVIII", 1726.2134, 1170.9809, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 4480.4933, 726.9206, 644.8489, 644.8489, 1046.7656 },
+  { "Torment XIX", 2503.0094, 1697.9223, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 6496.7153, 1054.0348, 935.0309, 935.0309, 1517.8101 },
+  { "Torment XX", 3629.3636, 2461.9874, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 9420.2371, 1528.3505, 1355.7948, 1355.7948, 2200.8247 },
+  { "Torment XXI", 5262.5772, 3569.8817, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 13659.3439, 2216.1082, 1965.9025, 1965.9025, 3191.1958 },
+  { "Torment XXII", 7630.737, 5176.3285, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 19806.0486, 3213.3569, 2850.5586, 2850.5586, 4627.234 },
+  { "Torment XXIII", 11064.5686, 7505.6763, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 28718.7705, 4659.3675, 4133.3099, 4133.3099, 6709.4892 },
+  { "Torment XXIV", 16043.6245, 10883.2307, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 41642.2172, 6756.0829, 5993.2994, 5993.2994, 9728.7594 },
+  { "Torment XXV", 23263.2555, 15780.6845, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 60381.2149, 9796.3202, 8690.2841, 8690.2841, 14106.7011 },
+  { "Torment XXVI", 33731.7205, 22881.9925, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 87552.7616, 14204.6643, 12600.9119, 12600.9119, 20454.7166 },
+  { "Torment XXVII", 48910.9947, 33178.8891, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 126951.5043, 20596.7633, 18271.3223, 18271.3223, 29659.3391 },
+  { "Torment XXVIII", 70920.9423, 48109.3892, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 184079.6812, 29865.3068, 26493.4173, 26493.4173, 43006.0418 },
+  { "Torment XXIX", 102835.3663, 69758.6144, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 266915.5378, 43304.6948, 38415.4551, 38415.4551, 62358.7605 },
+  { "Torment XXX", 149111.2812, 101149.9909, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 387027.5298, 62791.8075, 55702.4099, 55702.4099, 90420.2028 },
 }
+
+-- Per-context ratios: health to the flat line; damage to the trash curve (adds) or to the
+-- boss curve (row field 14, bosses), every damage ratio 1 since 2026-10-13.
+local CTX_RATIO = {
+  dungeon_boss   = { hp = 1.0, melee = 1.0, spell = 1.0 },
+  raid_boss      = { hp = 1.15, melee = 1.0, spell = 1.0 },
+  dungeon_add    = { hp = 1.15, melee = 1.0, spell = 1.0 },
+  raid_add       = { hp = 1.15, melee = 1.0, spell = 1.0 },
+}
+
+local OPEN_WORLD_HP_FACTOR = 4.0
+
+-- Last tier of the real ladder: above it the gate is Torment 10's own achievement.
+local LADDER_TOP_TIER = 11
+
+-- Affixes a tier can roll (world.hardmode_aura_pool), cumulative.
+local POOL_AT_TIER = {
+  [2] = { 902001, 902000, 902003, 902008, 902002, 902006, 902004, 902007, 902005, 902009 },
+}
+
+local DEBUFFS_AT_TIER = {
+  [2] = { 900900 },
+  [3] = { 900900, 900908 },
+  DEFAULT = { 900900, 900908, 900901 },   -- tier 4 and up
+}
+local BONUS_AURAS_AT_TIER = {
+  [2] = { 900922 },
+}
+
+local function SpellList(ids)
+  local out = {}
+  for _, id in ipairs(ids or {}) do out[#out + 1] = { spellId = id } end
+  return out
+end
+
+-- Expand the rows above into the shape the rest of this file already reads. Nothing downstream
+-- knows the table is generated.
+local TIER_DATA = {}
+do
+  local pool = {}
+  for tier, row in ipairs(TORMENT_ROWS) do
+    local name, hp, dmg, auraMax, auraChance, bossDmg = row[1], row[2], row[3], row[4], row[5], row[14] or row[3]
+    for _, id in ipairs(POOL_AT_TIER[tier] or {}) do pool[#pool + 1] = id end
+
+    local scaling = { hp_multiplier = row[15] or hp, melee_multiplier = row[16] or dmg, spell_multiplier = row[17] or dmg }
+    if tier > 1 then
+      scaling.aura_max = auraMax
+      scaling.aura_chance = auraChance
+      for key, ratio in pairs(CTX_RATIO) do
+        local keyDmg = key:find("_boss$") and bossDmg or dmg
+        -- dungeon trash health: its own column (row field 18, the open-world curve x1.44), not the instance ladder
+        scaling[key .. "_hp_mul"]    = (key == "dungeon_add" and row[18]) or hp * ratio.hp
+        scaling[key .. "_melee_mul"] = keyDmg * ratio.melee
+        scaling[key .. "_spell_mul"] = keyDmg * ratio.spell
+      end
+    end
+
+    TIER_DATA[tier] = {
+      name       = name,
+      tier       = tier,
+      scaling    = scaling,
+      auras      = SpellList(tier > 1 and pool or nil),
+      rewards    = {
+        gold_multiplier        = row[6],
+        quest_xp_multiplier    = row[7],
+        creature_xp_multiplier = row[8],
+        -- Torment does not move Soul Ashes any more; the Content Bracket does.
+        soul_ash_multiplier    = 1.0,
+        reagent_multiplier     = row[9],
+        affix_chance           = row[10],   -- % of eligible loot carrying an affix
+        affix_rank_weights     = row[11],   -- relative weights of ranks I..V
+        -- Extra items per kill / instance boss cache: extra_item_count sure, plus
+        -- extra_item_chance % of one more. Each is one more pass of the loot table, best
+        -- item kept (HardmodeMgr.cpp RollTormentExtraItems).
+        extra_item_chance      = row[12],
+        extra_item_count       = row[13],
+      },
+      debuffs    = SpellList(tier > 1 and (DEBUFFS_AT_TIER[tier] or DEBUFFS_AT_TIER.DEFAULT) or nil),
+      bonusAuras = SpellList(BONUS_AURAS_AT_TIER[tier]),
+      extraLoot  = {},
+    }
+  end
+end
+-- <<< GENERATED BY tools/torment/emit_torment_addon.py <<<
+
+-- Champions (src/server/game/Ashendor/DifficultyScaling/TormentChampionMgr.h): one bonus enemy per
+-- zone and raid (none in 5-man dungeons since 2026-10-25), on every difficulty, that brings a horde. Hand-copied from the server
+-- constants - keep the two in step.
+local CHAMPION_ASHES_PER_LEVEL = 50
+local CHAMPION_SHARDS_PER_LEVEL = 1
+local CHAMPION_REWARD_GROWTH = 1.1314   -- per Torment, up to Torment X (the raids' shard curve)
+local CHAMPION_RESPAWN_OPEN_MIN = 2     -- RESPAWN_OPEN_WORLD_S; never again in the same dungeon or raid run
+local CHAMPION_HORDE_BONUS_PCT = 5      -- HORDE_KILL_BONUS, per horde monster slain
+local CHAMPION_HORDE_BONUS_MAX = 2      -- 1 + HORDE_BONUS_MAX: the reward at most doubles
+local CHAMPION_AFFIX_STEPS = {           -- TormentChampionMgr::AffixCount
+  { torment = 1, count = 2 },
+  { torment = 4, count = 3 },
+  { torment = 7, count = 4 },
+}
+local function ChampionAffixCount(torment)
+  local count = 0
+  for _, step in ipairs(CHAMPION_AFFIX_STEPS) do
+    if torment >= step.torment then count = step.count end
+  end
+  return count
+end
 
 -- State
 local hardmodeFrame        = nil
 local confirmPopup         = nil
 local selectedTier         = 1
 
-local SLIDER_MIN           = 1
 local function GetSliderMax()
-  return 6
+  return #TIER_DATA
 end
+
+-- Shared with the Dungeon Finder panel (modules/dungeonFinder), which draws the same
+-- selector and the same creature-modifier tiles for the run it queues.
+ProjectEbonhold.TormentTierData = TIER_DATA
+ProjectEbonhold.TormentLadderTop = LADDER_TOP_TIER
 
 -- Expose UI handle for service callbacks
 ProjectEbonhold.HardmodeUI = ProjectEbonhold.HardmodeUI or {}
@@ -325,7 +225,7 @@ local function ColorText(text, r, g, b)
     math.floor(r * 255), math.floor(g * 255), math.floor(b * 255), text)
 end
 
--- Padlock shown on locked Hardcore tiers. Inline texture escape so it can sit inside a
+-- Padlock shown on locked Torment tiers. Inline texture escape so it can sit inside a
 -- FontString; the .blp ships with the addon (assets\lock) and is the same one the run HUD
 -- already stamps on locked perk icons, so the two read as the same "locked" language.
 -- Shown once, on the tier label: the lock-reason line under Apply already spells the
@@ -334,25 +234,29 @@ end
 -- negative) with the size, otherwise the padlock rides above the text baseline.
 local LOCK_ICON = "|TInterface\\AddOns\\ProjectEbonhold\\assets\\lock:28:28:0:-8|t"
 
--- What each tier's "Ahead of the Curve" achievement actually asks for: a raid final boss
--- killed while the world runs at the tier BELOW the one it unlocks. Mirrored from the server's
--- own definition (tools/achievements/ahead_of_the_curve.yaml, enforced by
--- AheadOfTheCurveCriteriaScript) - if that ladder is ever re-cut, this table moves with it.
+-- What each tier's "Unlocking Torment N" achievement asks for: content cleared while the world
+-- runs at the tier BELOW the one it unlocks - EITHER one raid boss OR ten Northrend dungeons
+-- cleared at level 80.
+-- Mirrored from the server's own definition (tools/achievements/catalog.py, cles ahead_of_the_curve_N, credited
+-- by HardmodeMgr::OnInstanceEncounterCompleted); if that ladder is re-cut, this moves with it.
 --
--- Kept here rather than read back from the client's Achievement.dbc description, because a
--- client without the patched DBC has no description to show, and the lock line under the
--- slider is exactly where a player asks "so what do I actually have to do?".
--- Every rung is 25-PLAYER ONLY, enforced server-side by AheadOfTheCurveCriteriaScript
--- (Map::Is25ManRaid). A 10-player kill is silently ignored, so the raid size is spelled out on
--- each line rather than left as a footnote.
-local ACHIEVEMENT_HINTS = {
-  [2] = { name = "Ahead of the Curve I",   task = "Defeat Kel'Thuzad in Naxxramas (25-player).",                      difficulty = "Normal",
-          note = "Normal only: a kill on a Hardcore tier does not count for this one." },
-  [3] = { name = "Ahead of the Curve II",  task = "Defeat Yogg-Saron in Ulduar (25-player).",                         difficulty = "Hardcore I or higher" },
-  [4] = { name = "Ahead of the Curve III", task = "Defeat Anub'arak in the Trial of the Crusader (25-player).",       difficulty = "Hardcore II or higher" },
-  [5] = { name = "Ahead of the Curve IV",  task = "Defeat the Lich King in Icecrown Citadel (25-player).",            difficulty = "Hardcore III or higher" },
-  [6] = { name = "Ahead of the Curve V",   task = "Defeat Halion in the Ruby Sanctum (25-player).",                   difficulty = "Hardcore IV or higher" },
-}
+-- Kept here rather than read back from the client's Achievement.dbc description, because a client
+-- without the patched DBC has no description to show, and the lock line under the slider is
+-- exactly where a player asks "so what do I actually have to do?".
+--
+-- The tier has to MATCH, not merely be reached: clearing on Torment V credits the rung that
+-- unlocks Torment VI and nothing lower. That is why the chain is walked one rung at a time.
+local ACHIEVEMENT_HINTS = {}
+for tier = 2, #TIER_DATA do
+  -- Above the ladder the gate is the last rung's achievement (HardmodeMgr::GetAchievementGate),
+  -- so a cosmetic tier shows what Torment X asked for rather than a feat that does not exist.
+  local rung = math.min(tier, LADDER_TOP_TIER)
+  ACHIEVEMENT_HINTS[tier] = {
+    name       = "Unlocking " .. TIER_DATA[rung].name,
+    task       = "Defeat any raid boss, or clear 10 Northrend dungeons at level 80.",
+    difficulty = TIER_DATA[rung - 1].name,
+  }
+end
 
 local function GetTierColor(tier)
   if tier <= 1 then return 1, 1, 1 end
@@ -375,14 +279,27 @@ local function CanApply()
   return playerLevel <= 10 or IsResting()
 end
 
+--- Dungeon / raid lock. The server refuses every difficulty switch off a layered world map
+--- (MapInstanced::SwitchPlayerToDifficulty: "You can only change difficulty in the open
+--- world."), and inside an instance the tier that applies is the one the instance was opened
+--- at anyway. Returns the instance kind ("dungeon" / "raid") or nil in the open world.
+local function InstanceLockKind()
+  if not IsInInstance then return nil end
+  local inInstance, instanceType = IsInInstance()
+  if not inInstance then return nil end
+  if instanceType == "raid" then return "raid" end
+  if instanceType == "party" then return "dungeon" end
+  return nil
+end
+
 --- Returns a red lock-reason string if the given tier cannot be applied due
 --- to account-level requirements, or nil when no lock applies. When the lock is the
 --- achievement gate, the tier is returned as a second value so the caller can hang the
 --- "what do I have to do" tooltip off the line.
 --- Mirrors what the server enforces on every difficulty-switch path
---- (MapInstanced::SwitchPlayerToDifficulty): reaching max level once, then the Hardcore
+--- (MapInstanced::SwitchPlayerToDifficulty): reaching max level once, then the Torment
 --- Soul Ash gate. This is presentation only - sending a locked tier is refused server-side.
-local function GetHardmodeLockReason(tier)
+local function GetPlayerLockReason(tier)
   if tier <= 1 then return nil end
 
   local data = _G["EbonholdPlayerRunData"]
@@ -408,12 +325,12 @@ local function GetHardmodeLockReason(tier)
     end
 
     if label == "" then
-      return "Requires this tier's Hardcore achievement", tier
+      return "Requires this tier's Torment achievement", tier
     end
     return "Requires " .. label, tier
   end
 
-  -- Hardcore 1 is the only tier that still has a Soul Ash floor; every tier above it stops at
+  -- Torment 1 is the only tier that still has a Soul Ash floor; every tier above it stops at
   -- the achievement, so it must not be held back by a pool it no longer cares about.
   local required = svc.GetSoulAshRequirement(tier)
   if required <= 0 then return nil end
@@ -422,7 +339,7 @@ local function GetHardmodeLockReason(tier)
   -- /reload leaves it at 0 until the server's next push. Fail closed rather than advertise the
   -- tier as available on a value we do not have yet.
   if not svc.IsCommittedSoulAshesKnown() then
-    return "Loading Hardcore requirements..."
+    return "Loading Torment requirements..."
   end
 
   if not svc.IsTierUnlocked(tier) then
@@ -436,6 +353,23 @@ local function GetHardmodeLockReason(tier)
   return nil
 end
 
+--- The player's lock, with a GM line under it: the conditions always show, and a GM in
+--- .gm on may step past them (the server lets him; third value true), while a GM in .gm off
+--- is reminded how.
+local function GetHardmodeLockReason(tier)
+  local svc = ProjectEbonhold.HardmodeService
+  local gm = svc and svc.GetGmState and svc.GetGmState() or 0
+
+  local reason, achievementTier = GetPlayerLockReason(tier)
+  if not reason then return nil end
+  if gm == 2 then
+    return reason .. "\n|cff3FC7EBGM (.gm on): you may step in|r", achievementTier, true
+  elseif gm == 1 then
+    reason = reason .. "\n|cff3FC7EBGM: type .gm on to step in|r"
+  end
+  return reason, achievementTier, false
+end
+
 --- Update Apply button / hint / lock-text visibility for the given selection.
 local function RefreshApplyState(selTier, curTier)
   if not (hardmodeFrame and hardmodeFrame.applyBtn) then return end
@@ -444,409 +378,158 @@ local function RefreshApplyState(selTier, curTier)
   local applyLockText = hardmodeFrame.applyLockText
   local applyLockHover = hardmodeFrame.applyLockHover
 
-  local function hideHint() if applyHint then applyHint:Hide() end end
   local function hideLock()
     if applyLockText then applyLockText:Hide() end
     if applyLockHover then applyLockHover:Hide() end
   end
 
-  local lockReason, lockAchievementTier = GetHardmodeLockReason(selTier)
+  applyBtn:Show()
+  local lockReason, lockAchievementTier, gmPass = GetHardmodeLockReason(selTier)
   if lockReason then
-    applyBtn:Hide()
-    hideHint()
+    -- Grey "Locked" button; the reason sits under the ladder, where the eye already is.
+    if not gmPass then
+      applyBtn:SetText("Locked")
+      applyBtn:Disable()
+      if applyHint then applyHint:Hide() end
+    end
     if applyLockText then
       applyLockText:SetText(lockReason)
       applyLockText:Show()
     end
     -- Only the achievement gate gets a tooltip: the Soul Ash line already prints its own
-    -- numbers, but "Requires Ahead of the Curve II" says nothing about which boss to go kill.
+    -- numbers, but "Requires Unlocking Torment X" says nothing about which boss to go kill.
     if applyLockHover then
       applyLockHover.tier = lockAchievementTier
       if lockAchievementTier then applyLockHover:Show() else applyLockHover:Hide() end
     end
+    -- A GM in .gm on keeps the conditions on display and goes on to the usual Apply rules.
+    if not gmPass then return end
+  end
+
+  local instanceKind = InstanceLockKind()
+  if instanceKind then
+    -- Same wording as the overlay, kept under the ladder for when the overlay is dismissed.
+    applyBtn:SetText("Locked")
+    applyBtn:Disable()
+    if applyHint then applyHint:Hide() end
+    if applyLockText then
+      applyLockText:SetText("You cannot change your Torment while inside a " .. instanceKind .. ".")
+      applyLockText:Show()
+    end
+    if applyLockHover then applyLockHover:Hide() end
     return
   end
 
-  hideLock()
+  if not gmPass then hideLock() end
 
   if not CanApply() then
-    applyBtn:Hide()
+    applyBtn:SetText("Apply")
+    applyBtn:Disable()
     if applyHint then applyHint:Show() end
     return
   end
 
-  hideHint()
-  applyBtn:Show()
+  if applyHint then applyHint:Hide() end
   if selTier == curTier then
+    applyBtn:SetText("Current difficulty")
     applyBtn:Disable()
   else
+    applyBtn:SetText("Apply")
     applyBtn:Enable()
   end
 end
 
-------------------------------------------------------------
--- SECTION BUILDER: bordered sub-panel inside the scroll
-------------------------------------------------------------
-local function CreateSection(parent, title, yOffset, width)
-  local w = width or SECTION_WIDTH
-  local section = CreateFrame("Frame", nil, parent)
-  section:SetSize(w, 10)
-  section:SetPoint("TOP", parent, "TOP", 0, yOffset)
-
-  local header = section:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  header:SetPoint("TOP", section, "TOP", 0, -2)
-  header:SetText(ColorText(title, COLOR_GOLD[1], COLOR_GOLD[2], COLOR_GOLD[3]))
-  section.header = header
-
-  section.contentTop = -18
-  section.sectionWidth = w
-  section.lines = {}
-  section.iconRows = {}
-
-  return section
-end
-
-local function AddLine(section, text, yOff)
-  local y = yOff or (section.contentTop - (#section.lines * 16))
-  local line = section:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  line:SetPoint("TOP", section, "TOP", 0, y)
-  line:SetWidth(SECTION_WIDTH - 24)
-  line:SetJustifyH("CENTER")
-  line:SetWordWrap(true)
-  line:SetText(text)
-  table.insert(section.lines, line)
-  return line
-end
-
-local function FinaliseSection(section, bottomPadding)
-  bottomPadding = bottomPadding or 4
-  local lowest = section.contentTop
-  for _, line in ipairs(section.lines) do
-    local _, _, _, _, y = line:GetPoint(1)
-    if y then
-      local h = line:GetStringHeight() or 14
-      local bottom = y - h
-      if bottom < lowest then lowest = bottom end
-    end
-  end
-  for _, row in ipairs(section.iconRows) do
-    local _, _, _, _, y = row:GetPoint(1)
-    if y then
-      local h = row:GetHeight() or 20
-      local bottom = y - h
-      if bottom < lowest then lowest = bottom end
-    end
-  end
-  local totalH = math.abs(lowest) + bottomPadding
-  section:SetHeight(totalH)
-  return totalH
-end
-
-------------------------------------------------------------
--- ICON ROW
-------------------------------------------------------------
-
 local TOOLTIP_SCALE = 0.85
 
-local function AddIconRow(section, icon, text, yOff, tooltipTitle, tooltipBody)
-  local row = CreateFrame("Frame", nil, section)
-  row:SetSize(SECTION_WIDTH - 24, 18)
-  row:SetPoint("TOPLEFT", section, "TOPLEFT", 12, yOff)
-
-  local tex = row:CreateTexture(nil, "ARTWORK")
-  tex:SetTexture(icon)
-  tex:SetSize(14, 14)
-  tex:SetPoint("LEFT", row, "LEFT", 0, 0)
-  tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-  local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  label:SetPoint("LEFT", tex, "RIGHT", 6, 0)
-  label:SetWidth(SECTION_WIDTH - 60)
-  label:SetJustifyH("LEFT")
-  label:SetText(text)
-
-  if tooltipTitle then
-    row:EnableMouse(true)
-    row:SetScript("OnEnter", function(self)
-      GameTooltip:SetScale(TOOLTIP_SCALE)
-      GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-      GameTooltip:SetText(tooltipTitle, 1, 0.82, 0)
-      if tooltipBody then
-        GameTooltip:AddLine(tooltipBody, 1, 1, 1, true)
-      end
-      GameTooltip:Show()
-    end)
-    row:SetScript("OnLeave", function()
-      GameTooltip:SetScale(1); GameTooltip:Hide()
-    end)
-  end
-
-  table.insert(section.iconRows, row)
-  return row
+------------------------------------------------------------
+-- TIER SELECTOR
+-- The shared widget (modules/torment/tier_selector.lua): tier name on the dialog banner
+-- between the spellbook page arrows (mouse wheel on the name), then the ladder of panel
+-- buttons, one per rung of the real ladder (Normal, I..X) plus a single "XI+" rung for the
+-- cosmetic tiers, stepped through rather than browsed. The rung being looked at is pushed
+-- in, the one in force glows, a locked one wears the disabled face and a padlock. Same
+-- contract as the old slider: frame:SetValue(tier) / frame:GetValue().
+------------------------------------------------------------
+local function IsTierLocked(tier)
+  if tier <= 1 then return false end
+  -- A Soul-Ash-floored tier only reads as locked once the committed pool is known,
+  -- otherwise every tier would flash a padlock after a /reload.
+  return svc ~= nil and not svc.IsTierUnlocked(tier)
+      and (svc.GetSoulAshRequirement(tier) <= 0 or svc.IsCommittedSoulAshesKnown())
 end
 
--- --------------------------------------------------------
--- Horizontal icon strip helper
---   items = { { icon, tooltipTitle, tooltipBody }, ... }
---   Returns the strip frame (caller must store/cleanup)
--- --------------------------------------------------------
-local HSTRIP_ICON   = 26
-local HSTRIP_GAP    = 4
-local HSTRIP_BORDER = 4 -- extra px for border frame around icon
-
-local function CreateHIconStrip(parent, items, yOff)
-  local strip = CreateFrame("Frame", nil, parent)
-  local cellSize = HSTRIP_ICON + HSTRIP_BORDER
-  strip:SetHeight(cellSize)
-  local totalW = #items * cellSize + math.max(0, #items - 1) * HSTRIP_GAP
-  strip:SetWidth(totalW)
-  strip:SetPoint("TOP", parent, "TOP", 0, yOff)
-
-  for i, entry in ipairs(items) do
-    -- Border frame (like perk browser)
-    local borderFrame = CreateFrame("Frame", nil, strip)
-    borderFrame:SetSize(cellSize, cellSize)
-    borderFrame:SetPoint("LEFT", strip, "LEFT", (i - 1) * (cellSize + HSTRIP_GAP), 0)
-    borderFrame:SetBackdrop({
-      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-      edgeSize = 10,
-      insets = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
-    if entry.borderColor then
-      borderFrame:SetBackdropBorderColor(entry.borderColor[1], entry.borderColor[2], entry.borderColor[3],
-        entry.borderColor[4] or 1)
-    else
-      borderFrame:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
-    end
-
-    -- Icon centred inside border
-    local tex = borderFrame:CreateTexture(nil, "ARTWORK")
-    tex:SetSize(HSTRIP_ICON, HSTRIP_ICON)
-    tex:SetPoint("CENTER", borderFrame, "CENTER", 0, 0)
-    tex:SetTexture(entry.icon)
-    tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-
-    -- Desaturated (inactive) state
-    if entry.desaturated then
-      tex:SetDesaturated(true)
-      tex:SetAlpha(0.45)
-      borderFrame:SetBackdropBorderColor(0.35, 0.35, 0.35, 0.6)
-    end
-
-    -- Value text overlay (bottom line; shrink to 7 when a second line is also shown)
-    if entry.value and not entry.desaturated then
-      local valText = borderFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-      valText:SetPoint("BOTTOM", borderFrame, "BOTTOM", 0, 1)
-      valText:SetFont(valText:GetFont(), entry.value2 and 7 or 8, "OUTLINE")
-      valText:SetText(entry.value)
-      valText:SetTextColor(1, 1, 1, 1)
-    end
-    -- Second value text overlay (stacked above the first)
-    if entry.value2 and not entry.desaturated then
-      local val2Text = borderFrame:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-      val2Text:SetPoint("BOTTOM", borderFrame, "BOTTOM", 0, 10)
-      val2Text:SetFont(val2Text:GetFont(), 7, "OUTLINE")
-      val2Text:SetText(entry.value2)
-      val2Text:SetTextColor(1, 0.85, 0.2, 1)
-    end
-
-    -- Tooltip
-    borderFrame:EnableMouse(true)
-    local tt = entry.tooltipTitle
-    local tb = entry.tooltipBody
-    local sid = entry.spellId
-    borderFrame:SetScript("OnEnter", function(self)
-      GameTooltip:SetScale(TOOLTIP_SCALE)
-      GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-      if sid then
-        GameTooltip:SetHyperlink('spell:' .. sid)
-      else
-        GameTooltip:SetText(tt, 1, 0.82, 0)
-        if tb then GameTooltip:AddLine(tb, 1, 1, 1, true) end
-      end
-      GameTooltip:Show()
-    end)
-    borderFrame:SetScript("OnLeave", function()
-      GameTooltip:SetScale(1); GameTooltip:Hide()
-    end)
+local function HighestUnlockedTier()
+  local top = 1
+  for tier = 2, GetSliderMax() do
+    if not IsTierLocked(tier) then top = tier end
   end
-
-  return strip
+  return top
 end
 
-------------------------------------------------------------
--- CONFIRMATION POPUP
-------------------------------------------------------------
+local SELECTOR_HEIGHT = ProjectEbonhold.TierSelector.HEIGHT
 
-local function HidePopup()
-  if confirmPopup then
-    confirmPopup:Hide()
-    confirmPopup.overlay:Hide()
-    confirmPopup.blockFrame:Hide()
-  end
-end
+local function CreateTierSelector(parent)
+  local TS = ProjectEbonhold.TierSelector
+  local maxTier = GetSliderMax()
 
-local function ShowConfirmationPopup(tier)
-  if not confirmPopup then
-    local blockFrame = CreateFrame("Frame", "HardmodeBlockFrame", UIParent)
-    blockFrame:SetFrameStrata("FULLSCREEN_DIALOG")
-    blockFrame:SetFrameLevel(999)
-    blockFrame:SetAllPoints(UIParent)
-    blockFrame:EnableMouse(true)
-    blockFrame:SetScript("OnMouseDown", function() end)
-    blockFrame:Hide()
-
-    confirmPopup = CreateFrame("Frame", "HardmodeConfirmPopup", UIParent)
-    confirmPopup:SetSize(380, 260)
-    confirmPopup:SetPoint("CENTER")
-    confirmPopup:SetFrameStrata("FULLSCREEN_DIALOG")
-    confirmPopup:SetFrameLevel(1000)
-    confirmPopup.blockFrame = blockFrame
-
-    local bg = confirmPopup:CreateTexture(nil, "BACKGROUND")
-    bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\UI-Background-Rock")
-    bg:SetPoint("TOPLEFT", 8, -8)
-    bg:SetPoint("BOTTOMRIGHT", -8, 8)
-    bg:SetHorizTile(true)
-    bg:SetVertTile(true)
-
-    confirmPopup:SetBackdrop({
-      edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-      edgeSize = 32,
-      insets = { left = 11, right = 12, top = 12, bottom = 11 },
-    })
-
-    local overlay = confirmPopup:CreateTexture(nil, "BACKGROUND")
-    overlay:SetTexture(0, 0, 0, 0.85)
-    overlay:SetAllPoints(UIParent)
-    confirmPopup.overlay = overlay
-
-    confirmPopup:EnableMouse(true)
-    confirmPopup:SetScript("OnMouseDown", function() end)
-
-    confirmPopup.title = confirmPopup:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-    confirmPopup.title:SetPoint("TOP", 0, -20)
-    confirmPopup.title:SetDrawLayer("OVERLAY", 7)
-
-    confirmPopup.desc = confirmPopup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    confirmPopup.desc:SetPoint("TOP", confirmPopup.title, "BOTTOM", 0, -12)
-    confirmPopup.desc:SetWidth(340)
-    confirmPopup.desc:SetJustifyH("CENTER")
-    confirmPopup.desc:SetWordWrap(true)
-    confirmPopup.desc:SetDrawLayer("OVERLAY", 7)
-
-    confirmPopup.acceptBtn = CreateFrame("Button", nil, confirmPopup, "UIPanelButtonTemplate")
-    confirmPopup.acceptBtn:SetSize(120, 30)
-    confirmPopup.acceptBtn:SetPoint("BOTTOM", confirmPopup, "BOTTOM", -65, 20)
-    confirmPopup.acceptBtn:SetText("Accept")
-    confirmPopup.acceptBtn:SetFrameLevel(confirmPopup:GetFrameLevel() + 10)
-
-    confirmPopup.cancelBtn = CreateFrame("Button", nil, confirmPopup, "UIPanelButtonTemplate")
-    confirmPopup.cancelBtn:SetSize(120, 30)
-    confirmPopup.cancelBtn:SetPoint("BOTTOM", confirmPopup, "BOTTOM", 65, 20)
-    confirmPopup.cancelBtn:SetText("Cancel")
-    confirmPopup.cancelBtn:SetFrameLevel(confirmPopup:GetFrameLevel() + 10)
-    confirmPopup.cancelBtn:SetScript("OnClick", HidePopup)
-  end
-
-  local tr, tg, tb = GetTierColor(tier)
-  confirmPopup.title:SetText("|cffFFD100Change Difficulty|r")
-
-  local msg
-  if tier == 1 then
-    msg = "Return to |cffFFFFFFNormal|r difficulty?\nAll hardcore effects will be removed."
-  else
-    local tierName = (TIER_DATA[tier] or TIER_DATA[1]).name
-    local tierStr = ColorText(tierName, tr, tg, tb)
-    msg = "Activate " ..
-        tierStr ..
-        " difficulty?\nEnemies will become significantly stronger\nand you will receive increased rewards.\n\n|cffFF4444Warning:|r Dying in Hardcore is |cffFF4444definitive|r: you cannot use any auto-resurrection mechanic. You are forced to commit your Soul Ashes in your Skill Tree to continue progressing. However, your character remains playable.\n\n|cffFFCC00Dungeon/Raid IDs are shared across all Hardcore and normal tiers.|r"
-  end
-  confirmPopup.desc:SetText(msg)
-
-  confirmPopup.acceptBtn:SetScript("OnClick", function()
-    HidePopup()
-    if ProjectEbonhold.HardmodeService then
-      ProjectEbonhold.HardmodeService.SetDifficulty(tier)
-    end
-  end)
-
-  confirmPopup.blockFrame:Show()
-  confirmPopup.overlay:Show()
-  confirmPopup:Show()
-end
-
-------------------------------------------------------------
--- TIER SLIDER  (1 – 4)
-------------------------------------------------------------
-
-local function CreateTierSlider(parent)
-  local frame = CreateFrame("Frame", nil, parent)
-  frame:SetSize(220, 44)
-
-  local slider = CreateFrame("Slider", "HardmodeTierSlider", frame, "OptionsSliderTemplate")
-  slider:SetWidth(180)
-  slider:SetHeight(17)
-  slider:SetPoint("TOP", frame, "TOP", 0, -4)
-  slider:SetMinMaxValues(SLIDER_MIN, GetSliderMax())
-  slider:SetValueStep(1)
-
-  _G[slider:GetName() .. "Low"]:SetText(SLIDER_MIN)
-  _G[slider:GetName() .. "High"]:SetText(GetSliderMax())
-  _G[slider:GetName() .. "Text"]:SetText("")
-
-  frame.valueText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  frame.valueText:SetPoint("TOP", slider, "BOTTOM", 0, -2)
-
-  local function UpdateLabel(tier)
-    local r, g, b = GetTierColor(tier)
-    local td = TIER_DATA[tier] or TIER_DATA[1]
-    if tier == 1 then
-      frame.valueText:SetText("|cffFFFFFFNormal|r")
-      return
-    end
-
-    -- A locked tier stays selectable so the player can read what it costs and what it gives;
-    -- the padlock plus the requirement under the Apply button is what tells them why they
-    -- cannot switch to it. (The server refuses it regardless.)
-    local label = ColorText(td.name, r, g, b)
+  local function CurrentTier()
     local svc = ProjectEbonhold.HardmodeService
-    -- The pool-known guard only applies to a tier that still has a Soul Ash floor: without it,
-    -- an achievement-locked tier would drop its padlock after a /reload for no reason.
-    if svc and not svc.IsTierUnlocked(tier)
-        and (svc.GetSoulAshRequirement(tier) <= 0 or svc.IsCommittedSoulAshesKnown()) then
-      label = label .. " " .. LOCK_ICON
-    end
-    frame.valueText:SetText(label)
+    return svc and svc.GetCurrentDifficulty() or 1
   end
 
-  function frame:SetValue(tier)
-    selectedTier = tier
-    slider:SetValue(tier)
-    UpdateLabel(tier)
-  end
-
-  function frame:GetValue()
-    return selectedTier
-  end
-
-  slider:SetScript("OnValueChanged", function(self, value)
-    value = math.floor(value + 0.5)
-    if value == selectedTier then return end
-    selectedTier = value
-    UpdateLabel(value)
-    -- Instantly refresh info sections from hardcoded data
+  local frame
+  local function Select(tier)
+    tier = math.max(1, math.min(maxTier, tier))
+    if tier == selectedTier then return end
+    frame:SetValue(tier)
     if hardmodeFrame and hardmodeFrame:IsShown() and hardmodeFrame.canvas then
-      BuildInfoSections(hardmodeFrame.canvas, GetTierDisplayData(value), INFO_SECTIONS_Y)
+      BuildInfoSections(hardmodeFrame.canvas, GetTierDisplayData(tier), INFO_SECTIONS_Y)
     end
-    -- Refresh Apply visibility/state on slider change
     if hardmodeFrame and hardmodeFrame.applyBtn then
-      local svc = ProjectEbonhold.HardmodeService
-      local curTier = svc and svc.GetCurrentDifficulty() or 1
-      RefreshApplyState(value, curTier)
+      RefreshApplyState(tier, CurrentTier())
     end
-  end)
+  end
 
+  frame = TS.Create(parent, {
+    width    = SECTION_WIDTH,
+    rungs    = LADDER_TOP_TIER,
+    cosmetic = maxTier > LADDER_TOP_TIER,
+    GetMax   = function() return maxTier end,
+    GetName  = function(tier)
+      local td = TIER_DATA[tier] or TIER_DATA[1]
+      local label = tier == 1 and "Normal" or td.name
+      -- 16 px padlock, nudged 1 px down so its centre sits on the capitals' mid-height.
+      if IsTierLocked(tier) then
+        label = label .. " |TInterface\\AddOns\\ProjectEbonhold\\assets\\lock:16:16:0:-1|t"
+      end
+      return label
+    end,
+    GetColor   = GetTierColor,
+    IsLocked   = IsTierLocked,
+    GetCurrent = CurrentTier,
+    ShiftMax   = HighestUnlockedTier,
+    OnSelect   = Select,
+    OnRungEnter = function(btn, tier)
+      GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+      local td = TIER_DATA[tier] or TIER_DATA[1]
+      GameTooltip:SetText(td.name, GetTierColor(tier))
+      if btn.isCosmetic then
+        GameTooltip:AddLine("Torment XI-XXX: health and damage only, instance-only. Step through them with the arrows or the mouse wheel.", 0.7, 0.7, 0.7, true)
+      elseif tier == CurrentTier() then
+        GameTooltip:AddLine("Your current difficulty", 0.1, 1, 0.1)
+      elseif IsTierLocked(tier) then
+        GameTooltip:AddLine("Locked", 1, 0.3, 0.3)
+      end
+      GameTooltip:Show()
+    end,
+  })
+
+  -- SetValue also keeps the file-level selection that RefreshApplyState and Apply read.
+  local baseSetValue = frame.SetValue
+  function frame:SetValue(tier)
+    baseSetValue(self, tier)
+    selectedTier = self.value
+  end
   return frame
 end
 
@@ -871,289 +554,205 @@ BuildInfoSections = nil
 
 BuildInfoSections = function(canvas, displayData, startY)
   ClearInfoSections()
+  local W = ProjectEbonhold.TormentWidgets
 
   local y = startY
+  local isNormal = displayData.name == "Normal"
+  local s = displayData.scaling or {}
+  local rw = displayData.rewards or {}
 
-  -- Tier 0: just show a centred "Normal difficulty" label
-  if displayData.name == "Normal" then
-    local label = canvas:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    label:SetPoint("TOP", canvas, "TOP", 0, y - 40)
-    label:SetText("Normal difficulty")
-    label:SetAlpha(0.75)
-    table.insert(infoSectionFrames, label)
-    canvas:SetHeight(math.abs(y) + 100)
-    return y
+  --------------------------------------------------------
+  -- Section: gold title, grey context, the quest log's horizontal break; then one
+  -- character-sheet row per figure (icon, label, green value, tooltip on the row).
+  --------------------------------------------------------
+  local rowIndex = 0
+  local function Section(title, context)
+    local h = W.CreateSectionHeader(canvas, SECTION_WIDTH, title, context)
+    h:SetPoint("TOP", canvas, "TOP", 0, y)
+    y = y - W.HEADER_H
+    rowIndex = 0
+    table.insert(infoSectionFrames, h)
   end
 
-  --------------------------------------------------------
-  -- Creature Modifiers  (single Open World row, full breakdown in tooltip)
-  --------------------------------------------------------
-  local s          = displayData.scaling
-
-  local ICON_HP    = "Interface\\Icons\\PetBattle_Health"
-  local ICON_MELEE = "Interface\\Icons\\Ability_MeleeDamage"
-  local ICON_SPELL = "Interface\\Icons\\Spell_Ice_MagicDamage"
-
-  local dualRow    = CreateFrame("Frame", nil, canvas)
-  dualRow:SetSize(SECTION_WIDTH, 10) -- height set below
-  dualRow:SetPoint("TOP", canvas, "TOP", 0, y)
-  table.insert(infoSectionFrames, dualRow)
-
-  local modTitle = dualRow:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  modTitle:SetPoint("TOP", dualRow, "TOP", 0, -2)
-  modTitle:SetText(ColorText("Creature Modifiers", COLOR_GOLD[1], COLOR_GOLD[2], COLOR_GOLD[3]))
-
-  local scalingItems = {
-    {
-      icon         = ICON_HP,
-      value        = Pct(s.hp_multiplier),
-      tooltipTitle = "Health  " .. Pct(s.hp_multiplier),
-      tooltipBody  = "Open World: x" .. Fmt(s.hp_multiplier)
-          .. "\nDungeon Boss: x" .. Fmt(s.dungeon_boss_hp_mul)
-          .. "\nRaid Boss: x" .. Fmt(s.raid_boss_hp_mul)
-          .. "\nDungeon Adds: x" .. Fmt(s.dungeon_add_hp_mul)
-          .. "\nRaid Adds: x" .. Fmt(s.raid_add_hp_mul),
-    },
-    {
-      icon         = ICON_MELEE,
-      value        = Pct(s.melee_multiplier),
-      tooltipTitle = "Melee  " .. Pct(s.melee_multiplier),
-      tooltipBody  = "Open World: x" .. Fmt(s.melee_multiplier)
-          .. "\nDungeon Boss: x" .. Fmt(s.dungeon_boss_melee_mul)
-          .. "\nRaid Boss: x" .. Fmt(s.raid_boss_melee_mul)
-          .. "\nDungeon Adds: x" .. Fmt(s.dungeon_add_melee_mul)
-          .. "\nRaid Adds: x" .. Fmt(s.raid_add_melee_mul),
-    },
-    {
-      icon         = ICON_SPELL,
-      value        = Pct(s.spell_multiplier),
-      tooltipTitle = "Spell  " .. Pct(s.spell_multiplier),
-      tooltipBody  = "Open World: x" .. Fmt(s.spell_multiplier)
-          .. "\nDungeon Boss: x" .. Fmt(s.dungeon_boss_spell_mul)
-          .. "\nRaid Boss: x" .. Fmt(s.raid_boss_spell_mul)
-          .. "\nDungeon Adds: x" .. Fmt(s.dungeon_add_spell_mul)
-          .. "\nRaid Adds: x" .. Fmt(s.raid_add_spell_mul),
-    },
-  }
-  local scalingStrip = CreateHIconStrip(dualRow, scalingItems, 0)
-  scalingStrip:ClearAllPoints()
-  scalingStrip:SetPoint("TOP", modTitle, "BOTTOM", 0, -4)
-  table.insert(infoSectionFrames, scalingStrip)
-
-  -- title(2+14) + gap(4) + row(30) + padding(6)
-  local dualRowH = 2 + 14 + 4 + (HSTRIP_ICON + HSTRIP_BORDER) + 6
-  dualRow:SetHeight(dualRowH)
-  y = y - dualRowH - 6
-
-  --------------------------------------------------------
-  -- Bonuses & Creature Empowerments (single section, full width)
-  --------------------------------------------------------
-  local rewardSec = CreateSection(canvas, "Bonuses", y)
-  table.insert(infoSectionFrames, rewardSec)
-
-  local rw           = displayData.rewards
-  local rwY          = rewardSec.contentTop
-
-  local GREEN_BORDER = { 0.1, 1, 0.1, 0.8 }
-  local GREY_BORDER  = { 0.35, 0.35, 0.35, 0.6 }
-
-  local function RewardIcon(icon, multiplier, label)
-    local active = multiplier > 1.0
-    return {
-      icon         = icon,
-      value        = Pct(multiplier),
-      borderColor  = active and GREEN_BORDER or GREY_BORDER,
-      desaturated  = not active,
-      tooltipTitle = label .. "  " .. Pct(multiplier),
-      tooltipBody  = active
-          and (label .. " increased by " .. Pct(multiplier))
-          or (label .. ", no bonus at this tier"),
-    }
-  end
-
-  local xpActive = rw.quest_xp_multiplier > 1.0 or rw.creature_xp_multiplier > 1.0
-  local extraLootCount = rw.extra_loot_count or 0
-  local extraLootActive = extraLootCount > 0
-  local rewardItems = {
-    RewardIcon(ICON_GOLD, rw.gold_multiplier, "Gold"),
-    {
-      icon         = "Interface\\AddOns\\ProjectEbonhold\\assets\\xp_icon",
-      value        = Pct(rw.quest_xp_multiplier),
-      value2       = Pct(rw.creature_xp_multiplier),
-      borderColor  = xpActive and GREEN_BORDER or GREY_BORDER,
-      desaturated  = not xpActive,
-      tooltipTitle = "Experience",
-      tooltipBody  = "Quest XP: " .. Pct(rw.quest_xp_multiplier) .. "\nKill XP:  " .. Pct(rw.creature_xp_multiplier),
-    },
-    RewardIcon(ICON_SOUL_ASH, rw.soul_ash_multiplier, "Soul Ash"),
-    RewardIcon(ICON_REAGENT, rw.reagent_multiplier, "Reagents"),
-    {
-      icon         = ICON_LOOT,
-      value        = extraLootActive and ("+" .. extraLootCount) or nil,
-      borderColor  = extraLootActive and GREEN_BORDER or GREY_BORDER,
-      desaturated  = not extraLootActive,
-      tooltipTitle = extraLootActive and ("Extra Loot  +" .. extraLootCount) or "Extra Loot",
-      tooltipBody  = extraLootActive
-          and ("Creatures and bosses drop +" .. extraLootCount .. " additional loot item(s) on top of their normal drops.")
-          or "Not active at this tier.",
-    },
-  }
-
-  local affixTier = rw.affix_chance_tier or 0
-  local affixDescs = {
-    [1] =
-    "Equipment looted in the open world, dungeons and raids has a small chance to drop corrupted with a random stat modifier.\n\nExtract affixes from corrupted gear to learn them, then apply them to clean items.",
-    [2] =
-    "Equipment looted in the open world, dungeons and raids has an increased chance to drop corrupted.\n\nMore corruption types become available and roll chances scale higher than Tier 1.",
-    [3] =
-    "Equipment looted in the open world, dungeons and raids has a high chance to drop corrupted with powerful modifiers.\n\nAll corruption types are unlocked and roll at maximum probability.",
-    [4] =
-    "Tier 4 affixes drop only from raid equipment, with powerful modifiers and a high chance to roll.\n\nLower-tier affixes (Tier 1-3) can still drop from open world, dungeons and raids as before.\n\nAll corruption types are unlocked and roll at maximum probability.",
-    [5] =
-    "Tier 5 affixes drop from raid equipment with the most powerful modifiers and the highest chance to roll.\n\nLower-tier affixes (Tier 1-4) can still drop from open world, dungeons and raids as before.\n\nAll corruption types are unlocked and roll at maximum probability.",
-
-  }
-  table.insert(rewardItems, {
-    icon         = "Interface\\Icons\\Inv_enchant_formulasuperior_01",
-    borderColor  = affixTier > 0 and GREEN_BORDER or GREY_BORDER,
-    desaturated  = affixTier == 0,
-    tooltipTitle = affixTier > 0 and ("Predefined Affixes : Tier " .. affixTier) or "Predefined Affixes",
-    tooltipBody  = affixTier > 0
-        and affixDescs[affixTier]
-        or "Not active at this tier.",
-  })
-
-  local iccActive = rw.icc_affixes == true
-  table.insert(rewardItems, {
-    icon         = "Interface\\Icons\\Achievement_Zone_Icecrown_01",
-    borderColor  = iccActive and GREEN_BORDER or GREY_BORDER,
-    desaturated  = not iccActive,
-    tooltipTitle = iccActive and "ICC Affixes : Tier VI" or "ICC Affixes",
-    tooltipBody  = iccActive
-        and
-        "Unleashes Tier VI affixes, the most powerful corruptions in the game.\n\nEquipment looted inside Icecrown Citadel has a chance to drop corrupted with these devastating modifiers, found nowhere else."
-        or "Not active at this tier.",
-  })
-
-  local rewardStrip = CreateHIconStrip(rewardSec, rewardItems, rwY)
-  table.insert(rewardSec.iconRows, rewardStrip)
-  table.insert(infoSectionFrames, rewardStrip)
-  rwY = rwY - HSTRIP_ICON - 4
-
-  -- Creature Empowerments sub-row (replaces Curses)
-  do
-    -- Build ordered unique aura list: sorted by first unlock tier (lowest → highest)
-    local orderedAuras = {}
-    local seenAura = {}
-    for tier = 2, GetSliderMax() do
-      for _, aura in ipairs(TIER_DATA[tier].auras or {}) do
-        if not seenAura[aura.spellId] then
-          seenAura[aura.spellId] = true
-          table.insert(orderedAuras, { spellId = aura.spellId, unlockTier = tier })
+  -- it = { icon, label, value, sub, active, tooltipTitle, tooltipBody, tooltipRows, tooltipFoot, spellId }
+  local function Row(it)
+    rowIndex = rowIndex + 1
+    local row = W.CreateStatRow(canvas, SECTION_WIDTH, rowIndex)
+    row:SetPoint("TOP", canvas, "TOP", 0, y)
+    y = y - W.STAT_H
+    row:Set(it.icon, it.label, it.value, it.sub)
+    row:SetActive(it.active ~= false)
+    row.tooltip = not it.noTooltip and function()
+      GameTooltip:SetScale(TOOLTIP_SCALE)
+      if it.spellId then
+        GameTooltip:SetHyperlink("spell:" .. it.spellId)
+        return
+      end
+      GameTooltip:SetText(it.tooltipTitle or it.label or "", 1, 0.82, 0)
+      if it.tooltipBody then GameTooltip:AddLine(it.tooltipBody, 1, 1, 1, true) end
+      for _, r in ipairs(it.tooltipRows or {}) do
+        if r[2] == " " and r[1] ~= " " then
+          GameTooltip:AddLine(r[1], 1, 0.82, 0)
+        else
+          GameTooltip:AddDoubleLine(r[1], r[2], 0.9, 0.9, 0.9, 0.1, 1, 0.1)
         end
       end
-    end
-
-    if #orderedAuras > 0 then
-      rwY = rwY - 8 -- extra gap between reward icons and Creature Empowerments
-
-      local auraMaxLabel = (s.aura_max and s.aura_max > 0) and ("  (Max " .. s.aura_max .. ")") or ""
-      local empLabel = rewardSec:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-      empLabel:SetPoint("TOP", rewardSec, "TOP", 0, rwY)
-      empLabel:SetText(ColorText("Creature Empowerments" .. auraMaxLabel,
-        COLOR_GOLD[1], COLOR_GOLD[2], COLOR_GOLD[3]))
-      table.insert(rewardSec.lines, empLabel)
-      rwY = rwY - 16
-
-      local activeAuras = {}
-      for _, aura in ipairs(displayData.auras or {}) do
-        activeAuras[aura.spellId] = true
+      if it.tooltipFoot then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(it.tooltipFoot, 0.6, 0.6, 0.6, true)
       end
-
-      local auraItems = {}
-      for _, aura in ipairs(orderedAuras) do
-        local sid = aura.spellId
-        local isActive = activeAuras[sid] or false
-        local auraName, _, auraIcon = GetSpellInfo(sid)
-        auraName = auraName or ("Spell " .. sid)
-        auraIcon = auraIcon or "Interface\\Icons\\INV_Misc_QuestionMark"
-        table.insert(auraItems, {
-          icon         = auraIcon,
-          borderColor  = isActive and { 1, 0.2, 0.2, 0.8 } or nil,
-          desaturated  = not isActive,
-          spellId      = sid,
-          tooltipTitle = auraName,
-          tooltipBody  = isActive
-              and ("Unlocked at Tier " .. aura.unlockTier .. ", creatures can gain this aura")
-              or ("Unlocked at Tier " .. aura.unlockTier .. ", not active at this difficulty"),
-        })
-      end
-
-      local auraStrip = CreateHIconStrip(rewardSec, auraItems, rwY)
-      table.insert(rewardSec.iconRows, auraStrip)
-      table.insert(infoSectionFrames, auraStrip)
     end
+    table.insert(infoSectionFrames, row)
   end
 
-  local rewardH = FinaliseSection(rewardSec)
-  y = y - rewardH - 6
-
-  --------------------------------------------------------
-  -- Extra Loot
-  --------------------------------------------------------
-  local extraLoot = displayData.extraLoot or {}
-  local maxExtraLoot = TIER_DATA[GetSliderMax()].extraLoot or {}
-  if #maxExtraLoot > 0 then
-    local activeBags = {}
-    for _, item in ipairs(extraLoot) do
-      activeBags[item.bagType] = true
-    end
-
-    local lootSec = CreateSection(canvas, "Bonus Loot", y)
-    table.insert(infoSectionFrames, lootSec)
-    local lY = lootSec.contentTop
-    local lootItems = {}
-    for _, item in ipairs(maxExtraLoot) do
-      local isActive = activeBags[item.bagType] or false
-      if item.bagType == "dungeon" then
-        table.insert(lootItems, {
-          icon         = "Interface\\Icons\\garrison_bluearmor",
-          borderColor  = isActive and GREEN_BORDER or GREY_BORDER,
-          desaturated  = not isActive,
-          tooltipTitle = "Blue Loot",
-          tooltipBody  = isActive
-              and
-              "Grants a chance to obtain a blue-quality item upon defeating enemies. The item’s level matches that of the defeated creature and it drops without any affixes"
-              or "Not available at this tier.",
-        })
-      elseif item.bagType == "raid" then
-        table.insert(lootItems, {
-          icon         = "Interface\\Icons\\garrison_purplearmor",
-          borderColor  = isActive and GREEN_BORDER or GREY_BORDER,
-          desaturated  = not isActive,
-          tooltipTitle = "Epic Loot",
-          tooltipBody  = isActive
-              and
-              "Grants a chance to obtain an epic-quality item upon defeating enemies. The item’s level matches that of the defeated creature and it drops without any affixes"
-              or "Not available at this tier.",
-        })
-      end
-    end
-    local lootStrip = CreateHIconStrip(lootSec, lootItems, lY)
-    table.insert(lootSec.iconRows, lootStrip)
-    table.insert(infoSectionFrames, lootStrip)
-    lY = lY - HSTRIP_ICON - 4
-    local lootH = FinaliseSection(lootSec)
-    y = y - lootH - 6
+  local function EndSection()
+    y = y - 12
   end
 
-  local contentH = math.abs(y) + 20
+  local function X(mult) return "x" .. Fmt(mult or 1) end
+  -- Torments past the ladder are instance-only: the open world is clamped at Torment X on the
+  -- server (HardmodeMgr::MAX_OPEN_WORLD_TORMENT), so its row reads the Torment X figure.
+  local isCosmetic = (displayData.tier or 1) > LADDER_TOP_TIER
+  local sOpen = isCosmetic and (TIER_DATA[LADDER_TOP_TIER] or {}).scaling or s
+  local openLabel = isCosmetic and "Open world (capped at Torment X)" or "Open world"
+
+  --------------------------------------------------------
+  -- Creature modifiers
+  --------------------------------------------------------
+  Section("Creature Modifiers", isCosmetic and "instances only" or "instances and open world")
+  Row({
+    icon = "Interface\\Icons\\PetBattle_Health", label = "Health", value = Pct(s.hp_multiplier or 1), active = not isNormal,
+    tooltipTitle = "Health",
+    tooltipRows = { { openLabel, X(sOpen.hp_multiplier) }, { "Dungeon boss", X(s.dungeon_boss_hp_mul) }, { "Raid boss", X(s.raid_boss_hp_mul) },
+                    { "Dungeon adds", X(s.dungeon_add_hp_mul) }, { "Raid adds", X(s.raid_add_hp_mul) } },
+  })
+  Row({
+    icon = "Interface\\Icons\\Ability_MeleeDamage", label = "Melee damage", value = Pct(s.melee_multiplier or 1), active = not isNormal,
+    tooltipTitle = "Melee damage",
+    tooltipRows = { { openLabel, X(sOpen.melee_multiplier) }, { "Dungeon boss", X(s.dungeon_boss_melee_mul) }, { "Raid boss", X(s.raid_boss_melee_mul) },
+                    { "Dungeon adds", X(s.dungeon_add_melee_mul) }, { "Raid adds", X(s.raid_add_melee_mul) } },
+  })
+  Row({
+    icon = "Interface\\Icons\\Spell_Ice_MagicDamage", label = "Spell damage", value = Pct(s.spell_multiplier or 1), active = not isNormal,
+    tooltipTitle = "Spell damage",
+    tooltipRows = { { openLabel, X(sOpen.spell_multiplier) }, { "Dungeon boss", X(s.dungeon_boss_spell_mul) }, { "Raid boss", X(s.raid_boss_spell_mul) },
+                    { "Dungeon adds", X(s.dungeon_add_spell_mul) }, { "Raid adds", X(s.raid_add_spell_mul) } },
+  })
+  EndSection()
+
+  --------------------------------------------------------
+  -- Rewards
+  --------------------------------------------------------
+  local ROMANS = { "I", "II", "III", "IV", "V" }
+  local function PctText(v)
+    return (v % 1 == 0) and string.format("%d%%", v) or string.format("%.1f%%", v)
+  end
+  local chance  = rw.affix_chance or 0
+  local weights = rw.affix_rank_weights or { 100, 0, 0, 0, 0 }
+  local total = 0
+  for _, w in ipairs(weights) do total = total + w end
+  local rankRows, topRank = {}, 1
+  for r = 1, 5 do
+    local share = total > 0 and (100 * (weights[r] or 0) / total) or 0
+    if share > 0 then
+      topRank = r
+      rankRows[#rankRows + 1] = { "Rank " .. ROMANS[r], PctText(share) }
+    end
+  end
+  -- Only the chance climbs with the Torment; the rank spread is the same on every tier
+  -- (tools/affixes/catalog.py RANK_WEIGHTS_ALL_TIERS), so the tooltip says so instead of
+  -- letting a per-tier panel imply that higher Torments unlock higher ranks.
+  local normalChance = (TIER_DATA[1] and TIER_DATA[1].rewards.affix_chance) or 0
+  local topChance    = (TIER_DATA[LADDER_TOP_TIER] and TIER_DATA[LADDER_TOP_TIER].rewards.affix_chance) or chance
+  local affixRows = {
+    { "Chance per item on this Torment", PctText(chance) },
+    { "Climbs with the Torment", PctText(normalChance) .. " (Normal) to " .. PctText(topChance) .. " (" .. ((TIER_DATA[LADDER_TOP_TIER] and TIER_DATA[LADDER_TOP_TIER].name) or "Torment X") .. ")" },
+    { " ", " " },
+    { "Rank of the affix - same odds on every Torment", " " },
+  }
+  for _, row in ipairs(rankRows) do affixRows[#affixRows + 1] = row end
+
+  Section("Rewards")
+  Row({ icon = ICON_GOLD, label = "Gold", value = Pct(rw.gold_multiplier or 1), active = (rw.gold_multiplier or 1) > 1,
+    tooltipTitle = "Gold", tooltipRows = { { "Looted gold", Pct(rw.gold_multiplier or 1) } } })
+  Row({ icon = "Interface\\AddOns\\ProjectEbonhold\\assets\\xp_icon", label = "Experience", sub = "quest / kill",
+    value = Pct(rw.quest_xp_multiplier or 1) .. " / " .. Pct(rw.creature_xp_multiplier or 1),
+    active = (rw.quest_xp_multiplier or 1) > 1 or (rw.creature_xp_multiplier or 1) > 1,
+    tooltipTitle = "Experience", tooltipRows = { { "Quest XP", Pct(rw.quest_xp_multiplier or 1) }, { "Kill XP", Pct(rw.creature_xp_multiplier or 1) } } })
+  Row({ icon = ICON_REAGENT, label = "Reagents", value = Pct(rw.reagent_multiplier or 1), active = (rw.reagent_multiplier or 1) > 1,
+    tooltipTitle = "Reagents", tooltipRows = { { "Crafting materials", Pct(rw.reagent_multiplier or 1) } } })
+  -- Extra items: extra_item_count sure, plus extra_item_chance % of one more. The row shows the
+  -- average ("+1.5"), the tooltip splits it.
+  local function ExtraAvg(r)
+    return ((r and r.extra_item_count) or 0) + ((r and r.extra_item_chance) or 0) / 100
+  end
+  local function ExtraText(v)
+    return (v % 1 == 0) and string.format("+%d", v) or string.format("+%.1f", v)
+  end
+  local extraCount  = rw.extra_item_count or 0
+  local extraChance = rw.extra_item_chance or 0
+  local extraAvg    = ExtraAvg(rw)
+  local topData     = TIER_DATA[LADDER_TOP_TIER]
+  local extraRows   = {
+    { "Sure extra items", tostring(extraCount) },
+    { "Chance of one more", PctText(extraChance) },
+    { "Climbs with the Torment", "+0 (Normal) to " .. ExtraText(ExtraAvg(topData and topData.rewards)) .. " (" .. ((topData and topData.name) or "Torment X") .. ")" },
+  }
+  Row({ icon = ICON_EXTRA_ITEM, label = "Extra items", sub = "kills and boss chests",
+    value = ExtraText(extraAvg), active = extraAvg > 0,
+    tooltipTitle = "Extra Items", tooltipRows = extraRows,
+    tooltipFoot = "Each extra item is one more roll on the loot table of the creature or boss chest; the best item it gives is added to the loot.  Not on open-world chests or gathering." })
+  Row({ icon = "Interface\\Icons\\Inv_enchant_formulasuperior_01", label = "Item affix chance", sub = "ranks I-" .. ROMANS[topRank],
+    value = string.format("%d%%", chance), active = chance > 0,
+    tooltipTitle = "Item Affixes", tooltipRows = affixRows,
+    tooltipFoot = "Any rank can drop on any Torment, Normal included: the Torment only changes how often an item carries one.  Below level 80: rank I only.  Two-handed: affix doubled." })
+  EndSection()
+
+  --------------------------------------------------------
+  -- Torment champions
+  --------------------------------------------------------
+  do
+    -- Champions: one bonus enemy per tour, up to 4 per zone and raid (none in 5-man dungeons, 2026-10-25), on every difficulty, that
+    -- brings a horde (TormentChampionMgr, 2026-10-08; one per tour and x3 horde on 2026-10-12). Torment adds its modifiers and its reward; ordinary monsters
+    -- and bosses carry no modifier. The figures below are CHAMPION_* above, mirrored from the server.
+    local torment = math.max(0, (displayData.tier or 1) - 1)
+    local rung = math.min(torment, LADDER_TOP_TIER - 1)
+    local affixes = isNormal and 0 or ChampionAffixCount(torment)
+    local growth = CHAMPION_REWARD_GROWTH ^ rung
+    local ashes80 = math.floor(80 * CHAMPION_ASHES_PER_LEVEL * growth + 0.5)
+    local shards80 = math.floor(80 * CHAMPION_SHARDS_PER_LEVEL * growth + 0.5)
+
+    -- No tooltips on these rows: the label and the value say enough (owner, 13/10).
+    Section("Champions", "every difficulty")
+    Row({ icon = "Interface\\Icons\\Ability_Warrior_Rampage", label = "Champions", value = "up to 4 per zone", noTooltip = true })
+    Row({ icon = "Interface\\Icons\\Ability_Creature_Cursed_02", label = "Champion modifiers", value = tostring(affixes),
+      active = affixes > 0, noTooltip = true })
+    Row({ icon = "Interface\\Icons\\INV_Misc_Bone_ElfSkull_01", label = "Champion reward", sub = "level 80",
+      value = isNormal and "-" or (ashes80 .. " / " .. shards80), active = not isNormal, noTooltip = true })    EndSection()
+  end
+
+  --------------------------------------------------------
+  -- Button at the bottom, then size the panel to its content
+  --------------------------------------------------------
+  if hardmodeFrame and hardmodeFrame.applyBtn then
+    hardmodeFrame.applyBtn:ClearAllPoints()
+    -- 2 px under the last row (y already carries the 12 px section gap)
+    hardmodeFrame.applyBtn:SetPoint("TOP", canvas, "TOP", 0, y + 10)
+    y = y + 10 - hardmodeFrame.applyBtn:GetHeight() - 4
+  end
+
+  local contentH = math.abs(y)
   canvas:SetHeight(contentH)
+  if hardmodeFrame then
+    -- 42 px of chrome above the canvas, 14 px of margin under the button.
+    hardmodeFrame:SetHeight(math.max(PANEL_MIN_H, contentH + 42 + 14))
+    if hardmodeFrame.FitSlate then hardmodeFrame:FitSlate() end
+  end
   return y
 end
 
--- Y offset where info sections start (below the top bar)
-INFO_SECTIONS_Y = -105
+-- Y offset where info sections start (below the top bar: selector + lock line)
+INFO_SECTIONS_Y = -(SELECTOR_HEIGHT + 30)
 
 --- Tooltip for the achievement gate under the slider. The lock line only names the
 --- achievement; this spells out the boss, the raid and the world difficulty it has to die at.
@@ -1180,6 +779,102 @@ local function ShowAchievementGateTooltip(owner, tier)
 end
 
 ------------------------------------------------------------
+-- CONFIRMATION POPUP
+------------------------------------------------------------
+
+local function HidePopup()
+  if confirmPopup then
+    confirmPopup:Hide()
+    confirmPopup.blockFrame:Hide()
+  end
+end
+
+--- Modal "switch to tier N?" dialog shown by Apply. Same chrome as the panel itself
+--- (dialog border, slate ground, title banner) so it reads as part of it, and a full-screen click
+--- blocker so the ladder cannot be moved under the dialog while it is open.
+local function ShowConfirmationPopup(tier)
+  if not confirmPopup then
+    local blockFrame = CreateFrame("Frame", "HardmodeBlockFrame", UIParent)
+    blockFrame:SetFrameStrata("FULLSCREEN_DIALOG")
+    blockFrame:SetFrameLevel(999)
+    blockFrame:SetAllPoints(UIParent)
+    blockFrame:EnableMouse(true)
+    blockFrame:SetScript("OnMouseDown", function() end)
+    local dim = blockFrame:CreateTexture(nil, "BACKGROUND")
+    dim:SetTexture(0, 0, 0, 0.7)
+    dim:SetAllPoints(blockFrame)
+    blockFrame:Hide()
+
+    confirmPopup = CreateFrame("Frame", "HardmodeConfirmPopup", UIParent)
+    confirmPopup:SetSize(380, 190)
+    confirmPopup:SetPoint("CENTER")
+    confirmPopup:SetFrameStrata("FULLSCREEN_DIALOG")
+    confirmPopup:SetFrameLevel(1000)
+    confirmPopup:EnableMouse(true)
+    confirmPopup:SetScript("OnMouseDown", function() end)
+    confirmPopup.blockFrame = blockFrame
+
+    confirmPopup:SetBackdrop({
+      edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+      edgeSize = 32,
+      insets = { left = 11, right = 12, top = 12, bottom = 11 },
+    })
+    local slate = confirmPopup:CreateTexture(nil, "BACKGROUND")
+    slate:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\journeysframebackground")
+    slate:SetPoint("TOPLEFT", confirmPopup, "TOPLEFT", 11, -12)
+    slate:SetPoint("BOTTOMRIGHT", confirmPopup, "BOTTOMRIGHT", -12, 11)
+    slate:SetTexCoord(0, 794 / 1024, 0, 434 / 512)
+    local banner = ProjectEbonhold.TormentWidgets.CreateBanner(confirmPopup, 200, 14)
+    banner:SetPoint("TOP", confirmPopup, "TOP", 0, 14)
+    confirmPopup.title = banner.text
+
+    confirmPopup.desc = confirmPopup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    confirmPopup.desc:SetPoint("TOP", confirmPopup, "TOP", 0, -52)
+    confirmPopup.desc:SetWidth(330)
+    confirmPopup.desc:SetJustifyH("CENTER")
+    confirmPopup.desc:SetWordWrap(true)
+
+    confirmPopup.acceptBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(confirmPopup, "HardmodeConfirmPopupAccept", 130, 24, "Accept")
+    confirmPopup.acceptBtn:SetPoint("BOTTOM", confirmPopup, "BOTTOM", -72, 22)
+    confirmPopup.acceptBtn:SetScript("OnClick", function()
+      HidePopup()
+      local svc = ProjectEbonhold.HardmodeService
+      if svc and confirmPopup.pendingTier then
+        svc.SetDifficulty(confirmPopup.pendingTier)
+      end
+    end)
+
+    confirmPopup.cancelBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(confirmPopup, "HardmodeConfirmPopupCancel", 130, 24, "Cancel")
+    confirmPopup.cancelBtn:SetPoint("BOTTOM", confirmPopup, "BOTTOM", 72, 22)
+    confirmPopup.cancelBtn:SetScript("OnClick", HidePopup)
+
+    -- Child frames do not reliably land above a parent pushed to level 1000, so the banner and
+    -- both buttons drew under the slate and the dim (no way to confirm). Pin them explicitly,
+    -- same as the lock overlays' "Got it" buttons.
+    for _, child in ipairs({ banner, confirmPopup.acceptBtn, confirmPopup.cancelBtn }) do
+      child:SetFrameStrata("FULLSCREEN_DIALOG")
+      child:SetFrameLevel(confirmPopup:GetFrameLevel() + 10)
+    end
+  end
+
+  confirmPopup.pendingTier = tier
+  confirmPopup.title:SetText("Change Difficulty")
+
+  local msg
+  if tier <= 1 then
+    msg = "Return to |cffFFFFFFNormal|r difficulty?\nAll Torment effects will be removed."
+  else
+    local td = GetTierDisplayData(tier)
+    local tierStr = ColorText(td.name, GetTierColor(tier))
+    msg = "Activate " .. tierStr .. "?\nEnemies will become significantly stronger\nand you will receive increased rewards."
+  end
+  confirmPopup.desc:SetText(msg)
+
+  confirmPopup.blockFrame:Show()
+  confirmPopup:Show()
+end
+
+------------------------------------------------------------
 -- BUILD THE MAIN PANEL
 ------------------------------------------------------------
 
@@ -1196,61 +891,56 @@ local function BuildContent(canvas, currentTier)
   infoSectionFrames = {}
 
   --------------------------------------------------------
-  -- TOP BAR
+  -- TOP BAR : selector, then the lock line under it
   --------------------------------------------------------
   local topBar = CreateFrame("Frame", nil, canvas)
-  topBar:SetSize(SECTION_WIDTH, 70)
+  topBar:SetSize(SECTION_WIDTH, SELECTOR_HEIGHT + 24)
   topBar:SetPoint("TOP", canvas, "TOP", 0, 0)
 
-  -- Slider – centred horizontally, 40 px below top
-  local slider = CreateTierSlider(topBar)
-  slider:SetPoint("TOP", topBar, "TOP", 0, -18)
+  local slider = CreateTierSelector(topBar)
+  slider:SetPoint("TOP", topBar, "TOP", 0, 0)
   slider:SetValue(currentTier)
+  hardmodeFrame.tierSelector = slider
 
-  -- Apply button – centred, below the slider
-  local applyBtn = utils.CreateSimpleCustomButton(topBar,
-    "Apply",
-    function()
-      local playerLevel = UnitLevel("player")
-      if UnitAffectingCombat and UnitAffectingCombat("player") then
-        DEFAULT_CHAT_FRAME:AddMessage(
-          "|cffFF0000[Hardcore] You cannot change difficulty while in combat.|r")
-        return
-      end
-      if playerLevel > 10 and not IsResting() then
-        DEFAULT_CHAT_FRAME:AddMessage(
-          "|cffFF0000[Hardcore] You must be level 10 or below, or rested (in an inn or capital city) to change difficulty.|r")
-        return
-      end
-      local svc = ProjectEbonhold.HardmodeService
-      local curTier = svc and svc.GetCurrentDifficulty() or 1
-      if selectedTier ~= curTier then
-        ShowConfirmationPopup(selectedTier)
-      end
-    end,
-    120, 30)
-  applyBtn:SetPoint("TOP", slider, "BOTTOM", 0, -4)
-
-  -- Disable Apply if already at the current tier
+  -- Full-width panel button at the bottom; BuildInfoSections places it under the sections.
+  local applyBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(canvas, nil, SECTION_WIDTH, 24, "Apply")
+  applyBtn:SetScript("OnClick", function()
+    local playerLevel = UnitLevel("player")
+    local instanceKind = InstanceLockKind()
+    if instanceKind then
+      DEFAULT_CHAT_FRAME:AddMessage(
+        "|cffFF0000[Torment] You cannot change difficulty while inside a " .. instanceKind .. ".|r")
+      return
+    end
+    if UnitAffectingCombat and UnitAffectingCombat("player") then
+      DEFAULT_CHAT_FRAME:AddMessage(
+        "|cffFF0000[Torment] You cannot change difficulty while in combat.|r")
+      return
+    end
+    if playerLevel > 10 and not IsResting() then
+      DEFAULT_CHAT_FRAME:AddMessage(
+        "|cffFF0000[Torment] You must be level 10 or below, or rested (in an inn or capital city) to change difficulty.|r")
+      return
+    end
+    local svc = ProjectEbonhold.HardmodeService
+    local curTier = svc and svc.GetCurrentDifficulty() or 1
+    if selectedTier ~= curTier then
+      ShowConfirmationPopup(selectedTier)
+    end
+  end)
   hardmodeFrame.applyBtn = applyBtn
 
-  -- Hint shown when Apply is hidden (not in a rested area)
-  local applyHint = topBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  applyHint:SetPoint("TOP", slider, "BOTTOM", 0, -6)
-  applyHint:SetWidth(280)
-  applyHint:SetJustifyH("CENTER")
-  applyHint:SetWordWrap(true)
-  applyHint:SetText(
-    "|cffFF6666You must be level 10, rested (inn or capital city), and not in combat to change difficulty.|r")
-  hardmodeFrame.applyHint = applyHint
+  -- No hint line under the button: when the player cannot switch, the button simply stays
+  -- greyed, and the click handler prints the reason in chat.
+  hardmodeFrame.applyHint = nil
 
-  -- Red lock-reason text shown in place of Apply when hardcore is gated
-  local applyLockText = topBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  applyLockText:SetPoint("TOP", slider, "BOTTOM", 0, -8)
-  applyLockText:SetWidth(320)
+  -- Red lock-reason line under the ladder, right where the eye already is
+  local applyLockText = topBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  applyLockText:SetTextColor(COLOR_RED[1], COLOR_RED[2], COLOR_RED[3])
+  applyLockText:SetPoint("TOP", slider, "BOTTOM", 0, -2)
+  applyLockText:SetWidth(SECTION_WIDTH - 10)
   applyLockText:SetJustifyH("CENTER")
   applyLockText:SetWordWrap(true)
-  applyLockText:SetTextColor(1, 0.2, 0.2)
   applyLockText:Hide()
   hardmodeFrame.applyLockText = applyLockText
 
@@ -1270,8 +960,8 @@ local function BuildContent(canvas, currentTier)
   end)
   hardmodeFrame.applyLockHover = applyLockHover
 
-  RefreshApplyState(selectedTier, currentTier)
   BuildInfoSections(canvas, GetTierDisplayData(currentTier), INFO_SECTIONS_Y)
+  RefreshApplyState(selectedTier, currentTier)
 end
 
 local function CreateHardmodeFrame()
@@ -1280,10 +970,35 @@ local function CreateHardmodeFrame()
   hardmodeFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
   hardmodeFrame:SetFrameStrata("HIGH")
 
-  local bgTexture = hardmodeFrame:CreateTexture(nil, "BACKGROUND")
-  bgTexture:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background-torment")
-  bgTexture:SetAllPoints(hardmodeFrame)
-  bgTexture:SetTexCoord(0, 0.84375, 0, 0.70703125)
+  -- 9-slice edge + the Echo Journal's dark-slate ground: the panel takes the height of its
+  -- content (it varies with the tier), and neither the fill nor the border deform with it.
+  hardmodeFrame:SetBackdrop({
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  -- journeysframebackground, opaque region x 0-794 / y 0-434 of a 1024x512 file. The panel
+  -- is taller than wide, so a slice of that region with the panel's own aspect is shown,
+  -- centred, and re-cropped whenever the panel changes height - never stretched.
+  local slate = hardmodeFrame:CreateTexture(nil, "BACKGROUND")
+  slate:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\journeysframebackground")
+  slate:SetPoint("TOPLEFT", hardmodeFrame, "TOPLEFT", 11, -12)
+  slate:SetPoint("BOTTOMRIGHT", hardmodeFrame, "BOTTOMRIGHT", -12, 11)
+  hardmodeFrame.slate = slate
+  function hardmodeFrame:FitSlate()
+    local w, h = self:GetWidth() - 23, self:GetHeight() - 23
+    if w <= 0 or h <= 0 then return end
+    local ART_W, ART_H = 794, 434
+    local cropW = math.min(ART_W, ART_H * w / h)
+    local cropH = cropW * h / w
+    local x0 = (ART_W - cropW) / 2
+    local y0 = (ART_H - cropH) / 2
+    self.slate:SetTexCoord(x0 / 1024, (x0 + cropW) / 1024, y0 / 512, (y0 + cropH) / 512)
+  end
+  hardmodeFrame:FitSlate()
+  local banner = ProjectEbonhold.TormentWidgets.CreateBanner(hardmodeFrame, 160, 14)
+  banner:SetPoint("TOP", hardmodeFrame, "TOP", 0, 14)
+  banner.text:SetText("Torment")
 
   hardmodeFrame:SetMovable(true)
   hardmodeFrame:EnableMouse(true)
@@ -1330,7 +1045,7 @@ local function CreateHardmodeFrame()
   lockTitle:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
   lockTitle:SetPoint("TOP", lockSkull, "BOTTOM", 0, -8)
   lockTitle:SetTextColor(1, 0, 0)
-  lockTitle:SetText("Hardcore")
+  lockTitle:SetText("Torment")
 
   local lockMsg = lockOverlay:CreateFontString(nil, "OVERLAY")
   lockMsg:SetFont("Fonts\\FRIZQT__.TTF", 13, "")
@@ -1342,26 +1057,88 @@ local function CreateHardmodeFrame()
   lockMsg:SetSpacing(4)
   lockMsg:SetTextColor(1, 1, 1)
   lockMsg:SetText(
-    "Hardcore mode lets you increase your |cffFFD100rewards|r, at the cost of a much harder challenge.\n\n" ..
-    "To unlock Hardcore, you must reach |cffFFD100level 80|r with one of the characters on your account.\n\n" ..
-    "|cffFF4444Dying in Hardcore is definitive:|r you cannot use any auto-resurrection mechanic. You are forced to commit your Soul Ashes in your Skill Tree to continue progressing. However, your character remains playable."
+    "Torment lets you increase your |cffFFD100rewards|r, at the cost of a much harder challenge.\n\n" ..
+    "To unlock Torment, you must reach |cffFFD100level 80|r with one of the characters on your account.\n\n" ..
+    "Then, |cffFFD100defeat a raid boss|r to open the next Torment.\n\n" ..
+    "Monsters hit much harder in Torment. Dying works the same way as in Normal."
   )
 
-  local gotItBtn = utils.CreateSimpleCustomButton(lockOverlay,
-    "Got it",
-    function()
-      lockOverlay:Hide()
-    end,
-    120, 30)
+  local gotItBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(lockOverlay, "HardmodeLockOverlayGotIt", 120, 24, "Got it")
+  gotItBtn:SetScript("OnClick", function() lockOverlay:Hide() end)
   gotItBtn:SetPoint("BOTTOM", lockOverlay, "BOTTOM", 0, 20)
   gotItBtn:SetFrameStrata("FULLSCREEN_DIALOG")
   gotItBtn:SetFrameLevel(lockOverlay:GetFrameLevel() + 10)
 
   hardmodeFrame.lockOverlay = lockOverlay
   lockOverlay:Hide()
+
+  -- Dungeon / raid overlay. Built on the same pattern as the account lock, but dismissable:
+  -- the panel is still worth reading inside a run (the tier the instance is on, its
+  -- modifiers, its rewards), only the switch itself is impossible.
+  local instOverlay = CreateFrame("Frame", "HardmodeInstanceOverlay", UIParent)
+  instOverlay:SetPoint("TOPLEFT", hardmodeFrame, "TOPLEFT", 4, -30)
+  instOverlay:SetPoint("BOTTOMRIGHT", hardmodeFrame, "BOTTOMRIGHT", -4, 4)
+  instOverlay:SetFrameStrata("FULLSCREEN_DIALOG")
+  instOverlay:SetFrameLevel(998)
+  instOverlay:EnableMouse(true)
+  instOverlay:EnableMouseWheel(true)
+  instOverlay:SetScript("OnMouseDown", function() end)
+  instOverlay:SetScript("OnMouseWheel", function() end)
+
+  instOverlay:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  instOverlay:SetBackdropColor(0, 0, 0, 1)
+
+  local instIcon = instOverlay:CreateTexture(nil, "OVERLAY")
+  instIcon:SetTexture("Interface\\Icons\\INV_Misc_Key_11")
+  instIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  instIcon:SetSize(56, 56)
+  instIcon:SetPoint("TOP", instOverlay, "TOP", 0, -20)
+
+  local instTitle = instOverlay:CreateFontString(nil, "OVERLAY")
+  instTitle:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
+  instTitle:SetPoint("TOP", instIcon, "BOTTOM", 0, -8)
+  instTitle:SetTextColor(1, 0, 0)
+  instTitle:SetText("Locked in an instance")
+
+  local instMsg = instOverlay:CreateFontString(nil, "OVERLAY")
+  instMsg:SetFont("Fonts\\FRIZQT__.TTF", 13, "")
+  instMsg:SetPoint("TOP", instTitle, "BOTTOM", 0, -20)
+  instMsg:SetWidth(PANEL_WIDTH - 50)
+  instMsg:SetJustifyH("CENTER")
+  instMsg:SetWordWrap(true)
+  instMsg:SetNonSpaceWrap(true)
+  instMsg:SetSpacing(4)
+  instMsg:SetTextColor(1, 1, 1)
+  instOverlay.msg = instMsg
+
+  local instGotIt = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(instOverlay, "HardmodeInstanceOverlayGotIt", 120, 24, "Got it")
+  instGotIt:SetScript("OnClick", function() instOverlay:Hide() end)
+  instGotIt:SetPoint("BOTTOM", instOverlay, "BOTTOM", 0, 20)
+  instGotIt:SetFrameStrata("FULLSCREEN_DIALOG")
+  instGotIt:SetFrameLevel(instOverlay:GetFrameLevel() + 10)
+
+  hardmodeFrame.instanceOverlay = instOverlay
+  instOverlay:Hide()
+
   hardmodeFrame:HookScript("OnHide", function()
     lockOverlay:Hide()
+    instOverlay:Hide()
   end)
+
+  -- The panel can be left open across a zone-in: re-read the instance state so the overlay
+  -- appears on entering a dungeon and disappears on leaving it.
+  hardmodeFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+  hardmodeFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+  hardmodeFrame:SetScript("OnEvent", function()
+    if ProjectEbonhold.HardmodeUI and ProjectEbonhold.HardmodeUI.Refresh then
+      ProjectEbonhold.HardmodeUI.Refresh()
+    end
+  end)
+
   hardmodeFrame:Hide()
   table.insert(UISpecialFrames, "HardmodeFrame")
 end
@@ -1374,9 +1151,9 @@ end
 -- place the meta-progression milestones are granted). Nothing here re-derives the crossing
 -- from a Soul Ash update, so relogging or gaining more ashes can never replay an alert.
 --
--- Presented as the yellow GlowBox alert anchored on the Hardcore skull icon of the run HUD
+-- Presented as the yellow GlowBox alert anchored on the Torment skull icon of the run HUD
 -- (the same treatment the Skill Tree uses for unspent points), NOT as a modal popup: the
--- unlock is an invitation to open the Hardcore panel, and it points straight at the button
+-- unlock is an invitation to open the Torment panel, and it points straight at the button
 -- that opens it.
 
 -- A single commit can cross several gates at once (a big Soul Ash payout, or thresholds
@@ -1456,7 +1233,7 @@ ShowNextUnlockAlert = function()
 
   local tier = rank + 1   -- rank R is difficulty tier R+1 (tier 1 is Normal)
   local td = TIER_DATA[tier]
-  local tierName = (td and td.name) or ("Hardcore " .. rank)
+  local tierName = (td and td.name) or ("Torment " .. rank)
   local svc = ProjectEbonhold.HardmodeService
   local required = svc and svc.GetSoulAshRequirement(tier) or 0
 
@@ -1500,12 +1277,12 @@ ShowNextUnlockAlert = function()
 
     -- Chat line and sound ride with the alert that was actually shown, so a retry does not
     -- announce the same unlock twice.
-    DEFAULT_CHAT_FRAME:AddMessage("|cffFFD100[Hardcore]|r " .. tierName .. " unlocked!")
+    DEFAULT_CHAT_FRAME:AddMessage("|cffFFD100[Torment]|r " .. tierName .. " unlocked!")
     if PlaySound then PlaySound("LEVELUP") end
   end
 end
 
---- Queue the unlock alerts for the given Hardcore ranks (array of numbers).
+--- Queue the unlock alerts for the given Torment ranks (array of numbers).
 function ProjectEbonhold.HardmodeUI.ShowTierUnlocked(ranks)
   if type(ranks) ~= "table" then return end
   for _, rank in ipairs(ranks) do
@@ -1521,12 +1298,54 @@ end
 
 local function UpdateLockOverlay(currentTier)
   if not hardmodeFrame or not hardmodeFrame.lockOverlay then return end
-  -- Keep the panel interactive when the player is already on Hardcore so they can always switch back to Normal.
-  if IsHardmodeUnlocked() or (currentTier and currentTier > 1) then
+  -- Keep the panel interactive when the player is already on Torment so they can always switch back to Normal.
+  -- A GM in .gm on steps past the level-80 gate too (the server re-checks it on the switch).
+  local svc = ProjectEbonhold.HardmodeService
+  local gmOn = svc and svc.GetGmState and svc.GetGmState() == 2
+  if gmOn or IsHardmodeUnlocked() or (currentTier and currentTier > 1) then
     hardmodeFrame.lockOverlay:Hide()
   else
     hardmodeFrame.lockOverlay:Show()
   end
+end
+
+--- Dungeon/raid overlay. Shown whenever the player stands in an instance, and hidden again
+--- on the way out. It never covers the account lock: that one is the harder wall of the two,
+--- and both at once would just hide one message behind another.
+local function UpdateInstanceOverlay(currentTier)
+  if not hardmodeFrame or not hardmodeFrame.instanceOverlay then return end
+  local overlay = hardmodeFrame.instanceOverlay
+
+  local kind = InstanceLockKind()
+  if not kind or (hardmodeFrame.lockOverlay and hardmodeFrame.lockOverlay:IsShown()) then
+    overlay:Hide()
+    return
+  end
+
+  local svc = ProjectEbonhold.HardmodeService
+  local ts = ProjectEbonhold.TierSelector
+  local function Name(t)
+    if not t or t <= 1 then return "Normal" end
+    return "Torment " .. ((ts and ts.ShortName and ts.ShortName(t)) or tostring(t - 1))
+  end
+
+  -- The instance's own tier, when the server told us it is not the player's.
+  local hereTier = svc and svc.GetInstanceDifficulty and svc.GetInstanceDifficulty()
+  local text = "You cannot change your Torment while you are inside a " .. kind .. ".\n\n"
+    .. "Leave the " .. kind .. " and return to an inn or a capital city to change it."
+
+  if hereTier then
+    text = text .. "\n\n|cffFF4444This " .. kind .. " runs at " .. Name(hereTier) .. ", not at your own "
+      .. Name(currentTier) .. ".|r Its difficulty and its rewards are the ones of "
+      .. Name(hereTier) .. " until you leave."
+  else
+    text = text .. "\n\n|cffAAAAAAThis " .. kind .. " runs at " .. Name(currentTier)
+      .. ", the Torment it was opened at. A " .. kind
+      .. " opened by someone else can run at another Torment than yours.|r"
+  end
+
+  if overlay.msg then overlay.msg:SetText(text) end
+  overlay:Show()
 end
 
 function ProjectEbonhold.HardmodeUI.Refresh()
@@ -1537,6 +1356,7 @@ function ProjectEbonhold.HardmodeUI.Refresh()
   local tier = svc and svc.GetCurrentDifficulty() or 1
   BuildContent(hardmodeFrame.canvas, tier)
   UpdateLockOverlay(tier)
+  UpdateInstanceOverlay(tier)
 end
 
 function Addon.ToggleHardmodeFrame()
@@ -1563,6 +1383,7 @@ function Addon.ToggleHardmodeFrame()
     local tier = svc and svc.GetCurrentDifficulty() or 1
     BuildContent(hardmodeFrame.canvas, tier)
     UpdateLockOverlay(tier)
+    UpdateInstanceOverlay(tier)
   end
 end
 

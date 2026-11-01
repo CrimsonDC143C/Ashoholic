@@ -26,7 +26,7 @@ local function GetEchoForItem(itemId)
     local data = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[echoId]
     if not data then return nil end
     -- Only real tome echoes: the item must be their unlock spell
-    if not data.requiredSpell or data.requiredSpell == 0 then return nil end
+    if not data.isTome then return nil end
     return echoId, data
 end
 

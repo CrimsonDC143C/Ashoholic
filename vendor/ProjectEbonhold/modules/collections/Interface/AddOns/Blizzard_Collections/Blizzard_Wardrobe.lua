@@ -31,6 +31,45 @@ end
 -- **** TRANSMOG **********************************************************************************************************************************************
 -- ************************************************************************************************************************************************************
 
+-- [shell] Ashendor option: keep the transmog visible in Shadowform and combat
+-- forms. Every class: the server acts on the form, not on the class. The box
+-- shows the server's state (SEND_FORM_LOOK_STATE); a click sends the wish and
+-- waits for the answer.
+local FORM_LOOK_LABEL = "Show transmog in forms";
+local FORM_LOOK_TOOLTIP = "Cat, Bear, Dire Bear, Moonkin, Tree of Life and Metamorphosis keep your character and its transmog, and Shadowform no longer darkens it. The forms work as usual. Travel, Aquatic, Flight and Ghost Wolf forms are unchanged.";
+
+function WardrobeTransmogFrame_CreateFormLookCheck(self)
+	local label = FORM_LOOK_LABEL;
+	local check = CreateFrame("CheckButton", "WardrobeTransmogFrameFormLookCheck", self.Model, "UICheckButtonTemplate");
+	check:SetSize(24, 24);
+	check:SetPoint("TOPLEFT", self.Model, "TOPLEFT", 8, -8);
+	check:SetFrameLevel(self.Model:GetFrameLevel() + 5);
+	check.text = _G[check:GetName().."Text"];
+	check.text:SetFontObject(GameFontHighlightSmall);
+	check.text:ClearAllPoints();
+	check.text:SetPoint("LEFT", check, "RIGHT", 1, 1);
+	check.text:SetText(label);
+	check:SetChecked(ezCollections.FormLookHidden and true or false);
+	check:SetScript("OnClick", function(button)
+		local wanted = button:GetChecked() and true or false;
+		PlaySound(wanted and "igMainMenuOptionCheckBoxOn" or "igMainMenuOptionCheckBoxOff");
+		button:SetChecked(ezCollections.FormLookHidden and true or false);
+		ezCollections:SetFormLookHiddenOnServer(wanted);
+	end);
+	check:SetScript("OnEnter", function(button)
+		GameTooltip:SetOwner(button, "ANCHOR_RIGHT");
+		GameTooltip:SetText(label, 1, 1, 1);
+		GameTooltip:AddLine(FORM_LOOK_TOOLTIP, nil, nil, nil, true);
+		GameTooltip:Show();
+	end);
+	check:SetScript("OnLeave", GameTooltip_Hide);
+	check.OnEvent = function(button, event)
+		button:SetChecked(ezCollections.FormLookHidden and true or false);
+	end;
+	ezCollections:RegisterEvent(check, "TRANSMOG_FORM_LOOK_CHANGED");
+	self.FormLookCheck = check;
+end
+
 function WardrobeTransmogFrame_OnLoad(self)
 	self.Model.SlotButtons =
 	{
@@ -78,6 +117,7 @@ function WardrobeTransmogFrame_OnLoad(self)
 		self.SpecHelpBox:Hide();
 		self.SpecHelpBox.Show = function() end;
 	end
+	WardrobeTransmogFrame_CreateFormLookCheck(self);
 	local oTryOn = self.Model.TryOn;
 	function self.Model:TryOn(appearanceSourceID, slot, illusionSourceID)
 		local enchant = ezCollections:GetEnchantFromScroll(illusionSourceID);
@@ -413,6 +453,11 @@ function WardrobeTransmogFrame_UpdateWeaponModel(slot)
 	end
 	local slotID = GetInventorySlotInfo(slot);
 	local appearanceSourceID = WardrobeTransmogFrame_GetDisplayedSource(weaponSlotButton);
+	if ( C_TransmogCollection.IsAppearanceHiddenVisual(appearanceSourceID) ) then
+		-- hidden off hand: leave the hand empty on the model
+		WardrobeTransmogFrame.Model:UndressSlot(slotID);
+		return;
+	end
 	if ( appearanceSourceID ~= NO_TRANSMOG_SOURCE_ID ) then
 		local illusionSourceID = enchantSlotButton and WardrobeTransmogFrame_GetDisplayedSource(enchantSlotButton);
 		if WardrobeTransmogFrame.hideFailedSlots then
@@ -2225,7 +2270,7 @@ function WardrobeItemsCollectionMixin:RefreshVisualsList()
 	if ( self.transmogType == LE_TRANSMOG_TYPE_ILLUSION ) then
 		self.visualsList = C_TransmogCollection.GetIllusions();
 	else
-		self.visualsList = C_TransmogCollection.GetCategoryAppearances(self.activeCategory);
+		self.visualsList = C_TransmogCollection.GetCategoryAppearances(self.activeCategory, self.activeSlot);
 	end
 	local allLoaded = self:FilterVisuals();
 	self:SortVisuals();

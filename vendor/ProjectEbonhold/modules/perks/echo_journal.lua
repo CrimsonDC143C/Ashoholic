@@ -70,6 +70,9 @@ local QUALITY_BADGE_POS = {
 }
 
 local MAX_RUN_ECHOES = 79 -- one roll per level gained (2..80), so 79 picks per run
+-- Rows a build may hold, wishes and refusals together: PerkLoadoutHandler's
+-- MAX_UPLOAD_ENTRIES, minus a little room so a save never silently loses rows.
+local MAX_DRAFT_ENTRIES = 115
 
 -- Shared "an armed selection will act on THIS echo" mauve. The Orb of Lost Memories and the
 -- permanent-slot lock both hijack a click on the same grid, so they mark their target the same
@@ -106,14 +109,19 @@ local contextBar, searchBox, filterButton
 local lockModeActive = false
 
 -- Loadout builder: while active, the All Echoes grid becomes a picker
--- (left-click adds a stack, right-click removes one) with a Done/Cancel banner.
-local builderDraft = nil -- { name = string, entries = { [spellId] = { quality, stacks } } }
+-- (left-click adds a stack, right-click removes one, ctrl-click marks an echo
+-- as unwanted) with a Done/Cancel banner.
+-- An entry with avoid = true is the mirror of a wish: the draw never auto-picks
+-- it and its card is dimmed. It rides in the SAME entries table instead of a
+-- second list, so a build stays one object end to end (draft, wire, export).
+local builderDraft = nil -- { name = string, entries = { [spellId] = { quality, stacks, avoid } } }
 
 -- Set just before showing PROJECTEBONHOLD_LOADOUT_NAME from the loadout
 -- footer's dropdown (picking a specific empty slot) so the new wishlist
 -- targets that slot instead of auto-picking the first free one (the
 -- footer's plain "New Wishlist" button leaves this nil).
 local pendingWishlistTargetSlot = nil
+local SwitchOwedText -- defined with the switch popup, used by the row handlers above it
 
 -- Set when the player creates their FIRST-ever build (snapshot, wishlist or
 -- import): once the server's slot list comes back with exactly that one build
@@ -125,17 +133,32 @@ local autoActivateFirstBuild
 local function DraftCount()
     local n = 0
     if builderDraft then
-        for _ in pairs(builderDraft.entries) do n = n + 1 end
+        for _, e in pairs(builderDraft.entries) do
+            if not e.avoid then n = n + 1 end
+        end
+    end
+    return n
+end
+
+local function DraftAvoidCount()
+    local n = 0
+    if builderDraft then
+        for _, e in pairs(builderDraft.entries) do
+            if e.avoid then n = n + 1 end
+        end
     end
     return n
 end
 
 -- Total stacks across the draft: a build cannot hold more echoes than a run
--- can grant (MAX_RUN_ECHOES)
+-- can grant (MAX_RUN_ECHOES). Unwanted echoes cost nothing -- they are never
+-- picked, so budgeting them against the run's picks would be nonsense.
 local function DraftTotalStacks()
     local n = 0
     if builderDraft then
-        for _, e in pairs(builderDraft.entries) do n = n + (e.stacks or 1) end
+        for _, e in pairs(builderDraft.entries) do
+            if not e.avoid then n = n + (e.stacks or 1) end
+        end
     end
     return n
 end
@@ -195,22 +218,19 @@ local function GetService()
     return ProjectEbonhold.PerkService
 end
 
--- The build driving the My Echoes overview (ghosts + "Build:" header line).
--- The armed server slot wins; otherwise the wish-list loadout being played
--- (shared/imported builds - highlight-only, same as snapshots below 80).
--- Returns loadout, isSnapshot (true = a server-verified snapshot, applied whole
--- at level 80; false = wish-list, its echoes are only highlighted when rolled).
+-- The build driving the My Echoes overview (ghosts + "Build:" header line):
+-- the highlighted WISHLIST. Live loadouts are what the player owns, so they
+-- never act as a target here. Returns loadout, false (kept for callers that
+-- still take the old isSnapshot flag).
 local function GetActiveBuildOverview()
     local svc = GetService()
     if not svc then return nil, false end
 
-    local activeSlot = svc.GetServerActiveSlot and svc.GetServerActiveSlot() or 0
+    local design = svc.GetServerActiveDesign and svc.GetServerActiveDesign() or 0
     local slots = svc.GetServerBuildSlots and svc.GetServerBuildSlots()
-    local server = activeSlot > 0 and slots and slots[activeSlot] or nil
+    local server = design > 0 and slots and slots[design] or nil
     if server then
-        -- Snapshot builds are applied whole at 80; designed/imported ones
-        -- are highlight-only, same treatment as a wish-list loadout.
-        return server, server.verified and true or false
+        return server, false
     end
 
     local wish = svc.GetActiveEchoLoadout and svc.GetActiveEchoLoadout()
@@ -247,13 +267,17 @@ local function GetOwnedInfo()
     return owned
 end
 
--- True if ANY server-side build exists (snapshot slots or designed pool) --
--- the player's very first build gets auto-activated on creation (see
+-- True if ANY wishlist exists (live loadouts always do, so they don't count) --
+-- the player's very first wishlist gets highlighted on creation (see
 -- CompleteBuilderSave/CompleteImport/UpdateLoadoutFooter).
 local function HasAnyBuild()
     local svc = GetService()
     local slots = svc and svc.GetServerBuildSlots and svc.GetServerBuildSlots() or {}
-    return next(slots) ~= nil
+    local maxSlots = (svc and svc.GetServerMaxSlots and svc.GetServerMaxSlots()) or 10
+    for slot in pairs(slots) do
+        if slot > maxSlots then return true end
+    end
+    return false
 end
 
 local function MatchesFamily(data)
@@ -282,7 +306,9 @@ end
 -- lot per client, and a time budget self-tunes (many echoes per frame on a fast
 -- client, one at a time on a slow one) instead of picking a count that either
 -- stutters or drags the warm-up out for no reason.
-local DESC_WARM_BUDGET_MS = 8
+-- 3 ms (was 8): the scrape keeps running after the journal closes, until all ~950
+-- echoes are cached; a smaller slice per frame keeps that pass from dipping the FPS.
+local DESC_WARM_BUDGET_MS = 3
 local DESC_WARM_FALLBACK = 3 -- per frame, when no millisecond timer exists
 local descWarmQueue, descWarmIndex, descWarmDone
 local descWarmFrame
@@ -318,7 +344,10 @@ local function WarmSearchDescCache()
                 local spellId = descWarmQueue[descWarmIndex]
                 if not spellId then
                     self:Hide()
-                    descWarmDone = true
+                    -- Echoes whose read came back empty stay uncached: the next
+                    -- call (a keystroke, the journal opening) runs a pass for them.
+                    descWarmDone = not self.missed
+                    self.missed = nil
                     descWarmQueue = nil
                     -- Echoes still uncached could not match on their effect
                     -- while the user was typing; redo the pass now they can.
@@ -331,8 +360,15 @@ local function WarmSearchDescCache()
 
                 if not searchDescCache[spellId] then
                     local text = utils.GetSpellSearchText(spellId) or ""
-                    searchDescCache[spellId] =
-                        string.lower(text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+                    -- Every echo has a description, so an empty read is a failed
+                    -- scrape: caching "" would hide the echo from effect searches
+                    -- until the next /reload.
+                    if text ~= "" then
+                        searchDescCache[spellId] =
+                            string.lower(text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+                    else
+                        self.missed = true
+                    end
                 end
 
                 left = left - 1
@@ -408,8 +444,8 @@ local function BuildItems(tab)
 
     if tab == TAB_MY_RUN then
         -- Group quality variants by echo name with per-quality counts, like
-        -- the run echoes panel. The search bar only filters the catalog (All
-        -- Echoes) -- this list always shows everything currently held.
+        -- the run echoes panel. The search bar filters this list too (name,
+        -- comment, effect), but not the catalog's filter dropdown.
         local svc = GetService()
         local granted = svc and svc.GetGrantedPerks and svc.GetGrantedPerks() or {}
         local lockedPerks = svc and svc.GetLockedPerks and svc.GetLockedPerks() or {}
@@ -465,7 +501,8 @@ local function BuildItems(tab)
         if activeBuild then
             for _, e in ipairs(activeBuild.echoes or {}) do
                 local data = ProjectEbonhold.PerkDatabase[e.spellId]
-                if data then
+                -- A crossed-out echo is not a build target: no ghost, no counter
+                if data and not e.avoid then
                     local name = GetSpellInfo(e.spellId)
                     local entry = name and byName[name]
                     local ownedStacks = entry and entry.totalStacks or 0
@@ -475,7 +512,7 @@ local function BuildItems(tab)
                         -- this column against the catalog next door, so a ghost
                         -- whose tome is already learned must say so too instead
                         -- of falling back to "Requires Tome to unlock".
-                        local isTome = (data.requiredSpell and data.requiredSpell ~= 0) or false
+                        local isTome = data.isTome == true
                         local tomeKnown = isTome and discovered[e.spellId] ~= nil
                         table.insert(ghostItems, {
                             spellId = e.spellId, data = data,
@@ -501,6 +538,43 @@ local function BuildItems(tab)
             end
         end
 
+        -- Souvenirs of the active loadout not reclaimed yet this climb: greyed
+        -- ghosts too, so the finished build shows whole while it is rebuilt.
+        -- Exact spell ids (the memory is the loadout's own picks); an echo the
+        -- player already holds stacks of gets its remaining count on the tooltip.
+        do
+            local slots = svc and svc.GetServerBuildSlots and svc.GetServerBuildSlots()
+            local activeSlot = svc and svc.GetServerActiveSlot and svc.GetServerActiveSlot() or 0
+            local live = slots and slots[activeSlot]
+            for _, m in ipairs(live and live.memory or {}) do
+                if (m.remaining or 0) > 0 then
+                    local data = ProjectEbonhold.PerkDatabase[m.spellId]
+                    if data then
+                        local name = GetSpellInfo(m.spellId)
+                        local entry = name and byName[name]
+                        if entry and entry.totalStacks > 0 then
+                            entry.souvenirRemaining = m.remaining
+                        else
+                            local isTome = data.isTome == true
+                            local tomeKnown = isTome and discovered[m.spellId] ~= nil
+                            table.insert(ghostItems, {
+                                spellId = m.spellId, data = data,
+                                name = name,
+                                stacks = 0,
+                                dimmed = true,
+                                souvenirMissing = true,
+                                souvenirRemaining = m.remaining,
+                                isTome = isTome,
+                                tomeKnown = tomeKnown,
+                                tomeDisabled = (tomeKnown and svc and svc.IsTomeEchoDisabled
+                                    and svc.IsTomeEchoDisabled(m.spellId)) or false,
+                            })
+                        end
+                    end
+                end
+            end
+        end
+
         local totalPicks = 0
         for _, entry in pairs(byName) do
             totalPicks = totalPicks + entry.totalStacks
@@ -508,7 +582,7 @@ local function BuildItems(tab)
             if data then
                 -- Holding stacks of a tome echo implies its tome is known (the
                 -- catalog draws the same inference from ownership).
-                local isTome = (data.requiredSpell and data.requiredSpell ~= 0) or false
+                local isTome = data.isTome == true
                 table.insert(items, {
                     spellId = entry.spellId, data = data,
                     name = GetSpellInfo(entry.spellId),
@@ -519,6 +593,7 @@ local function BuildItems(tab)
                     locked = entry.locked or false,
                     buildTarget = entry.buildTarget,
                     buildLocked = entry.buildLocked,
+                    souvenirRemaining = entry.souvenirRemaining,
                     isTome = isTome,
                     tomeKnown = isTome,
                     tomeDisabled = (isTome and svc and svc.IsTomeEchoDisabled
@@ -528,6 +603,18 @@ local function BuildItems(tab)
         end
         for _, ghost in ipairs(ghostItems) do
             table.insert(items, ghost)
+        end
+
+        -- totalPicks is counted above, before this: the header keeps the
+        -- real number of picks held while a search narrows the grid.
+        if currentSearchText ~= "" then
+            local matched = {}
+            for _, item in ipairs(items) do
+                if PassesFilters(item.spellId, item.data, false, true) then
+                    table.insert(matched, item)
+                end
+            end
+            items = matched
         end
 
         SortItems(items)
@@ -560,7 +647,7 @@ local function BuildItems(tab)
         end
 
         for spellId, data in pairs(ProjectEbonhold.PerkDatabase) do
-            local isTome = data.requiredSpell and data.requiredSpell ~= 0
+            local isTome = data.isTome == true
             local info = owned[spellId]
             local isUnlocked = info ~= nil or discovered[spellId] ~= nil
             -- an unlocked (un-dimmed) tome echo = its tome is known: highlight
@@ -690,7 +777,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_TOME_ENABLE"] = {
 
 local function TryToggleTome(button)
     local data = button.perkData
-    if not (button.tomeKnown and data and data.requiredSpell and data.requiredSpell ~= 0) then
+    if not (button.tomeKnown and data and data.isTome) then
         return
     end
     if (UnitLevel("player") or 1) ~= 1 then
@@ -735,12 +822,17 @@ local function ShowEchoTooltip(button)
         end
 
         GameTooltip:AddLine(" ")
-        local familyIcons = utils and utils.FormatPerkFamilies and utils.FormatPerkFamilies(data.families)
-        if familyIcons then
-            GameTooltip:AddDoubleLine("Perk Family", familyIcons, 0.6, 0.6, 0.6, 1, 1, 1)
-        end
+        -- no "Perk Family" line any more (owner 2026-10-23)
         if button.isLocked then
             GameTooltip:AddLine("Permanent echo (locked between runs)", 1, 0.82, 0)
+        end
+        if button.souvenirMissing then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(string.format(
+                "Souvenir of this loadout's finished build: not reclaimed yet (x%d)", button.souvenirRemaining or 1), 1, 0.82, 0.1)
+            GameTooltip:AddLine("Offered as the fourth card of your draws while you climb.", 0.9, 0.9, 0.9, true)
+        elseif button.souvenirRemaining then
+            GameTooltip:AddDoubleLine("Souvenir stacks still to reclaim", tostring(button.souvenirRemaining), 1, 0.82, 0.1, 1, 1, 1)
         end
         if button.buildMissing then
             GameTooltip:AddLine(" ")
@@ -768,7 +860,7 @@ local function ShowEchoTooltip(button)
             GameTooltip:AddLine(dropSource, 0.5, 0.5, 0.5, true)
         end
 
-        if data.requiredSpell and data.requiredSpell ~= 0 then
+        if data.isTome then
             GameTooltip:AddLine(" ")
             if button.tomeKnown then
                 if button.tomeDisabled then
@@ -850,6 +942,9 @@ local function ShowEchoTooltip(button)
             GameTooltip:AddLine("Shift-click to link in chat", 0.4, 0.4, 0.4)
             if utils and utils.IsDevRealm and utils.IsDevRealm() then
                 GameTooltip:AddLine("|cffFF6600Left-click to add stack (DEV)|r", 1, 1, 1, true)
+                if (button.ownedStacks or 0) > 0 then
+                    GameTooltip:AddLine("|cffFF6600Right-click to remove stack (DEV)|r", 1, 1, 1, true)
+                end
             end
         end
     end
@@ -862,36 +957,64 @@ end
 -- closure would compile a GLOBAL lookup and blow up on the first right-click.
 local ApplyOrbMark
 
+-- Every region of a grid button hangs straight off the button: the icon
+-- square (BUTTON_SIZE, 3px below the top) used to be an invisible child
+-- Frame the regions anchored to, but each shown frame or region of the
+-- catalog is re-laid out on every scroll step, at a cost that grows with the
+-- SQUARE of their count (see the virtualized grid notes). These offsets put
+-- each region exactly where that square used to place it.
+-- (One table, not three locals: this file's main chunk sits at Lua's limit of
+-- 200 locals, and one more fails the whole file at load.)
+local CARD = { ICON_TOP = 3 }
+CARD.ICON_CENTER_Y = -(CARD.ICON_TOP + BUTTON_SIZE / 2) -- icon centre, from the button's TOP
+CARD.ICON_BOTTOM_Y = -(CARD.ICON_TOP + BUTTON_SIZE)     -- icon bottom edge, from the button's TOP
+
+-- The overlay frame only carries badges and markers. With none of them up it
+-- is hidden, so a plain catalog card is the button and its four regions.
+CARD.OVERLAY_REGIONS = { "orbGlow", "builderSelCheck", "builderAvoidMark", "badgeBg", "lockIcon", "tomeIcon" }
+local function SyncOverlay(button)
+    local overlay = button.overlayFrame
+    if not overlay then return end
+    for _, key in ipairs(CARD.OVERLAY_REGIONS) do
+        if button[key]:IsShown() then
+            overlay:Show()
+            return
+        end
+    end
+    for i = 1, QUALITY_BADGE_SLOTS do
+        if button.qualityBadges[i].bg:IsShown() then
+            overlay:Show()
+            return
+        end
+    end
+    overlay:Hide()
+end
+
 local function CreateGridButton(parent)
     local button = CreateFrame("Button", nil, parent)
     button:SetSize(BUTTON_SIZE, BUTTON_SIZE + NAME_HEIGHT)
 
     -- Rounded icon look, same textures as the run echoes panel:
     -- quality disc behind a portrait-cropped icon, with a rounded quality ring.
-    local anchor = CreateFrame("Frame", nil, button)
-    anchor:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-    anchor:SetPoint("TOP", button, "TOP", 0, -3)
-    button.anchorFrame = anchor
-
     local iconBase = button:CreateTexture(nil, "BORDER")
     iconBase:SetSize(BUTTON_SIZE * 1.2, BUTTON_SIZE * 1.2)
-    iconBase:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+    iconBase:SetPoint("CENTER", button, "TOP", 0, CARD.ICON_CENTER_Y)
     button.iconBase = iconBase
 
     local icon = button:CreateTexture(nil, "ARTWORK")
     icon:SetSize(BUTTON_SIZE * 0.8, BUTTON_SIZE * 0.8)
-    icon:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+    icon:SetPoint("CENTER", button, "TOP", 0, CARD.ICON_CENTER_Y)
     button.icon = icon
 
     local ring = button:CreateTexture(nil, "OVERLAY", nil, 2)
     ring:SetSize(110 * BUTTON_SIZE / 32, 110 * BUTTON_SIZE / 32)
-    ring:SetPoint("CENTER", anchor, "CENTER", 0, 2)
+    ring:SetPoint("CENTER", button, "TOP", 0, CARD.ICON_CENTER_Y + 2)
     button.ring = ring
 
     -- Strong golden glow marking an echo locked into a permanent slot
     local lockedGlow = button:CreateTexture(nil, "BACKGROUND")
     lockedGlow:SetSize(BUTTON_SIZE * 1.8, BUTTON_SIZE * 1.8)
-    lockedGlow:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+    lockedGlow:SetPoint("CENTER", button, "TOP", 0, CARD.ICON_CENTER_Y)
     lockedGlow:SetTexture(ASSETS .. "perm_background_texture")
     lockedGlow:SetBlendMode("ADD")
     lockedGlow:SetVertexColor(1, 0.82, 0, 0.9)
@@ -899,7 +1022,7 @@ local function CreateGridButton(parent)
     button.lockedGlow = lockedGlow
 
     local nameText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    nameText:SetPoint("TOP", anchor, "BOTTOM", 0, -2)
+    nameText:SetPoint("TOP", button, "TOP", 0, CARD.ICON_BOTTOM_Y - 2)
     nameText:SetWidth(BUTTON_SIZE + 6)
     nameText:SetHeight(NAME_HEIGHT)
     nameText:SetJustifyH("CENTER")
@@ -923,17 +1046,22 @@ local function CreateGridButton(parent)
     local orbGlow = overlay:CreateTexture(nil, "ARTWORK")
     orbGlow:SetTexture("Interface\\Cooldown\\star4")
     orbGlow:SetSize(BUTTON_SIZE * 1.9, BUTTON_SIZE * 1.9)
-    orbGlow:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+    orbGlow:SetPoint("CENTER", button, "TOP", 0, CARD.ICON_CENTER_Y)
     orbGlow:SetBlendMode("ADD")
     orbGlow:SetVertexColor(ARMED_PICK_R, ARMED_PICK_G, ARMED_PICK_B, 0.95)
     orbGlow:Hide()
     button.orbGlow = orbGlow
 
-    local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+    -- Hover glow. Not a HIGHLIGHT-layer texture: those stay laid out on every
+    -- card all the time. This one is shown on enter and hidden on leave, so
+    -- only the hovered card carries it. Top OVERLAY sublevel = where the
+    -- HIGHLIGHT layer drew it, above the ring and the name.
+    local highlight = button:CreateTexture(nil, "OVERLAY", nil, 7)
     highlight:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
     highlight:SetBlendMode("ADD")
     highlight:SetSize(BUTTON_SIZE * 1.1, BUTTON_SIZE * 1.1)
-    highlight:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+    highlight:SetPoint("CENTER", button, "TOP", 0, CARD.ICON_CENTER_Y)
+    highlight:Hide()
     button._highlight = highlight
 
     -- Builder-mode selection marker: a corner check -- the old shared gold
@@ -942,14 +1070,22 @@ local function CreateGridButton(parent)
     local selCheck = overlay:CreateTexture(nil, "OVERLAY", nil, 7)
     selCheck:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
     selCheck:SetSize(22, 22)
-    selCheck:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", 8, -4)
+    selCheck:SetPoint("BOTTOMRIGHT", button, "TOPRIGHT", 8, CARD.ICON_BOTTOM_Y - 4)
     selCheck:Hide()
     button.builderSelCheck = selCheck
+
+    -- Same corner, opposite meaning: this echo is crossed out of the draft
+    local avoidMark = overlay:CreateTexture(nil, "OVERLAY", nil, 6)
+    avoidMark:SetTexture("Interface\\RaidFrame\\ReadyCheck-NotReady")
+    avoidMark:SetSize(20, 20)
+    avoidMark:SetPoint("BOTTOMRIGHT", button, "TOPRIGHT", 6, CARD.ICON_BOTTOM_Y - 2)
+    avoidMark:Hide()
+    button.builderAvoidMark = avoidMark
 
     -- Count badge at the top of the icon, same look as the run echoes panel
     local badgeBg = overlay:CreateTexture(nil, "OVERLAY", nil, 5)
     badgeBg:SetSize(22, 22)
-    badgeBg:SetPoint("TOP", anchor, "TOP", 0, 9)
+    badgeBg:SetPoint("TOP", button, "TOP", 0, -CARD.ICON_TOP + 9)
     badgeBg:SetTexture(ASSETS .. "background_count")
     button.badgeBg = badgeBg
 
@@ -968,7 +1104,7 @@ local function CreateGridButton(parent)
         local pos = QUALITY_BADGE_POS[i]
         local bg = overlay:CreateTexture(nil, "OVERLAY", nil, 5)
         bg:SetSize(QUALITY_BADGE_SIZE, QUALITY_BADGE_SIZE)
-        bg:SetPoint("CENTER", anchor, "CENTER", pos.x, pos.y)
+        bg:SetPoint("CENTER", button, "TOP", pos.x, CARD.ICON_CENTER_Y + pos.y)
         bg:SetTexture(ASSETS .. "background_count")
         bg:Hide()
 
@@ -1005,8 +1141,16 @@ local function CreateGridButton(parent)
     button.tomeGlow = tomeGlow
 
 
-    button:SetScript("OnEnter", ShowEchoTooltip)
-    button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    button:SetScript("OnEnter", function(self)
+        self._highlight:Show()
+        ShowEchoTooltip(self)
+    end)
+    button:SetScript("OnLeave", function(self)
+        self._highlight:Hide()
+        GameTooltip:Hide()
+    end)
+    -- A card scrolled out of the shown window must not come back lit
+    button:SetScript("OnHide", function(self) self._highlight:Hide() end)
     button:SetScript("OnClick", function(self, mouseButton)
         -- Orb of Lost Memories: while an orb is armed, left-clicking an echo you OWN spends it
         -- on that echo. Checked before everything else so no other binding can steal the click.
@@ -1046,25 +1190,62 @@ local function CreateGridButton(parent)
             and not IsShiftKeyDown() then
             local entries = builderDraft.entries
             local e = entries[self.spellId]
+            -- Ctrl-click toggles "never take this one". Held first so it works on a
+            -- free echo and on one already wished for, in one gesture either way.
+            if IsControlKeyDown() then
+                if e and e.avoid then
+                    entries[self.spellId] = nil
+                else
+                    -- The server keeps at most MAX_DRAFT_ENTRIES rows per build and
+                    -- silently drops the rest, so the cap is enforced here where it
+                    -- can still be said out loud.
+                    if not e and DraftCount() + DraftAvoidCount() >= MAX_DRAFT_ENTRIES then
+                        UIErrorsFrame:AddMessage(string.format(
+                            "A wishlist holds at most %d echoes, wanted and refused together.",
+                            MAX_DRAFT_ENTRIES), 1, 0.1, 0.1)
+                        return
+                    end
+                    entries[self.spellId] =
+                        { quality = self.perkData.quality or 0, stacks = 1, avoid = true }
+                end
+                Refresh()
+                return
+            end
             if mouseButton == "LeftButton" then
                 if DraftTotalStacks() >= MAX_RUN_ECHOES then
                     UIErrorsFrame:AddMessage(
                         string.format("A wishlist cannot exceed %d echoes.", MAX_RUN_ECHOES), 1, 0.1, 0.1)
                     return
                 end
-                if e then
+                if e and e.avoid then
+                    -- Wishing for an echo you had crossed out flips it back, at one stack
+                    e.avoid = nil
+                    e.stacks = 1
+                elseif e then
                     e.stacks = math.min(e.stacks + 1, self.perkData.maxStack or 1)
                 else
                     entries[self.spellId] = { quality = self.perkData.quality or 0, stacks = 1 }
                 end
             elseif mouseButton == "RightButton" and e then
-                e.stacks = e.stacks - 1
-                if e.stacks <= 0 then entries[self.spellId] = nil end
+                if e.avoid then
+                    entries[self.spellId] = nil
+                else
+                    e.stacks = e.stacks - 1
+                    if e.stacks <= 0 then entries[self.spellId] = nil end
+                end
             end
             Refresh()
             return
         end
         if mouseButton == "RightButton" then
+            -- PTR: right-click takes a stack off an owned echo (the run HUD's dev rule);
+            -- an echo not owned keeps the tome toggle. Grouped My Echoes cards target the
+            -- rarity actually held, like the orb does.
+            if utils and utils.IsDevRealm and utils.IsDevRealm() and orbTarget
+                and (self.ownedStacks or 0) > 0 and ProjectEbonhold.sendToServer and ProjectEbonhold.CS then
+                ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_DEV_REMOVE_PERK_STACK, tostring(orbTarget))
+                return
+            end
             TryToggleTome(self)
             return
         end
@@ -1121,6 +1302,7 @@ function ApplyOrbMark(button)
         button.ring:SetAlpha(button._ringAlpha or 1)
         if button.orbGlow then button.orbGlow:Hide() end
     end
+    SyncOverlay(button)
 end
 
 local function UpdateGridButton(button, item)
@@ -1138,7 +1320,10 @@ local function UpdateGridButton(button, item)
         button.buildMissing = nil
         button.buildTarget = nil
         button.buildLocked = nil
+        button.souvenirMissing = nil
+        button.souvenirRemaining = nil
         button.isEmptySlot = true
+        if button.builderAvoidMark then button.builderAvoidMark:Hide() end
         button.icon:Hide()
         button.iconBase:SetTexture(ASSETS .. "perk_quality_0")
         button.iconBase:SetDesaturated(true)
@@ -1158,6 +1343,7 @@ local function UpdateGridButton(button, item)
         button.tomeGlow:Hide()
         button.lockedGlow:Hide()
         if button.tomeSwirl then button.tomeSwirl:Hide() end
+        SyncOverlay(button)
         return
     end
 
@@ -1179,6 +1365,8 @@ local function UpdateGridButton(button, item)
     button.buildMissing = item.buildMissing
     button.buildTarget = item.buildTarget
     button.buildLocked = item.buildLocked
+    button.souvenirMissing = item.souvenirMissing
+    button.souvenirRemaining = item.souvenirRemaining
 
     local spellName, _, spellIcon = GetSpellInfo(spellId)
     button.icon:Show()
@@ -1251,6 +1439,12 @@ local function UpdateGridButton(button, item)
         button.stackText:SetTextColor(0.6, 0.6, 0.6)
         button.stackText:Show()
         button.badgeBg:Show()
+    elseif item.souvenirMissing then
+        -- Ghost of a souvenir not reclaimed yet: its remaining stacks in grey
+        button.stackText:SetText(tostring(item.souvenirRemaining or 1))
+        button.stackText:SetTextColor(0.6, 0.6, 0.6)
+        button.stackText:Show()
+        button.badgeBg:Show()
     else
         button.stackText:Hide()
         button.badgeBg:Hide()
@@ -1289,13 +1483,12 @@ local function UpdateGridButton(button, item)
     -- echo can appear in this run's draws. Disabled tomes show no swirl.
     if item.tomeKnown and not item.tomeDisabled then
         if not button.tomeSwirl then
-            local host = button.anchorFrame or button
             local swirl = button:CreateTexture(nil, "BACKGROUND", nil, 2)
             swirl:SetTexture("Interface\\Cooldown\\star4")
             swirl:SetBlendMode("ADD")
             swirl:SetVertexColor(0.3, 0.8, 1, 0.6)
             swirl:SetSize(BUTTON_SIZE * 1.7, BUTTON_SIZE * 1.7)
-            swirl:SetPoint("CENTER", host, "CENTER", 0, 0)
+            swirl:SetPoint("CENTER", button, "TOP", 0, CARD.ICON_CENTER_Y)
             local anim = swirl:CreateAnimationGroup()
             anim:SetLooping("REPEAT")
             local rot = anim:CreateAnimation("Rotation")
@@ -1312,12 +1505,20 @@ local function UpdateGridButton(button, item)
     button.tomeDisabled = item.tomeDisabled
 
     -- Loadout builder: corner check + green stack count on echoes picked
-    -- for the draft. (The gold lockedGlow is deliberately NOT reused here:
-    -- gold means "locked into a permanent slot" everywhere else.)
+    -- for the draft, red cross + greyed icon on the ones crossed out.
+    -- (The gold lockedGlow is deliberately NOT reused here: gold means
+    -- "locked into a permanent slot" everywhere else.)
     button.builderSelCheck:Hide()
+    if button.builderAvoidMark then button.builderAvoidMark:Hide() end
     if builderDraft and currentTab == TAB_ALL then
         local e = builderDraft.entries[spellId]
-        if e then
+        if e and e.avoid then
+            if button.builderAvoidMark then button.builderAvoidMark:Show() end
+            button.icon:SetDesaturated(true)
+            button.icon:SetVertexColor(0.75, 0.45, 0.45)
+            button.stackText:Hide()
+            button.badgeBg:Hide()
+        elseif e then
             button.builderSelCheck:Show()
             button.stackText:SetText(tostring(e.stacks))
             button.stackText:SetTextColor(0.1, 1, 0.1)
@@ -1325,6 +1526,7 @@ local function UpdateGridButton(button, item)
             button.badgeBg:Show()
         end
     end
+    SyncOverlay(button)
 end
 
 -- ── My Run panel (merged Echoes tab's left column) ──────────────────────────
@@ -1342,6 +1544,11 @@ local function UpdateMyRunPanel(items)
     -- No SetShown on this 3.3.5 client (5.x API) -- explicit Show/Hide.
     if myRunEmptyState then
         if #items == 0 then myRunEmptyState:Show() else myRunEmptyState:Hide() end
+        if myRunEmptyState.text then
+            myRunEmptyState.text:SetText(currentSearchText ~= ""
+                and "None of your echoes match this search."
+                or "You have no echoes yet.\n\nLevel up during a run to earn new echoes.")
+        end
     end
     local pitch = BUTTON_SIZE + NAME_HEIGHT + BUTTON_SPACING
     -- Fixed, shared with the catalog grid (see ECHO_GRID_HSTEP) so column
@@ -1373,69 +1580,213 @@ end
 
 -- ── Virtualized grid ─────────────────────────────────────────────────────────
 -- Materializing one live button per catalog entry (hundreds of frames, each
--- with ~10 regions) made scrolling stutter. Instead, only the rows inside the
--- viewport (plus one buffer row on each side) exist; scrolling rebinds this
--- small pool onto different items at their virtual positions.
-local currentItems = {}
-local gridItemCount = -1
-local gridWindowFirst, gridWindowLast = -1, -1
+-- with ~10 regions) made scrolling stutter. Instead a small pool of buttons
+-- is bound onto the items around the viewport, at their virtual positions.
+--
+-- The pool is a ring of rows: virtual row r always lives in pool row
+-- r % gridPoolRows, so scrolling by one row only rebinds the row that enters
+-- the window, and every other button keeps its echo and its position. The
+-- first version rebound the WHOLE window (~90 buttons) on every row crossed,
+-- each with a SetPortraitToTexture (a synchronous icon load + round crop) --
+-- that was the FPS drop while scrolling.
+--
+-- Rows whose art crosses the viewport are bound at once and shown. Past
+-- them, one mouse-wheel step of rows on each side is bound in the
+-- background, a few per frame, and kept hidden: the next wheel step then
+-- mostly just shows rows that are already filled.
+--
+-- Showing as few cards as possible is what keeps a scroll step cheap. The
+-- client re-anchors the scroll child on every step and re-lays out each
+-- SHOWN frame and region below it, and its resize queue costs the SQUARE of
+-- that count (RE note wow335-ui-layout-engine, mod_customopcode memory; the
+-- DLL's layoutfix bounds it, but the client that ships does not always load
+-- it). Hidden cards cost nothing. So: no margin row past the viewport, and
+-- as few shown regions per card as possible (see CreateGridButton).
+-- The grid's state and helpers live in this block, so they do not count
+-- against the main chunk's 200-locals limit (see CARD above).
+local UpdateVisibleGrid, UpdateGrid
+do
+    local GRID_PITCH = BUTTON_SIZE + NAME_HEIGHT + BUTTON_SPACING
+    local GRID_TOP_PAD = 10   -- first row's distance from the top of the scroll child
+    -- A row's art reaches past its buttons' top edge: the orb glow (1.9x the
+    -- icon, the widest region) starts 18px above it and ends 70px below, past
+    -- the name. Measured on the textures; the ring's visible part is inside.
+    local GRID_ART_ABOVE, GRID_ART_BELOW = 18, 70
+    local GRID_PREFETCH_BUDGET_MS = 4
 
-local function UpdateVisibleGrid()
-    if not scrollFrame then return end
-    local pitch = BUTTON_SIZE + NAME_HEIGHT + BUTTON_SPACING
-    local offset = scrollFrame:GetVerticalScroll() or 0
-    local viewH = scrollFrame:GetHeight() or 300
+    local currentItems = {}
+    local gridItemCount = -1
+    local gridPoolRows, gridBufferRows = 0, 0
+    local gridSlotRow = {}   -- [pool row] = virtual row bound there (nil = needs a bind)
+    local gridSlotShown = {} -- [pool row] = true while its buttons are shown
+    local gridShownFirst, gridShownLast = 0, -1
+    local gridBufFirst, gridBufLast = 0, -1
+    local gridDirty = true
+    local gridPrefetchFrame
 
-    local firstRow = math.max(0, math.floor(offset / pitch) - 1)
-    local lastRow = math.floor((offset + viewH) / pitch) + 1
-    local firstIdx = firstRow * PERKS_PER_ROW + 1
-    local lastIdx = math.min(#currentItems, (lastRow + 1) * PERKS_PER_ROW)
-
-    -- Rebinding ~50 buttons is cheap, but skip it entirely while the visible
-    -- window has not moved (the thumb drag fires every frame)
-    if gridWindowFirst == firstIdx and gridWindowLast == lastIdx then return end
-    gridWindowFirst, gridWindowLast = firstIdx, lastIdx
-
-    -- Fixed, shared with the My Run grid (ECHO_GRID_HSTEP) so column spacing
-    -- always matches between the two panels, instead of each justifying to
-    -- fill its own (different) width.
-    local hstep = ECHO_GRID_HSTEP
-
-    local b = 0
-    for i = firstIdx, lastIdx do
-        b = b + 1
-        local button = gridButtons[b]
-        if not button then
-            button = CreateGridButton(scrollChild)
-            gridButtons[b] = button
+    local function BindGridRow(slot, row)
+        local base = slot * PERKS_PER_ROW
+        for col = 1, PERKS_PER_ROW do
+            local item = currentItems[row * PERKS_PER_ROW + col]
+            if item then
+                local button = gridButtons[base + col]
+                if not button then
+                    button = CreateGridButton(scrollChild)
+                    button:Hide()
+                    gridButtons[base + col] = button
+                end
+                UpdateGridButton(button, item)
+                -- Fixed, shared with the My Run grid (ECHO_GRID_HSTEP) so column
+                -- spacing always matches between the two panels, instead of each
+                -- justifying to fill its own (different) width.
+                button:ClearAllPoints()
+                button:SetPoint("TOPLEFT", scrollChild, "TOPLEFT",
+                    GRID_MARGIN_L + (col - 1) * ECHO_GRID_HSTEP,
+                    -GRID_TOP_PAD - row * GRID_PITCH)
+            end
         end
-        UpdateGridButton(button, currentItems[i])
-        local row = math.floor((i - 1) / PERKS_PER_ROW)
-        local col = (i - 1) % PERKS_PER_ROW
-        button:ClearAllPoints()
-        button:SetPoint("TOPLEFT", scrollChild, "TOPLEFT",
-            GRID_MARGIN_L + col * hstep,
-            -10 - row * pitch)
-        button:Show()
+        gridSlotRow[slot] = row
     end
-    for j = b + 1, #gridButtons do gridButtons[j]:Hide() end
-end
 
-local function UpdateGrid(items)
-    currentItems = items or {}
-    local pitch = BUTTON_SIZE + NAME_HEIGHT + BUTTON_SPACING
-    local numRows = math.ceil(#currentItems / PERKS_PER_ROW)
-    scrollChild:SetHeight(math.max(numRows * pitch + 25, 300))
-
-    -- Keep the scroll position when only the contents changed (builder clicks,
-    -- data refreshes); jump back to the top when the list itself changed.
-    if gridItemCount ~= #currentItems then
-        scrollFrame:SetVerticalScroll(0)
+    -- The last row is usually partial: its trailing buttons stay hidden
+    local function ShowGridSlot(slot, shown)
+        local base = slot * PERKS_PER_ROW
+        local row = gridSlotRow[slot]
+        local count = #currentItems
+        for col = 1, PERKS_PER_ROW do
+            local button = gridButtons[base + col]
+            if button then
+                if shown and row and row * PERKS_PER_ROW + col <= count then
+                    button:Show()
+                else
+                    button:Hide()
+                end
+            end
+        end
+        gridSlotShown[slot] = shown or nil
     end
-    gridItemCount = #currentItems
 
-    gridWindowFirst, gridWindowLast = -1, -1 -- force a rebind
-    UpdateVisibleGrid()
+    -- Nearest first, alternating below and above the shown window
+    local function NextUnboundBufferRow()
+        for d = 1, gridBufferRows do
+            local below = gridShownLast + d
+            if below <= gridBufLast and gridSlotRow[below % gridPoolRows] ~= below then
+                return below
+            end
+            local above = gridShownFirst - d
+            if above >= gridBufFirst and gridSlotRow[above % gridPoolRows] ~= above then
+                return above
+            end
+        end
+    end
+
+    function UpdateVisibleGrid()
+        if not scrollFrame then return end
+        local offset = scrollFrame:GetVerticalScroll() or 0
+        local viewH = scrollFrame:GetHeight() or 300
+        local numRows = math.ceil(#currentItems / PERKS_PER_ROW)
+
+        -- The ring is sized from the viewport, which changes with the tab and the
+        -- context bar height: a new size starts it over.
+        local viewRows = math.ceil(viewH / GRID_PITCH)
+        local bufferRows = math.ceil(viewRows / 2) -- a wheel step scrolls half the view
+        local poolRows = viewRows + 3 + 2 * bufferRows
+        if poolRows ~= gridPoolRows then
+            for _, button in pairs(gridButtons) do button:Hide() end
+            wipe(gridSlotRow)
+            wipe(gridSlotShown)
+            gridPoolRows, gridBufferRows = poolRows, bufferRows
+            gridDirty = true
+        end
+
+        -- Row r's art spans [top - ABOVE, top + BELOW], top = GRID_TOP_PAD + r * pitch:
+        -- shown while that band crosses [offset, offset + viewH], not a row more.
+        -- (At most viewRows + 2 rows, so the shown window always fits the ring.)
+        local shownFirst = math.max(0,
+            math.floor((offset - GRID_TOP_PAD - GRID_ART_BELOW) / GRID_PITCH) + 1)
+        local shownLast = math.min(numRows - 1,
+            math.ceil((offset + viewH - GRID_TOP_PAD + GRID_ART_ABOVE) / GRID_PITCH) - 1)
+
+        -- Skip it all while the shown rows have not changed (the thumb drag
+        -- fires every frame)
+        if not gridDirty and shownFirst == gridShownFirst and shownLast == gridShownLast then
+            return
+        end
+        gridDirty = false
+        gridShownFirst, gridShownLast = shownFirst, shownLast
+        gridBufFirst = math.max(0, shownFirst - bufferRows)
+        gridBufLast = math.min(numRows - 1, shownLast + bufferRows)
+
+        for row = shownFirst, shownLast do
+            local slot = row % gridPoolRows
+            if gridSlotRow[slot] ~= row then
+                BindGridRow(slot, row)
+                ShowGridSlot(slot, true)
+            elseif not gridSlotShown[slot] then
+                ShowGridSlot(slot, true) -- prebound in the background, or scrolled back to
+            end
+        end
+        -- Rows that left the shown window are hidden but keep their binding, so
+        -- scrolling back to them costs a Show and nothing else
+        for slot = 0, gridPoolRows - 1 do
+            if gridSlotShown[slot] then
+                local row = gridSlotRow[slot]
+                if not row or row < shownFirst or row > shownLast then
+                    ShowGridSlot(slot, false)
+                end
+            end
+        end
+
+        if gridBufLast >= gridBufFirst then
+            if not gridPrefetchFrame then
+                gridPrefetchFrame = CreateFrame("Frame")
+                gridPrefetchFrame:Hide()
+                -- Time budget per frame rather than a fixed count, as for the
+                -- search cache: at least one row per frame, more on a fast client
+                gridPrefetchFrame:SetScript("OnUpdate", function(self)
+                    if ProjectEbonhold_IsClosing or not scrollFrame:IsVisible() then
+                        self:Hide()
+                        return
+                    end
+                    local clock = debugprofilestop
+                    local deadline = clock and (clock() + GRID_PREFETCH_BUDGET_MS)
+                    repeat
+                        local row = NextUnboundBufferRow()
+                        if not row then
+                            self:Hide()
+                            return
+                        end
+                        -- Its pool row is never a shown one (the buffered window
+                        -- fits the ring), so the bind stays hidden
+                        BindGridRow(row % gridPoolRows, row)
+                    until not deadline or clock() >= deadline
+                end)
+            end
+            gridPrefetchFrame:Show()
+        end
+    end
+
+    function UpdateGrid(items)
+        currentItems = items or {}
+
+        -- Contents changed: every pool row is rebound, the shown ones right away
+        -- and the rest in the background. A button that keeps its echo skips the
+        -- portrait crop (see UpdateGridButton), so a plain refresh stays cheap.
+        wipe(gridSlotRow)
+        gridDirty = true
+
+        local numRows = math.ceil(#currentItems / PERKS_PER_ROW)
+        scrollChild:SetHeight(math.max(numRows * GRID_PITCH + 25, 300))
+
+        -- Keep the scroll position when only the contents changed (builder clicks,
+        -- data refreshes); jump back to the top when the list itself changed.
+        if gridItemCount ~= #currentItems then
+            gridItemCount = #currentItems
+            scrollFrame:SetVerticalScroll(0)
+        end
+
+        UpdateVisibleGrid()
+    end
 end
 
 -- ── Loadouts tab ─────────────────────────────────────────────────────────────
@@ -1501,6 +1852,9 @@ local function BuildProgressChecker()
     for _, lp in ipairs(lockedPerks) do add(lp.spellId, lp.stack or 1) end
 
     return function(e, verified)
+        -- A refused echo has nothing to obtain: count it done so the row does not
+        -- dim it as "missing" (the cross already says what it is).
+        if e.avoid then return true end
         local target = e.stacks or 1
         if verified == false then
             local nm = GetSpellInfo(e.spellId)
@@ -1510,61 +1864,20 @@ local function BuildProgressChecker()
     end
 end
 
--- Name of the active build when it is a SNAPSHOT (nil for none/designed): a
--- snapshot is the thing you give up by switching, so callers warn about it.
-local function ActiveSnapshotName()
-    local svc = GetService()
-    local activeSlot = svc and svc.GetServerActiveSlot and svc.GetServerActiveSlot() or 0
-    local slots = svc and svc.GetServerBuildSlots and svc.GetServerBuildSlots()
-    local active = activeSlot > 0 and slots and slots[activeSlot] or nil
-    if active and active.verified then
-        return (active.name ~= "" and active.name) or ("Build " .. activeSlot)
-    end
-    return nil
-end
-
--- What clicking/pressing Activate on a server row should do at this level.
--- Returns "none" when the click has no meaning here, so the caller stays silent.
+-- What clicking/pressing Activate on a server row should do. Returns "none"
+-- when the click has no meaning here, so the caller stays silent.
 local function ServerSlotClickAction(slot, verified)
     local svc = GetService()
-    local level = UnitLevel("player") or 1
-    -- A build is never turned off, only replaced: clicking the active one does
-    -- nothing. Activating a different build is the only way to move off it.
-    if svc.GetServerActiveSlot() == slot then return "none" end
-    -- Designed builds ("in progress") only drive highlights / auto-pick - they
-    -- never change what the game offers - so they stay usable at any level while
-    -- leveling. At 80 there are no draws left to guide, so activating one would
-    -- do nothing. Snapshots are level-80 only: below 80 they have no effect at all.
+    -- Wishlists: highlight toggle. Clicking the highlighted one does nothing
+    -- (it is cleared from its menu).
     if verified == false then
-        if level >= 80 then return "designed80" end
+        if svc.GetServerActiveDesign() == slot then return "none" end
         return "activate"
     end
-    if level == 80 then return "switch" end
-    return "level"
-end
-
--- Lowest build slot this account can still fill, or nil when they are all
--- taken. Mirrors the server's own pick (PerkLoadoutHandler::FindFreeBuildSlot)
--- so a recovery that has nowhere to land is refused before it is sent.
-local function FirstFreeBuildSlot()
-    local svc = GetService()
-    local slots = svc and svc.GetServerBuildSlots and svc.GetServerBuildSlots()
-    if not slots then return nil end
-    local unlocked = (svc.GetServerUnlockedSlots and svc.GetServerUnlockedSlots())
-        or (svc.GetServerMaxSlots and svc.GetServerMaxSlots()) or 5
-    for slot = 1, unlocked do
-        if not slots[slot] then return slot end
-    end
-    return nil
-end
-
--- Why Recover cannot be used right now, or nil when it can. Same gates as the
--- server's HandleRecover, so the button never offers a call that only fails.
-local function RecoverBlockedReason()
-    if not FirstFreeBuildSlot() then
-        return "You have no free build slot. Free one up first."
-    end
-    return nil
+    -- Live loadouts: a build is never turned off, only replaced, so clicking
+    -- the one being played is inert. Any other slot switches, at any level.
+    if svc.GetServerActiveSlot() == slot then return "none" end
+    return "switch"
 end
 
 local function GetRowIcon(row, k)
@@ -1589,6 +1902,12 @@ local function GetRowIcon(row, k)
     ib.lockTex:SetSize(10, 10)
     ib.lockTex:SetPoint("TOPRIGHT", ib, "TOPRIGHT", 2, 2)
     ib.lockTex:Hide()
+    -- Same corner on a wishlist row: this echo is one the build refuses
+    ib.avoidTex = ib:CreateTexture(nil, "OVERLAY")
+    ib.avoidTex:SetTexture("Interface\\RaidFrame\\ReadyCheck-NotReady")
+    ib.avoidTex:SetSize(12, 12)
+    ib.avoidTex:SetPoint("TOPRIGHT", ib, "TOPRIGHT", 3, 3)
+    ib.avoidTex:Hide()
     ib:SetScript("OnEnter", function(self)
         if not self.spellId then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1601,7 +1920,9 @@ local function GetRowIcon(row, k)
         if self.locked then
             GameTooltip:AddLine("Locked echo (permanent between runs)", 1, 0.82, 0)
         end
-        if self.notObtained then
+        if self.avoid then
+            GameTooltip:AddLine("Never taken: this build refuses this echo", 1, 0.25, 0.25)
+        elseif self.notObtained then
             GameTooltip:AddLine("Not obtained this run yet", 1, 0.4, 0.4)
         end
         if utils and utils.GetSpellDescription then
@@ -1683,18 +2004,18 @@ local function ShowLoadoutMenu(row)
 
     if row.serverSlot then
         if row.serverFilled then
-            if row.serverToRecover then
-                add("Recover", row.recoverBtn)
-            end
             if row.serverVerified == false then
                 add("Design", row.designBtn)
+                add("Rename", row.renameBuildBtn)
+                add("Share", row.shareBtn)
+                add("Export", row.exportBtn)
+                add("Delete", row.deleteBtn)
             else
-                add("Overwrite", row.saveBuildBtn)
+                add("Switch", row.saveBuildBtn)
+                add("Rename", row.renameBuildBtn)
+                add("Share", row.shareBtn)
+                add("Export", row.exportBtn)
             end
-            add("Rename", row.renameBuildBtn)
-            add("Share", row.shareBtn)
-            add("Export", row.exportBtn)
-            add("Delete", row.deleteBtn)
         end
     elseif row.isMine then
         add("Edit", row.editBtn)
@@ -1770,8 +2091,8 @@ local function GetLoadoutRow(i)
     row.emptyBg:SetGradientAlpha("VERTICAL", 0.20, 0.30, 0.45, 0.14, 0.06, 0.09, 0.14, 0.03)
     row.emptyBg:Hide()
 
-    -- Grey accent stripe: this build exists but cannot be activated right now
-    -- (wrong level for a snapshot, level 80 for a design). Same shape as the
+    -- Grey accent stripe: this build exists but is not the one being played
+    -- (dormant loadout, locked slot not next to buy). Same shape as the
     -- gold/blue stripes so the left edge always says what the row can do.
     row.disabledStripe = row:CreateTexture(nil, "BORDER")
     row.disabledStripe:SetTexture("Interface\\Buttons\\WHITE8X8")
@@ -1791,45 +2112,22 @@ local function GetLoadoutRow(i)
 
     -- Clicking the row (outside its buttons) picks it as the ACTIVE loadout:
     -- its echoes get highlighted whenever a perk choice is offered.
-    -- Server build-slot rows activate the slot instead (a full swap, level 80
-    -- only). A build is only ever replaced, never turned off.
+    -- Server rows: a live loadout row switches to it (any level), a wishlist
+    -- row highlights it. A loadout is only ever replaced, never turned off.
     row:EnableMouse(true)
     row:SetScript("OnMouseUp", function(self, mouseButton)
         if mouseButton ~= "LeftButton" or not self.loadout then return end
         if self.serverSlot then
-            if not self.serverFilled then return end
+            if self.serverLockedCost then return end
             local action = ServerSlotClickAction(self.serverSlot, self.serverVerified)
             -- "none": the click is simply inert here, with no popup and no error
             if action == "none" then return end
             pendingServerSlot = self.serverSlot
-            if action == "designed80" then
-                -- Designed content only guides draws while leveling, and there
-                -- are none left at 80: activating it here would change nothing.
-                pendingServerSlot = nil
-                UIErrorsFrame:AddMessage(
-                    "Designed builds only guide your draws while leveling, and there is nothing left to draw at level 80. Only snapshots can be applied here.",
-                    1, 0.2, 0.2)
-            elseif action == "switch" then
-                StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SWITCH", self.loadout.name or "")
+            if action == "switch" then
+                StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SWITCH", self.loadout.name or "",
+                    SwitchOwedText(self.loadout.missing))
             elseif action == "activate" then
-                if self.serverVerified == false then
-                    -- Only designed builds reach "activate": snapshots are level-80
-                    -- only (see ServerSlotClickAction). Switching to a design is the
-                    -- only way to drop a snapshot mid-run, so the warning lives here.
-                    local level = UnitLevel("player") or 1
-                    local active = (level < 80) and ActiveSnapshotName() or nil
-                    local warn = ""
-                    if active then
-                        warn = string.format(
-                            "\n\n|cffff2020WARNING:|r |cffff6060this replaces your saved build |r|cffffd700%s|r|cffff6060. A saved build can only be turned back on at level 80, so you will be without one until then.|r",
-                            active)
-                    end
-                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_ACTIVATE_DESIGNED",
-                        self.loadout.name or "", warn)
-                end
-            else
-                pendingServerSlot = nil
-                UIErrorsFrame:AddMessage("Saved builds can only be activated at level 80. While you level, every echo you are offered is drawn at random.", 1, 0.2, 0.2)
+                StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_ACTIVATE_DESIGNED", self.loadout.name or "", "")
             end
             return
         end
@@ -1856,59 +2154,56 @@ local function GetLoadoutRow(i)
         GameTooltip:SetText(self.loadout.name or "Loadout", 1, 0.82, 0)
         if self.serverSlot then
             if self.serverLockedCost then
-                GameTooltip:AddLine("Locked build slot.\nThe unlock applies to every character on your account.",
+                GameTooltip:AddLine("Locked loadout slot.\nThe unlock applies to every character on your account.",
                     1, 1, 1, true)
                 GameTooltip:AddLine(string.format("Unlock it for |cffffd700%s gold|r.",
                     tostring(self.serverLockedCost)), 0.5, 0.5, 0.5, true)
             elseif not self.serverFilled then
                 GameTooltip:AddLine(
-                    "Empty loadout slot.\nIt holds a snapshot of the echoes you finished a run with.",
+                    "Empty loadout.\nA fresh, independent echo build: its own echoes, locks, banishes, rerolls and freezes.",
                     1, 1, 1, true)
                 GameTooltip:AddLine(
-                    "At |cffffd700level 80|r, use |cffffd700Save Build|r to fill it with your current echoes (stacks and locks included).",
+                    "Click to switch to it. It starts with every draw your level owes it, so you build it from scratch.",
                     0.5, 0.5, 0.5, true)
             else
                 local svc = GetService()
                 local isDesigned = self.serverVerified == false
-                local isEnabled = svc.GetServerActiveSlot() == self.serverSlot
-                -- State first: whether this build is the one being played is the
-                -- thing the row's colours encode, spelled out here
-                if isEnabled then
-                    GameTooltip:AddLine("Enabled", 0.25, 1, 0.25)
-                else
-                    GameTooltip:AddLine("Disabled", 0.5, 0.5, 0.5)
-                end
-                if self.serverToRecover then
-                    GameTooltip:AddLine(
-                        "|cffffd700Recoverable.|r This wishlist stands for a build you really played. |cffffd700Recover|r moves it back into a free build slot, as a saved build you can wear again at level 80.",
-                        1, 1, 1, true)
-                end
-                -- What the build DOES reads the same either way: only the action
-                -- hint at the end changes with the state.
                 if isDesigned then
-                    if (UnitLevel("player") or 1) >= 80 then
-                        GameTooltip:AddLine(
-                            "|cffff6060Cannot be activated at level 80.|r\nIt works by guiding your draws, and there are none left. Only snapshots can replace your echoes here.",
-                            1, 1, 1, true)
+                    local isEnabled = svc.GetServerActiveDesign() == self.serverSlot
+                    if isEnabled then
+                        GameTooltip:AddLine("Highlighted", 0.25, 1, 0.25)
                     else
-                        GameTooltip:AddLine(
-                            "While leveling, its echoes are |cffffd700highlighted|r in your draws, and picked for you if that option is on.\nHighlights only: it never changes what you are offered, and cannot replace your echoes at level 80.",
-                            1, 1, 1, true)
-                        GameTooltip:AddLine(isEnabled and "Activate another build to swap to it."
-                            or "Click to activate this build.", 0.5, 0.5, 0.5, true)
+                        GameTooltip:AddLine("Not highlighted", 0.5, 0.5, 0.5)
                     end
+                    GameTooltip:AddLine(
+                        "Its echoes are |cffffd700highlighted|r in your draws, and picked for you if that option is on.\nHighlights only: it never changes what you are offered.",
+                        1, 1, 1, true)
+                    GameTooltip:AddLine(isEnabled and "Highlight another wishlist to swap, or clear it from its menu."
+                        or "Click to highlight this wishlist.", 0.5, 0.5, 0.5, true)
                 else
-                    if (UnitLevel("player") or 1) < 80 then
-                        GameTooltip:AddLine(
-                            "|cffff6060Saved builds only work at level 80.|r\nWhile you level, every echo you are offered is drawn at random.",
-                            1, 1, 1, true)
-                        GameTooltip:AddLine("Reach |cffffd700level 80|r to wear it again.", 0.5, 0.5, 0.5, true)
+                    local isEnabled = svc.GetServerActiveSlot() == self.serverSlot
+                    if isEnabled then
+                        GameTooltip:AddLine("Playing", 0.25, 1, 0.25)
                     else
-                        GameTooltip:AddLine("Activate: replaces your echoes with this build.",
-                            1, 1, 1, true)
-                        GameTooltip:AddLine(isEnabled and "Activate another build to swap to it."
-                            or "Click to activate this build.", 0.5, 0.5, 0.5, true)
+                        GameTooltip:AddLine("Dormant", 0.5, 0.5, 0.5)
                     end
+                    GameTooltip:AddLine(
+                        "An independent echo build: its own echoes, locked echoes, banishes, rerolls and freezes.",
+                        1, 1, 1, true)
+                    local missing = self.loadout.missing or 0
+                    if not isEnabled and missing > 0 then
+                        GameTooltip:AddLine(string.format(
+                            "Switching to it grants |cffffd700%d echo draw%s|r it is still owed.",
+                            missing, missing > 1 and "s" or ""), 1, 0.82, 0, true)
+                    end
+                    local memTotal = self.loadout.memoryTotal or 0
+                    if memTotal > 0 then
+                        GameTooltip:AddLine(string.format(
+                            "Finished build remembered: |cffa080e0%d echo stacks|r. While climbing, each draw offers one of them as a 4th card (%d still to reclaim).",
+                            memTotal, self.loadout.memoryRemaining or 0), 1, 1, 1, true)
+                    end
+                    GameTooltip:AddLine(isEnabled and "Switch to another loadout to swap."
+                        or "Click to switch to this loadout (a short attunement is cast first).", 0.5, 0.5, 0.5, true)
                 end
             end
         elseif not self.isMine then
@@ -2001,41 +2296,21 @@ local function GetLoadoutRow(i)
     end)
     row.menuBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Server build-slot rows: snapshot the current build into this slot /
-    -- rename the stored build. Hidden on library and community rows.
-    row.saveBuildBtn = MakeRowBtn("Save Build", 84)
+    -- Server rows: switch to an empty (never played) loadout / rename the
+    -- loadout. Hidden on library and community rows.
+    row.saveBuildBtn = MakeRowBtn("Switch", 84)
     row.saveBuildBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 10)
     row.renameBuildBtn = MakeRowBtn("Rename", 64)
     row.renameBuildBtn:SetPoint("RIGHT", row.saveBuildBtn, "LEFT", -3, 0)
 
     row.saveBuildBtn:SetScript("OnClick", function()
-        if not row.serverSlot then return end
-        -- Snapshots are a max-level-only feature server-side (HandleSave). Gate
-        -- the prompt here so the player never fills in a name for a save that
-        -- can only be rejected.
-        if (UnitLevel("player") or 1) < 80 then
-            UIErrorsFrame:AddMessage("You can only save a build snapshot at level 80.", 1, 0.2, 0.2)
-            return
-        end
+        if not row.serverSlot or row.serverLockedCost then return end
+        if ServerSlotClickAction(row.serverSlot, true) ~= "switch" then return end
         pendingServerSlot = row.serverSlot
-        if row.serverFilled then
-            -- Overwriting destroys the stored build: warn before the name prompt
-            StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_OVERWRITE",
-                (row.loadout and row.loadout.name) or ("Build " .. row.serverSlot))
-        else
-            StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SAVE", row.serverSlot)
-        end
+        StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SWITCH",
+            (row.loadout and row.loadout.name) or ("Loadout " .. row.serverSlot),
+            SwitchOwedText(row.loadout and row.loadout.missing))
     end)
-    -- Disabled below 80, so the reason has to come from a tooltip: a disabled
-    -- button still fires OnEnter, but never OnClick.
-    row.saveBuildBtn:SetScript("OnEnter", function(self)
-        if self:IsEnabled() then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Save Build", 1, 1, 1)
-        GameTooltip:AddLine("You can only save a build snapshot at level 80.", 1, 0.2, 0.2, true)
-        GameTooltip:Show()
-    end)
-    row.saveBuildBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.renameBuildBtn:SetScript("OnClick", function()
         if not row.serverSlot or not row.serverFilled then return end
@@ -2043,35 +2318,9 @@ local function GetLoadoutRow(i)
         StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_RENAME", row.serverSlot)
     end)
 
-    -- Recoverable wishlist only: promotes it back into a free build slot.
-    -- Sits left of the "..." menu, as the row's one meaningful action.
+    -- Kept as a hidden stub: pooled rows and ShowLoadoutMenu still reference it.
     row.recoverBtn = MakeRowBtn("Recover", 72)
-    row.recoverBtn:SetPoint("RIGHT", row.menuBtn, "LEFT", -3, 0)
-    row.recoverBtn:SetScript("OnClick", function()
-        if not row.serverSlot or not row.serverToRecover then return end
-        if not row.recoverBtn:IsEnabled() then return end
-        pendingServerSlot = row.serverSlot
-        StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_RECOVER",
-            (row.loadout and row.loadout.name) or "")
-    end)
-    -- Disabled when every build slot is taken, so the reason has to come from
-    -- the tooltip: a disabled button still fires OnEnter, never OnClick.
-    row.recoverBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Recover this build", 1, 1, 1)
-        GameTooltip:AddLine(
-            "Moves this wishlist into a free build slot and makes it a saved build again, with the level-80 swap it used to have. It leaves your Echo Wishlist.",
-            0.9, 0.9, 0.9, true)
-        local blocked = RecoverBlockedReason()
-        if blocked then
-            GameTooltip:AddLine(blocked, 1, 0.2, 0.2, true)
-        else
-            GameTooltip:AddLine("It lands in build slot |cffffd700"
-                .. tostring(FirstFreeBuildSlot()) .. "|r.", 0.5, 0.5, 0.5, true)
-        end
-        GameTooltip:Show()
-    end)
-    row.recoverBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.recoverBtn:Hide()
 
     -- Design (builder) and Import (EBH1 string) into this server slot.
     -- On a filled DESIGNED row, Design reopens the build in the builder.
@@ -2112,7 +2361,7 @@ local function GetLoadoutRow(i)
     end)
     row.unlockBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Unlock build slot", 1, 1, 1)
+        GameTooltip:SetText("Unlock loadout slot", 1, 1, 1)
         if row.serverPurchasable then
             GameTooltip:AddLine(string.format(
                 "Costs |cffffd700%s gold|r. The unlock is |cffffd700account-wide|r: all your characters get this slot.",
@@ -2134,8 +2383,8 @@ local function GetLoadoutRow(i)
         if not row.loadout then return end
         if row.serverSlot then
             if not row.serverFilled then return end
-            -- Deleting the build you are wearing would leave no way back to it,
-            -- and a build is never turned off: switch away from it first.
+            -- Only wishlists can be deleted: a live loadout emptied would be a
+            -- free redraw of a whole build, so the server refuses it.
             if not row.deleteBtn:IsEnabled() then return end
             pendingServerSlot = row.serverSlot
             StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_DELETE", row.loadout.name or "")
@@ -2177,14 +2426,13 @@ end
 -- serverLockedCost (gold, non-nil = slot not yet purchased) + serverPurchasable
 -- (true = it is the NEXT slot, so the Unlock button is clickable) drive the
 -- gold-unlock presentation of locked slots.
--- serverToRecover marks a wishlist the server flagged as a build the player
--- really owned: it is the only one that can be promoted back into a build slot.
-local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSlot, serverFilled, serverLockedCost, serverPurchasable, serverVerified, serverToRecover)
+-- serverVerified: true = live loadout, false = wishlist, nil = empty/locked slot.
+local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSlot, serverFilled, serverLockedCost, serverPurchasable, serverVerified)
     row.loadout, row.index, row.isMine = loadout, index, isMine
     row.serverSlot, row.serverFilled = serverSlot, serverFilled
     row.serverLockedCost, row.serverPurchasable = serverLockedCost, serverPurchasable
     row.serverVerified = serverVerified
-    row.serverToRecover = serverToRecover and true or false
+    row.serverToRecover = false
     row.expandKey = expandKey
     local expanded = expandedLoadouts[expandKey] and true or false
 
@@ -2207,9 +2455,21 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
         label = string.format("|cff%02x%02x%02x%s|r",
             math.floor(c.r * 255), math.floor(c.g * 255), math.floor(c.b * 255), label)
     end
-    if row.serverToRecover then
-        -- Server rows have no author, so the line doubles as a status badge
-        row.author:SetText("|cffffd700Recoverable|r")
+    if serverSlot and serverFilled and serverVerified ~= false
+        and ((loadout.missing or 0) > 0 or (loadout.memoryRemaining or 0) > 0) then
+        -- Server rows have no author, so the line doubles as a status badge: the
+        -- draws a switch to this loadout would hand out, and the souvenirs its
+        -- climb may still take back from its finished build
+        local parts = {}
+        if (loadout.missing or 0) > 0 then
+            table.insert(parts, string.format("|cffffd700%d draw%s waiting|r", loadout.missing,
+                loadout.missing > 1 and "s" or ""))
+        end
+        if (loadout.memoryRemaining or 0) > 0 then
+            table.insert(parts, string.format("|cffa080e0%d/%d souvenirs|r", loadout.memoryRemaining,
+                loadout.memoryTotal or loadout.memoryRemaining))
+        end
+        row.author:SetText(table.concat(parts, "  "))
         row.author:Show()
     elseif not isMine and loadout.author and loadout.author ~= "" then
         row.author:SetText("by " .. loadout.author)
@@ -2218,18 +2478,23 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
         row.author:Hide()
     end
 
-    -- Golden border + tag on the loadout currently being played
-    -- (server rows: the slot the level-80 swap would apply)
+    -- Golden border + tag on the loadout currently being played (live rows)
+    -- or the highlighted wishlist (design rows)
     local isActive
     if serverSlot then
-        isActive = serverFilled and GetService().GetServerActiveSlot() == serverSlot
+        if serverVerified == false then
+            isActive = serverFilled and GetService().GetServerActiveDesign() == serverSlot
+        else
+            isActive = serverFilled and GetService().GetServerActiveSlot() == serverSlot
+        end
     else
         isActive = IsActiveLoadout(loadout)
     end
-    -- Run progress vs this build (server rows only): per-entry check used
-    -- below to dim the icons of echoes not yet obtained this run
+    -- Run progress vs this wishlist: per-entry check used below to dim the
+    -- icons of echoes not yet obtained this run. Live loadouts own their
+    -- echoes outright, so they are never dimmed.
     local entryDone
-    if serverSlot and serverFilled then
+    if serverSlot and serverFilled and serverVerified == false then
         entryDone = BuildProgressChecker()
     end
 
@@ -2242,15 +2507,15 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
     -- An empty (unfilled, unlocked) server slot gets the "available to fill" look
     local isEmptySlot = serverSlot and not serverFilled and not serverLockedCost
     -- Grey stripe = this row is not the build you are playing: every filled but
-    -- inactive build, plus slots with nothing to offer (an empty one below 80,
-    -- where Save Build is greyed, or a locked one that is not next to buy).
+    -- inactive build, plus a locked slot that is not next to buy. An empty
+    -- loadout can always be switched to, so it keeps the blue treatment.
     local isUnavailable
     if serverSlot and serverFilled then
         isUnavailable = not isActive
     elseif serverLockedCost then
         isUnavailable = not serverPurchasable
     elseif serverSlot then
-        isUnavailable = (UnitLevel("player") or 1) < 80
+        isUnavailable = false
     end
     if isUnavailable and not isActive then
         row.disabledStripe:Show()
@@ -2286,9 +2551,9 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
             -- a build you can act on.
             row:SetBackdropBorderColor(0.45, 0.45, 0.45, 1)
         elseif serverSlot and serverFilled and serverVerified == false then
-            row:SetBackdropBorderColor(0.6, 0.4, 0.9, 1) -- designed builds: purple
+            row:SetBackdropBorderColor(0.6, 0.4, 0.9, 1) -- wishlists: purple
         elseif serverSlot then
-            row:SetBackdropBorderColor(0.35, 0.55, 0.85, 1) -- snapshots/empty: blue
+            row:SetBackdropBorderColor(0.35, 0.55, 0.85, 1) -- loadouts/empty: blue
         else
             row:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
         end
@@ -2325,9 +2590,14 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
                 SetPortraitToTexture(ib.tex, tex)
             end
             ib.spellId, ib.quality, ib.stacks = e.spellId, e.quality, e.stacks
-            ib.locked = e.locked or false
+            -- On a wishlist the flag means "never take this", not "locked in"
+            ib.avoid = e.avoid or false
+            ib.locked = (e.locked and not e.avoid) or false
             if ib.lockTex then
                 if ib.locked then ib.lockTex:Show() else ib.lockTex:Hide() end
+            end
+            if ib.avoidTex then
+                if ib.avoid then ib.avoidTex:Show() else ib.avoidTex:Hide() end
             end
             local borderIdx = math.min(e.quality or 0, 3) -- rounded assets exist for 0-3
             ib.base:SetTexture(ASSETS .. "perk_quality_" .. borderIdx)
@@ -2362,9 +2632,9 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
     row.recoverBtn:Hide()
 
     if serverSlot then
-        -- Server build slots. Locked: gold Unlock button only. Empty: Save
-        -- Build (snapshot). Filled: the "..." menu (Overwrite/Design, Rename,
-        -- Share, Export, Delete).
+        -- Server rows. Locked: gold Unlock button only. Empty loadout: Switch.
+        -- Filled: the "..." menu (Switch/Rename for loadouts; Design, Rename,
+        -- Share, Export, Delete for wishlists).
         if serverLockedCost then
             row.saveBuildBtn:Hide()
             row.deleteBtn:Hide()
@@ -2386,54 +2656,34 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
             row.menuBtn:Show()
             row.menuBtn:ClearAllPoints()
             row.menuBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 10)
-            -- A recoverable wishlist gets its action out of the menu: it is the
-            -- one thing the player is meant to do with it.
-            if row.serverToRecover then
-                row.recoverBtn:Show()
-                row.recoverBtn:ClearAllPoints()
-                row.recoverBtn:SetPoint("RIGHT", row.menuBtn, "LEFT", -3, 0)
-                if RecoverBlockedReason() then
-                    row.recoverBtn:Disable()
-                    if row.recoverBtn.text then row.recoverBtn.text:SetTextColor(0.5, 0.5, 0.5) end
-                else
-                    row.recoverBtn:Enable()
-                    if row.recoverBtn.text then row.recoverBtn.text:SetTextColor(1, 0.82, 0) end
-                end
-            end
         else
             row.unlockBtn:Hide()
             row.deleteBtn:Hide()
             row.menuBtn:Hide()
-            -- Empty snapshot slot: snapshot-only (designs are created with the
-            -- New/Import bar buttons and live in their own unlimited pool)
+            -- Empty loadout slot: switching to it starts the build
             row.saveBuildBtn:Show()
-            row.saveBuildBtn.text:SetText("Save Build")
+            row.saveBuildBtn.text:SetText("Switch")
             row.saveBuildBtn:ClearAllPoints()
             row.saveBuildBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 10)
         end
 
-        -- Snapshots (Save Build) are level-80-only server-side; disable the
-        -- button below max level so it takes the greyed-out disabled art and
-        -- stops responding, with the reason moved to its tooltip.
-        -- An active saved build cannot be deleted: it is the echo set you are
-        -- wearing, and builds are only ever switched, never turned off. Its
-        -- Delete lives in the "..." menu, which greys off this enabled state.
-        if isActive and serverVerified ~= false then
-            row.deleteBtn:Disable()
-        else
+        -- Live loadouts are never deleted (the server refuses: an emptied build
+        -- would be a free redraw). Wishlists always can be.
+        if serverVerified == false then
             row.deleteBtn:Enable()
+        else
+            row.deleteBtn:Disable()
         end
 
-        -- Applied even while hidden: on filled rows the button lives behind the
-        -- "..." menu, which greys its entry off this same enabled state.
-        do
-            if (UnitLevel("player") or 1) < 80 then
-                row.saveBuildBtn:Disable()
-                if row.saveBuildBtn.text then row.saveBuildBtn.text:SetTextColor(0.5, 0.5, 0.5) end
-            else
-                row.saveBuildBtn:Enable()
-                if row.saveBuildBtn.text then row.saveBuildBtn.text:SetTextColor(1, 1, 1) end
-            end
+        -- Switch: enabled on every loadout but the one being played. Applied
+        -- even while hidden: on filled rows it lives behind the "..." menu,
+        -- which greys its entry off this same enabled state.
+        if serverVerified ~= false and not isActive then
+            row.saveBuildBtn:Enable()
+            if row.saveBuildBtn.text then row.saveBuildBtn.text:SetTextColor(1, 1, 1) end
+        else
+            row.saveBuildBtn:Disable()
+            if row.saveBuildBtn.text then row.saveBuildBtn.text:SetTextColor(0.5, 0.5, 0.5) end
         end
     else
         -- Library ("mine") and community rows: everything is in the "..." menu.
@@ -2541,8 +2791,8 @@ local function RenderLoadouts()
     local headerCount, lastClass = 0, nil
     local rowCount = 0
 
-    -- "My Loadouts" leads with the server build slots (verified snapshots with
-    -- the level-80 swap), then the local library below.
+    -- "My Loadouts" leads with the server slots (live loadouts, then the
+    -- wishlists), then the local library below.
     -- Nothing renders until the server's first reply, so realms without the
     -- feature (or with it disabled) show the plain library unchanged.
     if isMine then
@@ -2558,11 +2808,9 @@ local function RenderLoadouts()
             local unlocked = (svc and svc.GetServerUnlockedSlots and svc.GetServerUnlockedSlots()) or maxSlots
             local classToken = GetPlayerClassToken()
 
-            -- Partition the slots into collapsible groups: snapshots you saved,
-            -- designed builds you're farming, and the empty/locked slots.
-            -- Designed builds (an unlimited pool) lead. Your loadouts = the
-            -- snapshot slots themselves, saved or not: one list in slot order
-            -- rather than splitting filled from empty.
+            -- Partition the slots into collapsible groups: your live loadouts
+            -- (every slot, played or not, in slot order) and the wishlists
+            -- (an unlimited pool, ids beyond the loadout slots).
             local DESIGN, LOADOUTS = 1, 2
             local groups = {
                 [DESIGN]   = { key = "design",   label = "|cffa080e0Echo Wishlist|r", items = {} },
@@ -2571,13 +2819,7 @@ local function RenderLoadouts()
             for slot = 1, maxSlots do
                 local stored = serverSlots[slot]
                 local isSlotLocked = slot > unlocked
-                local item = { slot = slot, stored = stored, locked = isSlotLocked }
-                -- Legacy designs stored in a snapshot slot still belong below
-                if stored and not stored.verified and not isSlotLocked then
-                    table.insert(groups[DESIGN].items, item)
-                else
-                    table.insert(groups[LOADOUTS].items, item)
-                end
+                table.insert(groups[LOADOUTS].items, { slot = slot, stored = stored, locked = isSlotLocked })
             end
 
             -- Designed builds live beyond the snapshot slots (unlimited pool,
@@ -2613,9 +2855,11 @@ local function RenderLoadouts()
                             if isSlotLocked then
                                 loadout = { name = "|cff808080Locked slot " .. slot .. "|r", class = classToken, echoes = {} }
                             elseif stored then
-                                loadout = { name = stored.name ~= "" and stored.name or ("Build " .. slot), class = classToken, echoes = stored.echoes }
+                                loadout = { name = stored.name ~= "" and stored.name or ("Loadout " .. slot), class = classToken,
+                                    echoes = stored.echoes, missing = stored.missing,
+                                    memoryRemaining = stored.memoryRemaining, memoryTotal = stored.memoryTotal }
                             else
-                                loadout = { name = "|cff808080Empty slot " .. slot .. "|r", class = classToken, echoes = {} }
+                                loadout = { name = "|cff808080Empty loadout " .. slot .. "|r", class = classToken, echoes = {} }
                             end
                             rowCount = rowCount + 1
                             local row = GetLoadoutRow(rowCount)
@@ -2628,8 +2872,7 @@ local function RenderLoadouts()
                                 (not isSlotLocked) and stored ~= nil,
                                 isSlotLocked and (svc.GetServerSlotCostGold and svc.GetServerSlotCostGold(slot) or 0) or nil,
                                 isSlotLocked and slot == unlocked + 1,
-                                rowVerified,
-                                stored ~= nil and stored.toRecover == true)
+                                rowVerified)
                             row:ClearAllPoints()
                             row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 4, y)
                             row:Show()
@@ -2755,7 +2998,7 @@ function Journal.ImportBuildToSlot(text, slot)
     end
     local lo = svc.ImportEchoLoadout(text)
     if not lo then
-        UIErrorsFrame:AddMessage("Invalid loadout string.", 1, 0.2, 0.2)
+        UIErrorsFrame:AddMessage("Invalid loadout string or build link.", 1, 0.2, 0.2)
         return
     end
     pendingImport = { slot = slot, name = lo.name, echoes = lo.echoes }
@@ -2870,7 +3113,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_EXPORT"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_IMPORT"] = {
-    text = "Paste a loadout string:",
+    text = "Paste a loadout string or a website build link:",
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -2983,75 +3226,8 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_SHARE"] = {
 
 -- ── Server build-slot popups ─────────────────────────────────────────────────
 
-StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_SAVE"] = {
-    text = "Save your current echoes (stacks and locks included) to build slot %d?\n\nName:",
-    button1 = ACCEPT,
-    button2 = CANCEL,
-    hasEditBox = 1,
-    maxLetters = 32,
-    OnShow = function(self)
-        local svc = GetService()
-        local slots = svc.GetServerBuildSlots and svc.GetServerBuildSlots()
-        local existing = slots and pendingServerSlot and slots[pendingServerSlot]
-        self.editBox:SetText(existing and existing.name or "")
-        self.editBox:SetFocus()
-    end,
-    OnAccept = function(self)
-        if pendingServerSlot then
-            GetService().SaveServerBuildSlot(pendingServerSlot, self.editBox:GetText())
-        end
-        pendingServerSlot = nil
-    end,
-    EditBoxOnEnterPressed = function(self)
-        local dialog = self:GetParent()
-        if pendingServerSlot then
-            GetService().SaveServerBuildSlot(pendingServerSlot, self:GetText())
-        end
-        pendingServerSlot = nil
-        dialog:Hide()
-    end,
-    EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-    OnCancel = function() pendingServerSlot = nil end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
--- Overwrite variant of the save popup: the slot already holds a build, so make
--- the destruction explicit before asking for the new name
-StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_OVERWRITE"] = {
-    text = "Overwrite |cffffd700%s|r?\n\n|cffff5050Its saved echoes will be lost|r and replaced by a snapshot of your current ones.\n\nName:",
-    button1 = ACCEPT,
-    button2 = CANCEL,
-    hasEditBox = 1,
-    maxLetters = 32,
-    OnShow = function(self)
-        local svc = GetService()
-        local slots = svc.GetServerBuildSlots and svc.GetServerBuildSlots()
-        local existing = slots and pendingServerSlot and slots[pendingServerSlot]
-        self.editBox:SetText(existing and existing.name or "")
-        self.editBox:HighlightText()
-        self.editBox:SetFocus()
-    end,
-    OnAccept = function(self)
-        if pendingServerSlot then
-            GetService().SaveServerBuildSlot(pendingServerSlot, self.editBox:GetText())
-        end
-        pendingServerSlot = nil
-    end,
-    EditBoxOnEnterPressed = function(self)
-        local dialog = self:GetParent()
-        if pendingServerSlot then
-            GetService().SaveServerBuildSlot(pendingServerSlot, self:GetText())
-        end
-        pendingServerSlot = nil
-        dialog:Hide()
-    end,
-    EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-    OnCancel = function() pendingServerSlot = nil end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_RENAME"] = {
-    text = "New name for build slot %d:",
+    text = "New name for loadout %d:",
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3086,28 +3262,12 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_RENAME"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_DELETE"] = {
-    text = "Delete build |cffffd700%s|r?\n\n|cffff5050This is permanent.|r The saved build will be gone for good and |cffff5050cannot be recovered.|r",
+    text = "Delete wishlist |cffffd700%s|r?\n\n|cffff5050This is permanent.|r It will be gone for good and |cffff5050cannot be recovered.|r",
     button1 = YES,
     button2 = NO,
     OnAccept = function()
         if pendingServerSlot then
             GetService().DeleteServerBuildSlot(pendingServerSlot)
-        end
-        pendingServerSlot = nil
-    end,
-    OnCancel = function() pendingServerSlot = nil end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
-StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_RECOVER"] = {
-    text = "Recover build |cffffd700%s|r?\n\nIt leaves your Echo Wishlist and becomes a saved build again, in the first free build slot. You can wear it at level 80 like any other saved build.",
-    button1 = YES,
-    button2 = NO,
-    OnAccept = function()
-        if pendingServerSlot then
-            -- Target 0: the server picks the free slot, so its answer is the
-            -- authority even if a slot filled up while the popup was open.
-            GetService().RecoverServerBuildSlot(pendingServerSlot, 0)
         end
         pendingServerSlot = nil
     end,
@@ -3130,8 +3290,17 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_ACTIVATE_DESIGNED"] = {
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 }
 
+-- Second line of the switch popup: the draws the target is still owed, or
+-- nothing at all when there are none
+function SwitchOwedText(missing)
+    missing = tonumber(missing) or 0
+    if missing <= 0 then return "" end
+    return string.format("\n\nIt is owed |cffffd700%d echo draw%s|r, granted on arrival.",
+        missing, missing > 1 and "s" or "")
+end
+
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_SWITCH"] = {
-    text = "Switch to build \"%s\"?\n\n|cffff5050All your current echoes will be replaced|r by this build (including its locked echoes).\n\nYou will |cffffd700cast a short attunement|r, and the switch happens when it completes.",
+    text = "Switch to loadout \"%s\"?\n\nYour current echoes are set aside with their loadout and this one takes over: its own echoes, locked echoes, banishes, rerolls and freezes.%s",
     button1 = YES,
     button2 = NO,
     OnAccept = function()
@@ -3170,7 +3339,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_DESIGN"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_IMPORT"] = {
-    text = "Paste a loadout string to import into build slot %d:",
+    text = "Paste a loadout string or a website build link to import into build slot %d:",
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3196,7 +3365,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_IMPORT"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_UNLOCK"] = {
-    text = "Unlock build slot %d for |cffffd700%s gold|r?\n\nThe unlock is account-wide: all your characters get this slot.",
+    text = "Unlock loadout slot %d for |cffffd700%s gold|r?\n\nThe unlock is account-wide: all your characters get this slot.",
     button1 = ACCEPT,
     button2 = CANCEL,
     OnAccept = function()
@@ -3527,7 +3696,8 @@ local function UpdateLockAlert()
     end
 
     if not lockAlert then
-        lockAlert = CreateFrame("Frame", nil, journalFrame, "GlowBoxTemplate")
+        -- named: GlowBoxTemplate anchors its border by texture name ($parentGlowTopLeft...)
+        lockAlert = CreateFrame("Frame", "EchoJournalLockAlert", journalFrame, "GlowBoxTemplate")
         lockAlert:SetWidth(220)
         lockAlert:SetFrameStrata("HIGH")
         lockAlert:SetFrameLevel(journalFrame:GetFrameLevel() + 60)
@@ -3585,7 +3755,7 @@ local function UpdateBuilderAlert()
     end
 
     if not builderAlert then
-        builderAlert = CreateFrame("Frame", nil, journalFrame, "GlowBoxTemplate")
+        builderAlert = CreateFrame("Frame", "EchoJournalBuilderAlert", journalFrame, "GlowBoxTemplate")
         builderAlert:SetWidth(220)
         builderAlert:SetFrameStrata("HIGH")
         builderAlert:SetFrameLevel(journalFrame:GetFrameLevel() + 60)
@@ -3604,7 +3774,8 @@ local function UpdateBuilderAlert()
         builderAlert.Text:SetWidth(188)
         builderAlert.Text:SetText(
             "Click echoes in the catalog to add them to this wishlist.\n\n" ..
-            "|cffffd700Left-click|r adds a stack.\n|cffffd700Right-click|r removes one.\n\n" ..
+            "|cffffd700Left-click|r adds a stack.\n|cffffd700Right-click|r removes one.\n" ..
+            "|cffff4040Ctrl-click|r never take this echo.\n\n" ..
             "Hit |cffffd700Done|r up top when you are finished.")
 
         builderAlert.Count = builderAlert:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -3613,8 +3784,13 @@ local function UpdateBuilderAlert()
 
     builderAlert.Title:SetText((builderDraft.editIndex and "Editing \"" or "Building \"")
         .. builderDraft.name .. "\"")
-    builderAlert.Count:SetText(string.format("|cffffffff%d|r echo(es), |cffffffff%d/%d|r stacks",
-        DraftCount(), DraftTotalStacks(), MAX_RUN_ECHOES))
+    local avoided = DraftAvoidCount()
+    local countText = string.format("|cffffffff%d|r echo(es), |cffffffff%d/%d|r stacks",
+        DraftCount(), DraftTotalStacks(), MAX_RUN_ECHOES)
+    if avoided > 0 then
+        countText = countText .. string.format("\n|cffff4040%d|r never taken", avoided)
+    end
+    builderAlert.Count:SetText(countText)
     -- both helper bubbles live on the right edge; stack below the lock-mode
     -- bubble when it is showing (UpdateLockAlert always runs first in Refresh)
     builderAlert:ClearAllPoints()
@@ -3773,10 +3949,8 @@ local echoesTour = ProjectEbonhold.GuidedTour.Create({
                     "|cff9ec8ffWorth keeping for level 80|r: on a build you are refining, " ..
                     "each orb trades an echo that no longer fits for a fresh draw." ..
                     "\n\n" ..
-                    "Earned from |cffffd700Prestige|r, |cffffd700Daily Dungeons|r, " ..
-                    "|cffffd700Weekly Raids|r, |cffffd700Daily Runs (1-80)|r and " ..
-                    "|cffffd700Callboard Quests|r - the dailies and weeklies are taken " ..
-                    "from |cffffd700Maerys, the Ashen Archivist|r.",
+                    "Earned from the |cffffd700Dungeon Finder|r, the |cffffd700Lich King|r " ..
+                    "and the |cffffd700Hero's Call Board|r contracts.",
                 -- Anchored on the bubble itself, which sits just right of the last permanent
                 -- slot. Nil until the orb module has built it, and a step whose zone resolves
                 -- to nil is skipped by the tour rather than stranding the highlight.
@@ -3802,11 +3976,11 @@ local echoesTour = ProjectEbonhold.GuidedTour.Create({
             },
             {
                 title = "Loadouts",
-                text = "This menu manages your builds. |cff60a0e0Saved Builds|r are " ..
-                    "snapshots, and they are a |cffffd700level 80|r feature: activate " ..
-                    "one there to swap to it outright. While you level, every echo you " ..
-                    "are offered is drawn at random. A saved build does nothing " ..
-                    "until you reach 80.\n\n|cffa080e0Wishlists|r are for |cffffd700designing|r: " ..
+                text = "This menu manages your builds. |cff60a0e0Loadouts|r are " ..
+                    "independent echo builds, each with its own echoes, locked echoes, " ..
+                    "banishes, rerolls and freezes. Switch between them at any level: " ..
+                    "the one you arrive on is handed every draw your level owes it. " ..
+                    "Death empties them all, locked echoes excepted.\n\n|cffa080e0Wishlists|r are for |cffffd700designing|r: " ..
                     "the echoes you wish to collect, assembled into your dream build. " ..
                     "Create one with |cffffd700New Wishlist|r, pick its echoes in the " ..
                     "catalog, then |cffffd700Done|r. While it is active, its echoes " ..
@@ -3831,22 +4005,21 @@ local echoesTour = ProjectEbonhold.GuidedTour.Create({
 
 local LOADOUTS_INTRO =
     "Builds come in two kinds:\n\n" ..
-    "|cff60a0e0Saved Builds|r are |cffffd700snapshots|r of echoes you actually had: " ..
-    "at |cffffd700level 80|r, hit |cffffd700Save Build|r on a slot to freeze your " ..
-    "current echoes (stacks and locks included). They are a |cffffd700level 80|r " ..
-    "feature through and through: activating one there replaces all your echoes " ..
-    "with it, so you can swap freely between the builds you have finished. They " ..
-    "do nothing while you level: the climb to 80 is a fresh run every time, and " ..
-    "every echo you are offered is drawn at random. 3 slots are free; 7 more can " ..
-    "be unlocked with gold, account-wide.\n\n" ..
+    "|cff60a0e0Loadouts|r are |cffffd700independent echo builds|r. Each one has its " ..
+    "own echoes, locked echoes, banishes, rerolls and freezes. Switch between them " ..
+    "at any level (alive, out of combat): your current echoes stay with their " ..
+    "loadout, and the one you arrive on is handed every echo draw your level owes " ..
+    "it, so a loadout you start at 60 begins with 59 draws. Death empties every " ..
+    "loadout, locked echoes excepted - but a loadout that was |cffffd700finished|r " ..
+    "(every pick of a level-80 run made) remembers its build: while you climb back, " ..
+    "each draw offers one of its echoes as a |cffffd700fourth card|r. Take it, or " ..
+    "gamble on a random echo and lose that souvenir for the climb. The first slot " ..
+    "is free; nine more can be unlocked with gold, account-wide.\n\n" ..
     "|cffa080e0Echo Wishlist|r builds are |cffffd700goals|r you design yourself with " ..
     "|cffffd700New Wishlist|r, paste with |cffffd700Import|r, or copy from the " ..
-    "|cffffd700Community|r view (unlimited). While one is active, its echoes are " ..
+    "|cffffd700Community|r view (unlimited). While one is highlighted, its echoes are " ..
     "|cffffd700highlighted|r in your draws (and can be auto-picked), and the " ..
-    "missing ones show greyed out in My Echoes.\n\n" ..
-    "Watch the |cffaaaaaa(X/Y)|r counter fill up; once you finish a design at " ..
-    "|cffffd700level 80|r, save it as a snapshot to keep it and swap to it whenever " ..
-    "you like."
+    "missing ones show greyed out in My Echoes."
 
 local myEchoesIntro, loadoutsIntro
 
@@ -3906,7 +4079,7 @@ local LOADOUT_MENU_ROW_H = 24
 local LOADOUT_MENU_HIDE_DELAY = 2 -- seconds without the mouse before auto-close
 
 -- Per-row gear flyout (same idea as the outfit manager's little cog):
--- Save / Export / Delete for an existing build.
+-- Rename / Export for a loadout, Edit / Export / Delete for a wishlist.
 local gearMenuHolder
 local function OpenLoadoutRowMenu(opts)
     gearMenuHolder = gearMenuHolder
@@ -3917,31 +4090,15 @@ local function OpenLoadoutRowMenu(opts)
     if opts.edit then
         table.insert(items, { text = "Edit", notCheckable = true, func = opts.edit })
     end
-    if opts.save then
-        table.insert(items, { text = "Save current run here", notCheckable = true, func = opts.save })
-    end
-    -- Recoverable wishlist: the one action it exists for. Greyed with its
-    -- reason when there is nowhere to put it, rather than failing on click.
-    if opts.recover then
-        if FirstFreeBuildSlot() then
-            table.insert(items, { text = "|cffffd700Recover build|r",
-                notCheckable = true, func = opts.recover })
-        else
-            table.insert(items, { text = "|cff808080Recover (no free build slot)|r",
-                notCheckable = true, disabled = true })
-        end
+    if opts.rename then
+        table.insert(items, { text = "Rename", notCheckable = true, func = opts.rename })
     end
     table.insert(items, { text = "Export", notCheckable = true, func = opts.export })
     if opts.deactivate then
-        table.insert(items, { text = "Deactivate", notCheckable = true, func = opts.deactivate })
+        table.insert(items, { text = "Clear highlight", notCheckable = true, func = opts.deactivate })
     end
     if opts.delete then
         table.insert(items, { text = "|cffff4040Delete|r", notCheckable = true, func = opts.delete })
-    else
-        -- The server refuses deleting the ACTIVE build -- surface the rule
-        -- instead of a click that silently fails (Deactivate first).
-        table.insert(items, { text = "|cff808080Delete (deactivate first)|r",
-            notCheckable = true, disabled = true })
     end
     EasyMenu(items, gearMenuHolder, "cursor", 0, 0, "MENU")
 end
@@ -4056,7 +4213,8 @@ local function UpdateLoadoutMenu()
     local serverSlots = (svc.GetServerBuildSlots and svc.GetServerBuildSlots()) or {}
     local maxSlots = (svc.GetServerMaxSlots and svc.GetServerMaxSlots()) or 5
     local unlocked = (svc.GetServerUnlockedSlots and svc.GetServerUnlockedSlots()) or maxSlots
-    local activeSlot = (svc.GetServerActiveSlot and svc.GetServerActiveSlot()) or 0
+    local activeSlot = (svc.GetServerActiveSlot and svc.GetServerActiveSlot()) or 1
+    local activeDesign = (svc.GetServerActiveDesign and svc.GetServerActiveDesign()) or 0
 
     local idx, maxTextW = 0, 0
     -- cfg: text, [icon], [checked], [grey], [header], [onClick]
@@ -4093,77 +4251,39 @@ local function UpdateLoadoutMenu()
         maxTextW = math.max(maxTextW, row.Text:GetStringWidth() + (cfg.header and 0 or 34))
     end
 
-    -- Same decision logic + confirmation popups as the old Loadouts rows
-    -- (ServerSlotClickAction): wishlists/designed builds (verified == false)
-    -- activate at ANY level while leveling -- only at 80 is there nothing
-    -- left for them to guide; snapshots stay gated to levels 1 (arm) and 80
-    -- (full swap, with its confirm popup).
-    local function AddActivateRow(text, slot, icon, gear, verified)
+    -- Same decision logic + confirmation popups as the Loadouts rows
+    -- (ServerSlotClickAction): a live loadout switches (any level), a wishlist
+    -- gets highlighted.
+    local function AddActivateRow(text, slot, icon, gear, verified, missing)
         AddRow({
-            text = text, icon = icon, checked = (activeSlot == slot), gear = gear,
+            text = text, icon = icon, gear = gear,
+            checked = (verified == false) and (activeDesign == slot) or (verified ~= false and activeSlot == slot),
             onClick = function()
                 local action = ServerSlotClickAction(slot, verified)
                 if action == "none" then return end
                 pendingServerSlot = slot
-                if action == "designed80" then
-                    pendingServerSlot = nil
-                    UIErrorsFrame:AddMessage(
-                        "Designed builds only guide your draws while leveling, and there is nothing left to draw at level 80. Only snapshots can be applied here.",
-                        1, 0.2, 0.2)
-                elseif action == "switch" then
-                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SWITCH", text)
+                if action == "switch" then
+                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SWITCH", text, SwitchOwedText(missing))
                 elseif action == "activate" then
-                    if verified == false then
-                        -- Only designed builds reach "activate": snapshots are
-                        -- level-80 only. Dropping one mid-run lasts until 80.
-                        local level = UnitLevel("player") or 1
-                        local active = (level < 80) and ActiveSnapshotName() or nil
-                        local warn = ""
-                        if active then
-                            warn = string.format(
-                                "\n\n|cffff2020WARNING:|r |cffff6060this replaces your saved build |r|cffffd700%s|r|cffff6060. A saved build can only be turned back on at level 80, so you will be without one until then.|r",
-                                active)
-                        end
-                        StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_ACTIVATE_DESIGNED", text, warn)
-                    end
-                else
-                    pendingServerSlot = nil
-                    UIErrorsFrame:AddMessage("Saved builds can only be activated at level 80. While you level, every echo you are offered is drawn at random.", 1, 0.2, 0.2)
+                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_ACTIVATE_DESIGNED", text, "")
                 end
             end,
         })
     end
 
-    -- Gear flyout actions for an existing build row. Save (overwrite with
-    -- the current run) only applies to snapshot slots and shares the old
-    -- Save Build button's level-80 server gate. Edit (reopen in the builder,
-    -- the old Design button's path) only applies to designed content
-    -- (verified == false), wherever it is stored. The ACTIVE build offers
-    -- Deactivate instead of Delete -- the server refuses deleting it.
-    local function GearFor(slot, stored, name, isSnapshot, verified)
-        local isActive = (activeSlot == slot)
+    -- Gear flyout actions for an existing row. Rename applies to loadouts;
+    -- Edit (reopen in the builder) to wishlists. The highlighted wishlist
+    -- offers Clear highlight.
+    local function GearFor(slot, stored, name, isLoadout)
         return function()
             OpenLoadoutRowMenu({
                 name = name,
-                edit = (verified == false) and function()
-                    -- Designs in the unlimited pool re-upload in place; a
-                    -- legacy design stored in a snapshot slot re-saves as a
-                    -- NEW design (the old row can then be deleted).
-                    Journal.EditLoadout(stored, nil, slot > maxSlots and slot or 0)
+                edit = (not isLoadout) and function()
+                    Journal.EditLoadout(stored, nil, slot)
                 end or nil,
-                save = isSnapshot and function()
-                    if (UnitLevel("player") or 1) < 80 then
-                        UIErrorsFrame:AddMessage("You can only save a build snapshot at level 80.", 1, 0.2, 0.2)
-                        return
-                    end
+                rename = isLoadout and function()
                     pendingServerSlot = slot
-                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_OVERWRITE", name)
-                end or nil,
-                -- Flagged server side: this wishlist stands for a build the
-                -- player really owned, so it can move back into a build slot.
-                recover = (stored.toRecover == true) and function()
-                    pendingServerSlot = slot
-                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_RECOVER", name)
+                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_RENAME", slot)
                 end or nil,
                 export = function()
                     if svc.ExportEchoLoadout then
@@ -4171,10 +4291,10 @@ local function UpdateLoadoutMenu()
                             svc.ExportEchoLoadout(stored))
                     end
                 end,
-                deactivate = isActive and function()
-                    svc.ActivateServerBuildSlot(0) -- slot 0 = deactivate, any level
+                deactivate = (not isLoadout and activeDesign == slot) and function()
+                    svc.ActivateServerBuildSlot(0) -- 0 = clear the highlighted wishlist
                 end or nil,
-                delete = (not isActive) and function()
+                delete = (not isLoadout) and function()
                     pendingServerSlot = slot
                     StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_DELETE", name)
                 end or nil,
@@ -4182,8 +4302,8 @@ local function UpdateLoadoutMenu()
         end
     end
 
-    -- ── Saved Builds: the gold-purchasable server snapshot slots ──
-    AddRow({ text = "Saved Builds", header = true })
+    -- ── Loadouts: the live builds (slot 1 free, the rest gold-purchasable) ──
+    AddRow({ text = "Loadouts", header = true })
     for slot = 1, maxSlots do
         local stored = serverSlots[slot]
         local isLocked = slot > unlocked
@@ -4200,37 +4320,24 @@ local function UpdateLoadoutMenu()
                 end or nil,
             })
         elseif stored then
-            local name = stored.name ~= "" and stored.name or ("Build " .. slot)
-            -- verified normalized to a real boolean: an imported/designed
-            -- build CAN sit in a snapshot slot, and ServerSlotClickAction
-            -- tests `verified == false` (nil would slip through as snapshot)
-            local verified = stored.verified and true or false
-            AddActivateRow(name, slot, "Interface\\Icons\\Spell_Shadow_SoulGem",
-                GearFor(slot, stored, name, true, verified), verified)
+            local name = stored.name ~= "" and stored.name or ("Loadout " .. slot)
+            local label = name
+            if activeSlot ~= slot and (stored.missing or 0) > 0 then
+                label = string.format("%s |cffffd700(%d draw%s)|r", name, stored.missing,
+                    stored.missing > 1 and "s" or "")
+            end
+            AddActivateRow(label, slot, "Interface\\Icons\\Spell_Shadow_SoulGem",
+                GearFor(slot, stored, name, true), true, stored.missing)
         else
-            -- Empty snapshot slot: SAVE the current run's echoes into it
-            -- (name prompt -> SaveServerBuildSlot; level-80-only feature
-            -- server-side, same gate the old Save Build button had).
-            -- Wishlist creation is a different thing and lives on the New
-            -- Wishlist row below.
-            AddRow({
-                text = string.format("Empty slot %d |cff808080(save your run)|r", slot),
-                onClick = function()
-                    if (UnitLevel("player") or 1) < 80 then
-                        UIErrorsFrame:AddMessage("You can only save a build snapshot at level 80.", 1, 0.2, 0.2)
-                        return
-                    end
-                    -- First build ever: arm it automatically once it lands
-                    -- (see UpdateLoadoutFooter)
-                    autoActivateFirstBuild = autoActivateFirstBuild or not HasAnyBuild()
-                    pendingServerSlot = slot
-                    StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SAVE", slot)
-                end,
-            })
+            -- Never played loadout: switching to it starts it from scratch, with
+            -- every draw the level owes it.
+            local name = "Loadout " .. slot
+            AddActivateRow(string.format("Empty loadout %d |cff808080(start it)|r", slot), slot,
+                "Interface\\Icons\\Spell_Shadow_SoulGem", nil, true, nil)
         end
     end
 
-    -- ── Wishlists: designed builds beyond the snapshot slots (unlimited
+    -- ── Wishlists: designed builds beyond the loadout slots (unlimited
     -- pool, ids assigned by the server on upload/import) ──
     AddRow({ text = "Wishlists", header = true })
     local designedIds = {}
@@ -4241,12 +4348,8 @@ local function UpdateLoadoutMenu()
     for _, slot in ipairs(designedIds) do
         local stored = serverSlots[slot]
         local name = stored.name ~= "" and stored.name or ("Wishlist " .. slot)
-        -- The gear menu and the popups keep the bare name; only the row
-        -- label carries the badge.
-        local label = name
-        if stored.toRecover then label = name .. " |cffffd700(recoverable)|r" end
-        AddActivateRow(label, slot, "Interface\\Icons\\INV_Scroll_03",
-            GearFor(slot, stored, name, false, false), false)
+        AddActivateRow(name, slot, "Interface\\Icons\\INV_Scroll_03",
+            GearFor(slot, stored, name, false), false, nil)
     end
 
     AddRow({
@@ -4314,31 +4417,39 @@ local function UpdateLoadoutFooter()
     loadoutPrimaryBtn:Hide()
     loadoutSecondaryBtn:Hide()
 
-    -- First-ever build was just created (snapshot, wishlist or import): arm it
-    -- as soon as the server's slot list confirms it, instead of leaving the
-    -- dropdown on "Select a loadout". Wishlists go through the same path, since
-    -- their slot id only exists once the server has assigned it.
+    -- First-ever wishlist was just created (builder or import): highlight it
+    -- as soon as the server's slot list confirms it. Its id only exists once
+    -- the server has assigned it.
     if autoActivateFirstBuild then
         local svc = GetService()
         local slots = svc and svc.GetServerBuildSlots and svc.GetServerBuildSlots() or {}
+        local maxSlots = (svc and svc.GetServerMaxSlots and svc.GetServerMaxSlots()) or 10
         local only, count = nil, 0
-        for s in pairs(slots) do count = count + 1; only = s end
+        for s in pairs(slots) do
+            if s > maxSlots then count = count + 1; only = s end
+        end
         if count > 1 then
-            autoActivateFirstBuild = nil -- not their first build after all
-        elseif count == 1 and (svc.GetServerActiveSlot and svc.GetServerActiveSlot() or 0) == 0 then
-            if not svc.CanActivateServerBuildSlot or svc.CanActivateServerBuildSlot() then
-                svc.ActivateServerBuildSlot(only)
-            end
+            autoActivateFirstBuild = nil -- not their first wishlist after all
+        elseif count == 1 and (svc.GetServerActiveDesign and svc.GetServerActiveDesign() or 0) == 0 then
+            svc.ActivateServerBuildSlot(only)
             autoActivateFirstBuild = nil
         end
     end
 
-    local activeBuild = GetActiveBuildOverview()
-    if activeBuild then
-        local name = (activeBuild.name and activeBuild.name ~= "") and activeBuild.name or "Unnamed"
-        UIDropDownMenu_SetText(loadoutDD, name)
-    else
-        UIDropDownMenu_SetText(loadoutDD, "Select a loadout")
+    -- The dropdown names the loadout being played, and the highlighted
+    -- wishlist after it when there is one.
+    do
+        local svc = GetService()
+        local slots = svc and svc.GetServerBuildSlots and svc.GetServerBuildSlots() or {}
+        local activeSlot = (svc and svc.GetServerActiveSlot and svc.GetServerActiveSlot()) or 1
+        local live = slots[activeSlot]
+        local text = (live and live.name ~= "" and live.name) or ("Loadout " .. activeSlot)
+        local wish = GetActiveBuildOverview()
+        if wish then
+            local wname = (wish.name and wish.name ~= "") and wish.name or "Unnamed"
+            text = text .. " |cffa080e0/ " .. wname .. "|r"
+        end
+        UIDropDownMenu_SetText(loadoutDD, text)
     end
 
     -- Live refresh if the list is open while slot data changes under it
@@ -4610,7 +4721,8 @@ function Journal.EditLoadout(loadout, index, targetSlot)
     if not loadout then return end
     local entries = {}
     for _, e in ipairs(loadout.echoes or {}) do
-        entries[e.spellId] = { quality = e.quality or 0, stacks = e.stacks or 1 }
+        entries[e.spellId] =
+            { quality = e.quality or 0, stacks = e.stacks or 1, avoid = e.avoid or nil }
     end
     builderDraft = {
         name = loadout.name, entries = entries,
@@ -4681,13 +4793,19 @@ function Journal.FinishLoadoutBuilder()
     if not builderDraft then return end
     local list = {}
     for spellId, e in pairs(builderDraft.entries) do
-        table.insert(list, { spellId = spellId, quality = e.quality, stacks = e.stacks })
+        table.insert(list,
+            { spellId = spellId, quality = e.quality, stacks = e.stacks, avoid = e.avoid or nil })
     end
     if #list == 0 then
         UIErrorsFrame:AddMessage("Pick at least one echo before saving.", 1, 0.2, 0.2)
         return
     end
+    -- Wishes first, refusals last. The server stores entries sorted by spell id,
+    -- so what really fixes the display order is the sort on the way back in
+    -- (see the 540 handler) -- this one just keeps the upload readable.
     table.sort(list, function(a, b)
+        local aa, ba = a.avoid and 1 or 0, b.avoid and 1 or 0
+        if aa ~= ba then return aa < ba end
         if a.quality ~= b.quality then return a.quality > b.quality end
         return (GetSpellInfo(a.spellId) or "") < (GetSpellInfo(b.spellId) or "")
     end)
@@ -4939,6 +5057,43 @@ local function CreateJournalFrame()
         return families
     end
 
+    -- Splits the families for the Family submenu: role families ("Tank",
+    -- "Healer"...) stay flat, "Class - Spec" ones go one submenu per class.
+    -- A single flat list (~37 rows) ran off the top of the screen.
+    local function GroupFamilies()
+        local roles, classes, specsByClass = {}, {}, {}
+        for _, fam in ipairs(CollectFamilies()) do
+            local class = fam:match("^(.-) %- ")
+            if class then
+                if not specsByClass[class] then
+                    specsByClass[class] = {}
+                    table.insert(classes, class)
+                end
+                table.insert(specsByClass[class], fam)
+            else
+                table.insert(roles, fam)
+            end
+        end
+        return roles, classes, specsByClass
+    end
+
+    local function AddFamilyToggle(fam, text, level)
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = text
+        info.keepShownOnClick = true
+        info.checked = selectedFamilies[fam] and true or false
+        info.func = function()
+            if selectedFamilies[fam] then
+                selectedFamilies[fam] = nil
+            else
+                selectedFamilies[fam] = true
+            end
+            UpdateFilterText()
+            Refresh()
+        end
+        UIDropDownMenu_AddButton(info, level)
+    end
+
     UIDropDownMenu_Initialize(filterDropdown, function(self, level)
         level = level or 1
         local info
@@ -5088,21 +5243,26 @@ local function CreateJournalFrame()
             end
             UIDropDownMenu_AddButton(info, level)
 
-            for _, fam in ipairs(CollectFamilies()) do
+            local roles, classes = GroupFamilies()
+            for _, fam in ipairs(roles) do
+                AddFamilyToggle(fam, fam, level)
+            end
+
+            for _, class in ipairs(classes) do
                 info = UIDropDownMenu_CreateInfo()
-                info.text = fam
-                info.keepShownOnClick = true
-                info.checked = selectedFamilies[fam] and true or false
-                info.func = function()
-                    if selectedFamilies[fam] then
-                        selectedFamilies[fam] = nil
-                    else
-                        selectedFamilies[fam] = true
-                    end
-                    UpdateFilterText()
-                    Refresh()
-                end
+                info.text = class
+                info.hasArrow = true
+                info.notCheckable = true
+                info.value = "FAMILY_CLASS:" .. class
                 UIDropDownMenu_AddButton(info, level)
+            end
+        elseif level == 3 and type(UIDROPDOWNMENU_MENU_VALUE) == "string"
+            and UIDROPDOWNMENU_MENU_VALUE:find("^FAMILY_CLASS:") then
+            local class = UIDROPDOWNMENU_MENU_VALUE:sub(#"FAMILY_CLASS:" + 1)
+            local _, _, specsByClass = GroupFamilies()
+            for _, fam in ipairs(specsByClass[class] or {}) do
+                -- "Priest - Holy" -> "Holy": the class is the parent row
+                AddFamilyToggle(fam, fam:sub(#class + 4), level)
             end
         end
     end)
@@ -5331,6 +5491,7 @@ local function CreateJournalFrame()
     emptyText:SetJustifyH("CENTER")
     emptyText:SetTextColor(0.55, 0.55, 0.55)
     emptyText:SetText("You have no echoes yet.\n\nLevel up during a run to earn new echoes.")
+    myRunEmptyState.text = emptyText -- UpdateMyRunPanel swaps it while a search is on
 
     -- ── Loadout controls: active loadout + slot switcher + create/import ──
     -- Consolidates what used to be the separate Loadouts tab (server save
@@ -5426,8 +5587,17 @@ function Journal.Toggle(tab)
 end
 
 -- Called by the perk service whenever granted/locked perks change
-function Journal.OnDataChanged()
+-- Opening the journal sends three requests whose replies each land here, on top of
+-- the OnShow refresh: one Refresh per frame at most (each one rebuilds ~950 items).
+local refreshSoon = CreateFrame("Frame")
+refreshSoon:Hide()
+refreshSoon:SetScript("OnUpdate", function(self)
+    self:Hide()
     Refresh()
+end)
+
+function Journal.OnDataChanged()
+    refreshSoon:Show()
 end
 
 -- The journal shell and its overlays (loadout list menu, guided tour) sit on

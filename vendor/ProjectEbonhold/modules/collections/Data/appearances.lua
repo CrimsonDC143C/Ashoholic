@@ -18,7 +18,6 @@
 ------------------------------------------------------------------------------]]
 
 local ez = _G.ezCollections
-local flat = (_G.Ebonhold and _G.Ebonhold.AppearanceFlat) or {}
 
 -- (class, subclass, invType) -> categoryID. Armor keys on invType; weapons on subclass.
 local INVTYPE_TO_ARMOR_CAT = {
@@ -118,12 +117,20 @@ ez.AppearanceCategoryMeta = M
 -- IDENTIFIED to the UI by a representative itemID (the wardrobe treats visualID
 -- as an item — GetItemInfo(visualID), invType, model TryOn). The visual's
 -- collected state is keyed on its displayID (what the server tracks).
+--
+-- Built on first use, not at load: ~22,600 rows folded into ~35,000 tables cost
+-- every login and /reload, for players who never open the wardrobe.
 --=============================================================================
 local catalog       = {}  -- [cat] = { order = {repItemID,...}, sourcesOf = {[rep]={itemID,...}} }
 local sourceInfo    = {}  -- [itemID] = { visual = repItemID, display = displayID, category = cat, quality }
 local visualDisplay = {}  -- [repItemID] = displayID   (for collected checks)
+local built = false
 
-do
+local function Build()
+    if built then return end
+    built = true
+    local flat = (_G.Ebonhold and _G.Ebonhold.AppearanceFlat) or {}
+
     -- 1) group items by (category, displayID); pick a representative per visual
     local group = {}  -- [cat] = { [displayID] = { items = {}, bestQ = -1, rep = nil } }
     local i, n = 1, #flat
@@ -163,31 +170,38 @@ do
         end
         catalog[cat] = c
     end
+
+    -- Free the flat blob; the folded catalog is the working copy.
+    if _G.Ebonhold then _G.Ebonhold.AppearanceFlat = nil end
 end
 
+-- The same tables before and after the build (filled in place); read them through
+-- the accessors below, or call BuildAppearanceCatalog() first.
 ez.AppearanceCatalog = catalog
 ez.SourceInfo        = sourceInfo
-
--- Free the flat blob; the folded catalog is the working copy.
-if _G.Ebonhold then _G.Ebonhold.AppearanceFlat = nil end
+ez.BuildAppearanceCatalog = Build
 
 --=============================================================================
 -- Accessors used by the C_TransmogCollection backing
 --=============================================================================
 function ez:GetCategoryVisuals(categoryID)                 -- ordered list of representative itemIDs
+    Build()
     local c = catalog[categoryID]
     return c and c.order or nil
 end
 function ez:GetVisualSourceItems(visualID)                 -- source itemIDs sharing this visual's display
+    Build()
     local info = sourceInfo[visualID]
     if not info then return nil end
     local c = catalog[info.category]
     return c and c.sourcesOf[visualID] or nil
 end
 function ez:GetAppearanceSourceRow(itemID)                 -- { visual, display, category, quality }
+    Build()
     return sourceInfo[itemID]
 end
 function ez:GetVisualDisplayID(visualID)
+    Build()
     return visualDisplay[visualID]
 end
 function ez:IsVisualCollected(visualID)
@@ -195,6 +209,7 @@ function ez:IsVisualCollected(visualID)
     -- entries (the transmog NPC does GetItemTemplate(appearance)). A visual (one
     -- displayID, one representative) is collected iff ANY source item sharing its
     -- appearance has been collected server-side.
+    Build()
     local collected = ez.Collections.Appearances
     if collected[visualID] then return true end          -- fast path: the representative itself
     local info = sourceInfo[visualID]

@@ -13,8 +13,9 @@ local ADDON_NAME = "ProjectEbonhold"
 local function Initialize()
     ProjectEbonholdOptionsService:Initialize()
 
-    -- One-time CVar defaults (Font Rendering on, Stance Patch on, tutorials
-    -- off). Safe to call unconditionally; it only touches CVars + saved vars.
+    -- One-time CVar defaults (Font Rendering on, tutorials off) and the
+    -- Stance Patch forced off on every load (it corrupts client memory, see
+    -- cvar_options.lua). Safe to call unconditionally; it only touches CVars + saved vars.
     if ProjectEbonhold and ProjectEbonhold.CVarOptions and ProjectEbonhold.CVarOptions.ApplyInitialDefaults then
         ProjectEbonhold.CVarOptions.ApplyInitialDefaults()
     end

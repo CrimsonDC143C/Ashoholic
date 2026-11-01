@@ -11,7 +11,6 @@ local empowermentFrame = nil
 local currentData = {}
 local isCollapsed = false
 local isEmpowermentCollapsed = false
-local intensityButton = nil
 
 local qualityInfo =
 {
@@ -148,6 +147,9 @@ WatchFrame:SetScript("OnUpdate", function(self, elapsed)
     if watchSince < 0.25 then return end
     watchSince = 0
     if not UIParent:IsShown() then return end
+    -- WatchFrame holds the secure quest-item buttons, so it is protected: an addon SetPoint in
+    -- combat is refused (4x a second, "Interface action failed because of an AddOn"). Wait.
+    if InCombatLockdown() then return end
     local point, rel, relPoint, x, y = self:GetPoint(1)
     if point == "TOPRIGHT" and rel == UIParent and relPoint == "TOPRIGHT"
        and x == WATCH_X and y == WATCH_Y then
@@ -304,9 +306,9 @@ local function CreatePlayerRunFrame()
                 local diff = svc.GetCurrentDifficulty()
                 if diff <= 1 then
                     GameTooltip:SetText("Normal Mode", 0.7, 0.7, 0.7)
-                    GameTooltip:AddLine("No hardcore modifiers active.", 1, 1, 1, true)
+                    GameTooltip:AddLine("No Torment: monsters have their normal strength.", 1, 1, 1, true)
                 else
-                    GameTooltip:SetText("Hardcore Mode " .. (diff - 1), 1, 0.3, 0.3)
+                    GameTooltip:SetText("Torment " .. (diff - 1), 1, 0.3, 0.3)
                     GameTooltip:AddLine("Increased difficulty and rewards.", 1, 1, 1, true)
                 end
             else
@@ -316,13 +318,19 @@ local function CreatePlayerRunFrame()
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             local svc = ProjectEbonhold.HardmodeService
             local tier = svc and svc.GetCurrentDifficulty() or 1
-            local isHardcore = tier > 1
-            if isHardcore then
-                GameTooltip:SetText("|cffFF2020Hardcore " .. (tier - 1) .. "|r", 1, 0.2, 0.2)
+            local dungeonTier = svc and svc.GetInstanceDifficulty and svc.GetInstanceDifficulty()
+            local function Name(t) return t > 1 and ("Torment " .. (t - 1)) or "Normal" end
+            if dungeonTier then
+                -- Inside a Dungeon Finder run at another tier: the dungeon's rules apply for now.
+                GameTooltip:SetText("|cffFF2020Dungeon: " .. Name(dungeonTier) .. "|r", 1, 0.2, 0.2)
+                GameTooltip:AddLine("Your Torment: " .. Name(tier), 0.8, 0.8, 0.8)
+                GameTooltip:AddLine("The dungeon runs at the difficulty picked in the Dungeon Finder; your own difficulty returns when you leave.", 1, 1, 1, true)
+            elseif tier > 1 then
+                GameTooltip:SetText("|cffFF2020Torment " .. (tier - 1) .. "|r", 1, 0.2, 0.2)
             else
-                GameTooltip:SetText("Hardcore", 0.8, 0.8, 0.8)
+                GameTooltip:SetText("Torment", 0.8, 0.8, 0.8)
             end
-            GameTooltip:AddLine("Click to open the Hardcore difficulty panel.", nil, nil, nil, true)
+            GameTooltip:AddLine("Click to open the Torment difficulty panel.", nil, nil, nil, true)
         end
         GameTooltip:Show()
     end)
@@ -359,6 +367,9 @@ local function CreatePlayerRunFrame()
         multiplierText:SetPoint("LEFT", headerFrame, "LEFT", 110, -15)
     end
     multiplierText:SetText("|cff00ff00+0%|r")
+    -- Off the row since 2026-09-12: the multiplier (and the catch-up bonus) now live in the
+    -- Soul Ash tooltip, the row's right side holds the Soul Shard counter.
+    multiplierText:Hide()
     playerRunFrame.multiplierText = multiplierText
 
     local spHitbox = CreateFrame("Button", nil, headerFrame)
@@ -371,6 +382,15 @@ local function CreatePlayerRunFrame()
         GameTooltip:SetText(UITexts.tooltips.soulPoints.title(sp), 1, 1, 1)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(UITexts.tooltips.soulPoints.line, nil, nil, nil, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(UITexts.tooltips.multiplier.title(playerRunFrame.currentMultiplier or 0), 0, 1, 0)
+        GameTooltip:AddLine(UITexts.tooltips.multiplier.line, nil, nil, nil, true)
+        local catchup = playerRunFrame.currentCatchupPct or 0
+        if catchup > 0 then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("|cffffcc00Catch-Up Bonus: +" .. catchup .. "%|r", 1, 0.8, 0)
+            GameTooltip:AddLine("Until your account catches up with the previous patches.", nil, nil, nil, true)
+        end
         GameTooltip:Show()
     end)
     spHitbox:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
@@ -388,11 +408,62 @@ local function CreatePlayerRunFrame()
         GameTooltip:Show()
     end)
     multiplierHitbox:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+    multiplierHitbox:Hide()
+
+    -- Run Soul Shards (2026-09-12): earned at final encounters, banked with the ashes when the
+    -- run ends. Same look as the ash counter - icon half over the left edge of a dark box, white
+    -- count inside - mirrored on the right of the SAME row (the ash box sits 27 px from the left
+    -- edge of the header art, this one 27 px from the right). The box is the ash box lifted out
+    -- of the header art (texture_ui, source px 38-124 x 46-65). Multipliers live in the tooltips.
+    local soulShardBox = headerFrame:CreateTexture(nil, "ARTWORK")
+    soulShardBox:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
+    soulShardBox:SetTexCoord(0.148438, 0.484375, 0.179688, 0.253906)
+    -- Pushed against the right border so the shard icon clears the ash box (which ends
+    -- ~109 px in): a 74 px box at -12 leaves a 10 px gap between the two currencies.
+    if IsTransparentDesign() then
+        soulShardBox:SetSize(70, 18)
+        soulShardBox:SetPoint("RIGHT", headerFrame, "RIGHT", -34, -26)
+    else
+        soulShardBox:SetSize(74, 18)
+        soulShardBox:SetPoint("RIGHT", headerFrame, "RIGHT", -12, -15)
+    end
+    playerRunFrame.soulShardBox = soulShardBox
+
+    local soulShardIcon = headerFrame:CreateTexture(nil, "OVERLAY")
+    soulShardIcon:SetSize(16, 16)
+    soulShardIcon:SetTexture("Interface\\Icons\\inv_10_jewelcrafting3_soulcage_frost")
+    -- Measured on the ash row: 3 px between the icon and the visible box edge (the box
+    -- texture carries ~2 px of background margin, hence -10 rather than -8).
+    soulShardIcon:SetPoint("CENTER", soulShardBox, "LEFT", -10, 0)
+    playerRunFrame.soulShardIcon = soulShardIcon
+
+    local soulShardsText = headerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    soulShardsText:SetPoint("LEFT", soulShardIcon, "RIGHT", 8, 0)
+    soulShardsText:SetText("|cffffffff0|r")
+    playerRunFrame.soulShardsText = soulShardsText
+
+    local shardHitbox = CreateFrame("Button", nil, headerFrame)
+    shardHitbox:SetPoint("LEFT", soulShardIcon, "LEFT", -5, 0)
+    shardHitbox:SetPoint("RIGHT", soulShardsText, "RIGHT", 5, 0)
+    shardHitbox:SetHeight(30)
+    shardHitbox:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(UITexts.tooltips.soulShards.title(playerRunFrame.currentSoulShards or 0), 1, 1, 1)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(UITexts.tooltips.soulShards.line, nil, nil, nil, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(UITexts.tooltips.shardMultiplier.title(playerRunFrame.currentShardBonusPct or 0), 0, 1, 0)
+        GameTooltip:AddLine(UITexts.tooltips.shardMultiplier.line, nil, nil, nil, true)
+        GameTooltip:Show()
+    end)
+    shardHitbox:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+    playerRunFrame.shardHitbox = shardHitbox
 
     -- Catchup multiplier display
     local catchupText = headerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     catchupText:SetPoint("LEFT", multiplierText, "RIGHT", 6, 0)
     catchupText:SetText("")
+    catchupText:Hide() -- shown in the Soul Ash tooltip instead (see spHitbox)
     playerRunFrame.catchupText = catchupText
 
     local catchupHitbox = CreateFrame("Button", nil, headerFrame)
@@ -404,315 +475,335 @@ local function CreatePlayerRunFrame()
         GameTooltip:SetOwner(self, IsTransparentDesign() and "ANCHOR_TOP" or "ANCHOR_RIGHT")
         GameTooltip:SetText("|cffffcc00Catch-Up Bonus|r", 1, 0.8, 0)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("You are behind the progression curve. A " ..
-            (playerRunFrame.currentCatchupPct or 0) ..
-            "% bonus is applied on top of all other multipliers until you reach the previous patches' total Soul Ashes cap.",
+        GameTooltip:AddLine("+" .. (playerRunFrame.currentCatchupPct or 0) ..
+            "% until your account catches up with the previous patches.",
             nil, nil, nil, true)
         GameTooltip:Show()
     end)
     catchupHitbox:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+    catchupHitbox:Hide()
     playerRunFrame.catchupHitbox = catchupHitbox
 
     local headerRight
-    local reaperParent, hearthParent
+    local hearthParent
     if IsTransparentDesign() then
         headerRight = CreateFrame("Frame", nil, playerRunFrame)
         headerRight:SetSize(60, headerH)
         headerRight:SetPoint("TOPRIGHT", playerRunFrame, "TOPRIGHT", -edgeInset, -edgeInset)
         headerRight:SetFrameLevel(playerRunFrame:GetFrameLevel() + 20)
-        reaperParent = headerRight
         hearthParent = headerRight
     else
-        reaperParent = headerFrame
         hearthParent = headerFrame
     end
 
-    local reaperIcon = reaperParent:CreateTexture(nil, "OVERLAY")
-    reaperIcon:SetSize(24, 24)
-    reaperIcon:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
-    reaperIcon:SetTexCoord(0.121094, 0.214844, 0.898438, 0.996094)
-    if IsTransparentDesign() then
-        reaperIcon:SetPoint("TOPRIGHT", headerRight, "TOPRIGHT", 0, 0)
-    else
-        reaperIcon:SetPoint("TOPRIGHT", headerFrame, "TOPRIGHT", -10, -10)
-    end
-    playerRunFrame.reaperIcon = reaperIcon
-
-    local reaperHitbox = CreateFrame("Button", nil, reaperParent)
-    reaperHitbox:SetPoint("CENTER", reaperIcon, "CENTER", 0, 0)
-    reaperHitbox:SetSize(25, 25)
-    reaperHitbox:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        local data
-        if IsTransparentDesign() then
-            data = ProjectEbonhold.PlayerRunService.GetIntensityData()
-        else
-            data = _G["EbonholdIntensityData"] or {}
-        end
-        local areaName = data.areaNameReaper or "0"
-        GameTooltip:SetText(UITexts.tooltips.reaper.title, 1, 0.5, 0.5)
-        GameTooltip:AddLine(" ")
-        if areaName ~= "0" then
-            GameTooltip:AddLine(UITexts.tooltips.reaper.spawned(areaName), 1, 1, 1, true)
-        else
-            GameTooltip:AddLine(UITexts.tooltips.reaper.notSpawned, 0.7, 0.7, 0.7, true)
-        end
-        GameTooltip:Show()
-    end)
-    reaperHitbox:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
-    playerRunFrame.reaperHitbox = reaperHitbox
-
+    -- The corpse skull of the world map (2026-09-17, was the heart): the counter next to it
+    -- is the number of Soul Ash resurrections paid this run.
     local hearthIcon = hearthParent:CreateTexture(nil, "OVERLAY")
-    hearthIcon:SetSize(22, 24)
-    hearthIcon:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
-    hearthIcon:SetTexCoord(0.316406, 0.398438, 0.898438, 0.988281)
-    hearthIcon:SetPoint("TOPRIGHT", reaperIcon, "TOPLEFT", -5, 0)
+    hearthIcon:SetSize(22, 22)
+    hearthIcon:SetTexture("Interface\\WorldMap\\Skull_64Grey")
+    hearthIcon:SetTexCoord(0, 1, 0, 1)
+    if IsTransparentDesign() then
+        hearthIcon:SetPoint("TOPRIGHT", headerRight, "TOPRIGHT", 0, 0)
+    else
+        hearthIcon:SetPoint("TOPRIGHT", headerFrame, "TOPRIGHT", -10, -10)
+    end
     playerRunFrame.hearthIcon = hearthIcon
 
+    -- Soul Ash resurrections used this run, sitting just left of the heart (2026-09-17):
+    -- every one raises the price of the next; the tooltip adds the friend rez.
+    local freeRezText = hearthParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    freeRezText:SetPoint("RIGHT", hearthIcon, "LEFT", -3, 0)
+    freeRezText:SetText("|cffffffff0|r")
+    playerRunFrame.freeRezText = freeRezText
+
     local hearthHitbox = CreateFrame("Button", nil, hearthParent)
-    hearthHitbox:SetPoint("CENTER", hearthIcon, "CENTER", 0, 0)
-    hearthHitbox:SetSize(25, 25)
+    -- Covers the count and the heart as one hover zone
+    hearthHitbox:SetPoint("TOPLEFT", freeRezText, "TOPLEFT", -5, 3)
+    hearthHitbox:SetPoint("BOTTOMRIGHT", hearthIcon, "BOTTOMRIGHT", 3, -3)
     hearthHitbox:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local data = playerRunFrame.currentData or {}
-        local playerLevel = UnitLevel("player")
-        GameTooltip:SetText(UITexts.tooltips.survival.title, 1, 1, 0.5)
+        local survival = UITexts.tooltips.survival
+        GameTooltip:SetText(survival.title, 1, 1, 0.5)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(UITexts.tooltips.survival.playerRezs .. (data.countCanAcceptedRezs or 0), 1, 1, 1)
-        GameTooltip:AddLine(UITexts.tooltips.survival.freeRezs .. (data.countCanSelfRezs or 0), 1, 1, 1)
-        GameTooltip:AddLine(UITexts.tooltips.survival.classRezs .. (data.countCanClassRezs or 0), 1, 1, 1)
-        GameTooltip:AddLine(UITexts.tooltips.survival.cheatDeath .. (data.countCanAvoidFatalAttacks or 0), 1, 1, 1)
-        GameTooltip:AddLine(
-        UITexts.tooltips.survival.nextRezCost ..
-        (math.max(playerLevel, data.costNextReset or 0)) .. UITexts.tooltips.survival.nextCost, 1, 1, 1)
+        GameTooltip:AddLine(survival.paidRezs(data.paidRezsUsed or 0, data.costNextReset or 0,
+            data.costNextResetShards or 0, data.paidRezAvailable), 1, 1, 1, true)
+        local friendMax = (data.countCanAcceptedRezs or 0) + (data.acceptedRezsUsed or 0)
+        GameTooltip:AddLine(survival.friendRezs(data.countCanAcceptedRezs or 0, friendMax), 1, 1, 1, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(survival.hint, 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)
     hearthHitbox:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
     playerRunFrame.hearthHitbox = hearthHitbox
 
-    local intensityFrame = CreateFrame("Frame", nil, playerRunFrame)
-    intensityFrame:SetSize(contentW, intensityH)
+    -- The Reaper's Gaze (modules/reaper/reaper.lua):
+    -- the old Intensity bar, reused. The cursor is the run's gauge between empty (left) and its
+    -- cap (right); fed by PlayerRunUI.UpdateBracket.
+    local bracketFrame = CreateFrame("Frame", nil, playerRunFrame)
+    bracketFrame:SetSize(contentW, intensityH)
     if IsTransparentDesign() then
-        intensityFrame:SetPoint("TOP", headerFrame, "BOTTOM", -20, 5)
+        bracketFrame:SetPoint("TOP", headerFrame, "BOTTOM", -20, 5)
     else
-        intensityFrame:SetPoint("TOP", headerFrame, "BOTTOM", 0, 0)
+        bracketFrame:SetPoint("TOP", headerFrame, "BOTTOM", 0, 0)
     end
 
-    local intensityFill = intensityFrame:CreateTexture(nil, "BACKGROUND")
-    intensityFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    if IsTransparentDesign() then
-        intensityFill:SetPoint("LEFT", intensityFrame, "LEFT", 40, 0)
-        intensityFill:SetHeight(14)
-    else
-        intensityFill:SetPoint("LEFT", intensityFrame, "LEFT", 20, -8)
-        intensityFill:SetHeight(18)
-    end
-    intensityFill:SetVertexColor(0.8, 0.1, 0.1, 0.8)
-    playerRunFrame.intensityFill = intensityFill
+    -- One gauge, one colour: a fill that grows from the left end (empty) to the right end (the
+    -- cap). Animated: the width eases toward the server's value (see UpdateBracket / OnUpdate).
+    local zoneY = IsTransparentDesign() and 4 or -4
+    local zoneH = IsTransparentDesign() and 14 or 18
+    -- the bar art (texture_ui) runs between the two pillars: ~22 px in from each side
+    local zoneX0 = IsTransparentDesign() and 40 or 22
+    local barW = IsTransparentDesign() and 160 or 176
+    playerRunFrame.bracketBarX0, playerRunFrame.bracketBarW = zoneX0, barW
+    local gaugeTrack = bracketFrame:CreateTexture(nil, "BACKGROUND")
+    gaugeTrack:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    gaugeTrack:SetSize(barW, zoneH)
+    gaugeTrack:SetPoint("LEFT", bracketFrame, "LEFT", zoneX0, zoneY)
+    gaugeTrack:SetVertexColor(0.12, 0.10, 0.16, 0.85)
+    playerRunFrame.gaugeTrack = gaugeTrack -- the whole bar, whatever its fill (the HUD tips light it)
+    local gaugeFill = bracketFrame:CreateTexture(nil, "BORDER")
+    gaugeFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    gaugeFill:SetSize(1, zoneH)
+    gaugeFill:SetPoint("LEFT", bracketFrame, "LEFT", zoneX0, zoneY)
+    gaugeFill:SetVertexColor(0.86, 0.48, 0.16, 0.95)
+    playerRunFrame.gaugeFill = gaugeFill
+    -- a soft head on the fill's edge, so the growth reads even on a tiny step
+    local gaugeHead = bracketFrame:CreateTexture(nil, "ARTWORK")
+    gaugeHead:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    gaugeHead:SetSize(6, zoneH)
+    gaugeHead:SetPoint("LEFT", gaugeFill, "RIGHT", -3, 0)
+    gaugeHead:SetVertexColor(1, 0.85, 0.55, 0.9)
+    gaugeHead:SetBlendMode("ADD")
+    playerRunFrame.gaugeHead = gaugeHead
+    playerRunFrame.gaugeShown, playerRunFrame.gaugeTarget = 0, 0
+    -- easing: the shown fraction chases the target, faster the further it is (never below a floor)
+    bracketFrame:SetScript("OnUpdate", function(self, elapsed)
+        -- The switch between the gauge and a contract's hourglass (UpdateBracket starts it): the
+        -- old bar drains to empty in its own colour and its caption fades, then the new bar fills
+        -- from the left in its colour with a bright head and a glow, and the caption comes back.
+        -- the glass: comes in (fades in, turns over like a coin, pops), turns over again when the
+        -- sand starts, fades out when the contract is over. Size 48 at rest.
+        local fx, glass = playerRunFrame.hourglassFx, playerRunFrame.contractHourglass
+        if fx and glass then
+            fx.t = fx.t + elapsed
+            local t = fx.t
+            if fx.kind == "intro" then
+                glass:SetAlpha(math.min(1, t / 0.3))
+                if t < 0.5 then
+                    glass:SetSize(math.max(2, 48 * math.abs(math.cos(math.pi * t / 0.5))), 48)
+                elseif t < 0.8 then
+                    local sz = 48 * (1 + 0.35 * math.sin(math.pi * (t - 0.5) / 0.3))
+                    glass:SetSize(sz, sz)
+                else
+                    glass:SetSize(48, 48); glass:SetAlpha(1); playerRunFrame.hourglassFx = nil
+                end
+            elseif fx.kind == "turn" then
+                if t < 0.5 then
+                    glass:SetSize(math.max(2, 48 * math.abs(math.cos(math.pi * t / 0.5))), 48)
+                else
+                    glass:SetSize(48, 48); playerRunFrame.hourglassFx = nil
+                end
+            else -- "out"
+                if t < 0.5 then
+                    glass:SetAlpha(1 - t / 0.5)
+                else
+                    glass:Hide(); glass:SetAlpha(1); glass:SetSize(48, 48); playerRunFrame.hourglassFx = nil
+                end
+            end
+        end
+        local tr = playerRunFrame.barTransition
+        if tr then
+            tr.t = tr.t + elapsed
+            local caption = playerRunFrame.bracketSuggestedText
+            if tr.phase == 1 then
+                local k = math.min(1, tr.t / 0.3)
+                local w = tr.from * (1 - k * k)
+                playerRunFrame.gaugeShown = w
+                gaugeFill:SetWidth(math.max(1, barW * w))
+                if caption then caption:SetAlpha(1 - k) end
+                if k >= 1 then
+                    tr.phase, tr.t = 2, 0
+                    local c, h = playerRunFrame.barColor, playerRunFrame.barHeadColor
+                    if c then gaugeFill:SetVertexColor(c[1], c[2], c[3], c[4]) end
+                    if h then gaugeHead:SetVertexColor(h[1], h[2], h[3], h[4]) end
+                    gaugeHead:SetWidth(16)
+                    if playerRunFrame.bracketFillFlashAnim then
+                        playerRunFrame.bracketFillFlashAnim:Stop()
+                        playerRunFrame.bracketFillFlashAnim:Play()
+                    end
+                end
+                return
+            end
+            local k = math.min(1, tr.t / 0.6)
+            local e = 1 - (1 - k) * (1 - k) * (1 - k)
+            local w = math.min(math.max(playerRunFrame.gaugeTarget or 0, 0), 1) * e
+            playerRunFrame.gaugeShown = w
+            gaugeFill:SetWidth(math.max(1, barW * w))
+            gaugeHead:SetWidth(6 + 10 * (1 - k))
+            if caption then caption:SetAlpha(k) end
+            if k >= 1 then
+                playerRunFrame.barTransition = nil
+                gaugeHead:SetWidth(6)
+                if caption then caption:SetAlpha(1) end
+            end
+            return
+        end
+        local shown, target = playerRunFrame.gaugeShown or 0, playerRunFrame.gaugeTarget or 0
+        if math.abs(target - shown) < 0.0005 then
+            if shown ~= target then playerRunFrame.gaugeShown = target end
+            return
+        end
+        local step = (target - shown) * math.min(1, elapsed * 4)
+        local floor = math.min(math.abs(target - shown), elapsed * 0.08)
+        if math.abs(step) < floor then step = floor * (target > shown and 1 or -1) end
+        shown = shown + step
+        playerRunFrame.gaugeShown = shown
+        gaugeFill:SetWidth(math.max(1, barW * math.min(math.max(shown, 0), 1)))
+    end)
 
     if not IsTransparentDesign() then
-        local intensityBg = intensityFrame:CreateTexture(nil, "BORDER")
-        intensityBg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
-        intensityBg:SetTexCoord(0.019531, 0.964844, 0.312500, 0.515625)
-        intensityBg:SetAllPoints(intensityFrame)
+        local bracketBg = bracketFrame:CreateTexture(nil, "BORDER")
+        bracketBg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
+        bracketBg:SetTexCoord(0.019531, 0.964844, 0.312500, 0.515625)
+        bracketBg:SetAllPoints(bracketFrame)
     end
 
-    local intensityIndicator
+    local bracketIndicator
     if IsTransparentDesign() then
-        intensityIndicator = CreateFrame("Frame", nil, intensityFrame)
-        intensityIndicator:SetSize(24, 24)
-        intensityIndicator:SetPoint("LEFT", intensityFrame, "LEFT", 12, 0)
-        intensityIndicator:SetPoint("TOP", intensityFrame, "CENTER", 0, 0)
-        intensityIndicator:SetPoint("BOTTOM", intensityFrame, "CENTER", 0, 0)
+        bracketIndicator = CreateFrame("Frame", nil, bracketFrame)
+        bracketIndicator:SetSize(24, 24)
+        bracketIndicator:SetPoint("LEFT", bracketFrame, "LEFT", 28, 4)
+        local tex = bracketIndicator:CreateTexture(nil, "OVERLAY")
+        tex:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
+        tex:SetTexCoord(0.023438, 0.109375, 0.890625, 0.992188)
+        tex:SetAllPoints(bracketIndicator)
     else
-        intensityIndicator = intensityFrame:CreateTexture(nil, "OVERLAY")
-        intensityIndicator:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
-        intensityIndicator:SetTexCoord(0.023438, 0.109375, 0.890625, 0.992188)
-        intensityIndicator:SetSize(25, 30)
-        intensityIndicator:SetPoint("LEFT", intensityFrame, "LEFT", 10, 0)
+        bracketIndicator = bracketFrame:CreateTexture(nil, "OVERLAY")
+        bracketIndicator:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_ui")
+        bracketIndicator:SetTexCoord(0.023438, 0.109375, 0.890625, 0.992188)
+        bracketIndicator:SetSize(25, 30)
+        bracketIndicator:SetPoint("LEFT", bracketFrame, "LEFT", 8, -4)
     end
-    playerRunFrame.intensityIndicator = intensityIndicator
+    playerRunFrame.bracketIndicator = bracketIndicator
+    bracketIndicator:Hide() -- the cursor of the old three-zone bar: the fill IS the reading now
 
-    local intensityLevelCircle = CreateFrame("Frame", nil, intensityFrame)
-    intensityLevelCircle:SetSize(20, 20)
-    if IsTransparentDesign() then
-        intensityLevelCircle:SetPoint("CENTER", intensityIndicator, "CENTER", 0, 0)
-    else
-        intensityLevelCircle:SetPoint("CENTER", intensityIndicator, "CENTER", 0, 10)
-    end
-    intensityLevelCircle:SetFrameLevel(intensityFrame:GetFrameLevel() + 2)
+    local bracketFillFlash = bracketFrame:CreateTexture(nil, "OVERLAY")
+    bracketFillFlash:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bracketFillFlash:SetSize(barW, zoneH)
+    bracketFillFlash:SetPoint("LEFT", bracketFrame, "LEFT", zoneX0, zoneY)
+    bracketFillFlash:SetVertexColor(1, 0.8, 0.5, 1)
+    bracketFillFlash:SetBlendMode("ADD")
+    bracketFillFlash:SetAlpha(0)
+    local ag = bracketFillFlash:CreateAnimationGroup()
+    local a1 = ag:CreateAnimation("Alpha"); a1:SetChange(0.8); a1:SetDuration(0.15); a1:SetOrder(1)
+    local a2 = ag:CreateAnimation("Alpha"); a2:SetChange(-0.8); a2:SetDuration(0.6); a2:SetOrder(2)
+    playerRunFrame.bracketFillFlashAnim = ag
 
-    if not IsTransparentDesign() then
-        local circleBg = intensityLevelCircle:CreateTexture(nil, "BACKGROUND")
-        circleBg:SetAllPoints()
-        circleBg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\roundborder")
-        circleBg:SetVertexColor(0.1, 0.1, 0.1, 0.9)
-    end
+    -- Label under the bar: the content the player is in (the suggestion lives in the tooltip)
+    local suggestedText = bracketFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    suggestedText:SetPoint("BOTTOM", bracketFrame, "BOTTOM", IsTransparentDesign() and 20 or 0, IsTransparentDesign() and -16 or -6)
+    -- its place under the bar; a contract's timer (bigger font) sits lower, clear of the bar (UpdateBracket)
+    playerRunFrame.bracketCaptionX, playerRunFrame.bracketCaptionY = IsTransparentDesign() and 20 or 0, IsTransparentDesign() and -16 or -6
+    suggestedText:SetWidth(200)
+    suggestedText:SetJustifyH("CENTER")
+    suggestedText:SetText("|cff40ff40...|r")
+    playerRunFrame.bracketSuggestedText = suggestedText
+    playerRunFrame.bracketSuggestedFont = { suggestedText:GetFont() } -- restored when the hourglass leaves
+    local suggestedIcon = bracketFrame:CreateTexture(nil, "OVERLAY")
+    suggestedIcon:SetSize(16, 16)
+    suggestedIcon:SetPoint("RIGHT", suggestedText, "LEFT", -3, 0)
+    suggestedIcon:Hide()
+    playerRunFrame.bracketSuggestedIcon = suggestedIcon
+    playerRunFrame.bracketFrame = bracketFrame
 
-    local levelText = intensityLevelCircle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    levelText:SetPoint("CENTER", intensityLevelCircle, "CENTER", 0, 0)
-    levelText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    levelText:SetTextColor(1, 0.2, 0.2)
-    levelText:SetText("0")
-
-    playerRunFrame.intensityLevelCircle = intensityLevelCircle
-    playerRunFrame.intensityLevelText = levelText
-
-    local intensityFillFlash = intensityFrame:CreateTexture(nil, "OVERLAY")
-    intensityFillFlash:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    if IsTransparentDesign() then
-        intensityFillFlash:SetPoint("LEFT", intensityFrame, "LEFT", 40, 0)
-        intensityFillFlash:SetHeight(14)
-    else
-        intensityFillFlash:SetPoint("LEFT", intensityFrame, "LEFT", 20, -8)
-        intensityFillFlash:SetHeight(18)
-    end
-    intensityFillFlash:SetVertexColor(1, 0.5, 0.5, 1)
-    intensityFillFlash:SetBlendMode("ADD")
-    intensityFillFlash:SetAlpha(0)
-    playerRunFrame.intensityFillFlash = intensityFillFlash
-
-    local ag = intensityFillFlash:CreateAnimationGroup()
-    local a1 = ag:CreateAnimation("Alpha")
-    a1:SetChange(0.8)
-    a1:SetDuration(0.1)
-    a1:SetOrder(1)
-    a1:SetSmoothing("OUT")
-    local a2 = ag:CreateAnimation("Alpha")
-    a2:SetChange(-0.8)
-    a2:SetDuration(0.3)
-    a2:SetOrder(2)
-    a2:SetSmoothing("IN")
-    playerRunFrame.intensityFillFlashAnim = ag
-    playerRunFrame.intensityFrame = intensityFrame
-
-    intensityFrame:EnableMouse(true)
-    intensityFrame:SetScript("OnEnter", function(self)
+    -- The Eye of the Reaper: an eye at the right end of the bar, shown only while the player
+    -- holds the Eye; clicking asks to break it (modules/reaper/reaper.lua). The Pact shows as
+    -- a small purple mark at the left end.
+    local eyeButton = CreateFrame("Button", nil, bracketFrame)
+    eyeButton:SetSize(20, 20)
+    eyeButton:SetPoint("LEFT", bracketFrame, "LEFT", zoneX0 + barW + 2, zoneY)
+    local eyeTex = eyeButton:CreateTexture(nil, "ARTWORK")
+    eyeTex:SetAllPoints(eyeButton)
+    eyeTex:SetTexture("Interface\\Icons\\INV_Misc_Eye_01")
+    eyeTex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    eyeButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+    eyeButton:SetScript("OnClick", function()
+        if ProjectEbonhold.Reaper and ProjectEbonhold.Reaper.AskSummon then ProjectEbonhold.Reaper.AskSummon() end
+    end)
+    eyeButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        local intensityData = ProjectEbonhold.PlayerRunService.GetIntensityData()
-        local intensity = intensityData.intensity or 0
-        GameTooltip:SetText(UITexts.tooltips.intensity.title(intensity), 1, 1, 1)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(UITexts.tooltips.intensity.description1, nil, nil, nil, true)
-        GameTooltip:AddLine(UITexts.tooltips.intensity.description2, nil, nil, nil, true)
-        GameTooltip:AddLine(UITexts.tooltips.intensity.description3, nil, nil, nil, true)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(UITexts.tooltips.intensity.warning, 1, 0, 0, true)
+        GameTooltip:SetText("Eye of the Reaper", 0.58, 0.44, 0.86)
+        GameTooltip:AddLine("Break it under an open sky to call the Reaper to this layer, at your Torment. Its Harvest kills beyond any resurrection; slay it to seal your gauge for the rest of the run.", 1, 1, 1, true)
         GameTooltip:Show()
     end)
-    intensityFrame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
+    eyeButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    eyeButton:Hide()
+    playerRunFrame.reaperEyeButton = eyeButton
 
-    local intensityEffects = ProjectEbonhold.IntensityEffects or {}
-    local iconSize = 32
-    local iconSpacing, maxIcons, startX
+    local pactMark = bracketFrame:CreateTexture(nil, "OVERLAY")
+    pactMark:SetSize(14, 14)
+    pactMark:SetPoint("RIGHT", bracketFrame, "LEFT", zoneX0 - 2, zoneY)
+    pactMark:SetTexture("Interface\\Icons\\Spell_Shadow_SoulLeech_3")
+    pactMark:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    pactMark:Hide()
+    playerRunFrame.reaperPactMark = pactMark
 
-    if IsTransparentDesign() then
-        local frameW = contentW + pad
-        local totalIconsW = iconSize * 5
-        local gapTotal = frameW - (2 * edgeInset) - totalIconsW
-        iconSpacing = (gapTotal > 0 and gapTotal / 4) or 0
-        maxIcons = 5
-    else
-        maxIcons = 5
-        iconSpacing = 8
-        local totalIconsWidth = (iconSize * maxIcons) + (iconSpacing * (maxIcons - 1))
-        startX = (220 - totalIconsWidth) / 2
-    end
+    -- The hourglass of a running Death contract (modules/contracts, 2026-10-15): while one runs
+    -- the bar is its time left, draining, and this sand glass sits at the left end, breathing
+    -- slowly, then fast in the last fifth (UpdateBracket).
+    local hourglass = bracketFrame:CreateTexture(nil, "OVERLAY")
+    -- big, beside the bar on its left (owner, 2026-10-17)
+    hourglass:SetSize(48, 48)
+    hourglass:SetPoint("RIGHT", bracketFrame, "LEFT", zoneX0 - 4, zoneY)
+    hourglass:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\hourglass")
+    hourglass:Hide()
+    -- Always fully visible while a contract is held (owner, 2026-10-17: it must not fade). Its
+    -- effects are driven by hand in the bar's OnUpdate (playerRunFrame.hourglassFx): 3.3.5 cannot
+    -- turn or scale a texture with an AnimationGroup, and one that never finished left it unseen.
+    playerRunFrame.contractHourglass = hourglass
 
-    playerRunFrame.intensityIcons = {}
-
-    for i = 1, maxIcons do
-        local effectData = intensityEffects[i]
-        local iconFrame = CreateFrame("Button", nil, playerRunFrame)
-        iconFrame:SetSize(iconSize, iconSize)
-        if IsTransparentDesign() then
-            local x = edgeInset + (i - 1) * (iconSize + iconSpacing)
-            iconFrame:SetPoint("BOTTOMLEFT", playerRunFrame, "BOTTOMLEFT", x, edgeInset)
-        else
-            iconFrame:SetPoint("TOPLEFT", intensityFrame, "BOTTOMLEFT", startX + ((i - 1) * (iconSize + iconSpacing)), -8)
-
-            local borderFrame = CreateFrame("Frame", nil, iconFrame)
-            borderFrame:SetAllPoints()
-            borderFrame:SetBackdrop({
-                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-                edgeSize = 6,
-                insets = { left = 11, right = 12, top = 12, bottom = 11 }
-            })
-            borderFrame:SetBackdropBorderColor(1, 0, 0, 1)
-            iconFrame.borderFrame = borderFrame
-        end
-
-        local icon = iconFrame:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(iconSize - 4, iconSize - 4)
-        icon:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
-        if effectData and effectData.icon then
-            icon:SetTexture(effectData.icon)
-            icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-        else
-            icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-            icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-        end
-        iconFrame.icon = icon
-
-        if not IsTransparentDesign() then
-            local lockOverlay = iconFrame:CreateTexture(nil, "OVERLAY", nil, 2)
-            lockOverlay:SetSize(14, 14)
-            lockOverlay:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
-            lockOverlay:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\lock")
-            lockOverlay:SetAlpha(0.8)
-            lockOverlay:Hide()
-            iconFrame.lockOverlay = lockOverlay
-        end
-
-        local glow = iconFrame:CreateTexture(nil, "OVERLAY")
-        glow:SetSize(iconSize * 1.5, iconSize * 1.5)
-        glow:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
-        glow:SetTexture("Interface\\Cooldown\\star4")
-        glow:SetVertexColor(1, 0.3, 0, 1)
-        glow:SetBlendMode("ADD")
-        glow:SetAlpha(0)
-        iconFrame.glow = glow
-
-        local glowAnim = glow:CreateAnimationGroup()
-        local ga1 = glowAnim:CreateAnimation("Alpha")
-        ga1:SetChange(0.8)
-        ga1:SetDuration(0.3)
-        ga1:SetOrder(1)
-        ga1:SetSmoothing("OUT")
-        local ga2 = glowAnim:CreateAnimation("Alpha")
-        ga2:SetChange(-0.8)
-        ga2:SetDuration(0.5)
-        ga2:SetOrder(2)
-        ga2:SetSmoothing("IN")
-        iconFrame.glowAnim = glowAnim
-
-        icon:SetDesaturated(true)
-        iconFrame.level = i
-        iconFrame.effectData = effectData
-        iconFrame.wasActive = false
-
-        iconFrame:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            local isActive = self.icon and not self.icon:IsDesaturated()
-            if self.effectData then
-                if isActive then
-                    GameTooltip:SetText(self.effectData.name, 1, 0.2, 0.2)
-                    GameTooltip:AddLine(" ")
-                    GameTooltip:AddLine(self.effectData.description, 1, 1, 1, true)
+    bracketFrame:EnableMouse(true)
+    bracketFrame:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 24, 0)
+        GameTooltip:SetMinimumWidth(300)
+        local texts = UITexts.tooltips.bracket
+        GameTooltip:SetText(texts.title, 1, 0.82, 0)
+        local function addLines(lines)
+            for _, l in ipairs(lines) do
+                if l[5] then
+                    GameTooltip:AddDoubleLine(l[1], l[5], l[2], l[3], l[4], 1, 1, 1)
                 else
-                    GameTooltip:SetText(self.effectData.name, 0.5, 0.5, 0.5)
-                    GameTooltip:AddLine(" ")
-                    GameTooltip:AddLine(self.effectData.description, 0.6, 0.6, 0.6, true)
+                    GameTooltip:AddLine(l[1], l[2], l[3], l[4])
                 end
-            else
-                GameTooltip:SetText("Intensity " .. self.level, 1, 0.2, 0.2)
             end
-            GameTooltip:Show()
-        end)
-        iconFrame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
-
-        table.insert(playerRunFrame.intensityIcons, iconFrame)
-    end
+        end
+        -- the bonus against its cap (plus the Pact / harvest lines when they apply)
+        local rp = ProjectEbonhold.Reaper
+        if rp and rp.Lines then addLines(rp.Lines()) end
+        -- what the run is worth offered right now: the live counters x (1 + bonus)
+        local mult = 1 + ((rp and rp.gauge) or 0) / 100
+        local ashes = playerRunFrame.currentSoulPoints or 0
+        local shards = playerRunFrame.currentSoulShards or 0
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddDoubleLine("If you offer now",
+            "|TInterface\\Icons\\inv_soulash:12:12:0:0|t " .. ProjectEbonhold.FormatThousands(math.floor(ashes * mult + 0.5)) ..
+            "  |TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_frost:12:12:0:0|t " .. ProjectEbonhold.FormatThousands(math.floor(shards * mult + 0.5)),
+            1, 0.82, 0, 1, 1, 1)
+        local ct = ProjectEbonhold.Contracts
+        if ct and ct.Lines then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("Your contracts", 0.66, 0.86, 1)
+            addLines(ct.Lines())
+            if ct.received then
+                GameTooltip:AddDoubleLine("Offerings left this week", math.max(0, (ct.max or 0) - (ct.used or 0)) .. " / " .. (ct.max or 0), 0.8, 0.8, 0.8, 1, 1, 1)
+            end
+        end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(texts.rules, 0.6, 0.6, 0.6, true)
+        GameTooltip:Show()
+    end)
+    bracketFrame:SetScript("OnLeave", function(self) GameTooltip:SetMinimumWidth(0); GameTooltip:Hide() end)
 
     local function registerDragForward(frame)
         if not frame then return end
@@ -726,11 +817,7 @@ local function CreatePlayerRunFrame()
     registerDragForward(multiplierHitbox)
     registerDragForward(catchupHitbox)
     registerDragForward(hardmodeButton)
-    registerDragForward(intensityFrame)
-    for _, iconFrame in ipairs(playerRunFrame.intensityIcons) do
-        registerDragForward(iconFrame)
-    end
-    registerDragForward(playerRunFrame.reaperHitbox)
+    registerDragForward(bracketFrame)
     registerDragForward(playerRunFrame.hearthHitbox)
     registerDragForward(collapseBtn)
     registerDragForward(headerRight)
@@ -785,7 +872,7 @@ local function ApplySearchFilter(text)
             if not iconFrame._descCache then
                 local desc = ""
                 if pd.spellId and utils and utils.GetSpellDescription then
-                    local ok, d = pcall(utils.GetSpellDescription, utils, pd.spellId, 500, 1)
+                    local ok, d = pcall(utils.GetSpellDescription, pd.spellId, 500, 1)
                     if ok and d then desc = d:lower() end
                 end
                 iconFrame._descCache = desc
@@ -1862,56 +1949,27 @@ function ToggleCollapse()
     if not playerRunFrame then return end
 end
 
-local function CreateIntensityButton()
-    if intensityButton then return intensityButton end
-
-    intensityButton = CreateFrame("Button", "ProjectEbonholdIntensityButton", UIParent)
-    intensityButton:SetSize(128, 100)
-    intensityButton:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 250)
-    intensityButton:SetFrameStrata("HIGH")
-    intensityButton:Hide()
-
-    local soulSwapBg = intensityButton:CreateTexture(nil, "BACKGROUND")
-    soulSwapBg:SetSize(156, 90)
-    soulSwapBg:SetPoint("CENTER", intensityButton, "CENTER", 0, 0)
-    soulSwapBg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\soulswap")
-    intensityButton.soulSwapBg = soulSwapBg
-
-    local spellIcon = intensityButton:CreateTexture(nil, "BORDER")
-    spellIcon:SetSize(28, 28)
-    spellIcon:SetPoint("CENTER", intensityButton, "CENTER", 0, 0)
-    local spellName, _, spellIconPath = GetSpellInfo(95078)
-    if spellIconPath then
-        spellIcon:SetTexture(spellIconPath)
-        spellIcon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+-- The Torment label on the run frame. Inside a Dungeon Finder run at another tier the dungeon's
+-- tier is what applies: show it, with the player's own tier dimmed after it. Called from the
+-- run-data sync and from the Torment service whenever either tier changes.
+local function RefreshHardmodeTierText()
+    if not playerRunFrame or not playerRunFrame.hardmodeTierText then return end
+    local svc = ProjectEbonhold.HardmodeService
+    if not (svc and svc.GetCurrentDifficulty) then return end
+    local diff = svc.GetCurrentDifficulty()
+    local dungeonTier = svc.GetInstanceDifficulty and svc.GetInstanceDifficulty()
+    local function Name(t) return t > 1 and ("Torment " .. (t - 1)) or "Normal" end
+    if dungeonTier then
+        playerRunFrame.hardmodeTierText:SetText("|cffFF4444" .. Name(dungeonTier) .. "|r |cffAAAAAA(yours: " .. Name(diff) .. ")|r")
+    elseif diff <= 1 then
+        playerRunFrame.hardmodeTierText:SetText("|cffAAAAAANormal|r")
+    else
+        playerRunFrame.hardmodeTierText:SetText("|cffFF4444Torment " .. (diff - 1) .. "|r")
     end
-    intensityButton.spellIcon = spellIcon
-
-    local highlight = intensityButton:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetSize(128, 100)
-    highlight:SetPoint("CENTER", intensityButton, "CENTER", 0, 0)
-    highlight:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\soulswap")
-    highlight:SetBlendMode("ADD")
-    highlight:SetAlpha(0.3)
-
-    intensityButton:SetScript("OnClick", function(self)
-        if ProjectEbonhold and ProjectEbonhold.sendToServer and ProjectEbonhold.CS then
-            ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_ACCEPT_HIGHER_INTENSITY, "")
-        end
-        local intensityData = ProjectEbonhold.PlayerRunService.GetIntensityData()
-        if intensityData then intensityData.onCooldown = false end
-        self:Hide()
-    end)
-
-    intensityButton:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetHyperlink('spell:95078')
-        GameTooltip:Show()
-    end)
-    intensityButton:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
-
-    return intensityButton
 end
+
+-- Run HUD tips (defined further down, with the tips themselves): asked on every HUD refresh.
+local EvaluateHudTips
 
 local function UpdatePlayerRunData(data)
     if not playerRunFrame then CreatePlayerRunFrame() end
@@ -1924,9 +1982,26 @@ local function UpdatePlayerRunData(data)
             ProjectEbonhold.FormatThousands(data.soulPoints)))
     end
 
+    if playerRunFrame.soulShardsText and data.soulShards ~= nil then
+        playerRunFrame.currentSoulShards = data.soulShards
+        playerRunFrame.soulShardsText:SetText(string.format("|cffffffff%s|r",
+            ProjectEbonhold.FormatThousands(data.soulShards)))
+    end
+    if data.soulShardsBonusPct ~= nil then
+        playerRunFrame.currentShardBonusPct = data.soulShardsBonusPct
+    end
+
     if playerRunFrame.multiplierText and data.soulPointsMultiplier ~= nil then
         playerRunFrame.currentMultiplier = data.soulPointsMultiplier
         playerRunFrame.multiplierText:SetText(string.format("|cff00ff00+%.0f%%|r", data.soulPointsMultiplier * 100))
+    end
+
+    if playerRunFrame.freeRezText then
+        -- Resurrections paid this run; grey when the run cannot afford the next one.
+        local used = data.paidRezsUsed or 0
+        playerRunFrame.freeRezText:SetText(data.paidRezAvailable
+            and string.format("|cffffffff%d|r", used)
+            or string.format("|cff888888%d|r", used))
     end
 
     if playerRunFrame.catchupText then
@@ -1939,133 +2014,134 @@ local function UpdatePlayerRunData(data)
         end
     end
 
-    if playerRunFrame.hardmodeTierText then
-        local svc = ProjectEbonhold.HardmodeService
-        if svc and svc.GetCurrentDifficulty then
-            local diff = svc.GetCurrentDifficulty()
-            if diff <= 1 then
-                playerRunFrame.hardmodeTierText:SetText("|cffAAAAAANormal|r")
-            else
-                playerRunFrame.hardmodeTierText:SetText("|cffFF4444Hardcore " .. (diff - 1) .. "|r")
-            end
-        end
-    end
+    RefreshHardmodeTierText()
 
-    if playerRunFrame.intensityIndicator then
-        local intensityData = ProjectEbonhold.PlayerRunService.GetIntensityData()
-        local intensity = intensityData.intensity or 0
-        playerRunFrame.currentIntensity = intensity
-        local maxIntensity = ProjectEbonhold.Constants.MAX_INTENSITY
-        intensity = math.min(intensity, maxIntensity)
-        local progress = math.min(math.max(intensity / maxIntensity, 0), 1)
-        local startOffset = IsTransparentDesign() and 40 or 20
-        local barWidth = 160
-        local indicatorWidth = 24
-        local xPos = startOffset + (barWidth * progress) - (indicatorWidth / 2)
-        if playerRunFrame.intensityFill then
-            playerRunFrame.intensityFill:SetWidth(math.max(barWidth * progress, 1))
-        end
-        playerRunFrame.intensityIndicator:SetPoint("LEFT", playerRunFrame.intensityFrame, "LEFT", xPos, 0)
-    end
+    if EvaluateHudTips then EvaluateHudTips() end
 end
 
 
-local function UpdateIntensity(intensityData)
+-- The bar's colours (fill, head). Kept for later while a transition drains the old bar, so the
+-- new colour only shows when the new bar fills.
+-- The caption under the bar: its own place for the gauge, @p drop px lower for a contract's timer.
+local function PlaceCaption(drop)
+    local t = playerRunFrame.bracketSuggestedText
+    if not t or not playerRunFrame.bracketFrame then return end
+    t:ClearAllPoints()
+    t:SetPoint("BOTTOM", playerRunFrame.bracketFrame, "BOTTOM", playerRunFrame.bracketCaptionX or 0, (playerRunFrame.bracketCaptionY or -6) - drop)
+end
+
+local function SetBarColors(fill, head)
+    playerRunFrame.barColor, playerRunFrame.barHeadColor = fill, head
+    local tr = playerRunFrame.barTransition
+    if tr and tr.phase == 1 then return end
+    if playerRunFrame.gaugeFill then playerRunFrame.gaugeFill:SetVertexColor(fill[1], fill[2], fill[3], fill[4]) end
+    if playerRunFrame.gaugeHead then playerRunFrame.gaugeHead:SetVertexColor(head[1], head[2], head[3], head[4]) end
+end
+
+-- The Reaper's Gaze bar. Named after the content-bracket panel it grew out of (removed
+-- 2026-09-22); what it draws now is the gauge alone, from modules/reaper/reaper.lua.
+local function UpdateBracket()
     if not playerRunFrame then return end
+    local rp = ProjectEbonhold.Reaper
+    local gauge = rp and rp.gauge or 0
+    local cap = rp and rp.cap or 100
+    if cap <= 0 then cap = 100 end
+    local pact = rp and rp.pact or false
 
-    local intensity = intensityData.intensity or 0
-    playerRunFrame.currentIntensity = intensity
-    local maxIntensity = ProjectEbonhold.Constants.MAX_INTENSITY
-    intensity = math.min(intensity, maxIntensity)
-    local progress = math.min(math.max(intensity / maxIntensity, 0), 1)
-    local startOffset = IsTransparentDesign() and 40 or 20
-    local barWidth = 160
-    local indicatorWidth = 24
-    local xPos = startOffset + (barWidth * progress) - (indicatorWidth / 2)
-
-    if playerRunFrame.intensityFill then
-        playerRunFrame.intensityFill:SetWidth(math.max(barWidth * progress, 1))
-        playerRunFrame.intensityFill:SetVertexColor(0.8, 0.1, 0.1, 0.8)
-    end
-
-    if playerRunFrame.intensityFillFlash then
-        playerRunFrame.intensityFillFlash:SetWidth(math.max(barWidth * progress, 1))
-    end
-
-    if playerRunFrame.intensityIndicator then
-        playerRunFrame.intensityIndicator:SetPoint("LEFT", playerRunFrame.intensityFrame, "LEFT", xPos, 0)
-    end
-
-    if playerRunFrame.intensityLevelCircle and playerRunFrame.intensityLevelText then
-        playerRunFrame.intensityLevelCircle:SetPoint("CENTER", playerRunFrame.intensityIndicator, "CENTER", 0, 0)
-        local constants = ProjectEbonhold.Constants
-        local tier = ""
-        if intensity >= constants.INTENSITY_LEVEL_5 then
-            tier = "5"
-        elseif intensity >= constants.INTENSITY_LEVEL_4 then
-            tier = "4"
-        elseif intensity >= constants.INTENSITY_LEVEL_3 then
-            tier = "3"
-        elseif intensity >= constants.INTENSITY_LEVEL_2 then
-            tier = "2"
-        elseif intensity >= constants.INTENSITY_LEVEL_1 then
-            tier = "1"
-        end
-        playerRunFrame.intensityLevelText:SetText(tier)
-        if tier == "" then
-            playerRunFrame.intensityLevelCircle:Hide()
-        else
-            playerRunFrame.intensityLevelCircle:Show()
-        end
-    end
-
-    if playerRunFrame.intensityIcons then
-        local constants = ProjectEbonhold.Constants
-        local levels = {
-            constants.INTENSITY_LEVEL_1,
-            constants.INTENSITY_LEVEL_2,
-            constants.INTENSITY_LEVEL_3,
-            constants.INTENSITY_LEVEL_4,
-            constants.INTENSITY_LEVEL_5
-        }
-        for i, iconFrame in ipairs(playerRunFrame.intensityIcons) do
-            local isActive = intensity >= levels[i]
-            if isActive then
-                iconFrame.icon:SetDesaturated(false)
-                if not iconFrame.wasActive and iconFrame.glowAnim then
-                    iconFrame.glowAnim:Play()
-                end
-            else
-                iconFrame.icon:SetDesaturated(true)
+    -- A Death contract whose hourglass runs takes the bar over: the fill is its time left,
+    -- draining, sliding from sand to red as it runs out; under it "[72] Sholazar Basin  7:32". When
+    -- no contract runs any more the bar goes back to the gauge (modules/contracts ticks it).
+    -- A taken contract shows its glass at once, full and still ("wait"); its first kill turns
+    -- it over and the sand runs ("run"). Each switch plays a transition: the bar's glow, the glass
+    -- coming in turning over, turning again, or fading out when the bar goes back to the gauge.
+    local ct = ProjectEbonhold.Contracts
+    local running = ct and ct.Running and ct.Running()
+    local waiting = not running and ct and ct.Waiting and ct.Waiting()
+    local shown = running or waiting
+    local mode = running and "run" or (waiting and "wait" or "gauge")
+    local prev = playerRunFrame.barMode or "gauge"
+    local hg = playerRunFrame.contractHourglass
+    if mode ~= prev then
+        playerRunFrame.barMode = mode
+        playerRunFrame.barTransition = { phase = 1, t = 0, from = playerRunFrame.gaugeShown or 0 }
+        if hg then
+            if prev == "gauge" then
+                hg:SetAlpha(0)
+                hg:Show()
+                playerRunFrame.hourglassFx = { kind = "intro", t = 0 }
+            elseif mode == "run" then
+                playerRunFrame.hourglassFx = { kind = "turn", t = 0 }
+            elseif mode == "gauge" then
+                playerRunFrame.hourglassFx = { kind = "out", t = 0 }
             end
-            iconFrame.wasActive = isActive
         end
     end
-
-    if playerRunFrame.reaperIcon then
-        local areaName = intensityData.areaNameReaper or "0"
-        if areaName ~= "0" then
-            playerRunFrame.reaperIcon:SetTexCoord(0.214844, 0.312500, 0.894531, 0.996094)
-        else
-            playerRunFrame.reaperIcon:SetTexCoord(0.121094, 0.214844, 0.898438, 0.996094)
+    if shown then
+        local left = ct.TimeLeft(shown)
+        local tc = running and ct.TimeColor(running) or { 0.78, 0.70, 0.52 }
+        playerRunFrame.gaugeTarget = (shown.duration or 0) > 0 and math.min(1, left / shown.duration) or 0
+        SetBarColors({ tc[1], tc[2], tc[3], 0.95 }, { 1, 0.95, 0.8, 0.9 })
+        if playerRunFrame.bracketSuggestedText then
+            local t = playerRunFrame.bracketSuggestedText
+            t:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE") -- the timer reads at a glance
+            PlaceCaption(14)
+            t:SetWidth(260)
+            -- a kill contract also says where it stands: "[13-30] Redridge Mountains  12 / 50  4:00"
+            local count = shown.kind == 1 and ("  |cffffffff" .. shown.progress .. " / " .. shown.required .. "|r") or ""
+            t:SetText(ct.Heading(shown) .. count ..
+                string.format("  |cff%02x%02x%02x%s|r", tc[1] * 255, tc[2] * 255, tc[3] * 255, ct.FormatTime(left)))
+            t:SetWidth(math.min(260, t:GetStringWidth() + 2))
         end
+        if playerRunFrame.reaperPactMark then playerRunFrame.reaperPactMark:Hide() end
+        if hg then
+            hg:SetVertexColor(tc[1], tc[2], tc[3])
+            -- held = shown, fully: only the "out" effect may take it away
+            if not hg:IsShown() then hg:Show() end
+            local fx = playerRunFrame.hourglassFx
+            if not fx or fx.kind == "out" then
+                playerRunFrame.hourglassFx = nil
+                hg:SetAlpha(1); hg:SetSize(48, 48)
+            end
+        end
+        playerRunFrame.lastBracketProgress = nil -- back to the gauge: no "rise" glow on the switch
+        return
     end
 
-    local oldIntensity = playerRunFrame.lastIntensity or 0
-    if playerRunFrame.intensityFillFlashAnim and intensity > oldIntensity then
-        playerRunFrame.intensityFillFlashAnim:Stop()
-        playerRunFrame.intensityFillFlashAnim:Play()
+    if playerRunFrame.bracketSuggestedText then
+        local f = playerRunFrame.bracketSuggestedFont
+        if f and f[1] then playerRunFrame.bracketSuggestedText:SetFont(f[1], f[2], f[3]) end
+        PlaceCaption(0)
+        -- Under the bar: where the player is right now and what a kill there does to the gauge,
+        -- then the gauge itself
+        -- Under the bar: the contract bonus, nothing else
+        local gaugeText = rp and rp.GaugeText and rp.GaugeText() or ("+" .. math.floor(gauge + 0.5) .. "%")
+        playerRunFrame.bracketSuggestedText:SetText("|TInterface\\Icons\\inv_soulash:12:12:0:0|t " .. gaugeText)
+        playerRunFrame.bracketSuggestedText:SetWidth(math.min(220, playerRunFrame.bracketSuggestedText:GetStringWidth() + 2))
+        if playerRunFrame.bracketSuggestedIcon then playerRunFrame.bracketSuggestedIcon:Hide() end
     end
-    playerRunFrame.lastIntensity = intensity
 
-    if not intensityButton then CreateIntensityButton() end
-    local threshold = ProjectEbonhold.Constants and ProjectEbonhold.Constants.INTENSITY_LEVEL_3 or 300
-    local canTrigger = intensityData.onCooldown == false
-    if intensity >= threshold and canTrigger then
-        intensityButton:Show()
+    -- The bar is the gauge itself: empty at the left, its cap (100% + 10% per Torment) at the
+    -- right. The fill animates toward the target in the frame's OnUpdate; purple under the Pact.
+    local progress = math.min(math.max(gauge / cap, 0), 1)
+    playerRunFrame.gaugeTarget = progress
+    if pact then
+        SetBarColors({ 0.58, 0.44, 0.86, 0.95 }, { 0.85, 0.75, 1, 0.9 })
     else
-        intensityButton:Hide()
+        SetBarColors({ 0.86, 0.48, 0.16, 0.95 }, { 1, 0.85, 0.55, 0.9 })
     end
+    if playerRunFrame.reaperEyeButton then
+        if rp and rp.hasEye then playerRunFrame.reaperEyeButton:Show() else playerRunFrame.reaperEyeButton:Hide() end
+    end
+    if playerRunFrame.reaperPactMark then
+        if pact then playerRunFrame.reaperPactMark:Show() else playerRunFrame.reaperPactMark:Hide() end
+    end
+    local old = playerRunFrame.lastBracketProgress
+    if playerRunFrame.bracketFillFlashAnim and old ~= nil and progress > old + 0.005 then
+        playerRunFrame.bracketFillFlashAnim:Stop()
+        playerRunFrame.bracketFillFlashAnim:Play() -- a rise glows once; a loss just recedes
+    end
+    playerRunFrame.lastBracketProgress = progress
+    if EvaluateHudTips then EvaluateHudTips() end
 end
 
 
@@ -2073,7 +2149,6 @@ local function RequestPlayerRunData()
     if ProjectEbonhold and ProjectEbonhold.sendToServer and ProjectEbonhold.CS then
         ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PLAYER_RUN_DATA, "")
         ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PLAYER_SOUL_POINTS_ADDITIONAL_PCT, "")
-        ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_INTENSITY_POINTS, "")
     end
 end
 
@@ -2097,57 +2172,180 @@ local function UpdateGrantedPerks(forceEmpty)
 end
 
 
--- ── Run HUD guided tour ──────────────────────────────────────────────────────
--- Shown once, shortly after the HUD first appears on a fresh account. Built on
--- the shared GlowBox tour factory (modules/guidedTour). The tour frames are
--- parented to the HUD, so they follow it if the player drags it mid-tour; the
--- GlowBox hangs off the left side since the HUD defaults to the screen's
--- right edge.
-local hudTour = ProjectEbonhold.GuidedTour.Create({
-    parent = function() return playerRunFrame end,
-    dbKey = "seenRunHudTour",
-    steps = function()
-        return {
-            {
-                title = "Soul Ashes",
-                text = "Soul Ashes earned during this run. When the run ends, " ..
-                    "they are added to your |cffffd700Skill Tree|r, where you " ..
-                    "spend them on permanent upgrades.",
-                zone = function()
-                    return playerRunFrame.soulAshIcon, playerRunFrame.soulPointsText
-                end,
-                boxAnchor = { "TOPRIGHT", "TOPLEFT", -14, 0 },
-            },
-            {
-                title = "Soul Ash Multiplier",
-                text = "Your Soul Ash gain multiplier. Increase it by completing " ..
-                    "|cffffd700achievements|r and reaching higher " ..
-                    "|cffffd700Intensity|r levels.",
-                zone = function() return playerRunFrame.multiplierText end,
-                boxAnchor = { "TOPRIGHT", "TOPLEFT", -14, 0 },
-            },
-            {
-                title = "Survival",
-                text = "Your lifelines: resurrections you can accept from " ..
-                    "players, free self-resurrections, class resurrections and " ..
-                    "|cffffd700Cheat Death|r charges. Hover the heart for the " ..
-                    "full breakdown, including the Soul Ash cost of your next " ..
-                    "resurrection.",
-                zone = function() return playerRunFrame.hearthIcon end,
-                boxAnchor = { "TOPRIGHT", "TOPLEFT", -14, 0 },
-            },
-            {
-                title = "Intensity",
-                text = "Defeating enemies quickly raises your Intensity; it " ..
-                    "decays while you are out of combat. Higher levels unleash " ..
-                    "extra hazards and feed your Soul Ash multiplier. Hover " ..
-                    "the bar to see each threshold's effects.",
-                zone = function() return playerRunFrame.intensityFrame end,
-                boxAnchor = { "TOPRIGHT", "TOPLEFT", -14, 0 },
-            },
-        }
-    end,
-})
+-- ── Run HUD tips ─────────────────────────────────────────────────────────────
+-- One tip per part of the HUD, each shown once per account at the moment that part starts to
+-- matter (2026-10-22: the 8-step tour shown at login said everything before any of it meant
+-- something). Built on the shared GlowBox tour factory (modules/guidedTour), one single-step
+-- tour per tip with its own dbKey. The frames are parented to the HUD, so they follow it if
+-- the player drags it; the GlowBox hangs off the left side since the HUD defaults to the
+-- screen's right edge.
+-- An account that saw the old tour ("seenRunHudTour2") has seen every tip already.
+-- Only one GlowBox at a time: a tip waits while any tour is on screen (this HUD's, the
+-- contracts window's, the Echo Journal's...) and the next one is looked at when it closes.
+local HUD_TIP_ANCHOR = { "TOPRIGHT", "TOPLEFT", -14, 0 }
+
+local function HudTip(dbKey, step)
+    step.boxAnchor = step.boxAnchor or HUD_TIP_ANCHOR
+    return ProjectEbonhold.GuidedTour.Create({
+        parent = function() return playerRunFrame end,
+        -- the box always sits left of the whole HUD, even for the counters on its right
+        boxBeside = function() return playerRunFrame end,
+        dbKey = dbKey,
+        steps = { step },
+    })
+end
+
+local diedThisSession = false
+local hudTipsReady = false -- set once the saved HUD position is restored
+
+local function Contracts() return ProjectEbonhold.Contracts end
+
+-- In the order they are offered when several are due at once (a fresh login with ashes, ...).
+-- when() = the moment the tip matters; it is asked again on every HUD refresh until the tip shows.
+local hudTips = {
+    {
+        when = function() return true end,
+        tour = HudTip("seenHudTipRun", {
+            title = "Your run",
+            text = "This frame follows your run: one life, from level 1 until you " ..
+                "|cffff4040accept death|r. What you earn here is not safe yet. It reaches " ..
+                "your account, and your |cffffd700Skill Tree|r, when you make an offering at a " ..
+                "Spirit Healer or when the run ends.",
+            zone = function() return playerRunFrame end,
+        }),
+    },
+    {
+        when = function() return (playerRunFrame.currentSoulPoints or 0) > 0 end,
+        tour = HudTip("seenHudTipAshes", {
+            title = "Soul Ashes",
+            text = "Earned from every kill that gives experience. Hover the counter to see your " ..
+                "multiplier: |cffffd700achievements|r and |cffffd700Prestige|r raise it for good.",
+            zone = function()
+                return playerRunFrame.soulAshIcon, playerRunFrame.soulPointsText
+            end,
+        }),
+    },
+    {
+        when = function() return (playerRunFrame.currentSoulShards or 0) > 0 end,
+        tour = HudTip("seenHudTipShards", {
+            title = "Soul Shards",
+            -- server sources: ContentCatalogueMgr::PayClear (the clear: every boss dead, via
+            -- InstanceClear), TormentChampionMgr (champions, Torment only), CallboardMgr
+            -- (contract rewards). Same facts as constants.lua tooltips.soulShards.
+            text = "Paid when |cffffd700every boss|r of a dungeon or raid is dead, by dungeon " ..
+                "|cffffd700champions|r in Torment, and by some Hero's Call Board contracts. " ..
+                "Like your Soul Ashes, they stay in the run until you make an offering or " ..
+                "the run ends.",
+            zone = function()
+                return playerRunFrame.soulShardIcon, playerRunFrame.soulShardsText
+            end,
+        }),
+    },
+    {
+        when = function()
+            local d = playerRunFrame.currentData
+            return diedThisSession or (d and (d.paidRezsUsed or 0) > 0)
+        end,
+        tour = HudTip("seenHudTipDeath", {
+            title = "Death and resurrection",
+            text = "You can come back by paying part of your run: the first resurrection costs " ..
+                "|cffffd70025%|r of its Soul Ashes and Shards, |cffff4040each next one 25% more|r. " ..
+                "Another player can also resurrect you, once per run. The number is how many " ..
+                "you paid this run. |cffff4040Accepting death|r ends the run.",
+            zone = function() return playerRunFrame.hearthIcon, playerRunFrame.freeRezText end,
+        }),
+    },
+    {
+        -- the first time the Spirit Healer has contracts for this character, past the first
+        -- levels (the contracts window has its own tour; this one is about the HUD's bar)
+        when = function()
+            local ct = Contracts()
+            return ct and ct.list and #ct.list > 0 and UnitLevel("player") >= 3
+        end,
+        tour = HudTip("seenHudTipContracts", {
+            title = "Spirit Healer, contracts and offering",
+            text = "Every Spirit Healer offers |cffffd700Death contracts|r: kill 50 creatures in " ..
+                "a zone, or every boss of a dungeon or a raid. Each one you fulfil raises this " ..
+                "bar. Then make an |cffffd700offering|r at any Spirit Healer: your run's Soul " ..
+                "Ashes and Shards go to your account multiplied by |cffffd700(1 + bonus)|r. The " ..
+                "bonus then starts over and your run goes on. Five offerings a week.",
+            -- the track, not gaugeFill: the fill is 1 px wide while the bonus is 0
+            zone = function() return playerRunFrame.gaugeTrack end,
+        }),
+    },
+    {
+        -- a contract taken (in progress or already fulfilled), or a gauge already filled
+        when = function()
+            local ct = Contracts()
+            if ct and ct.list then
+                for _, c in ipairs(ct.list) do
+                    if c.state == 1 or c.state == 2 then return true end
+                end
+            end
+            local rp = ProjectEbonhold.Reaper
+            return rp and (rp.gauge or 0) > 0
+        end,
+        tour = HudTip("seenHudTipGaze", {
+            title = "The Reaper's Gaze",
+            text = "This bar is your |cffffd700contract bonus|r, up to +400%. It only rises when " ..
+                "you fulfil a |cffffd700Death contract|r: 50 creatures in a zone (+10%), every " ..
+                "boss of a dungeon (+25%) or a raid (+125%). Dying loses the contracts in " ..
+                "progress, never the bonus. |cffff4040Accepting death|r banks your ashes without " ..
+                "the bonus, and the bonus is gone. Hover the bar any time to see all of this again.",
+            zone = function() return playerRunFrame.bracketFrame end,
+        }),
+    },
+    {
+        -- the level-80 account gate is open (same test as the Torment panel's lock overlay)
+        when = function()
+            local d = playerRunFrame.currentData
+            local svc = ProjectEbonhold.HardmodeService
+            return (d and d.hasReachedMaxLevel)
+                or (svc and svc.GetCurrentDifficulty and (svc.GetCurrentDifficulty() or 1) > 1)
+        end,
+        tour = HudTip("seenHudTipTorment", {
+            title = "Torment",
+            text = "Torment is open to you. This is your difficulty: click it to open the " ..
+                "Torment panel. A higher Torment makes monsters stronger and rewards better, " ..
+                "and the Spirit Healer offers its Death contracts at your Torment.",
+            zone = function() return playerRunFrame.hardmodeButton end,
+        }),
+    },
+}
+
+local function HudTipsAllSeen()
+    if ProjectEbonholdDB and ProjectEbonholdDB.seenRunHudTour2 then return true end
+    for _, tip in ipairs(hudTips) do
+        if not tip.tour:HasSeen() then return false end
+    end
+    return true
+end
+
+-- Shows the first unseen tip whose moment has come, if nothing else is on screen. A tip whose
+-- zone is hidden right now does not show and is not burnt: the next refresh asks again.
+EvaluateHudTips = function()
+    if not hudTipsReady or not playerRunFrame or not playerRunFrame:IsShown() then return end
+    if HudTipsAllSeen() then return end
+    if ProjectEbonhold.GuidedTour.AnyActive() then return end
+    for _, tip in ipairs(hudTips) do
+        if not tip.tour:HasSeen() and tip.when() then
+            if tip.tour:MaybeStart() then return end
+        end
+    end
+end
+
+-- a tour closed (one of these tips or any other): give the next due tip its turn, a moment later
+ProjectEbonhold.GuidedTour.OnAnyEnd(function()
+    C_Timer.After(1.0, function() EvaluateHudTips() end)
+end)
+
+local tipEvents = CreateFrame("Frame")
+tipEvents:RegisterEvent("PLAYER_DEAD")
+tipEvents:SetScript("OnEvent", function()
+    diedThisSession = true
+    -- after the death frame is drawn
+    C_Timer.After(1.0, function() EvaluateHudTips() end)
+end)
 
 local isInitialized = false
 
@@ -2170,9 +2368,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             -- After the saved position is restored, so the highlight anchors
             -- to where the HUD actually sits
             C_Timer.After(2.0, function()
-                if playerRunFrame and playerRunFrame:IsShown() then
-                    hudTour:MaybeStart()
-                end
+                hudTipsReady = true
+                EvaluateHudTips()
             end)
             isInitialized = true
         end
@@ -2184,20 +2381,21 @@ local function GetUIElements()
     if not playerRunFrame then return nil end
     return {
         soulPointsText = playerRunFrame.soulPointsText,
+        soulShardsText = playerRunFrame.soulShardsText,
         acceptedRezsText = nil,
         selfRezsText = nil,
         classRezsText = nil,
         avoidDeathText = nil,
-        empowermentText = nil,
-        intensityIndicator = playerRunFrame.intensityIndicator
+        empowermentText = nil
     }
 end
 
 ProjectEbonhold = ProjectEbonhold or {}
 ProjectEbonhold.PlayerRunUI = ProjectEbonhold.PlayerRunUI or {}
 ProjectEbonhold.PlayerRunUI.UpdateData = UpdatePlayerRunData
+ProjectEbonhold.PlayerRunUI.RefreshTormentText = RefreshHardmodeTierText
 ProjectEbonhold.PlayerRunUI.Toggle = ToggleCollapse
 ProjectEbonhold.PlayerRunUI.ToggleEmpowerment = ToggleEmpowermentPanel
 ProjectEbonhold.PlayerRunUI.GetUIElements = GetUIElements
 ProjectEbonhold.PlayerRunUI.UpdateGrantedPerks = UpdateGrantedPerks
-ProjectEbonhold.PlayerRunUI.UpdateIntensity = UpdateIntensity
+ProjectEbonhold.PlayerRunUI.UpdateBracket = UpdateBracket

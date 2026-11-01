@@ -12,6 +12,16 @@ local selectedSpecIndex = nil
 
 SpecCustomNames = SpecCustomNames or {}
 
+-- Other windows showing the specs (the talent frame's spec tabs) register here
+-- and are told when the selected spec or a spec name changes.
+local listeners = {}
+
+local function NotifyListeners()
+    for _, fn in ipairs(listeners) do
+        fn(selectedSpecIndex)
+    end
+end
+
 
 local function GetSpecName(specIndex)
     if SpecCustomNames[specIndex] and SpecCustomNames[specIndex] ~= "" then
@@ -51,6 +61,7 @@ local function EditSpecName(specIndex)
             if specDropdown and selectedSpecIndex == specIndex then
                 UIDropDownMenu_SetText(specDropdown, GetSpecName(specIndex))
             end
+            NotifyListeners()
         end,
         EditBoxOnEnterPressed = function(self)
             local newName = self:GetText()
@@ -64,6 +75,7 @@ local function EditSpecName(specIndex)
             if specDropdown and selectedSpecIndex == specIndex then
                 UIDropDownMenu_SetText(specDropdown, GetSpecName(specIndex))
             end
+            NotifyListeners()
             self:GetParent():Hide()
         end,
         EditBoxOnEscapePressed = function(self)
@@ -135,6 +147,20 @@ local function GetRowGear(rowIndex)
     return gear
 end
 
+-- Asks the server to switch to this spec. Shared by the dropdown on the stock
+-- talent frame and the spec tabs of the three-tree talent frame.
+local function SelectSpec(specIndex)
+    if not specIndex or specIndex == selectedSpecIndex then return end
+    if not (ProjectEbonhold and ProjectEbonhold.SpecService and ProjectEbonhold.SpecService.ApplySpec) then return end
+    selectedSpecIndex = specIndex
+    ProjectEbonhold.SpecService.ApplySpec(specIndex)
+    if specDropdown then
+        UIDropDownMenu_SetText(specDropdown, GetSpecName(specIndex))
+    end
+    print("|cff00FF00Switching to " .. GetSpecName(specIndex) .. "...|r")
+    NotifyListeners()
+end
+
 local function CreateSpecDropdown()
     if specDropdown then return specDropdown end
 
@@ -152,12 +178,7 @@ local function CreateSpecDropdown()
                 info.checked = (selectedSpecIndex == i)
                 info.value = i
                 info.func = function()
-                    selectedSpecIndex = i
-                    if ProjectEbonhold and ProjectEbonhold.SpecService and ProjectEbonhold.SpecService.ApplySpec then
-                        ProjectEbonhold.SpecService.ApplySpec(i)
-                        UIDropDownMenu_SetText(dropdown, specName)
-                        print("|cff00FF00Switching to " .. specName .. "...|r")
-                    end
+                    SelectSpec(i)
                 end
                 UIDropDownMenu_AddButton(info, level)
 
@@ -190,6 +211,31 @@ local function CreateSpecDropdown()
 
     specDropdown = dropdown
     return dropdown
+end
+
+-- Confirmation popup, then the server resets the selected spec's talents.
+local function ConfirmResetTalents()
+    
+    if not selectedSpecIndex then
+        print("|cffFF0000Please select a specialization first|r")
+        return
+    end
+    local selectedSpec = GetSpecName(selectedSpecIndex)
+    StaticPopupDialogs["RESET_TALENTS_CONFIRM"] = {
+        text = "Are you sure you want to reset all your talents?\n\n|cffFFD700Current Spec: " .. selectedSpec .. "|r",
+        button1 = "Yes",
+        button2 = "No",
+        OnAccept = function()
+            if ProjectEbonhold and ProjectEbonhold.SpecService and ProjectEbonhold.SpecService.ResetTalents then
+                ProjectEbonhold.SpecService.ResetTalents(selectedSpecIndex)
+            end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3
+    }
+    StaticPopup_Show("RESET_TALENTS_CONFIRM")
 end
 
 local function CreateResetButton()
@@ -225,29 +271,7 @@ local function CreateResetButton()
         GameTooltip:Hide()
     end)
 
-    button:SetScript("OnClick", function()
-        
-        if not selectedSpecIndex then
-            print("|cffFF0000Please select a specialization first|r")
-            return
-        end
-        local selectedSpec = GetSpecName(selectedSpecIndex)
-        StaticPopupDialogs["RESET_TALENTS_CONFIRM"] = {
-            text = "Are you sure you want to reset all your talents?\n\n|cffFFD700Current Spec: " .. selectedSpec .. "|r",
-            button1 = "Yes",
-            button2 = "No",
-            OnAccept = function()
-                if ProjectEbonhold and ProjectEbonhold.SpecService and ProjectEbonhold.SpecService.ResetTalents then
-                    ProjectEbonhold.SpecService.ResetTalents(selectedSpecIndex)
-                end
-            end,
-            timeout = 0,
-            whileDead = true,
-            hideOnEscape = true,
-            preferredIndex = 3
-        }
-        StaticPopup_Show("RESET_TALENTS_CONFIRM")
-    end)
+    button:SetScript("OnClick", ConfirmResetTalents)
 
     resetButton = button
     return button
@@ -286,9 +310,18 @@ local function UpdateSelectedSpec(specIndex)
         UIDropDownMenu_SetText(specDropdown, GetSpecName(specIndex))
         
     end
+    NotifyListeners()
 end
 
 
 ProjectEbonhold = ProjectEbonhold or {}
 ProjectEbonhold.Spec = ProjectEbonhold.Spec or {}
 ProjectEbonhold.Spec.UpdateSelectedSpec = UpdateSelectedSpec
+ProjectEbonhold.Spec.MAX_SPECS = 5
+ProjectEbonhold.Spec.GetSpecName = GetSpecName
+ProjectEbonhold.Spec.EditSpecName = EditSpecName
+ProjectEbonhold.Spec.SelectSpec = SelectSpec
+ProjectEbonhold.Spec.ConfirmResetTalents = ConfirmResetTalents
+ProjectEbonhold.Spec.GetSelectedSpec = function() return selectedSpecIndex end
+-- fn(selectedSpecIndex) runs whenever the selected spec or a spec name changes.
+ProjectEbonhold.Spec.AddListener = function(fn) table.insert(listeners, fn) end

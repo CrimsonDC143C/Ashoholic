@@ -1,4 +1,16 @@
 local perkMainFrame = nil
+-- Forward declarations: the souvenir-stage and card-entrance helpers are
+-- defined further down but used by handlers registered earlier (card
+-- buttons, the reveal buttons). A closure only sees a local declared above it.
+local memoryDeck = {}
+local memoryHint
+local memoryStageShown = false
+local pendingMemoryReveal = false
+local ChoicesAreMemoryStage, MemoryRowOffset, GetMemoryDeckCard, HideMemoryDeck
+local PlayMemoryKeepBurst, PlayMemoryGiveUp, EnsureMemoryWidgets, LayoutMemoryStage, ShowMemoryStageWidgets
+local RequestMemoryDraw, SouvenirOnTableName
+local PlaceCard, PlayCardEntrance, PlayCardsEntrance, CollectVisibleCards
+local GetCardBody -- defined with the guided tour, used by the tour helpers below it
 local perkFramePool = {}
 local hideButton = nil
 local rerollButton = nil
@@ -24,6 +36,375 @@ local function GetSelectLabel(count)
         return "Select (" .. count .. ")"
     end
     return "Select"
+end
+
+-- Spec draw (level 10 / 20 / ... 80). perks_service keeps the server's tag in
+-- Perks.currentSpecDraw = { chosen = spec family id }, 0 = the level 10 draw where the
+-- spec is chosen. The draw gets a gold banner and light rays turning behind the row;
+-- the cards themselves keep the plain look.
+local SPEC_GOLD = { 1, 0.82, 0 }
+local specBanner, specRays
+
+local function GetSpecDraw()
+    local svc = ProjectEbonhold and ProjectEbonhold.Perks
+    return svc and svc.currentSpecDraw or nil
+end
+
+-- "Mage - Fire" -> "Fire", "Mage - Fire": the spec family an echo carries in the perk database.
+local function GetEchoSpecName(spellId)
+    local db = ProjectEbonhold and ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[spellId]
+    if db and db.families then
+        for _, family in ipairs(db.families) do
+            local spec = family:match("^.+ %- (.+)$")
+            if spec then return spec, family end
+        end
+    end
+    return nil
+end
+
+-- Current stat values on an echo tooltip (owner 2026-10-22). The stats an echo raises
+-- come first from its spell data: ECHO_STATS_BY_SPELL is generated from the echo's own auras
+-- and the self-buff its proc triggers (MOD_STAT, MOD_RESISTANCE armor, MOD_ATTACK_POWER,
+-- MOD_DAMAGE_DONE / healing, MOD_RATING mask, crit / haste / hit chance, max health / mana,
+-- mana regen). Echoes driven by scripts or dummies fall back to their description text.
+local ECHO_STATS_BY_SPELL = {
+    [200000]="STR", [200001]="AGI", [200002]="INT", [200003]="SPI", [200004]="STA", [200008]="SP",
+    [200009]="AP,RAP", [200017]="ARMOR", [200035]="HEALTH", [200429]="HIT", [200430]="CRIT", [200431]="HASTE",
+    [200432]="ARPEN", [200433]="EXPERTISE", [200441]="ARMOR", [200451]="STR", [200452]="AGI", [200453]="INT",
+    [200454]="SPI", [200455]="STA", [200459]="SP", [200460]="AP,RAP", [200464]="ARMOR", [200480]="HIT",
+    [200481]="CRIT", [200482]="HASTE", [200483]="ARPEN", [200484]="EXPERTISE", [200490]="ARMOR", [200492]="STR",
+    [200493]="AGI", [200494]="INT", [200495]="SPI", [200496]="STA", [200500]="SP", [200501]="AP,RAP",
+    [200505]="ARMOR", [200521]="HIT", [200522]="CRIT", [200523]="HASTE", [200524]="ARPEN", [200525]="EXPERTISE",
+    [200528]="ARMOR", [200674]="HEALTH", [200736]="ARMOR", [200738]="MANA", [200886]="HEALTH",
+}
+
+-- Description fallback: a keyword counts only where the text says the echo raises it
+-- ("your Haste", "Strength by", "Armor is increased", "increases Spell Power"), so damage
+-- formulas such as "27% of Spell Power" add nothing.
+local ECHO_STAT_KEYWORDS = {
+    { "armor penetration", "ARPEN" }, { "ranged attack power", "RAP" }, { "attack power", "AP" },
+    { "spell power", "SP" }, { "critical strike", "CRIT" }, { "crit chance", "CRIT" },
+    { "strength", "STR" }, { "agility", "AGI" }, { "stamina", "STA" }, { "intellect", "INT" },
+    { "spirit", "SPI" }, { "armor", "ARMOR" }, { "haste", "HASTE" }, { "hit chance", "HIT" },
+    { "hit rating", "HIT" }, { "expertise", "EXPERTISE" }, { "defense", "DEFENSE" },
+    { "dodge", "DODGE" }, { "parry", "PARRY" }, { "block chance", "BLOCK" }, { "block value", "BLOCK" },
+    { "maximum health", "HEALTH" }, { "max health", "HEALTH" }, { "maximum mana", "MANA" },
+    { "mana regeneration", "MP5" }, { "mana per 5", "MP5" },
+}
+local ECHO_STAT_ORDER = { "STR", "AGI", "STA", "INT", "SPI", "ARMOR", "AP", "RAP", "SP", "CRIT", "HASTE",
+    "HIT", "EXPERTISE", "ARPEN", "DEFENSE", "DODGE", "PARRY", "BLOCK", "HEALTH", "MANA", "MP5" }
+
+-- Best of several combat ratings (melee / ranged / spell), as "N rating (+X%)". The CR_*
+-- indexes are FrameXML globals of the 3.3.5 client; the numbers are their values, as a fallback.
+local function BestRating(names)
+    local bestRating, bestBonus = 0, 0
+    for _, n in ipairs(names) do
+        local idx = _G[n[1]] or n[2]
+        local rating, bonus = GetCombatRating(idx) or 0, GetCombatRatingBonus(idx) or 0
+        if bonus > bestBonus or (bonus == bestBonus and rating > bestRating) then
+            bestRating, bestBonus = rating, bonus
+        end
+    end
+    return string.format("%d rating (+%.2f%%)", bestRating, bestBonus)
+end
+
+local ECHO_STAT_VALUE = {
+    STR = { "Strength", function() return select(2, UnitStat("player", 1)) end },
+    AGI = { "Agility", function() return select(2, UnitStat("player", 2)) end },
+    STA = { "Stamina", function() return select(2, UnitStat("player", 3)) end },
+    INT = { "Intellect", function() return select(2, UnitStat("player", 4)) end },
+    SPI = { "Spirit", function() return select(2, UnitStat("player", 5)) end },
+    ARMOR = { "Armor", function() return select(2, UnitArmor("player")) end },
+    AP = { "Attack Power", function() local b, p, n = UnitAttackPower("player"); return b + p + n end },
+    RAP = { "Ranged Attack Power", function() local b, p, n = UnitRangedAttackPower("player"); return b + p + n end },
+    SP = { "Spell Power", function()
+        local best = GetSpellBonusHealing() or 0
+        for school = 2, 7 do best = math.max(best, GetSpellBonusDamage(school) or 0) end
+        return best
+    end },
+    CRIT = { "Crit Chance", function()
+        local best = math.max(GetCritChance() or 0, GetRangedCritChance() or 0)
+        for school = 2, 7 do best = math.max(best, GetSpellCritChance(school) or 0) end
+        return string.format("%.2f%%", best)
+    end },
+    HASTE = { "Haste", function() return BestRating({ { "CR_HASTE_MELEE", 18 }, { "CR_HASTE_RANGED", 19 }, { "CR_HASTE_SPELL", 20 } }) end },
+    HIT = { "Hit", function() return BestRating({ { "CR_HIT_MELEE", 6 }, { "CR_HIT_RANGED", 7 }, { "CR_HIT_SPELL", 8 } }) end },
+    EXPERTISE = { "Expertise", function() return (GetExpertise()) end },
+    ARPEN = { "Armor Penetration", function() return BestRating({ { "CR_ARMOR_PENETRATION", 25 } }) end },
+    DEFENSE = { "Defense", function() local b, m = UnitDefense("player"); return b + m end },
+    DODGE = { "Dodge", function() return string.format("%.2f%%", GetDodgeChance() or 0) end },
+    PARRY = { "Parry", function() return string.format("%.2f%%", GetParryChance() or 0) end },
+    BLOCK = { "Block", function() return string.format("%.2f%%", GetBlockChance() or 0) end },
+    HEALTH = { "Max Health", function() return UnitHealthMax("player") end },
+    MANA = { "Max Mana", function() local m = UnitPowerMax("player", 0); return (m and m > 0) and m or nil end },
+    MP5 = { "Mana Regen", function()
+        local base = GetManaRegen()
+        return base and string.format("%d per 5 sec", math.floor(base * 5 + 0.5)) or nil
+    end },
+}
+
+local function GetEchoStats(spellId, description)
+    local found = {}
+    local fromData = spellId and ECHO_STATS_BY_SPELL[spellId]
+    if fromData then
+        for key in fromData:gmatch("[^,]+") do found[key] = true end
+        return found
+    end
+    if type(description) ~= "string" or description == "" then return found end
+    local d = description:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower()
+    local dNoArpen = d:gsub("armor penetration", "")
+    for _, kw in ipairs(ECHO_STAT_KEYWORDS) do
+        local word, key = kw[1], kw[2]
+        -- "armor" inside "armor penetration" is the other stat
+        local text = (key == "ARMOR") and dNoArpen or d
+        if not found[key] and (text:find("your " .. word, 1, true) or text:find(word .. " by", 1, true)
+            or text:find(word .. " is increased", 1, true) or text:find("increases " .. word, 1, true)) then
+            found[key] = true
+        end
+    end
+    return found
+end
+
+-- The amount the description gives a stat ("Intellect by 39", "Armor by 10%"): number, isPercent.
+local function EchoStatAmount(text, key)
+    for _, kw in ipairs(ECHO_STAT_KEYWORDS) do
+        if kw[2] == key then
+            local n, pct = text:match(kw[1] .. " by (%d+)(%%?)")
+            if n then return tonumber(n), pct == "%" end
+        end
+    end
+end
+
+-- One line per stat the echo raises, under its effect, roguelite style (owner 2026-10-23): the stat
+-- and its value now in white, the value with the echo in green - "Intellect 20 » 59". The 3.3.5
+-- font has no arrow glyph; "»" (UTF-8 C2 BB) is in it. A stat whose gain the text does not give
+-- shows its value only. Never errors: an unknown echo, or a client API that returns nothing, adds no line.
+local ECHO_STAT_CHEVRON = "\194\187"
+
+-- An echo that gives a RATING ("increases expertise rating by 17") is shown in rating, current and
+-- after: the stat's own value (2 expertise, 8.2% crit) does not add up with a rating. CR_* values of
+-- the 3.3.5 client; the best of melee / ranged / spell where there are three.
+local ECHO_RATING_STATS = {
+    HIT = { { "hit" }, { 6, 7, 8 } }, CRIT = { { "critical strike", "crit" }, { 9, 10, 11 } },
+    HASTE = { { "haste" }, { 18, 19, 20 } }, EXPERTISE = { { "expertise" }, { 24 } },
+    ARPEN = { { "armor penetration" }, { 25 } }, DEFENSE = { { "defense" }, { 2 } },
+    DODGE = { { "dodge" }, { 3 } }, PARRY = { { "parry" }, { 4 } }, BLOCK = { { "block" }, { 5 } },
+}
+
+-- An echo already owned: where its value stands now and where this card takes it, with the increase
+-- in % (owner 2026-10-23) - "22.1 » 30.4 (+38%)", no copy count. Both values come from the echo's own
+-- description rendered at the copies owned and at one more (utils.GetSpellDescription): its
+-- formulas count the fixed "base" part once and the stat / flat parts per copy, so the base is
+-- never doubled. The first number that moves is shown, its "%" kept. No line for a first copy or
+-- a description that does not change with copies.
+local function EchoNumbers(text)
+    local list = {}
+    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    for token in text:gmatch("%d+%.?%d*%%?") do
+        -- "by 13." ends a sentence: the dot is not part of the number
+        local unit = token:match("%%$") and "%" or ""
+        local num = token:gsub("%%$", ""):gsub("%.$", "")
+        list[#list + 1] = { tonumber(num), unit, num }
+    end
+    return list
+end
+
+local function AddEchoStackLine(tooltip, spellId, owned)
+    if not spellId or not owned or owned < 1 then return false end
+    local now = EchoNumbers(utils.GetSpellDescription(spellId, 500, owned))
+    local after = EchoNumbers(utils.GetSpellDescription(spellId, 500, owned + 1))
+    for i, a in ipairs(now) do
+        local b = after[i]
+        if b and a[1] and b[1] and b[1] ~= a[1] and a[1] > 0 then
+            tooltip:AddLine(" ")
+            tooltip:AddLine(a[3] .. a[2] .. " |cff40ff40" .. ECHO_STAT_CHEVRON .. " " .. b[3] .. b[2]
+                .. " (+" .. math.floor((b[1] - a[1]) / a[1] * 100 + 0.5) .. "%)|r", 1, 1, 1)
+            return true
+        end
+    end
+    return false
+end
+
+-- Rating for 1 % (1 point for expertise / defense) at level 60, the WotLK combat rating table; scaled
+-- by EchoRatingLevelFactor. Only used when the character has none of that rating yet: otherwise the
+-- client's own ratio (GetCombatRatingBonus / GetCombatRating) is exact.
+local ECHO_RATING_BASE = { [2] = 1.5, [3] = 12, [4] = 15, [5] = 5, [6] = 10, [7] = 10, [8] = 8,
+    [9] = 14, [10] = 14, [11] = 14, [18] = 10, [19] = 10, [20] = 10, [24] = 2.5, [25] = 4.69512 }
+
+local function EchoRatingLevelFactor(level)
+    if level <= 10 then return 2 / 52 end
+    if level <= 60 then return (level - 8) / 52 end
+    if level <= 70 then return 82 / (262 - 3 * level) end
+    return (82 / 52) * (131 / 63) ^ ((level - 70) / 10)
+end
+
+-- What the echo's rating is worth, as shown in green (owner 2026-10-23): expertise turns into dodge /
+-- parry reduction (0.25 % a point), defense stays in skill points, everything else is a percentage.
+local function EchoRatingGain(idx, gain)
+    if idx == 24 then return string.format("+%.2f%%", gain * 0.25) end
+    if idx == 2 then return string.format("+%d defense", math.floor(gain + 0.5)) end
+    return string.format("+%.2f%%", gain)
+end
+
+local function EchoRatingLine(text, key, label)
+    local def = ECHO_RATING_STATS[key]
+    if not def then return nil end
+    for _, word in ipairs(def[1]) do
+        local n = text:match(word .. " rating by (%d+)")
+        if n then
+            local rating, bestIdx = -1, def[2][1]
+            for _, idx in ipairs(def[2]) do
+                local r = GetCombatRating(idx) or 0
+                if r > rating then rating, bestIdx = r, idx end
+            end
+            local bonus = GetCombatRatingBonus(bestIdx) or 0
+            local perRating = (rating > 0 and bonus > 0) and (bonus / rating)
+                or 1 / (ECHO_RATING_BASE[bestIdx] * EchoRatingLevelFactor(UnitLevel("player") or 1))
+            local gain = tonumber(n)
+            if key == "CRIT" then label = "Critical Strike" end -- "Crit Chance rating" reads wrong
+            return label .. " rating " .. rating .. " |cff40ff40" .. ECHO_STAT_CHEVRON .. " " .. (rating + gain)
+                .. " (" .. EchoRatingGain(bestIdx, gain * perRating) .. ")|r"
+        end
+    end
+end
+
+local function AddEchoStatLines(tooltip, spellId, description)
+    local ok, found = pcall(GetEchoStats, spellId, description)
+    if not ok or not found or not next(found) or type(description) ~= "string" then return end
+    local text = description:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower()
+    local first = true
+    for _, key in ipairs(ECHO_STAT_ORDER) do
+        local def = found[key] and ECHO_STAT_VALUE[key]
+        if def then
+            local okRating, ratingLine = pcall(EchoRatingLine, text, key, def[1])
+            local okValue, value = pcall(def[2])
+            if okRating and ratingLine then
+                if first then tooltip:AddLine(" "); first = false end
+                tooltip:AddLine(ratingLine, 1, 1, 1)
+            elseif okValue and value ~= nil then
+                local line = def[1] .. " " .. tostring(value)
+                if type(value) == "number" then
+                    line = def[1] .. " " .. math.floor(value + 0.5)
+                    local amount, isPercent = EchoStatAmount(text, key)
+                    if amount then
+                        local after = isPercent and value * (1 + amount / 100) or value + amount
+                        line = line .. " |cff40ff40" .. ECHO_STAT_CHEVRON .. " " .. math.floor(after + 0.5) .. "|r"
+                    end
+                end
+                if first then tooltip:AddLine(" "); first = false end
+                tooltip:AddLine(line, 1, 1, 1)
+            end
+        end
+    end
+end
+
+local function MakeSpin(texture, seconds, degrees)
+    local ag = texture:CreateAnimationGroup()
+    ag:SetLooping("REPEAT")
+    local rot = ag:CreateAnimation("Rotation")
+    rot:SetDuration(seconds)
+    rot:SetDegrees(degrees)
+    rot:SetOrigin("CENTER", 0, 0)
+    return ag
+end
+
+local function MakeBreath(region, change, seconds)
+    local ag = region:CreateAnimationGroup()
+    ag:SetLooping("BOUNCE")
+    local a = ag:CreateAnimation("Alpha")
+    a:SetChange(change)
+    a:SetDuration(seconds)
+    a:SetSmoothing("IN_OUT")
+    return ag
+end
+
+local function EnsureSpecDrawWidgets()
+    if specBanner or not perkMainFrame then return end
+
+    -- Two four-point stars turning against each other read as eight shifting rays.
+    -- On the main frame's background, so every card sits above them; centred on the
+    -- card row (PlaceCard puts it at +100).
+    specRays = {}
+    for i, spec in ipairs({ { 70, 360 }, { 95, -360 } }) do
+        local t = perkMainFrame:CreateTexture(nil, "BACKGROUND")
+        t:SetTexture("Interface\\Cooldown\\star4")
+        t:SetBlendMode("ADD")
+        t:SetVertexColor(1, 0.78, 0.15, i == 1 and 0.55 or 0.4)
+        t:SetSize(980, 980)
+        t:SetPoint("CENTER", perkMainFrame, "CENTER", 0, 100)
+        t.spin = MakeSpin(t, spec[1], spec[2])
+        t:Hide()
+        specRays[i] = t
+    end
+
+    specBanner = CreateFrame("Frame", nil, perkMainFrame)
+    specBanner:SetSize(620, 72)
+    -- Above the Reroll button (centre +310, 35 high) and the souvenir hint (+306)
+    specBanner:SetPoint("BOTTOM", perkMainFrame, "CENTER", 0, 336)
+
+    local glow = specBanner:CreateTexture(nil, "BACKGROUND")
+    glow:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
+    glow:SetBlendMode("ADD")
+    glow:SetVertexColor(1, 0.75, 0.1, 0.9)
+    glow:SetPoint("CENTER", specBanner, "CENTER", 0, 0)
+    glow:SetSize(680, 140)
+    specBanner.breath = MakeBreath(glow, -0.45, 1.4)
+
+    local title = specBanner:CreateFontString(nil, "OVERLAY")
+    title:SetFont("Fonts\\FRIZQT__.TTF", 28, "THICKOUTLINE")
+    title:SetPoint("TOP", specBanner, "TOP", 0, -4)
+    title:SetTextColor(unpack(SPEC_GOLD))
+    title:SetShadowColor(0, 0, 0, 1)
+    title:SetShadowOffset(2, -2)
+    specBanner.title = title
+
+    local sub = specBanner:CreateFontString(nil, "OVERLAY")
+    sub:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+    sub:SetPoint("TOP", title, "BOTTOM", 0, -6)
+    sub:SetTextColor(1, 0.93, 0.6)
+    specBanner.sub = sub
+
+    specBanner:Hide()
+end
+
+-- Banner and rays follow the cards: shown with them on a spec draw, hidden otherwise.
+local function ShowSpecDrawWidgets(shown)
+    local draw = GetSpecDraw()
+    if not shown or not draw then
+        if specBanner then
+            specBanner.breath:Stop()
+            specBanner:Hide()
+        end
+        for _, t in ipairs(specRays or {}) do
+            t.spin:Stop()
+            t:Hide()
+        end
+        return
+    end
+
+    EnsureSpecDrawWidgets()
+    if not specBanner then return end
+
+    if draw.chosen == 0 then
+        specBanner.title:SetText("Choose your Echo Specialization")
+        specBanner.sub:SetText("Each card is one specialization (icon above its name). Every 10 levels of this run, you will get three echoes of the one you take")
+    else
+        local specName
+        for _, f in ipairs(perkFramePool) do
+            if f.inUse and f._perkData and not f._perkData.isGuaranteed then
+                specName = GetEchoSpecName(f._spellId)
+                if specName then break end
+            end
+        end
+        specBanner.title:SetText(specName and (specName .. " Specialization") or "Specialization Echoes")
+        specBanner.sub:SetText("Three echoes of the specialization you chose at level 10")
+    end
+    specBanner:Show()
+    specBanner.breath:Play()
+    for _, t in ipairs(specRays) do
+        t:Show()
+        t.spin:Play()
+    end
 end
 
 -- "Auto Show Echoes" checkbox on the perk frame itself and the "Auto-show
@@ -80,8 +461,6 @@ local qualityInfo = {
     [4] = { name = "Legendary", color = { 1.0, 0.5, 0.0 }, border = 4 }
 }
 
--- Shared with the journal and the run panel (see utils.PerkFamilyIcons)
-local familyIcons = utils.PerkFamilyIcons
 
 local texCoords = {
     { 0.062500, 0.476562, 0.070312, 0.492188 },
@@ -237,13 +616,14 @@ local function RefreshRerollButton()
 end
 
 local function GetCardFrameByIndex(cardIndex)
-    if not cardIndex or cardIndex < 1 or cardIndex > 3 then return nil end
+    if not cardIndex or cardIndex < 1 or cardIndex > 4 then return nil end
     for _, f in ipairs(perkFramePool) do
         if f.inUse and f.perkIndex == cardIndex - 1 then return f end
     end
 
     return nil
 end
+
 
 -- ── First-prompt guided tour ─────────────────────────────────────────────────
 -- Shown once, the first time the choice cards are actually revealed (not while
@@ -255,8 +635,9 @@ end
 -- backdropFrame (the card frame's top 80px are invisible), while the classic
 -- design HIDES backdropFrame and paints the whole frame with the bg texture --
 -- so backdropFrame alone fails the tour's IsShown zone check there.
-local function GetCardBody(f)
+function GetCardBody(f)
     if f.backdropFrame and f.backdropFrame:IsShown() then return f.backdropFrame end
+    if f.body then return f.body end -- face-down placeholder of the souvenir stage
     return f
 end
 
@@ -393,6 +774,42 @@ do
     end
 end
 
+-- ── Card entrance: a short fade in place ───────────────────────────────────
+-- Every reveal (first show, Show after Hide, the reveal after a "Draw") plays
+-- this: each card sits on its place and fades in. No movement: the old drop from
+-- above was removed (owner's call).
+local CARD_FADE_DURATION = 0.2
+
+-- Remembers where a card belongs so a reveal can put it back there
+function PlaceCard(f, x, y)
+    f._cardX, f._cardY = x, y
+    f:ClearAllPoints()
+    f:SetPoint("CENTER", perkMainFrame, "CENTER", x, y)
+end
+
+function PlayCardEntrance(f, onDone)
+    if not f._cardX then return end
+    CancelFade(f)
+    f:ClearAllPoints()
+    f:SetPoint("CENTER", perkMainFrame, "CENTER", f._cardX, f._cardY)
+    FadeFrame(f, CARD_FADE_DURATION, 0, 1, 0, onDone)
+end
+
+function PlayCardsEntrance(frames)
+    for _, f in ipairs(frames) do
+        PlayCardEntrance(f)
+    end
+end
+
+-- Every card on the table right now: choice frames and face-down placeholders
+function CollectVisibleCards()
+    local list = {}
+    for _, f in ipairs(perkFramePool) do
+        if f.inUse and f:IsShown() then table.insert(list, f) end
+    end
+    return list
+end
+
 local FREEZE_FADE_DURATION = 0.45
 
 local function ApplyFreezeVisual(frame, smooth)
@@ -441,8 +858,9 @@ local function IsCardFrozen(frame)
     return pd and (pd.isFrozen or pd.isCarried or pd.justFrozen)
 end
 
--- Card injected by the server from the active build slot (choice flag 3):
--- guaranteed to be offered until taken, cannot be banished or frozen.
+-- The MEMORY card (choice flag 3, 4th slot): an echo of the loadout's engraved
+-- build, offered next to the random draws. Cannot be banished or frozen, and a
+-- reroll leaves it in place; picking a random card instead sacrifices it.
 local function IsCardGuaranteed(frame)
     if not frame then return false end
     local pd = frame._perkData
@@ -461,7 +879,9 @@ local function UpdateBanishButtons()
             -- Orb offer: banish is refused server-side, so the button is not shown at all.
             if (perkMainFrame and perkMainFrame.perksHidden) or IsOrbOfferPending() then
                 btn:Hide()
-            elseif IsCardFrozen(frame) or IsCardGuaranteed(frame) then
+            elseif IsCardGuaranteed(frame) then
+                btn:Hide() -- the souvenir card carries no run action at all
+            elseif IsCardFrozen(frame) then
                 btn:Show()
                 btn:Disable()
                 btn:EnableMouse(false)
@@ -499,6 +919,8 @@ local function UpdateFreezeButtons()
             if (perkMainFrame and perkMainFrame.perksHidden) or IsOrbOfferPending() then
                 btn:Hide()
             elseif IsCardGuaranteed(frame) then
+                btn:Hide() -- the souvenir card carries no run action at all
+            elseif false then
                 btn:Show()
                 btn:Disable()
                 btn:EnableMouse(false)
@@ -684,22 +1106,44 @@ local function AcquirePerkFrame(parent)
 
     local descText = topPerkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     descText:SetFont("Fonts\\ARIALN.TTF", 12)
-    descText:SetPoint("TOP", topPerkFrame, "CENTER", 0, 20)
+    descText:SetPoint("TOP", topPerkFrame, "CENTER", 0, 35)
     descText:SetWidth(140)
     descText:SetHeight(90)
     descText:SetJustifyH("CENTER")
     descText:SetJustifyV("TOP")
     frame.descText = descText
 
-    local familyIconSlots = {}
-    for i = 1, 5 do
-        local tex = frame:CreateTexture(nil, "OVERLAY")
-        tex:SetSize(20, 20)
-        tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-        tex:Hide()
-        familyIconSlots[i] = tex
-    end
-    frame.familyIconSlots = familyIconSlots
+    -- Spec badge: the echo's specialization as its talent-tab icon, round, in the skill
+    -- tree's gold ring (assets/class_ring, 1.16 x the icon like a tree node), centred above
+    -- the echo's name. Hidden on echoes without a spec.
+    local specBadge = CreateFrame("Frame", nil, frame)
+    specBadge:SetSize(32, 32)
+    specBadge:SetPoint("TOP", frame, "TOP", 0, -56)
+    specBadge:SetFrameLevel(frame:GetFrameLevel() + 6)
+    local specGlow = specBadge:CreateTexture(nil, "BACKGROUND")
+    specGlow:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
+    specGlow:SetBlendMode("ADD")
+    specGlow:SetVertexColor(1, 0.75, 0.1, 0.6)
+    specGlow:SetPoint("CENTER", specBadge, "CENTER", 0, 0)
+    specGlow:SetSize(68, 68)
+    local specIcon = specBadge:CreateTexture(nil, "ARTWORK")
+    specIcon:SetAllPoints(specBadge)
+    specBadge.icon = specIcon
+    local specRing = specBadge:CreateTexture(nil, "OVERLAY")
+    specRing:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\class_ring")
+    specRing:SetPoint("CENTER", specBadge, "CENTER", 0, 0)
+    specRing:SetSize(32 * 1.16, 32 * 1.16)
+    specBadge:EnableMouse(true)
+    specBadge:SetScript("OnEnter", function(self)
+        if not self.specName then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+        GameTooltip:SetText(self.specName .. " Specialization", unpack(SPEC_GOLD))
+        GameTooltip:AddLine("This echo belongs to the " .. self.specName .. " specialization.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    specBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    specBadge:Hide()
+    frame.specBadge = specBadge
 
     -- Invisible blocker behind buttons to prevent card tooltip when moving between them
     local buttonBlocker = CreateFrame("Frame", nil, frame)
@@ -900,6 +1344,27 @@ local function AcquirePerkFrame(parent)
         if isSelecting then
             return
         end
+        -- Choosing the spec is for the whole run: ask first (PROJECTEBONHOLD_SPEC_CONFIRM).
+        local draw = GetSpecDraw()
+        if draw and draw.chosen == 0 and not (frame._perkData and frame._perkData.isGuaranteed) then
+            local specName = GetEchoSpecName(frame._spellId)
+            if specName then
+                local dialog = StaticPopup_Show("PROJECTEBONHOLD_SPEC_CONFIRM", specName, GetSpellInfo(frame._spellId) or "this echo")
+                if dialog then
+                    dialog.data = { frame = frame, spellId = frame._spellId }
+                    -- Same lift as the souvenir popup: the cards and the gold banner sit on the
+                    -- DIALOG strata at a high level and would otherwise draw over the question.
+                    dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+                    dialog:SetFrameLevel(600)
+                end
+                return
+            end
+        end
+        frame.DoSelect()
+    end)
+
+    frame.DoSelect = function()
+        if isSelecting then return end
         isSelecting = true
         for _, f in ipairs(perkFramePool) do
             if f.inUse then
@@ -908,6 +1373,10 @@ local function AcquirePerkFrame(parent)
                 if f.banishCardButton then f.banishCardButton:EnableMouse(false) end
                 if f.freezeCardButton then f.freezeCardButton:EnableMouse(false) end
             end
+        end
+        if frame._perkData and frame._perkData.isGuaranteed then
+            PlayMemoryKeepBurst(frame)
+            for _, d in ipairs(memoryDeck) do d:EnableMouse(false) end
         end
         local success = ProjectEbonhold.PerkService.SelectPerk(frame._spellId)
         if not success then
@@ -921,7 +1390,7 @@ local function AcquirePerkFrame(parent)
                 end
             end
         end
-    end)
+    end
 
     banishCardButton:SetScript("OnClick", function()
         if GetTime() < perkCardsGraceUntil then return end
@@ -964,12 +1433,17 @@ local function AcquirePerkFrame(parent)
         GameTooltip:AddLine(sName or ("Spell " .. tostring(self._spellId)), qd.color[1], qd.color[2], qd.color[3])
         GameTooltip:AddLine(qd.name, 0.5, 0.5, 0.5)
         if self._perkData and self._perkData.isGuaranteed then
-            GameTooltip:AddLine("Guaranteed by your active build slot", 1, 0.82, 0.1)
+            -- The choice itself is spelled out under the cards (memoryHint)
+            GameTooltip:AddLine("Souvenir from your previous build", 1, 0.82, 0.1)
         end
-        local perkDb = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[self._spellId]
-        local familyLine = perkDb and utils.FormatPerkFamilies(perkDb.families)
-        if familyLine then
-            GameTooltip:AddLine(familyLine, 1, 1, 1)
+        local svcRule = ProjectEbonhold.PerkService
+            and ProjectEbonhold.PerkService.GetActiveEchoLoadoutRule
+        local rule = svcRule and svcRule(self._spellId)
+        if rule == "avoid" then
+            GameTooltip:AddLine("Your build refuses this echo", 1, 0.25, 0.25)
+            GameTooltip:AddLine("It is never taken for you. Take it yourself if you changed your mind.", 0.8, 0.6, 0.6, true)
+        elseif rule == "want" then
+            GameTooltip:AddLine("Wanted by your build", 0.1, 1, 0.1)
         end
         local st = self._stacks or 1
         local ms = self._maxStacks or 1
@@ -979,6 +1453,12 @@ local function AcquirePerkFrame(parent)
         GameTooltip:AddLine(" ")
         local description = utils.GetSpellDescription(self._spellId, 500, st)
         GameTooltip:AddLine(description, 1, 0.82, 0, true)
+        -- stat echoes have their stat line instead (owner 2026-10-23)
+        local okStats, stats = pcall(GetEchoStats, self._spellId, description)
+        if (self._ownedCount or 0) >= 1 and not (okStats and stats and next(stats)) then
+            pcall(AddEchoStackLine, GameTooltip, self._spellId, self._ownedCount)
+        end
+        AddEchoStatLines(GameTooltip, self._spellId, description)
         GameTooltip:Show()
     end)
     frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
@@ -1026,6 +1506,35 @@ local function ApplyLoadoutHighlight(frame, spellId)
         or (svc and svc.IsSpellInActiveEchoLoadout
             and svc.IsSpellInActiveEchoLoadout(spellId))
 
+    -- The other end of the same build: an echo it refuses. Greyed with a red
+    -- cross, never picked automatically - but still clickable, because the
+    -- build is a preference, not a rule the game enforces on its owner.
+    -- A souvenir card is exempt: it is the player's own finished build coming
+    -- back, and it can only ever be taken by hand.
+    local refused = (not IsCardGuaranteed(frame)) and svc and svc.GetActiveEchoLoadoutRule
+        and svc.GetActiveEchoLoadoutRule(spellId) == "avoid"
+    if refused then
+        if not frame.avoidMark then
+            local host = frame.iconFrame or frame
+            local ov = CreateFrame("Frame", nil, host)
+            ov:SetFrameLevel(host:GetFrameLevel() + 6)
+            ov:SetAllPoints(host)
+            local x = ov:CreateTexture(nil, "OVERLAY")
+            x:SetTexture("Interface\\RaidFrame\\ReadyCheck-NotReady")
+            x:SetSize(22, 22)
+            x:SetPoint("TOPLEFT", frame.icon, "TOPLEFT", -6, 6)
+            ov.mark = x
+            frame.avoidMark = ov
+        end
+        frame.avoidMark:Show()
+        frame.icon:SetDesaturated(true)
+        frame.icon:SetVertexColor(0.7, 0.45, 0.45)
+    else
+        if frame.avoidMark then frame.avoidMark:Hide() end
+        frame.icon:SetDesaturated(false)
+        frame.icon:SetVertexColor(1, 1, 1)
+    end
+
     if inLoadout then
         if not frame.loadoutOverlay then
             local host = frame.iconFrame or frame
@@ -1060,8 +1569,27 @@ local function ApplyLoadoutHighlight(frame, spellId)
         if iw < 1 then iw = 40 end
         frame.loadoutGlow:SetSize(iw * 2.2, iw * 2.2)
         frame.loadoutOverlay:Show()
+        -- The star is the wishlist mark; a souvenir keeps only the glow
+        if IsCardGuaranteed(frame) then frame.loadoutStar:Hide() else frame.loadoutStar:Show() end
+        -- Souvenir: the glow breathes so the card reads as "alive" next to the
+        -- face-down draws
+        if IsCardGuaranteed(frame) then
+            if not frame.loadoutBreath then
+                local ag = frame.loadoutGlow:CreateAnimationGroup()
+                ag:SetLooping("BOUNCE")
+                local a = ag:CreateAnimation("Alpha")
+                a:SetChange(-0.45)
+                a:SetDuration(1.3)
+                a:SetSmoothing("IN_OUT")
+                frame.loadoutBreath = ag
+            end
+            frame.loadoutBreath:Play()
+        elseif frame.loadoutBreath then
+            frame.loadoutBreath:Stop()
+        end
     elseif frame.loadoutOverlay then
         frame.loadoutOverlay:Hide()
+        if frame.loadoutBreath then frame.loadoutBreath:Stop() end
     end
 end
 
@@ -1110,31 +1638,20 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
     local description = utils.GetSpellDescription(spellId, 120)
     frame.descText:SetText(description)
 
-    if frame.familyIconSlots then
-        local ICON_SIZE = 20
-        local ICON_SPACING = 4
-        local perkDb = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[spellId]
-        local familiesToShow = {}
-        if perkDb and perkDb.families then
-            for _, familyName in ipairs(perkDb.families) do
-                if familyIcons[familyName] then
-                    table.insert(familiesToShow, familyName)
-                end
+    if frame.specBadge then
+        local specName, specFamily = GetEchoSpecName(spellId)
+        local specTex = specFamily and utils.PerkSpecIcons and utils.PerkSpecIcons[specFamily]
+        if specTex then
+            -- SetPortraitToTexture builds a new round texture each call: only on a change.
+            if frame.specBadge.iconPath ~= specTex then
+                frame.specBadge.iconPath = specTex
+                SetPortraitToTexture(frame.specBadge.icon, specTex)
             end
-        end
-        local n = #familiesToShow
-        local totalWidth = n * ICON_SIZE + math.max(0, n - 1) * ICON_SPACING
-        local startX = -(totalWidth / 2) + (ICON_SIZE / 2)
-        for i, slot in ipairs(frame.familyIconSlots) do
-            if i <= n then
-                local xOffset = startX + (i - 1) * (ICON_SIZE + ICON_SPACING)
-                slot:ClearAllPoints()
-                slot:SetPoint("TOP", frame, "TOP", xOffset, -60)
-                slot:SetTexture(familyIcons[familiesToShow[i]])
-                slot:Show()
-            else
-                slot:Hide()
-            end
+            frame.specBadge.specName = specName
+            frame.specBadge:Show()
+        else
+            frame.specBadge.specName = nil
+            frame.specBadge:Hide()
         end
     end
 
@@ -1153,13 +1670,9 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
     end
     frame._ownedCount = count
     frame._spellId = spellId
-    if frame.ownedCountFrame and frame.ownedCountText then
-        if count >= 1 then
-            frame.ownedCountText:SetText("x" .. tostring(count))
-            frame.ownedCountFrame:Show()
-        else
-            frame.ownedCountFrame:Hide()
-        end
+    -- The "x2" badge is gone (owner 2026-10-23): the tooltip's stack line says it, with the values.
+    if frame.ownedCountFrame then
+        frame.ownedCountFrame:Hide()
     end
 
     local rollsCount = (ProjectEbonhold.PerkService and ProjectEbonhold.PerkService.GetPendingRollsCount and ProjectEbonhold.PerkService.GetPendingRollsCount()) or
@@ -1202,9 +1715,15 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
         end
     end
 
-    -- Update freeze status text
+    -- Status line: the memory card says what it is; the frozen/carried states
+    -- keep it hidden as before.
     if frame.freezeStatusText then
-        frame.freezeStatusText:Hide()
+        if perkData.isGuaranteed then
+            frame.freezeStatusText:SetText("|cffffd700Souvenir|r")
+            frame.freezeStatusText:Show()
+        else
+            frame.freezeStatusText:Hide()
+        end
     end
     -- hide legacy indicator if still present
     if frame.freezeIndicator then frame.freezeIndicator:Hide() end
@@ -1229,7 +1748,7 @@ local function InitializePerkUI()
     perkMainFrame:SetFrameStrata("DIALOG")
     perkMainFrame:SetFrameLevel(100)
     perkMainFrame:SetSize(800, 280)
-    perkMainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    perkMainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, -40)
     perkMainFrame:SetScale(GetPerkUIScale())
     perkMainFrame:Hide()
 
@@ -1252,7 +1771,10 @@ local function InitializePerkUI()
                     end
                 end
             end
-            if not self.perksHidden and rerollButton then
+            if memoryStageShown and rerollButton and rerollButton:IsShown() then
+                rerollButton:Hide()
+            end
+            if not self.perksHidden and rerollButton and not memoryStageShown then
                 -- Mode-aware: on an orb offer the number on the button is the orb count, so
                 -- that is what has to be watched. The mode itself is watched too - an orb
                 -- offer arriving on the same count would otherwise leave the label stale.
@@ -1370,7 +1892,7 @@ local function InitializePerkUI()
 
     hideButton = CreateFrame("Button", "PerkHideButton", perkMainFrame)
     hideButton:SetSize(200, 100)
-    hideButton:SetPoint("TOP", perkMainFrame, "BOTTOM", 0, -65)
+    hideButton:SetPoint("TOP", perkMainFrame, "BOTTOM", 0, -25)
     hideButton:RegisterForClicks("LeftButtonUp")
     hideButton:Hide()
 
@@ -1440,7 +1962,7 @@ local function InitializePerkUI()
     autoShowCB:Hide()
 
     chooseButton = CreateFrame("Button", "PerkChooseButton", UIParent)
-    chooseButton:SetPoint("TOP", perkMainFrame, "BOTTOM", 0, -50)
+    chooseButton:SetPoint("TOP", perkMainFrame, "BOTTOM", 0, -10)
     chooseButton:SetFrameStrata("DIALOG")
     chooseButton:SetFrameLevel(perkMainFrame:GetFrameLevel() + 10)
     chooseButton:EnableMouse(true)
@@ -1479,7 +2001,7 @@ local function InitializePerkUI()
             if self.SetBackdropBorderColor then
                 self:SetBackdropBorderColor(0, 0, 0, 1)
             end
-            chooseButtonText:SetTextColor(0.9, 0.9, 0.9)
+            if GetSpecDraw() then chooseButtonText:SetTextColor(unpack(SPEC_GOLD)) else chooseButtonText:SetTextColor(0.9, 0.9, 0.9) end
         end)
     else
         chooseButton:SetSize(250, 120)
@@ -1567,7 +2089,8 @@ local function InitializePerkUI()
                 local yOffset = -25 + progress * 80
                 local wave = math.sin(p.life * 4 + i) * 15 * (1 - progress)
                 local x = p.xOffset + wave
-                p.texture:ClearAllPoints()
+                -- no ClearAllPoints: CENTER is the particle's only anchor, and setting
+                -- the same point again replaces it (30 re-anchors a frame saved)
                 p.texture:SetPoint("CENTER", self, "CENTER", x, yOffset)
                 local alpha
                 if progress < 0.2 then
@@ -1591,7 +2114,8 @@ local function InitializePerkUI()
         chooseButton:SetScript("OnLeave", function(self)
             self.isHovering = false
             chooseHighlight:SetAlpha(0)
-            chooseGlow:SetVertexColor(0.3, 0.3, 0.3)
+            -- Back to gold on a spec draw, grey otherwise
+            if GetSpecDraw() then chooseGlow:SetVertexColor(1, 0.75, 0.1) else chooseGlow:SetVertexColor(0.3, 0.3, 0.3) end
         end)
     end
 
@@ -1623,6 +2147,14 @@ local function InitializePerkUI()
 
         chooseButton:Hide()
 
+        ShowMemoryStageWidgets(true)
+        ShowSpecDrawWidgets(true)
+        if memoryStageShown then rerollButton:Hide() end
+        pendingMemoryReveal = false
+        -- Every reveal fades the cards in (a carried card that was already on
+        -- the table fades along with the others: the row is rebuilt as a whole)
+        PlayCardsEntrance(CollectVisibleCards())
+
         -- First reveal ever: run the guided tour and keep the family hint for
         -- a later prompt (both at once fight over the same screen space)
         if not perkTour:MaybeStart() then
@@ -1650,6 +2182,11 @@ local function InitializePerkUI()
                     frame.freezeCardButton:Hide(); frame.freezeCardButton:EnableMouse(false)
                 end
                 frame:SetScript("OnUpdate", nil)
+                CancelFade(frame)
+                if frame._cardX then
+                    frame:ClearAllPoints()
+                    frame:SetPoint("CENTER", perkMainFrame, "CENTER", frame._cardX, frame._cardY)
+                end
                 frame:SetAlpha(0)
                 frame:Hide()
             end
@@ -1657,6 +2194,8 @@ local function InitializePerkUI()
             hideButton.text:SetTextColor(0.7, 0.7, 0.7)
             if _G.EbonholdAutoShowCheck then _G.EbonholdAutoShowCheck:Hide() end
             rerollButton:Hide()
+            ShowMemoryStageWidgets(false)
+            ShowSpecDrawWidgets(false)
             if perkFamilyHintFrame and perkFamilyHintFrame:IsShown() then
                 perkMainFrame._hintWasShown = true
                 perkFamilyHintFrame:Hide()
@@ -1675,6 +2214,10 @@ local function InitializePerkUI()
             perkMainFrame.perksHidden = false
             RefreshRerollButton()
             ShowRerollButton()
+            ShowMemoryStageWidgets(true)
+            ShowSpecDrawWidgets(true)
+            if memoryStageShown then rerollButton:Hide() end
+            PlayCardsEntrance(CollectVisibleCards())
             _lastBanishRem = nil
             UpdateFreezeButtons()
             UpdateBanishButtons()
@@ -1734,6 +2277,7 @@ local function ForceResetPerkUI()
         rerollButton:SetAlpha(1)
     end
     if perkFamilyHintFrame then perkFamilyHintFrame:Hide() end
+    ShowSpecDrawWidgets(false)
     perkTour:Stop(false)
 end
 
@@ -1778,6 +2322,369 @@ ShowPerkFamilyHint = function()
     perkFamilyHintFrame:Show()
 end
 
+
+-- ── Memory stage: the souvenir card ──────────────────────────────────────────
+-- A draw on a loadout that remembers a finished build opens with ONE card: a
+-- souvenir of that build (choice flag 3). The three random cards are already
+-- rolled server-side but hidden. The player either keeps the souvenir (the
+-- card's Select button) or gives it up - "Draw" - which sends
+-- REQUEST_PERK_MEMORY_DRAW: the souvenir is lost for the climb and the server
+-- answers with the three random cards revealed. Three face-down cards stand
+-- where those will land, so the choice reads as "this echo, or those three".
+local MEMORY_CARD_PITCH = 202
+local MEMORY_GAP = 30
+-- (memoryDeck / memoryHint / memoryStageShown /
+--  pendingMemoryReveal are declared at the top of the file)
+
+function ChoicesAreMemoryStage(choices)
+    for _, c in ipairs(choices or {}) do
+        if c.isGuaranteed then return true end
+    end
+    return false
+end
+
+-- Card offsets of a full four-slot row (three draws, a gap, the souvenir)
+function MemoryRowOffset(slot)
+    local x = (slot - 1.5) * MEMORY_CARD_PITCH
+    if slot == 3 then x = x + MEMORY_GAP / 2 else x = x - MEMORY_GAP / 2 end
+    return x
+end
+
+function GetMemoryDeckCard(i)
+    if memoryDeck[i] then return memoryDeck[i] end
+    local f = CreateFrame("Frame", nil, perkMainFrame)
+    f:SetSize(200, 400)
+    f:SetFrameLevel(perkMainFrame:GetFrameLevel() + 1)
+
+    local body = CreateFrame("Frame", nil, f)
+    body:SetPoint("BOTTOM", f, "BOTTOM", 0, 0)
+    body:SetPoint("LEFT", f, "LEFT", 0, 0)
+    body:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    body:SetHeight(320)
+    f.body = body
+    -- Same background as the echo cards themselves (AcquirePerkFrame): the
+    -- dark backdrop of the transparent design, or the card art of the classic one
+    if IsTransparentDesign() then
+        body:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            tile = true,
+            tileSize = 16,
+            edgeSize = 4,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 }
+        })
+        body:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
+        body:SetBackdropBorderColor(0, 0, 0, 1)
+    else
+        local bg = f:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(f)
+        bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk")
+        bg:SetTexCoord(0.226562, 0.746094, 0.009766, 0.958984)
+        f.bg = bg
+    end
+
+    -- A faint swirl and a question mark: an echo not yet revealed
+    local swirl = body:CreateTexture(nil, "ARTWORK")
+    swirl:SetTexture("Interface\\Cooldown\\star4")
+    swirl:SetBlendMode("ADD")
+    swirl:SetVertexColor(0.45, 0.55, 0.9, 0.35)
+    swirl:SetSize(150, 150)
+    swirl:SetPoint("CENTER", f, "TOP", -5, -173)
+    local spin = swirl:CreateAnimationGroup()
+    spin:SetLooping("REPEAT")
+    local rot = spin:CreateAnimation("Rotation")
+    rot:SetDuration(9 + i * 1.5)
+    rot:SetDegrees(i % 2 == 0 and 360 or -360)
+    rot:SetOrigin("CENTER", 0, 0)
+    spin:Play()
+
+    -- The hidden echo: a question-mark icon dressed like a card icon (same
+    -- base + ring assets as the real cards, quality 0). MEMORY_DECK_ICON is the
+    -- one path to change for another picture.
+    local MEMORY_DECK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+    local iconBase = body:CreateTexture(nil, "BACKGROUND", nil, 2)
+    iconBase:SetSize(124, 124)
+    iconBase:SetPoint("CENTER", f, "TOP", -5, -173) -- where a card's iconFrame sits (topPerkFrame TOP -140, iconFrame TOP -20)
+    iconBase:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\perk_quality_0")
+    local mark = body:CreateTexture(nil, "ARTWORK", nil, 1)
+    mark:SetSize(26, 26)
+    mark:SetPoint("CENTER", f, "TOP", -5, -176)
+    SetPortraitToTexture(mark, MEMORY_DECK_ICON)
+    mark:SetDesaturated(true)
+    mark:SetVertexColor(0.75, 0.8, 1)
+    local ring = body:CreateTexture(nil, "OVERLAY")
+    ring:SetSize(124, 124)
+    ring:SetPoint("CENTER", f, "TOP", -5, -173)
+    ring:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\perk_border_quality_0")
+    f.mark = mark
+
+    -- Click to reveal (after confirmation); hover brightens the halo and explains
+    f:EnableMouse(true)
+    f:SetScript("OnEnter", function(self)
+        swirl:SetVertexColor(0.7, 0.8, 1, 0.7)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Hidden echo", 1, 1, 1)
+        GameTooltip:AddLine("Click to draw 3 random echoes and pick one.", 1, 1, 1, true)
+        GameTooltip:AddLine("|cffff6060You lose the souvenir until you finish the build again.|r", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    f:SetScript("OnLeave", function()
+        swirl:SetVertexColor(0.45, 0.55, 0.9, 0.35)
+        GameTooltip:Hide()
+    end)
+    f:SetScript("OnMouseUp", function(self, mouseButton)
+        if mouseButton ~= "LeftButton" then return end
+        if GetTime() < perkCardsGraceUntil then return end
+        if isSelecting or not memoryStageShown then return end
+        -- The card row sits on the DIALOG strata at a high level: lift the popup
+        -- above it, or the question opens behind the cards it is about
+        local dialog = StaticPopup_Show("PROJECTEBONHOLD_MEMORY_DRAW", SouvenirOnTableName())
+        if dialog then
+            dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+            dialog:SetFrameLevel(600)
+        end
+    end)
+
+    -- Gentle float, each card on its own beat
+    local floatGroup = f:CreateAnimationGroup()
+    floatGroup:SetLooping("BOUNCE")
+    local up = floatGroup:CreateAnimation("Translation")
+    up:SetOffset(0, 7)
+    up:SetDuration(1.1 + i * 0.2)
+    up:SetSmoothing("IN_OUT")
+    f.floatGroup = floatGroup
+
+    -- Pulse of the question mark
+    local pulse = mark:CreateAnimationGroup()
+    pulse:SetLooping("BOUNCE")
+    local pa = pulse:CreateAnimation("Alpha")
+    pa:SetChange(-0.5)
+    pa:SetDuration(0.9 + i * 0.15)
+    pa:SetSmoothing("IN_OUT")
+    pulse:Play()
+
+    memoryDeck[i] = f
+    return f
+end
+
+function HideMemoryDeck()
+    for _, f in ipairs(memoryDeck) do
+        if f.floatGroup then f.floatGroup:Stop() end
+        f:Hide()
+    end
+    if memoryHint then memoryHint:Hide() end
+end
+
+-- Golden burst played on the souvenir when it is kept
+function PlayMemoryKeepBurst(frame)
+    if not frame or not frame.iconFrame then return end
+    if not frame.memoryBurst then
+        local t = frame.iconFrame:CreateTexture(nil, "OVERLAY")
+        t:SetTexture("Interface\\Cooldown\\star4")
+        t:SetBlendMode("ADD")
+        t:SetVertexColor(1, 0.85, 0.2, 1)
+        t:SetPoint("CENTER", frame.iconFrame, "CENTER", 0, 0)
+        t:SetSize(60, 60)
+        t:Hide()
+        local ag = t:CreateAnimationGroup()
+        local sc = ag:CreateAnimation("Scale")
+        sc:SetScale(4, 4)
+        sc:SetDuration(0.45)
+        sc:SetOrigin("CENTER", 0, 0)
+        local al = ag:CreateAnimation("Alpha")
+        al:SetChange(-1)
+        al:SetDuration(0.45)
+        al:SetSmoothing("OUT")
+        ag:SetScript("OnFinished", function() t:Hide() end)
+        t.burst = ag
+        frame.memoryBurst = t
+    end
+    frame.memoryBurst:SetAlpha(1)
+    frame.memoryBurst:Show()
+    frame.memoryBurst.burst:Play()
+end
+
+-- The souvenir dissolves (rises, shrinks, tilts, fades) and the draw is
+-- requested when the dissolve ends - the reply repaints the row with the
+-- random cards, which then flip in.
+function PlayMemoryGiveUp(frame)
+    if not frame then return end
+    if not frame.memoryDissolve then
+        local ag = frame:CreateAnimationGroup()
+        local tr = ag:CreateAnimation("Translation")
+        tr:SetOffset(0, 60)
+        tr:SetDuration(0.5)
+        tr:SetSmoothing("IN")
+        local sc = ag:CreateAnimation("Scale")
+        sc:SetScale(0.6, 0.6)
+        sc:SetDuration(0.5)
+        sc:SetOrigin("CENTER", 0, 0)
+        local ro = ag:CreateAnimation("Rotation")
+        ro:SetDegrees(-14)
+        ro:SetDuration(0.5)
+        ro:SetOrigin("CENTER", 0, 0)
+        frame.memoryDissolve = ag
+    end
+    -- Alpha through the OnUpdate fader: an animated alpha would snap back to 1
+    -- when the group ends and the card would flash back until the reply lands
+    CancelFade(frame)
+    FadeFrame(frame, 0.5, 1, 0)
+    frame.memoryDissolve:SetScript("OnFinished", function()
+        frame:SetAlpha(0)
+        pendingMemoryReveal = true
+        ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PERK_MEMORY_DRAW, "")
+    end)
+    frame.memoryDissolve:Play()
+end
+
+-- Gives the souvenir up: the souvenir card dissolves, and the draw request
+-- leaves when the dissolve ends (the reply repaints the row with the random
+-- cards, which fade in). Called by the confirmation popup.
+function RequestMemoryDraw()
+    if isSelecting then return end
+    isSelecting = true
+    local souvenir
+    for _, f in ipairs(perkFramePool) do
+        if f.inUse then
+            f.selectButton:EnableMouse(false)
+            f:EnableMouse(false)
+            if f._perkData and f._perkData.isGuaranteed then souvenir = f end
+        end
+    end
+    for _, d in ipairs(memoryDeck) do
+        d:EnableMouse(false)
+        if d:IsShown() and d.floatGroup then d.floatGroup:Stop() end
+    end
+    if souvenir then
+        PlayMemoryGiveUp(souvenir)
+    else
+        pendingMemoryReveal = true
+        ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PERK_MEMORY_DRAW, "")
+    end
+end
+
+-- Name of the souvenir on the table, for the confirmation popup
+function SouvenirOnTableName()
+    for _, f in ipairs(perkFramePool) do
+        if f.inUse and f._perkData and f._perkData.isGuaranteed then
+            return GetSpellInfo(f._spellId or 0) or "your souvenir"
+        end
+    end
+    return "your souvenir"
+end
+
+-- The spec choice holds for the whole run: confirm it. data = { frame, spellId }; a card
+-- rerolled while the popup was open is not selected.
+StaticPopupDialogs["PROJECTEBONHOLD_SPEC_CONFIRM"] = {
+    text = "You are choosing your |cffffd100echo specialization|r.\n\nPick |cffffd100%s|r with |cffffd100%s|r?\n\nThen, every 10 levels, you will be offered three echoes of this specialization. Your talents are not changed.\n\nThis cannot be changed until you accept death.",
+    button1 = ACCEPT,
+    button2 = CANCEL,
+    -- The popup's own background lets the gold banner and rays show through: dim the whole
+    -- screen under it (top of DIALOG strata, the popup itself is lifted to FULLSCREEN_DIALOG).
+    -- The shade also takes the clicks, so no card is picked while the question is open.
+    OnShow = function()
+        local info = StaticPopupDialogs["PROJECTEBONHOLD_SPEC_CONFIRM"]
+        if not info.shade then
+            local shade = CreateFrame("Frame", nil, UIParent)
+            shade:SetAllPoints(UIParent)
+            shade:SetFrameStrata("DIALOG")
+            shade:SetFrameLevel(500)
+            shade:EnableMouse(true)
+            local tex = shade:CreateTexture(nil, "BACKGROUND")
+            tex:SetAllPoints(shade)
+            tex:SetTexture(0, 0, 0, 0.85)
+            info.shade = shade
+        end
+        info.shade:Show()
+    end,
+    OnHide = function()
+        local shade = StaticPopupDialogs["PROJECTEBONHOLD_SPEC_CONFIRM"].shade
+        if shade then shade:Hide() end
+    end,
+    OnAccept = function(self, data)
+        local f = data and data.frame
+        if f and f.inUse and f._spellId == data.spellId and f.DoSelect then f.DoSelect() end
+    end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+
+-- Clicking a face-down card asks before revealing: the player has to know the
+-- souvenir is the price.
+StaticPopupDialogs["PROJECTEBONHOLD_MEMORY_DRAW"] = {
+    text = "Reveal the three random echoes?\n\nYour souvenir |cffffd700%s|r is |cffff6060lost for this climb|r: it only comes back once this build is finished again.\n\nYou will then pick one of the three revealed echoes.",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function() RequestMemoryDraw() end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+
+function EnsureMemoryWidgets()
+    if memoryHint then return end
+    memoryHint = perkMainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    memoryHint:SetPoint("BOTTOM", perkMainFrame, "CENTER", 0, 306)
+    memoryHint:SetTextColor(1, 0.82, 0.2)
+    memoryHint:SetJustifyH("CENTER")
+    memoryHint:SetWidth(760)
+end
+
+-- Lays the souvenir stage out: carried cards (if any) and face-down placeholders
+-- on the three draw slots, the souvenir on the fourth. Called by ShowPerkUI
+-- after the choice frames were acquired.
+function LayoutMemoryStage(choices)
+    EnsureMemoryWidgets()
+    local souvenir, carried = nil, {}
+    for _, f in ipairs(perkFramePool) do
+        if f.inUse and f._perkData then
+            if f._perkData.isGuaranteed then souvenir = f else table.insert(carried, f) end
+        end
+    end
+
+    for i, f in ipairs(carried) do
+        if i <= 3 then PlaceCard(f, MemoryRowOffset(i - 1), 100) end
+    end
+    local deckCount = 0
+    for slot = #carried, 2 do
+        deckCount = deckCount + 1
+        local d = GetMemoryDeckCard(deckCount)
+        PlaceCard(d, MemoryRowOffset(slot), 100)
+        d:SetAlpha(1)
+        d:EnableMouse(true)
+        d:Show()
+    end
+    for i = deckCount + 1, #memoryDeck do memoryDeck[i]:Hide() end
+
+    if souvenir then
+        PlaceCard(souvenir, MemoryRowOffset(3), 100)
+    end
+
+    -- Always visible, no hover needed: what the fourth card is and what the choice costs
+    memoryHint:SetText("Souvenir from your previous build" ..
+        "\n|cffffffffTake it, or give it up to draw 3 random echoes.|r")
+end
+
+function ShowMemoryStageWidgets(shown)
+    if not memoryStageShown then return end
+    if shown then
+        -- The placeholders fade in with the cards; their float starts once shown
+        for _, d in ipairs(memoryDeck) do
+            if d.inStage then
+                d:Show()
+                if d.floatGroup then d.floatGroup:Stop() end
+                PlayCardEntrance(d, function()
+                    if d.floatGroup then d.floatGroup:Play() end
+                end)
+            end
+        end
+        if memoryHint then memoryHint:Show() end
+    else
+        for _, d in ipairs(memoryDeck) do
+            if d.floatGroup then d.floatGroup:Stop() end
+            d:Hide()
+        end
+        if memoryHint then memoryHint:Hide() end
+    end
+end
+
 local function ShowPerkUI(choices, isRerollRepopulate)
     if not choices or #choices == 0 then
         return
@@ -1809,7 +2716,12 @@ local function ShowPerkUI(choices, isRerollRepopulate)
         end
 
         local perkCount = #choices
-        local frameWidth = (perkCount * 180) + ((perkCount - 1) * 22) + 40
+        -- Souvenir stage: the row is laid out as four slots (three draws + the
+        -- souvenir) whatever the number of real cards, see LayoutMemoryStage.
+        memoryStageShown = ChoicesAreMemoryStage(choices)
+        HideMemoryDeck()
+        local layoutCount = memoryStageShown and 4 or perkCount
+        local frameWidth = (layoutCount * 180) + ((layoutCount - 1) * 22) + 40 + (memoryStageShown and MEMORY_GAP or 0)
         perkMainFrame:SetWidth(frameWidth)
 
         local remainingBanishes = GetBanishInfo()
@@ -1820,7 +2732,7 @@ local function ShowPerkUI(choices, isRerollRepopulate)
             UpdatePerkFrame(perkFrame, perkData, i - 1)
 
             local xOffset = ((i - 1) - ((perkCount - 1) / 2)) * 202
-            perkFrame:SetPoint("CENTER", perkMainFrame, "CENTER", xOffset, 100)
+            PlaceCard(perkFrame, xOffset, 100)
 
             if autoReveal then
                 perkFrame:SetAlpha(1)
@@ -1838,6 +2750,12 @@ local function ShowPerkUI(choices, isRerollRepopulate)
                 perkFrame:EnableMouse(false)
                 perkFrame.selectButton:EnableMouse(false)
             end
+        end
+
+        if memoryStageShown then
+            LayoutMemoryStage(choices)
+            for _, d in ipairs(memoryDeck) do d.inStage = d:IsShown() end
+            HideMemoryDeck() -- shown with the cards by the reveal below
         end
 
         -- Attach "Auto Show Echoes" to bottom of rightmost card (only shown when cards are visible)
@@ -1865,6 +2783,21 @@ local function ShowPerkUI(choices, isRerollRepopulate)
         hideButton.text:SetText("Show")
         hideButton.text:SetTextColor(0.7, 0.7, 0.7)
         perkMainFrame.perksHidden = true
+
+        -- The button that opens the draw already says it is the spec draw, in gold
+        local specDraw = GetSpecDraw()
+        if chooseButton.text then
+            if specDraw then
+                chooseButton.text:SetText(specDraw.chosen == 0 and "Choose Echo Spec" or "Specialization Echoes")
+                chooseButton.text:SetTextColor(unpack(SPEC_GOLD))
+            else
+                chooseButton.text:SetText("Select an Echo")
+                chooseButton.text:SetTextColor(IsTransparentDesign() and 0.9 or 1, IsTransparentDesign() and 0.9 or 1, IsTransparentDesign() and 0.9 or 1)
+            end
+        end
+        if chooseButton.glow then
+            if specDraw then chooseButton.glow:SetVertexColor(1, 0.75, 0.1) else chooseButton.glow:SetVertexColor(0.3, 0.3, 0.3) end
+        end
         rerollButton:Hide()
         if _G.EbonholdAutoShowCheck then _G.EbonholdAutoShowCheck:Hide() end
 
@@ -1928,6 +2861,9 @@ local function HidePerkUI()
         if hideButton then hideButton:Hide() end
         if chooseButton then chooseButton:Hide() end
         if perkFamilyHintFrame then perkFamilyHintFrame:Hide() end
+        HideMemoryDeck()
+        memoryStageShown = false
+        ShowSpecDrawWidgets(false)
         perkTour:Stop(false)
 
         isFading = false
