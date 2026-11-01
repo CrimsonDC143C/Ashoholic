@@ -148,7 +148,7 @@ local MIN_COL_W = 40
 
 -- Raids view: the same identity columns plus one column per raid, each split into one cell per difficulty.
 local RAID_CELL_W = 40
-local RAID_COLUMN_DEFS = { COLUMN_DEFS[1], COLUMN_DEFS[2], COLUMN_DEFS[3] }
+local RAID_COLUMN_DEFS = { COLUMN_DEFS[1], COLUMN_DEFS[2], COLUMN_DEFS[3], COLUMN_DEFS[4], COLUMN_DEFS[5] }
 local AVAILABLE_COLUMNS = {}
 for _, column in ipairs(COLUMN_DEFS) do AVAILABLE_COLUMNS[#AVAILABLE_COLUMNS + 1] = column end
 for _, group in ipairs(addon.RaidData.groups) do
@@ -447,6 +447,20 @@ local function ShowColumnResetScope(column)
     StaticPopup_Show("ASHOHOLIC_RESET_COLUMN_SCOPE",
         COLUMN_LABELS[column], nil, { column = column })
 end
+StaticPopupDialogs["ASHOHOLIC_RESET_COLUMN_ORDER_CONFIRM"] = {
+    text = "Reset the %s columns and their order to default?",
+    button1 = YES, button2 = NO,
+    OnAccept = function(self, data)
+        if not data or not data.view then return end
+        local orderKey, widthKey, visibilityKey = ViewOptionKeys(data.view == "raids")
+        addon.db.global.options[orderKey] = nil
+        addon.db.global.options[visibilityKey] = nil
+        if AshoholicFrame and AshoholicFrame.Rebuild then
+            AshoholicFrame:Rebuild()
+        end
+    end,
+    timeout = 0, whileDead = true, hideOnEscape = true,
+}
 StaticPopupDialogs["ASH_REMOVE_ACCOUNT_CONFIRM"] = {
     text = 'Remove |cFFFFD700%s|r and all its characters from the roster?\n\n' ..
            'This removes them from the roster only — the real WoW characters ' ..
@@ -793,8 +807,8 @@ function addon:CreateUI()
         RefreshViewTabs()
     end
     for _, spec in ipairs({
-        { key = "raids", label = "Raids", tip = "Per-raid lockout cells. Filled = locked." },
-        { key = "overview", label = "Overview", tip = "Reset cost, Soul Ash, money, location." },
+        { key = "raids", label = "Raids", tip = "Level, World Tour, reset cost, Soul Ash and raid lockouts." },
+        { key = "overview", label = "Overview", tip = "Level, World Tour, reset cost, Soul Ash, money, location and last seen." },
     }) do
         local tab = CreateFlatButton(frame, 62, 20, spec.label, "default")
         local baseStyle = tab.ApplyStyle
@@ -806,11 +820,20 @@ function addon:CreateUI()
                 self.text:SetTextColor(a[1], a[2], a[3], 1)
             end
         end
-        tab:SetScript("OnClick", function() SetView(spec.key) end)
+        tab:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        tab:SetScript("OnClick", function(self, button)
+            if button == "RightButton" then
+                StaticPopup_Show("ASHOHOLIC_RESET_COLUMN_ORDER_CONFIRM",
+                    spec.label, nil, { view = spec.key })
+            else
+                SetView(spec.key)
+            end
+        end)
         tab:HookScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
             GameTooltip:AddLine(spec.label .. " view", 1, 0.82, 0)
             GameTooltip:AddLine(spec.tip, 1, 1, 1)
+            GameTooltip:AddLine("Right-click to restore default columns and order (confirmation required).", 1, 0.82, 0)
             GameTooltip:Show()
         end)
         tab:HookScript("OnLeave", function() GameTooltip:Hide() end)
@@ -956,7 +979,7 @@ function addon:CreateUI()
             if not dragState then hot:SetVertexColor(1,0.75,0.3,0.6) end
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(col.title .. " width", 1, 0.82, 0)
-            GameTooltip:AddLine("Left-drag to resize. Alt+right-click to reset width.", 1, 1, 1)
+            GameTooltip:AddLine("Left-drag to resize. Right-click to reset width.", 1, 1, 1)
             GameTooltip:Show()
         end)
         zone:SetScript("OnLeave", function()
@@ -965,7 +988,7 @@ function addon:CreateUI()
         end)
         zone:SetScript("OnMouseDown", function(self, button)
             GameTooltip:Hide()
-            if button == "RightButton" and IsAltKeyDown() then
+            if button == "RightButton" then
                 local _, widthKey = ViewOptionKeys()
                 local o = addon.db.global.options
                 o[widthKey] = o[widthKey] or {}
