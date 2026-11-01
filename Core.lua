@@ -390,7 +390,7 @@ function addon:OnInitialize()
         addon:InitHourlyWidget()
     end
 
-    -- Raid entries per hour. Independent of the isLoaded gate so the first
+    -- Instance entries per hour. Independent of the isLoaded gate so the first
     -- zone event after login is counted.
     local hourlyWatch = CreateFrame("Frame")
     hourlyWatch:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -711,12 +711,44 @@ function addon:TrackRaidCostReset(observedResetAt)
     end
 end
 
-function addon:UpdateRaidResetCost()
-    local requestId = ProjectEbonhold and ProjectEbonhold.CS and ProjectEbonhold.CS.REQUEST_ACTION_TRACKER_INFO
-    local actionId = ProjectEbonhold and ProjectEbonhold.ActionTypes and ProjectEbonhold.ActionTypes.INSTANCE_RESET
-    if requestId and actionId and type(ProjectEbonhold.sendToServer) == "function" then
-        ProjectEbonhold.sendToServer(requestId, tostring(actionId))
+-- Paid instance-ID reset. The current companion no longer exports this
+-- protocol: raids have no instance ID, and each boss is looted once a week.
+-- An older companion still names the opcodes and the cost curve. Those
+-- constants are the source of truth when they are all present.
+local function InstanceResetProtocol()
+    local pe = ProjectEbonhold
+    if type(pe) ~= "table" or type(pe.sendToServer) ~= "function" then return nil end
+    local cs, ss, types, config = pe.CS, pe.SS, pe.ActionTypes, pe.InstanceResetConfig
+    local actionId = types and types.INSTANCE_RESET
+    local requestId = cs and cs.REQUEST_INSTANCE_RESET_ALL
+    local trackerRequest = cs and cs.REQUEST_ACTION_TRACKER_INFO
+    local trackerEvent = ss and ss.SEND_ACTION_TRACKER_INFO
+    local resultEvent = ss and ss.SEND_INSTANCE_RESET_RESULT
+    if type(actionId) ~= "number" or type(requestId) ~= "number"
+        or type(trackerRequest) ~= "number" or type(trackerEvent) ~= "number"
+        or type(resultEvent) ~= "number" or type(config) ~= "table"
+        or type(config.BASE_COST) ~= "number" or type(config.COST_MULTIPLIER) ~= "number" then
+        return nil
     end
+    return {
+        actionId = actionId,
+        requestId = requestId,
+        trackerRequest = trackerRequest,
+        trackerEvent = trackerEvent,
+        resultEvent = resultEvent,
+        baseCost = config.BASE_COST,
+        multiplier = config.COST_MULTIPLIER,
+    }
+end
+
+function addon:CanClearInstanceIDs()
+    return InstanceResetProtocol() ~= nil
+end
+
+function addon:UpdateRaidResetCost()
+    local protocol = InstanceResetProtocol()
+    if not protocol then return end
+    ProjectEbonhold.sendToServer(protocol.trackerRequest, tostring(protocol.actionId))
 end
 
 --------------------------------------------------------------------------
@@ -749,19 +781,16 @@ function addon:OnIDsCleared()
     end)
 end
 
-local function ApplyRaidResetTracker(body)
+local function ApplyRaidResetTracker(body, protocol)
     local actionId, count, nextResetTime = string.match(body, "^(%d+),(%d+),(%d+)$")
     actionId = tonumber(actionId)
     count = tonumber(count)
     nextResetTime = tonumber(nextResetTime)
-    local resetType = ProjectEbonhold and ProjectEbonhold.ActionTypes and ProjectEbonhold.ActionTypes.INSTANCE_RESET
-    if not resetType or actionId ~= resetType or not count or not nextResetTime then return end
+    if not protocol or actionId ~= protocol.actionId or not count or not nextResetTime then return end
 
-    local config = ProjectEbonhold and ProjectEbonhold.InstanceResetConfig
-    if not config or type(config.BASE_COST) ~= "number" or type(config.COST_MULTIPLIER) ~= "number" then return end
-    local cost = config.BASE_COST
+    local cost = protocol.baseCost
     for _ = 1, count do
-        cost = cost * config.COST_MULTIPLIER
+        cost = cost * protocol.multiplier
         if cost >= 2147483647 then
             cost = 2147483647
             break
@@ -777,14 +806,14 @@ local function ApplyRaidResetTracker(body)
 end
 
 function addon:ClearInstanceIDs()
-    local requestId = ProjectEbonhold and ProjectEbonhold.CS and ProjectEbonhold.CS.REQUEST_INSTANCE_RESET_ALL
-    if not requestId or type(ProjectEbonhold.sendToServer) ~= "function" then
+    local protocol = InstanceResetProtocol()
+    if not protocol then
         print("|cFF00FF9AAshoholic:|r |cffff4040Clear IDs is not available right now.|r")
         return
     end
     if pendingClearIDs then return end
     pendingClearIDs = true
-    ProjectEbonhold.sendToServer(requestId, "")
+    ProjectEbonhold.sendToServer(protocol.requestId, "")
     C_Timer.After(8, function()
         pendingClearIDs = false
     end)
@@ -797,9 +826,12 @@ resetAckFrame:SetScript("OnEvent", function(_, _, prefix, payload)
 
     local eventId, body = string.match(payload, "^(%d+)\t(.*)$")
     eventId = tonumber(eventId)
-    if eventId == ProjectEbonhold.SS.SEND_ACTION_TRACKER_INFO then
-        ApplyRaidResetTracker(body)
-    elseif eventId == ProjectEbonhold.SS.SEND_INSTANCE_RESET_RESULT then
+    if not eventId then return end
+    local protocol = InstanceResetProtocol()
+    if not protocol then return end
+    if eventId == protocol.trackerEvent then
+        ApplyRaidResetTracker(body, protocol)
+    elseif eventId == protocol.resultEvent then
         local resultCode = tonumber(string.match(body, "^(%d+),%d+$"))
         if not pendingClearIDs or not resultCode then return end
         pendingClearIDs = false
@@ -855,21 +887,21 @@ function addon:UpdateSavedInstances()
 end
 
 --------------------------------------------------------------------------
--- Raids per hour. Ebonhold allows 10 raid entries in a rolling hour.
--- A raid copy is name + difficulty + leader (or solo) + reset generation,
+-- Instance entries per hour. Ebonhold allows 10 entries in a rolling hour.
+-- An instance copy is name + difficulty + leader (or solo) + reset generation,
 -- matching LockoutInfo: re-entering the same copy does not take a new slot,
 -- and the hour restarts when that copy is entered or left.
 --------------------------------------------------------------------------
 local HOURLY_WINDOW = 3600
 
-local hourlyWasInRaid = false
+local hourlyWasInInstance = false
 local hourlySig = nil
 local hourlyVisit = nil
 local hourlyReady = false
 
 function addon:ClearHourlyVisit()
     hourlyVisit = nil
-    hourlyWasInRaid = false
+    hourlyWasInInstance = false
     hourlySig = nil
 end
 
@@ -941,7 +973,7 @@ end
 
 local function HourlyRead()
     local inside, kind = IsInInstance()
-    if not (inside and kind == "raid") then return false end
+    if not (inside and (kind == "raid" or kind == "party")) then return false end
     local name, _, diff = GetInstanceInfo()
     return true, name, diff
 end
@@ -1014,7 +1046,7 @@ function addon:TrackHourlyInstances()
         hourlyReady = true
         if inside and name and name ~= "" then HourlyEnter(name, diff, leader) end
     elseif inside then
-        if not hourlyWasInRaid then
+        if not hourlyWasInInstance then
             if name and name ~= "" then HourlyEnter(name, diff, leader) end
         elseif sig ~= hourlySig then
             HourlyLeave()
@@ -1022,11 +1054,11 @@ function addon:TrackHourlyInstances()
         elseif not hourlyVisit and name and name ~= "" then
             HourlyEnter(name, diff, leader)
         end
-    elseif hourlyWasInRaid then
+    elseif hourlyWasInInstance then
         HourlyLeave()
     end
 
-    hourlyWasInRaid = inside and true or false
+    hourlyWasInInstance = inside and true or false
     hourlySig = sig
     if addon.RefreshHourlyWidget then addon:RefreshHourlyWidget() end
 end
@@ -1272,10 +1304,19 @@ function addon:BeginDraft(fromKey)
     -- panelAlpha is legacy (pre-per-color-opacity). Force it to 100 so it
     -- never compounds down the bg color's own alpha across edit cycles.
     draft.panelAlpha = 100
-    if draft.glow == nil then
-        draft.glow = (builtForFlags and builtForFlags.glow and builtForFlags.glow[4] or 0.13) * 100
-    elseif draft.glow > 0 and draft.glow < 1 then
-        draft.glow = draft.glow * 100
+    if draft.bottomGlow == nil and draft.glow ~= nil then
+        draft.bottomGlow = draft.glow
+    end
+    draft.glow = nil
+    if draft.bottomGlow == nil then
+        draft.bottomGlow = (builtForFlags and builtForFlags.bottomGlow and builtForFlags.bottomGlow[4] or 0.13) * 100
+    elseif draft.bottomGlow > 0 and draft.bottomGlow < 1 then
+        draft.bottomGlow = draft.bottomGlow * 100
+    end
+    if draft.topGlow == nil then
+        draft.topGlow = (builtForFlags and builtForFlags.topGlow and builtForFlags.topGlow[4] or 0) * 100
+    elseif draft.topGlow > 0 and draft.topGlow < 1 then
+        draft.topGlow = draft.topGlow * 100
     end
     -- NB: use explicit if/else here. Lua's `and ... or true` idiom is broken
     -- when the middle operand can be `false` — it always yields `true`.
@@ -1359,6 +1400,8 @@ function addon:BeginDraft(fromKey)
     L.characterFontSize  = math.max(8,  math.min(22, L.characterFontSize or 12))
     L.totalsFontSize     = math.max(8,  math.min(22, L.totalsFontSize or 12))
     L.headerFontSize     = math.max(8,  math.min(22, L.headerFontSize or 12))
+    L.headerTitleFontSize = math.max(8, math.min(22, L.headerTitleFontSize or L.headerFontSize))
+    L.headerLabelFontSize = math.max(8, math.min(22, L.headerLabelFontSize or L.headerFontSize))
     L.titleSize          = math.max(10, math.min(32, L.titleSize or 20))
     L.classIconSize      = math.max(10, math.min(24, L.classIconSize or 14))
     L.wtIconSize         = math.max(14, math.min(32, L.wtIconSize or 22))
@@ -1474,7 +1517,7 @@ function addon:SaveDraftToExisting(key)
         "classColoredNames","showClassIcons","classColoredAccent","outerBorder",
         "formatResetCost","formatClearIDs","formatSoulAsh","formatMoney","moneyGoldOnly",
         "costResetWeekday",
-        "panelAlpha","glow",
+        "panelAlpha","bottomGlow","topGlow",
     }) do
         if def[f] == nil and existing and existing[f] ~= nil then
             def[f] = existing[f]

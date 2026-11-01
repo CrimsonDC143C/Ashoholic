@@ -10,24 +10,39 @@ local currentRunData = {}
 local previousRunData = {}
 
 
-local currentIntensityData = {
-    intensity = 0,
-    areaNameReaper = "0",
-    zoneNameReaper = "0"
-}
-
-
 _G["EbonholdPlayerRunData"] = currentRunData
-_G["EbonholdIntensityData"] = currentIntensityData
 
 
 local animationQueue = {}
 local animationFrame = nil
 
 
+-- Finished floating texts wait here to be reused: the client never frees a frame, and
+-- every ashes/shards change used to create new ones.
+local animPool = {}
+
+local function AcquireAnimFrame()
+    local animFrame = table.remove(animPool)
+    if not animFrame then
+        animFrame = CreateFrame("Frame", nil, UIParent)
+        animFrame:SetFrameStrata("FULLSCREEN_DIALOG")
+        animFrame:SetFrameLevel(2000)
+        animFrame.text = animFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        animFrame.text:SetPoint("CENTER")
+    end
+    animFrame:ClearAllPoints()
+    return animFrame
+end
+
+local function ReleaseAnimFrame(animFrame)
+    animFrame:SetScript("OnUpdate", nil)
+    animFrame:Hide()
+    table.insert(animPool, animFrame)
+end
+
 local function ShowChangeAnimation(text, isPositive, yOffset, anchorFrame,
                                    anchorPoint)
-    local animFrame = CreateFrame("Frame", nil, UIParent)
+    local animFrame = AcquireAnimFrame()
 
 
     if anchorFrame then
@@ -35,9 +50,6 @@ local function ShowChangeAnimation(text, isPositive, yOffset, anchorFrame,
     else
         animFrame:SetSize(300, 40)
     end
-
-    animFrame:SetFrameStrata("FULLSCREEN_DIALOG")
-    animFrame:SetFrameLevel(2000)
 
 
     if anchorFrame and anchorFrame:IsVisible() then
@@ -56,9 +68,9 @@ local function ShowChangeAnimation(text, isPositive, yOffset, anchorFrame,
     end
 
 
-    local fontString = anchorFrame and "GameFontNormal" or "GameFontNormalHuge"
-    local animText = animFrame:CreateFontString(nil, "OVERLAY", fontString)
-    animText:SetPoint("CENTER")
+    local animText = animFrame.text
+    animText:SetFontObject(anchorFrame and GameFontNormal or GameFontNormalHuge)
+    animText:SetAlpha(1)
     animText:SetText(text)
 
 
@@ -85,8 +97,7 @@ local function ShowChangeAnimation(text, isPositive, yOffset, anchorFrame,
         local progress = elapsed / duration
 
         if progress >= 1 then
-            self:Hide()
-            self:SetParent(nil)
+            ReleaseAnimFrame(self)
             return
         end
 
@@ -117,84 +128,6 @@ local function ShowChangeAnimation(text, isPositive, yOffset, anchorFrame,
 end
 
 
-local function ShowIntensityAnimation(oldValue, newValue)
-    if ProjectEbonholdOptionsService and not ProjectEbonholdOptionsService:GetSetting("showFloatingText") then
-        return
-    end
-    local difference = newValue - oldValue
-    if difference == 0 then return end
-
-    local isPositive = difference > 0
-    local text =
-        isPositive and ("|cffA020F0+" .. difference .. "|r Intensity") or
-        ("|cffA020F0" .. difference .. "|r Intensity")
-
-
-    local animFrame = CreateFrame("Frame", nil, UIParent)
-    animFrame:SetSize(300, 40)
-    animFrame:SetFrameStrata("FULLSCREEN_DIALOG")
-    animFrame:SetFrameLevel(2000)
-    animFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-
-    local animText = animFrame:CreateFontString(nil, "OVERLAY",
-        "GameFontNormalHuge")
-    animText:SetPoint("CENTER")
-    animText:SetText(text)
-    animText:SetTextColor(0.63, 0.13, 0.94, 1)
-
-    local startTime = GetTime()
-    local duration = 3
-    local moveDistance = 100
-
-    animFrame:SetScript("OnUpdate", function(self)
-        if ProjectEbonhold_IsClosing then
-            self:Hide()
-            return
-        end
-        local elapsed = GetTime() - startTime
-        local progress = elapsed / duration
-
-        if progress >= 1 then
-            self:Hide()
-            self:SetParent(nil)
-            return
-        end
-
-        local alpha = 1 - progress
-        local yMovement = progress * moveDistance
-
-        animText:SetAlpha(alpha)
-        self:SetPoint("CENTER", UIParent, "CENTER", 0, yMovement)
-    end)
-
-    animFrame:Show()
-end
-
-
-local function CheckIntensityThresholds(oldValue, newValue)
-    if ProjectEbonholdOptionsService and not ProjectEbonholdOptionsService:GetSetting("showFloatingText") then
-        return
-    end
-    local thresholds = {
-        { level = 1, value = ProjectEbonhold.Constants.INTENSITY_LEVEL_1, name = "Intensity Level 1" },
-        { level = 2, value = ProjectEbonhold.Constants.INTENSITY_LEVEL_2, name = "Intensity Level 2" },
-        { level = 3, value = ProjectEbonhold.Constants.INTENSITY_LEVEL_3, name = "Intensity Level 3" },
-        { level = 4, value = ProjectEbonhold.Constants.INTENSITY_LEVEL_4, name = "Intensity Level 4" },
-        { level = 5, value = ProjectEbonhold.Constants.INTENSITY_LEVEL_5, name = "Intensity Level 5" },
-    }
-
-    for _, threshold in ipairs(thresholds) do
-        if (oldValue < threshold.value and newValue >= threshold.value) then
-            local text = "|cffA020F0" .. threshold.name .. " Reached!|r"
-            ShowChangeAnimation(text, true, 150, nil, nil)
-        elseif (oldValue >= threshold.value and newValue < threshold.value) then
-            local text = "|cffA020F0" .. threshold.name .. " Lost!|r"
-            ShowChangeAnimation(text, false, 150, nil, nil)
-        end
-    end
-end
-
-
 local function AnimateDataChanges(newData, oldData, uiElements)
     if not oldData or not newData then return end
     if ProjectEbonholdOptionsService and not ProjectEbonholdOptionsService:GetSetting("showFloatingText") then
@@ -214,8 +147,13 @@ local function AnimateDataChanges(newData, oldData, uiElements)
             short = "Soul Ashe(s)",
             uiKey = "soulPointsText"
         },
-
-
+        -- Run Soul Shards (field 20, 2026-09-12): earned at final encounters, banked at run end
+        {
+            key = "soulShards",
+            name = "Soul Shards",
+            short = "Soul Shard(s)",
+            uiKey = "soulShardsText"
+        },
     }
 
     for i, stat in ipairs(stats) do
@@ -264,18 +202,10 @@ local function AnimateDataChanges(newData, oldData, uiElements)
         local delay = totalAnimations * 0.1
         totalAnimations = totalAnimations + 1
 
-        local timerFrame = CreateFrame("Frame")
-        local startTime = GetTime()
-        timerFrame:SetScript("OnUpdate", function(self)
-            if ProjectEbonhold_IsClosing then
-                self:SetScript("OnUpdate", nil)
-                return
-            end
-            if GetTime() - startTime >= delay then
-                ShowChangeAnimation(anim.text, anim.isPositive, anim.yOffset,
-                    nil, nil)
-                self:SetScript("OnUpdate", nil)
-            end
+        -- the shared timer (utils.lua), not one new frame per animation
+        C_Timer.After(delay, function()
+            ShowChangeAnimation(anim.text, anim.isPositive, anim.yOffset,
+                nil, nil)
         end)
     end
 
@@ -284,18 +214,9 @@ local function AnimateDataChanges(newData, oldData, uiElements)
         local delay = totalAnimations * 0.1
         totalAnimations = totalAnimations + 1
 
-        local timerFrame = CreateFrame("Frame")
-        local startTime = GetTime()
-        timerFrame:SetScript("OnUpdate", function(self)
-            if ProjectEbonhold_IsClosing then
-                self:SetScript("OnUpdate", nil)
-                return
-            end
-            if GetTime() - startTime >= delay then
-                ShowChangeAnimation(anim.text, anim.isPositive, nil,
-                    anim.anchorFrame, anim.anchorPoint)
-                self:SetScript("OnUpdate", nil)
-            end
+        C_Timer.After(delay, function()
+            ShowChangeAnimation(anim.text, anim.isPositive, nil,
+                anim.anchorFrame, anim.anchorPoint)
         end)
     end
 end
@@ -307,14 +228,64 @@ local function ParsePlayerRunData(body)
     local catchupMultiplierPct
     local usedFreezes, totalFreezes
     local hasReachedMaxLevel
+    local soulShards, soulShardsBonusPct
+    -- 2026-09-17 (25 fields): paid resurrections (fields 10-11 + 22-23: used this run, ash
+    -- cost, 1 = affordable, shard cost) and graveyard offerings (24-25). Fields 4-5 (Undying
+    -- Spark) are always 0 now.
+    local paidRezAvailable, costNextResetShards, banksUsedWeek, banksMaxWeek
 
-    -- Try newest format first (19 fields including hasReachedMaxLevel)
+    -- Try newest format first (25 fields, 2026-09-17)
     local soulPoints, soulPointsMax, acceptedRezs, acceptedRezsMax,
     countCanSelfRezs, selfRezsMax, classRezs, classRezsMax,
     avoidedFatalAttacks, avoidedFatalAttacksMax, nbResetAvoided,
-    costNextReset, usedRerolls, totalRerolls, remainingBanishes, catchupMultiplierPct, usedFreezes, totalFreezes, hasReachedMaxLevel = body
-    :match(
-        "^([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+)$")
+    costNextReset, usedRerolls, totalRerolls, remainingBanishes
+    local fields = { strsplit(";", body or "") }
+    if #fields == 25 then
+        soulPoints, soulPointsMax, acceptedRezs, acceptedRezsMax,
+        countCanSelfRezs, selfRezsMax, classRezs, classRezsMax,
+        avoidedFatalAttacks, avoidedFatalAttacksMax, nbResetAvoided,
+        costNextReset, usedRerolls, totalRerolls, remainingBanishes, catchupMultiplierPct, usedFreezes, totalFreezes, hasReachedMaxLevel, soulShards, soulShardsBonusPct,
+        paidRezAvailable, costNextResetShards, banksUsedWeek, banksMaxWeek = unpack(fields)
+    end
+
+    if not (soulPoints and banksMaxWeek) then
+        -- Try 21-field format (run Soul Shards + shard bonus %, 2026-09-12)
+        soulPoints, soulPointsMax, acceptedRezs, acceptedRezsMax,
+        countCanSelfRezs, selfRezsMax, classRezs, classRezsMax,
+        avoidedFatalAttacks, avoidedFatalAttacksMax, nbResetAvoided,
+        costNextReset, usedRerolls, totalRerolls, remainingBanishes, catchupMultiplierPct, usedFreezes, totalFreezes, hasReachedMaxLevel, soulShards, soulShardsBonusPct = body
+        :match(
+            "^([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+)$")
+    end
+
+    if not (soulPoints and soulShardsBonusPct) then
+        -- Try 20-field format (run shards, no bonus)
+        soulPoints, soulPointsMax, acceptedRezs, acceptedRezsMax,
+        countCanSelfRezs, selfRezsMax, classRezs, classRezsMax,
+        avoidedFatalAttacks, avoidedFatalAttacksMax, nbResetAvoided,
+        costNextReset, usedRerolls, totalRerolls, remainingBanishes, catchupMultiplierPct, usedFreezes, totalFreezes, hasReachedMaxLevel, soulShards = body
+        :match(
+            "^([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+)$")
+
+        if soulPoints and soulShards then
+            soulShardsBonusPct = "0"
+        end
+    end
+
+    if not (soulPoints and soulShards) then
+        -- Try 19-field format (hasReachedMaxLevel but no run shards)
+        soulPoints, soulPointsMax, acceptedRezs, acceptedRezsMax,
+        countCanSelfRezs, selfRezsMax, classRezs, classRezsMax,
+        avoidedFatalAttacks, avoidedFatalAttacksMax, nbResetAvoided,
+        costNextReset, usedRerolls, totalRerolls, remainingBanishes, catchupMultiplierPct, usedFreezes, totalFreezes, hasReachedMaxLevel = body
+        :match(
+            "^([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+);([^;]+)$")
+
+        if soulPoints and hasReachedMaxLevel then
+            soulShards = "0"
+            soulShardsBonusPct = "0"
+        end
+    end
 
     if not (soulPoints and hasReachedMaxLevel) then
         -- Try 18-field format (freeze counters but no max level flag)
@@ -327,6 +298,8 @@ local function ParsePlayerRunData(body)
 
         if soulPoints and usedFreezes and totalFreezes then
             hasReachedMaxLevel = "0"
+            soulShards = "0"
+            soulShardsBonusPct = "0"
         end
     end
 
@@ -342,6 +315,8 @@ local function ParsePlayerRunData(body)
             usedFreezes = "0"
             totalFreezes = "0"
             hasReachedMaxLevel = "0"
+            soulShards = "0"
+            soulShardsBonusPct = "0"
         end
     end
 
@@ -358,6 +333,8 @@ local function ParsePlayerRunData(body)
             usedFreezes = "0"
             totalFreezes = "0"
             hasReachedMaxLevel = "0"
+            soulShards = "0"
+            soulShardsBonusPct = "0"
         end
     end
 
@@ -378,6 +355,8 @@ local function ParsePlayerRunData(body)
             usedFreezes = "0"
             totalFreezes = "0"
             hasReachedMaxLevel = "0"
+            soulShards = "0"
+            soulShardsBonusPct = "0"
         else
             return
         end
@@ -394,16 +373,26 @@ local function ParsePlayerRunData(body)
         local newData = {
             soulPoints = tonumber(soulPoints) or 0,
             soulPointsMax = tonumber(soulPointsMax) or 0,
+            -- Run Soul Shards: banked with the ashes when the run ends (same life cycle)
+            soulShards = tonumber(soulShards) or 0,
+            soulShardsBonusPct = tonumber(soulShardsBonusPct) or 0,
             countCanAcceptedRezs = math.max(0, (tonumber(acceptedRezsMax) -
                 tonumber(acceptedRezs))),
             countCanSelfRezs = math.max(0, (tonumber(selfRezsMax) -
                 tonumber(countCanSelfRezs))),
+            -- Paid resurrections (2026-09-17): unlimited, as long as the run can pay. Used this
+            -- run, whether the next one is affordable, and its price in run Soul Ashes / Shards.
+            acceptedRezsUsed = tonumber(acceptedRezs) or 0,
+            paidRezsUsed = tonumber(nbResetAvoided) or 0,
+            paidRezAvailable = (tonumber(paidRezAvailable) or 0) == 1,
+            costNextResetShards = tonumber(costNextResetShards) or 0,
+            -- Graveyard offerings (Soul Ash bank) used / max this week
+            banksUsedWeek = tonumber(banksUsedWeek) or 0,
+            banksMaxWeek = tonumber(banksMaxWeek) or 0,
             countCanClassRezs = math.max(0, (tonumber(classRezsMax) -
                 tonumber(classRezs))),
-            countCanAvoidFatalAttacks = math.max(0, (tonumber(
-                    avoidedFatalAttacksMax) -
-                tonumber(
-                    avoidedFatalAttacks))),
+            -- cheat deaths are unlimited (2026-09-06): the max slot on the wire is always 0
+            avoidedFatalAttacks = tonumber(avoidedFatalAttacks) or 0,
             nbResetAvoided = tonumber(nbResetAvoided) or 0,
             costNextReset = tonumber(costNextReset) or 0,
             usedRerolls = tonumber(usedRerolls) or 0,
@@ -468,46 +457,11 @@ local function ParsePlayerRunData(body)
 end
 
 
-local function ParseIntensityData(body)
-    local intensity, areaName, cooldown = body:match("^([^;]+);([^;]+);([^;]+)$")
-    if intensity and areaName then
-        local oldIntensity = currentIntensityData.intensity or 0
-        local newIntensity = tonumber(intensity) or 0
-        local maxIntensity = ProjectEbonhold.Constants.MAX_INTENSITY
-        newIntensity = math.min(newIntensity, maxIntensity)
-        currentIntensityData = {
-            intensity = newIntensity,
-            areaNameReaper = areaName,
-            onCooldown = (cooldown == "1") and true or false
-        }
-        _G["EbonholdIntensityData"] = currentIntensityData
-
-        if oldIntensity ~= newIntensity and oldIntensity > 0 then
-            ShowIntensityAnimation(oldIntensity, newIntensity)
-            CheckIntensityThresholds(oldIntensity, newIntensity)
-        end
-
-
-        if ProjectEbonhold and ProjectEbonhold.PlayerRunUI and
-            ProjectEbonhold.PlayerRunUI.UpdateIntensity then
-            ProjectEbonhold.PlayerRunUI.UpdateIntensity(currentIntensityData)
-        end
-
-        return true
-    else
-        return false
-    end
-end
-
-
+-- The paid resurrection (2026-09-17): the server debits the run's Soul Ashes and Soul
+-- Shards (costNextReset / costNextResetShards) and revives at the graveyard.
 local function AvoidResetWithSoulPoints()
     ProjectEbonhold.sendToServer(ProjectEbonhold.CS
         .REQUEST_AVOID_RESET_WITH_SOUL_POINTS, "")
-end
-
-local function AvoidResetFreeResurrection()
-    ProjectEbonhold.sendToServer(ProjectEbonhold.CS
-        .REQUEST_AVOID_RESET_WITH_SELF_REZ, "")
 end
 
 local function AcceptDeath(itemEntries)
@@ -545,8 +499,6 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS
     end)
 
 
-ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_INTENSITY_POINTS,
-    function(body) ParseIntensityData(body) end)
 
 
 ProjectEbonhold = ProjectEbonhold or {}
@@ -554,10 +506,5 @@ ProjectEbonhold.PlayerRunService = ProjectEbonhold.PlayerRunService or {}
 ProjectEbonhold.PlayerRunService.GetCurrentData = GetCurrentRunData
 ProjectEbonhold.PlayerRunService.AvoidResetWithSoulPoints =
     AvoidResetWithSoulPoints
-ProjectEbonhold.PlayerRunService.AvoidResetFreeResurrection =
-    AvoidResetFreeResurrection
 ProjectEbonhold.PlayerRunService.AcceptDeath = AcceptDeath
 ProjectEbonhold.PlayerRunService.ShowChangeAnimation = ShowChangeAnimation
-ProjectEbonhold.PlayerRunService.GetIntensityData = function()
-    return currentIntensityData
-end

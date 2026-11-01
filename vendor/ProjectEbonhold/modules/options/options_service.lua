@@ -13,7 +13,9 @@ local defaultSettings = {
     -- Perk Selection UI options
     noPerkFadeAnimations = false,
     noRerollConfirm = false,
-    rerollAutoRepopulate = false,
+    rerollAutoRepopulate = true,
+    -- One-time stamp for rerollAutoRepopulate, see Initialize below.
+    rerollAutoRepopulateMigrated = false,
     echoesVisibleOnLevelUp = true,
     -- One-time stamp for echoesVisibleOnLevelUp, see Initialize below.
     echoesLevelUpOptionMigrated = false,
@@ -24,6 +26,10 @@ local defaultSettings = {
     hideTomeLearnedAlert = false,
     perkUIScale = 1.0,
     transparentDesign = false,
+    -- Spell visuals hidden by the server, boss telegraphs always stay (modules/options/echo_visuals.lua).
+    -- 0 = shown, 1 = other players' hidden, 2 = everyone's hidden (mine too)
+    echoVisualsMode = 0,
+    classVisualsMode = 0,
     -- Dragonflight-style quest tracker (modules/questTracker)
     dfQuestTracker = true,
     -- WoW-style nameplate reskin (modules/nameplates). Off by default while the
@@ -38,8 +44,13 @@ local defaultSettings = {
     nameplatesBarWidth = 130,
     nameplatesBarHeight = 14,
     nameplatesFontSize = 12,
+    -- Skip the "Looting X will bind it to you" confirmation (modules/lootBind)
+    autoConfirmLootBind = false,
     -- Merchant / junk selling options
     autoSellJunk = false,
+    -- Toolbelt / Vendor: run the sale / the repair when combat ends
+    vendorAutoSell = false,
+    vendorAutoRepair = false,
     sellEverything = false,
     -- Only Poor is sold out of the box; every other filter is opt-in
     sellQualityPoor = true,
@@ -86,6 +97,14 @@ function OptionsService:Initialize()
     if not ProjectEbonholdDB.settings.echoesLevelUpOptionMigrated then
         ProjectEbonholdDB.settings.echoesVisibleOnLevelUp = true
         ProjectEbonholdDB.settings.echoesLevelUpOptionMigrated = true
+    end
+
+    -- "Reroll auto-repopulates choices" is now on by default: a reroll shows the
+    -- new cards right away. Every existing profile stored the old default (off),
+    -- so turn it on once; from here on their own toggling is what sticks.
+    if not ProjectEbonholdDB.settings.rerollAutoRepopulateMigrated then
+        ProjectEbonholdDB.settings.rerollAutoRepopulate = true
+        ProjectEbonholdDB.settings.rerollAutoRepopulateMigrated = true
     end
 
     return ProjectEbonholdDB.settings

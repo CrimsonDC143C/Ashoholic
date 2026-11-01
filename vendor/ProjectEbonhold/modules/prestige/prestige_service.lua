@@ -4,7 +4,7 @@
 -- Protocol (IDs documented in projectebonhold.lua):
 --   CS.REQUEST_PRESTIGE_DATA (1200)  body: ""
 --   CS.REQUEST_DO_PRESTIGE   (1201)  body: ""
---   SS.SEND_PRESTIGE_DATA    (1200)  body: "<totalPrestiges>;<committedSoulAshes>;<prestigeBonusPct>"
+--   SS.SEND_PRESTIGE_DATA    (1200)  body: "<totalPrestiges>;<committedSoulAshes>;<prestigeBonusPct>[;<soulShards>;<essenceFromShards>;<essenceFromAshes>]"
 --   SS.SEND_PRESTIGE_RESULT  (1201)  body: "OK,<totalPrestiges>" or "FAIL,<reason>"
 --
 -- Prestiging is a FULL character reset (the Accept Death flow: back to level
@@ -41,6 +41,12 @@ local gateProgress = nil
 -- Comes from the server: it can no longer be derived from the prestige count,
 -- since each prestige grants a bonus proportional to the pool it destroyed.
 local prestigeBonusPct = 0
+-- Soul Shards the next prestige consumes, and the Soul Essence it mints (1000 shards -> 1),
+-- both as reported by the server (fields 4 and 5 of SEND_PRESTIGE_DATA, 2026-09).
+local pendingShards = 0
+local pendingEssence = 0
+-- Depuis le 2026-09-08 les cendres engagees ne rendent plus rien : ni multiplicateur, ni
+-- essence. Seuls les eclats frappent de l'Essence.
 
 ------------------------------------------------------------
 -- ACCESSORS
@@ -74,6 +80,12 @@ end
 function PrestigeService.GetGateProgress()
   return gateProgress or PrestigeService.GetCommittedSoulAshes()
 end
+
+--- Soul Shards the next prestige consumes and the Soul Essence it mints.
+function PrestigeService.GetPendingEssence()
+  return pendingShards or 0, pendingEssence or 0
+end
+
 
 --- Soul Ash bonus already earned through prestiging, as a fraction.
 function PrestigeService.GetPrestigeBonusPct()
@@ -112,8 +124,22 @@ function PrestigeService.IsGateProgressKnown()
   return gateProgress ~= nil
 end
 
+--- Eclats a banquer avant qu'un prestige ait le moindre interet : de quoi frapper une essence.
+--- Doit rester en accord avec SHARDS_PER_ESSENCE (PrestigeHandler.h).
+PrestigeService.SHARDS_PER_ESSENCE = 750
+
+--- Les eclats manquants pour ouvrir la seconde porte (0 quand elle est ouverte).
+function PrestigeService.GetMissingShards()
+  local have = select(1, PrestigeService.GetPendingEssence())
+  local need = PrestigeService.SHARDS_PER_ESSENCE
+  return (have < need) and (need - have) or 0
+end
+
+--- Deux portes : les cendres engagees, et de quoi frapper au moins une Soul Essence. Sans la
+--- seconde le prestige ne rendrait rien, puisque les cendres detruites n'achetent plus rien.
 function PrestigeService.CanPrestige()
   return PrestigeService.GetGateProgress() >= PrestigeService.GetGateThreshold()
+     and PrestigeService.GetMissingShards() == 0
 end
 ------------------------------------------------------------
 ------------------------------------------------------------
@@ -146,7 +172,15 @@ end
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PRESTIGE_DATA,
   function(body)
     if not body or body == "" then return end
-    local totalStr, progressStr, bonusStr = body:match("^(%d+);(%d+);([%d%.%-]+)$")
+    local totalStr, progressStr, bonusStr, shardsStr, essenceStr =
+      body:match("^(%d+);(%d+);([%d%.%-]+);(%d+);(%d+)$")
+    if not totalStr then
+      totalStr, progressStr, bonusStr = body:match("^(%d+);(%d+);([%d%.%-]+)$")
+    end
+    if shardsStr then
+      pendingShards = tonumber(shardsStr) or 0
+      pendingEssence = tonumber(essenceStr) or 0
+    end
     if not totalStr then
       -- Two-field body, from before the bonus was reported
       totalStr, progressStr = body:match("^(%d+);(%d+)$")

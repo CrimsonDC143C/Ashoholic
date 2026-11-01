@@ -1,7 +1,7 @@
 local addonName = ...
 local addon = _G[addonName]
 
--- Compact on-screen readout of this character's raids-per-hour counter.
+-- Compact on-screen readout of this character's instances-per-hour counter.
 -- Stays up while the roster is closed. Drag to move; /ash widget toggles it.
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local FONT = "Fonts\\FRIZQT__.TTF"
@@ -104,9 +104,9 @@ function addon:ToggleHourlyWidget()
     o.ShowHourlyWidget = show and 1 or 0
     addon:RefreshHourlyWidget()
     if show then
-        print("|cFF00FF9AAshoholic:|r Raid hour widget shown. Drag it to move.")
+        print("|cFF00FF9AAshoholic:|r Instance hour widget shown. Drag it to move.")
     else
-        print("|cFF00FF9AAshoholic:|r Raid hour widget hidden. /ash widget to show it again.")
+        print("|cFF00FF9AAshoholic:|r Instance hour widget hidden. /ash widget to show it again.")
     end
 end
 
@@ -159,11 +159,11 @@ function addon:InitHourlyWidget()
         local _, player = CurrentCharacter()
         local hourly = Hourly()
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(player or "Raids this hour", 1, 0.82, 0)
+        GameTooltip:AddLine(player or "Instances this hour", 1, 0.82, 0)
         if not hourly.tracked then
             GameTooltip:AddLine("Not tracked yet", 0.7, 0.7, 0.7)
         elseif hourly.count == 0 then
-            GameTooltip:AddLine("No raid entries this hour", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine("No instance entries this hour", 0.7, 0.7, 0.7)
         else
             GameTooltip:AddLine("Next slot frees in " .. Clock(hourly.nextFree), 0.85, 0.85, 0.85)
             local shown = math.min(hourly.count, 10)

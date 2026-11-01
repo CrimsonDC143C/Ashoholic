@@ -92,16 +92,9 @@ local function BuildUI()
     -- on a locked click carry the gate numbers.
 
 
-    -- The deal, in numbers: what this reset burns and what it buys. The bonus
-    -- scales with the pool, so this line is the whole argument for banking Soul
-    -- Ashes before resetting instead of prestiging the moment the gate opens.
-    -- The prestige Soul Ash Multiplier is capped SERVER-side
-    -- (PrestigeHandler::PRESTIGE_BONUS_MAX_TOTAL, applied in
-    -- SoulPointsHandler::GetAccountSoulPointsMultiplier). Read from the shared constant so the
-    -- ceiling is stated in one place and cannot drift between the three spots that show it.
-    local function PrestigeCapPct()
-        return (ProjectEbonhold.Constants.PRESTIGE_SOUL_ASH_BONUS_MAX_TOTAL or 0) * 100
-    end
+    -- La carte, en chiffres : ce que le reset brule et ce qu'il rend. Depuis le 2026-09-08 les
+    -- cendres ne rendent plus rien, la recompense est l'Essence frappee par les eclats, et c'est
+    -- elle qui justifie d'attendre plutot que de prestiger des l'ouverture des portes.
 
     local descText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     -- Anchor of the WHOLE lower column: the cap line, the deal card and the Prestige button
@@ -123,8 +116,8 @@ local function BuildUI()
     -- column says "on EVERY character". Keep all of it in agreement with
     -- PrestigeHandler::HandleDoPrestige.
     descText:SetText(
-        "Your Skill Tree is reset and every Soul Ash on the account is consumed." .. "\n" ..
-        "Every Soul Ash you destroy buys permanent Soul Ash Multiplier.")
+        "Resets your Skill Tree and consumes every Soul Ash on the account," .. "\n" ..
+        "banked or spent, on every character. Banked Shards return as Soul Essence.")
     descText:SetTextColor(0.9, 0.9, 0.9)
     descText:SetSpacing(3)
 
@@ -134,7 +127,7 @@ local function BuildUI()
     capText:SetPoint("TOP", descText, "BOTTOM", 0, -8)
     capText:SetWidth(430)
     capText:SetJustifyH("CENTER")
-    capText:SetText("Maximum: |cffFFCC00+" .. PrestigeCapPct() .. "%|r Soul Ash Multiplier")
+    capText:SetText("|cffFFCC00Soul Essence|r buys the Prestige branch, and no prestige takes it back.")
     capText:SetTextColor(0.75, 0.75, 0.75)
 
     local dealFrame = CreateFrame("Frame", nil, frame)
@@ -163,11 +156,37 @@ local function BuildUI()
     dealSep:SetPoint("CENTER", dealFrame, "CENTER", 6, 0)
     dealSep:SetGradientAlpha("VERTICAL", 0.95, 0.78, 0.25, 0, 0.95, 0.78, 0.25, 0.5)
 
-    -- Right half: the Multiplier, before and after.
+    -- Right half: the Soul Essence the reset mints.
     local dealGain = dealFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     dealGain:SetPoint("RIGHT", dealFrame, "RIGHT", -12, 0)
     dealGain:SetWidth(196)
     dealGain:SetJustifyH("RIGHT")
+
+    -- Second row: the Soul Shards the prestige consumes become Soul Essence, SHARDS_PER_ESSENCE (750) to 1.
+    -- Shown only when there are shards to convert; the card grows to fit.
+    local dealEssence = dealFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    dealEssence:SetPoint("TOP", dealFrame, "TOP", 0, -30)
+    dealEssence:SetWidth(396)
+    dealEssence:SetJustifyH("CENTER")
+    dealEssence:Hide()
+    local SHARD_ICON = "|TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_frost:14:14|t"
+    local ESSENCE_ICON = "|TInterface\\Icons\\inv_misc_supersoulash:14:14|t"
+    -- La carte tient sur UNE ligne : les eclats consommes et l'essence qu'ils frappent. Les
+    -- cendres detruites n'y figurent plus, elles n'achetent rien et le chiffre vit deja dans
+    -- le paragraphe du dessus et dans l'infobulle de la carte.
+    local function ShowEssenceDeal()
+        local shards, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+        dealCost:Hide()
+        dealGain:Hide()
+        dealSep:Hide()
+        dealEssence:ClearAllPoints()
+        dealEssence:SetPoint("CENTER", dealFrame, "CENTER", 0, 0)
+        dealEssence:SetText(SHARD_ICON .. " |cffFF6060" .. FormatThousands(shards) ..
+            "|r Soul Shards |TInterface\\CHATFRAME\\ChatFrameExpandArrow:14:14|t " ..
+            ESSENCE_ICON .. " |cff33FF33+" .. FormatThousands(essence) .. "|r Soul Essence")
+        dealEssence:Show()
+        dealFrame:SetHeight(42)
+    end
 
     -- The card states the deal; the tooltip explains the rule behind it, so a
     -- player wondering "why this number" gets the answer without leaving the tab.
@@ -178,30 +197,18 @@ local function BuildUI()
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine("Prestige reward", 1, 0.82, 0)
         GameTooltip:AddLine(
-            "Every Soul Ash you have committed is destroyed, and buys Soul Ash " ..
-            "Multiplier forever.", 1, 1, 1, true)
+            "Every Soul Ash you have committed is destroyed. Your banked Soul Shards are " ..
+            "consumed and mint Soul Essence, the only currency a prestige never takes back.",
+            1, 1, 1, true)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddDoubleLine("Destroyed now",
+        GameTooltip:AddDoubleLine("Soul Ashes destroyed",
             FormatThousands(self.destroyed or 0), 0.9, 0.9, 0.9, 1, 0.4, 0.4)
-        GameTooltip:AddDoubleLine("Multiplier after",
-            "+" .. math.ceil(((self.currentPct or 0) + (self.gainPct or 0)) * 100) .. "%",
-            0.9, 0.9, 0.9, 0.2, 1, 0.2)
-        GameTooltip:AddDoubleLine("Prestige maximum",
-            "+" .. PrestigeCapPct() .. "%", 0.9, 0.9, 0.9, 1, 0.82, 0)
-        -- The raw formula and what is actually granted only differ once the ceiling bites, so
-        -- say so rather than let the player wonder why a huge burn bought so little.
-        if (self.uncappedGainPct or 0) > (self.gainPct or 0) then
-            GameTooltip:AddLine(" ")
-            if (self.gainPct or 0) <= 0 then
-                GameTooltip:AddLine(
-                    "You have reached the maximum: this reset still destroys everything, " ..
-                    "but buys no further Multiplier.", 1, 0.4, 0.4, true)
-            else
-                GameTooltip:AddLine(
-                    "Capped: the raw reward would be +" ..
-                    math.ceil((self.uncappedGainPct or 0) * 100) ..
-                    "%, trimmed to keep the total at the maximum.", 1, 0.82, 0, true)
-            end
+        do
+            local shards, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+            GameTooltip:AddDoubleLine("Soul Shards consumed",
+                FormatThousands(shards), 0.9, 0.9, 0.9, 1, 0.4, 0.4)
+            GameTooltip:AddDoubleLine("Soul Essence (" .. FormatThousands(ProjectEbonhold.PrestigeService.SHARDS_PER_ESSENCE or 750) .. " shards each)",
+                "+" .. FormatThousands(essence), 0.9, 0.9, 0.9, 0.2, 1, 0.2)
         end
         GameTooltip:Show()
         GameTooltip:SetBackdropColor(0.04, 0.04, 0.06, 0.97)
@@ -257,6 +264,7 @@ local function BuildUI()
     eraseList:SetSpacing(4)
     eraseList:SetText(
         "\226\128\162 ALL Soul Ashes, banked or spent,\n   on EVERY character\n" ..
+        "\226\128\162 ALL banked Soul Shards\n   (turned into Soul Essence, 750 to 1)\n" ..
         "\226\128\162 Skill Tree nodes without\n   Carry over Prestige")
 
     local keepHeader = confirm:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -275,7 +283,9 @@ local function BuildUI()
         "\226\128\162 ALL your Echoes,\n   permanent or not\n" ..
         "\226\128\162 Your learned Tomes of Echo\n" ..
         "\226\128\162 Carry over Prestige nodes,\n   kept and permanently free\n" ..
+        "\226\128\162 Endless nodes and all their ranks\n" ..
         "\226\128\162 Your Echo builds, untouched\n" ..
+        "\226\128\162 Your Soul Essence and Artisan Souls\n" ..
         "\226\128\162 Milestone rewards earned")
 
     -- "I confirm" gate: the red button stays locked until the box is ticked,
@@ -313,11 +323,13 @@ local function BuildUI()
         cCheck:SetChecked(false)
         UpdateConfirmGate()
 
-        local destroyed, gainPct = ProjectEbonhold.PrestigeService.GetPendingPrestigeGain()
+        local destroyed = ProjectEbonhold.PrestigeService.GetPendingPrestigeGain()
         if destroyed > 0 then
-            cDeal:SetText("|cffFF4444" .. FormatThousands(destroyed) ..
-                "|r Soul Ashes destroyed, |cff33FF33+" ..
-                string.format("%.1f", gainPct * 100) .. "%|r Soul Ash gain forever")
+            local shards, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+            cDeal:SetText("|cffFF4444" .. FormatThousands(destroyed) .. "|r Soul Ashes destroyed" ..
+                (shards > 0 and ("\n|cffFF4444" .. FormatThousands(shards) ..
+                    "|r Soul Shards consumed, |cff33FF33+" .. FormatThousands(essence) ..
+                    "|r Soul Essence") or ""))
         else
             cDeal:SetText("")
         end
@@ -369,13 +381,27 @@ local function BuildUI()
         local svc = ProjectEbonhold.PrestigeService
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Prestige locked", 1, 0.2, 0.2)
-        GameTooltip:AddLine(
-            "Commit enough Soul Ashes to your Skill Tree to unlock prestige.",
-            1, 1, 1, true)
+        -- Deux portes : les cendres engagees, et de quoi frapper une Soul Essence. On nomme
+        -- celle qui manque, et on montre les deux compteurs pour situer l'autre.
+        local missingShards = svc.GetMissingShards and svc.GetMissingShards() or 0
+        if svc.GetGateProgress() < svc.GetGateThreshold() then
+            GameTooltip:AddLine(
+                "Commit enough Soul Ashes to your Skill Tree to unlock prestige.",
+                1, 1, 1, true)
+        else
+            GameTooltip:AddLine(
+                "Bank enough Soul Shards first: a prestige has to mint at least one " ..
+                "Soul Essence, or it would give you nothing at all.", 1, 1, 1, true)
+        end
         GameTooltip:AddLine(
             "Committed Soul Ashes: " ..
             FormatThousands(svc.GetGateProgress()) ..
             " / " .. FormatThousands(svc.GetGateThreshold()),
+            0.8, 0.8, 0.8)
+        GameTooltip:AddLine(
+            "Banked Soul Shards: " ..
+            FormatThousands(select(1, svc.GetPendingEssence())) ..
+            " / " .. FormatThousands(svc.SHARDS_PER_ESSENCE or 750),
             0.8, 0.8, 0.8)
         GameTooltip:Show()
         GameTooltip:SetBackdropColor(0.04, 0.04, 0.06, 0.97)
@@ -1070,38 +1096,15 @@ local function BuildUI()
             rankIconTex:Hide()
         end
 
-        -- The account's Soul Ash Multiplier, taken from the very value the run
-        -- HUD displays so the two never disagree. The prestige share alone is the
-        -- fallback until the run data lands; it can no longer be derived from the
-        -- prestige count, since each grant scales with the pool it destroyed.
-        local runData = _G["EbonholdPlayerRunData"]
-        local currentPct = (runData and runData.soulPointsMultiplier) or 0
-        -- 0 is TRUTHY in Lua, so a run payload that has not landed yet (or a run
-        -- with no multiplier) would shadow the prestige share instead of falling
-        -- back to it. Compare, do not "or".
-        if currentPct <= 0 then currentPct = svc.GetPrestigeBonusPct() or 0 end
-
         -- The offer on the table, once the gate is open. The button hangs off
         -- whichever line ends the column, so it never lands on top of this one.
-        local destroyed, gainPct = svc.GetPendingPrestigeGain()
+        -- Since 2026-09-08 the ashes buy nothing: they are destroyed, and the reward is the
+        -- Soul Essence the banked Soul Shards mint. The card says exactly that.
+        local destroyed = svc.GetPendingPrestigeGain()
         prestigeButton:ClearAllPoints()
         if destroyed > 0 then
-            -- Before and after on that same Multiplier, so the offer needs no
-            -- conversion in the player's head.
-            dealCost:SetText("|T" .. ASSETS .. "inv_soulash:16:16|t |cffFF6060-" ..
-                FormatThousands(destroyed) .. "|r")
-            if gainPct <= 0 then
-                dealGain:SetText("|cffFFCC00Maximum reached (+" .. PrestigeCapPct() .. "%)|r")
-            else
-                dealGain:SetText("|cffAAAAAA+" .. math.ceil(currentPct * 100) ..
-                    "%|r |TInterface\\CHATFRAME\\ChatFrameExpandArrow:14:14|t |cff33FF33+" ..
-                    math.ceil((currentPct + gainPct) * 100) .. "%|r")
-            end
-            dealFrame.destroyed, dealFrame.currentPct, dealFrame.gainPct =
-                destroyed, currentPct, gainPct
-            -- What the formula alone would have granted, so the tooltip can explain a trim.
-            dealFrame.uncappedGainPct =
-                ProjectEbonhold.PrestigeData.ComputeBonusPct(destroyed)
+            dealFrame.destroyed = destroyed
+            ShowEssenceDeal()
             dealFrame:Show()
             prestigeButton:SetPoint("TOP", dealFrame, "BOTTOM", 0, -14)
         else
@@ -1198,46 +1201,69 @@ local function BuildUI()
             return {
                 {
                     title = "Prestige",
-                    text = "This counter shows how many times you have prestiged. " ..
-                        "A prestige resets your Skill Tree and consumes every Soul Ash on your " ..
-                        "account - the ones you banked and the ones you already spent, on every " ..
-                        "character. In exchange you keep a permanent Soul Ash gain bonus.",
+                    text = "This counter shows how many times you have prestiged. A prestige " ..
+                        "is a trade: you give up everything your Skill Tree was built on, and " ..
+                        "you keep one thing forever.",
                     zone = function() return circle end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
-                    -- The step players most need: prestige used to be a full character wipe
-                    -- back to level 1. It no longer is, and someone who prestiged under the old
-                    -- rules will not find that out on their own.
-                    title = "What you keep",
-                    text = "That is the whole cost. Your level and your current run are untouched, " ..
-                        "and so are your Echoes - permanent or not - your saved builds, your gear, " ..
-                        "your talents and professions, your Tomes and every milestone reward you " ..
-                        "have earned.\n\n" ..
-                        "|cff00FF00Carry over Prestige|r Skill Tree nodes stay bought too, and " ..
-                        "become permanently free.",
+                    title = "What it costs",
+                    text = "Your Skill Tree is reset, and every Soul Ash on the account is " ..
+                        "destroyed: the ones you banked and the ones already spent, on every " ..
+                        "character. The Ashes buy nothing back. Only |cff00FF00Carry over " ..
+                        "Prestige|r nodes survive the reset, and they become free for good. " ..
+                        "Every |cff00FF00Endless|r node is one of them: all its ranks stay.",
                     zone = function() return dealFrame end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
-                    title = "Unlocking Prestige",
-                    text = "The button unlocks once you have committed enough Soul Ashes to your Skill Tree. " ..
-                        "Prestiging then consumes that pool, plus any Soul Ashes still banked on your " ..
-                        "other characters. Hover the locked button to see your progress.",
+                    title = "What it pays",
+                    text = "Your banked Soul Shards are consumed with the Ashes and come back " ..
+                        "as |cffFFCC00Soul Essence|r, one for every 750 Shards. This card " ..
+                        "shows the exchange you would make right now." .. "\n\n" ..
+                        "Soul Essence buys the Prestige branch of the Skill Tree, and it is the " ..
+                        "only currency a prestige never takes back: it only ever grows.",
+                    zone = function() return dealFrame end,
+                    boxAnchor = { "LEFT", "RIGHT", 16, 0 },
+                },
+                {
+                    title = "What you keep",
+                    text = "Everything else is untouched. Your level and your current run, your " ..
+                        "Echoes, permanent or not, your saved builds, your gear, your talents " ..
+                        "and professions, your Tomes, and every milestone reward you have earned.",
+                    zone = function() return preview end,
+                    boxAnchor = { "RIGHT", "LEFT", -16, 0 },
+                },
+                {
+                    title = "Two locks",
+                    text = "The button opens when both are met: enough Soul Ashes committed to " ..
+                        "your Skill Tree, and at least 750 banked Soul Shards, so the " ..
+                        "reset always pays at least one Soul Essence." .. "\n\n" ..
+                        "Hover the locked button to see which one is still missing.",
+                    zone = function() return prestigeButton end,
+                    boxAnchor = { "LEFT", "RIGHT", 16, 0 },
+                },
+                {
+                    title = "When to do it",
+                    text = "Nothing forces you the moment the locks open. Shards keep piling up " ..
+                        "from the dungeons, raids and Call Board contracts you clear, and every 750 of them is " ..
+                        "one more Soul Essence when you finally reset. Waiting is worth it.",
                     zone = function() return prestigeButton end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
                     title = "Milestones",
-                    text = "Each prestige fills this bar. Milestones grant rewards: mounts, full transmog sets, " ..
-                        "titles, a permanent Soul Ash gain bonus and an exclusive chat rank icon. " ..
-                        "Hover a milestone for its details.",
+                    text = "Each prestige fills this bar. Milestones grant rewards: mounts, full " ..
+                        "transmog sets, titles and an exclusive chat rank icon. Hover a milestone " ..
+                        "for its details.",
                     zone = function() return bubbles[1], barFrame end,
                     boxAnchor = { "BOTTOM", "TOP", 0, 14 },
                 },
                 {
                     title = "Reward Preview",
-                    text = "Your next milestone reward is previewed here. Hover any milestone to preview its mount or transmog set.",
+                    text = "Your next milestone reward is previewed here. Hover any milestone to " ..
+                        "preview its mount or transmog set.",
                     zone = function() return preview end,
                     boxAnchor = { "RIGHT", "LEFT", -16, 0 },
                 },

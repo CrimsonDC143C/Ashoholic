@@ -1,0 +1,101 @@
+-- Embedded in Project Ebonhold (libs/pretty_patchkit): the Display options panel of the
+-- client writes to this addon's `_data`. This copy is the only one meant to run.
+--
+-- The client patch (patch-D) still ships pretty_patchkit as a standalone addon. With it
+-- enabled, every equipped slot's tooltip showed only the slot name ("Head") - gone once it
+-- was disabled. The old "skip if the standalone is loaded" guard did not keep the two copies
+-- apart, so the standalone is switched off instead; it stops loading from the next /reload.
+for i = 1, GetNumAddOns() do
+	if (GetAddOnInfo(i) or ""):lower() == "pretty_patchkit" then
+		DisableAddOn(i);
+	end
+end
+
+local locale = GetLocale();
+
+-- localization;
+if locale == "ruRU" then
+	GS_HUNTER_SCORE = "Гир Охотника: "
+	GS_ITEM_LEVEL = "ур. предмета: "
+	GS_ITEM_LEVEL_TIP = "ур. предметов: "
+	GS_YOUR_SCORE = "Ваш гир: "
+	HEIRLOOMILVL = "Уровень предмета"
+	CONFIG_SUBTITLE = "Это дополнение улучшает панель персонажа и осмотра, добавляя следующие визуальные элементы: уровень предмета рядом с каждым предметом, камни, чары или их отсутствие, средний уровень и оценку экипировки."
+	CONFIG_REQTITLE = "|cffff0039Внимание!|r Некоторые изменения могут потребовать перезагрузку интерфейса (/reload) для вступления в силу. |cffffc700@s0high - pretty_w0w|r"
+	CONFIG_UPGRADES = "Покзывать улучшения"
+	CONFIG_UPGRADES_DESC = "Уровень улучшения предмета. Если предмет можно улучшить, будет показано, например: 226 (2/2)."
+	CONFIG_CHARKITS = "Обвесы на персонаже"
+	CONFIG_CHARKITS_DESC = "Гемы, чары, уровень предметов в окне персонажа."
+	CONFIG_CHARKITS_ENCH = "Вкл. чары"
+	CONFIG_CHARKITS_ENCH_DESC = "Отображение иконки наложенных чар на предмет."
+	CONFIG_CHARKITS_ENCHMISS = "Вкл. недостающие чары"
+	CONFIG_CHARKITS_ENCHMISS_DESC = "Отображение иконки отсутствующих чар (красным)."
+	CONFIG_CHARKITS_GEM = "Вкл. гемы"
+	CONFIG_CHARKITS_GEM_DESC = "Отображение иконки сокетов"
+	CONFIG_CHARKITS_ILVL = "Уровень предметов"
+	CONFIG_CHARKITS_ILVL_DESC = "Отображение текстовой информации об ур. предмета в окне персонажа (напротив каждого предмета)."
+	CONFIG_INSPKITS = "Обвесы в окне осмотра"
+	CONFIG_INSPKITS_DESC = "Гемы, чары, уровень предметов в окне осмотра."
+	CONFIG_ILVLSCORE = "Общий уровень предметов"
+	CONFIG_ILVLSCORE_DESC = "Оценивает уровень экипировки игроков."
+	CONFIG_GEARSCORE = "Гирскор"
+	CONFIG_GEARSCORE_DESC = "Оценивает очки экипировки игроков."
+	CONFIG_GSTOOLTIP = "Гирскор в подсказках"
+	CONFIG_GSTOOLTIP_DESC = "Отображать информацию во всплывающей подсказке."
+	CONFIG_GSITEMSILVL = "Ур. предметов в подсказках"
+	CONFIG_GSITEMSILVL_DESC = "Отображение информации об уровне предмета во всплывающей подсказке."
+	CONFIG_GSCOMPARE = "Сравнивать гирскор"
+	CONFIG_GSCOMPARE_DESC = "Сравнивает ваш гирскор с выбранной целью."
+	CONFIG_RESIST = "Отображение сопротивлений"
+	CONFIG_RESIST_DESC = "Показать или скрыть рамки сопротивлений разным школам магии на панели персонажа (вверху справа)."
+	CONFIG_COLORING = "Цвет ур. предметов по их качеству"
+	CONFIG_COLORING_DESC = "Цвет текста ур. предметов по качеству предмета в окне персонажа (напротив каждого предмета)."
+	CONFIG_GSFORMAT = "Округлять значение Гирскора"
+	CONFIG_GSFORMAT_DESC = "Отображать округленное числовое значение, например: 4.2k вместо 4192."
+else
+	GS_HUNTER_SCORE = "Hunter Score: "
+	GS_ITEM_LEVEL = "iLevel: "
+	GS_ITEM_LEVEL_TIP = "iLevel: "
+	GS_YOUR_SCORE = "Your Score: "
+	HEIRLOOMILVL = "Item Level"
+	CONFIG_SUBTITLE = "This add-on enhances Character and Inspection panes by adding following visual elements: item level next to each item, gems and enchants, or placeholders if missing, average item level and Gear Score."
+	CONFIG_REQTITLE = "|cffff0039Attention!|r Some changes may require a UI reload (/reload) to take effect. |cffffc700@s0high - pretty_w0w|r"
+	CONFIG_UPGRADES = "Display upgrades"
+	CONFIG_UPGRADES_DESC = "Upgrade level of the item. If the item can be upgraded will be shown e.g.: 226 (2/2)."
+	CONFIG_CHARKITS = "Display character kits"
+	CONFIG_CHARKITS_DESC = "Gems, enchants, item levels on character window."
+	CONFIG_CHARKITS_ENCH = "Show enchants"
+	CONFIG_CHARKITS_ENCH_DESC = "Include enchant icons."
+	CONFIG_CHARKITS_ENCHMISS = "Show missing enchants"
+	CONFIG_CHARKITS_ENCHMISS_DESC = "Include missing enchantment icons."
+	CONFIG_CHARKITS_GEM = "Show gems"
+	CONFIG_CHARKITS_GEM_DESC = "Include socket icons."
+	CONFIG_CHARKITS_ILVL = "Show item level"
+	CONFIG_CHARKITS_ILVL_DESC = "Include item level text info next to each icons."
+	CONFIG_INSPKITS = "Display inspection kits"
+	CONFIG_INSPKITS_DESC = "Gems, enchants, item levels on inspection window."
+	-- CONFIG_INSPKITS_ENCH = "Show enchants"
+	-- CONFIG_INSPKITS_ENCH_DESC = "Include enchant icons."
+	-- CONFIG_INSPKITS_ENCHMISS = "Show missing enchants"
+	-- CONFIG_INSPKITS_ENCHMISS_DESC = "Include missing enchantment icons."
+	-- CONFIG_INSPKITS_GEM = "Show gems"
+	-- CONFIG_INSPKITS_GEM_DESC = "Include socket icons."
+	-- CONFIG_INSPKITS_ILVL = "Show item level"
+	-- CONFIG_INSPKITS_ILVL_DESC = "Include item level text info next to each icons."
+	CONFIG_ILVLSCORE = "Display average item level"
+	CONFIG_ILVLSCORE_DESC = "Assesses the equipment level of players."
+	CONFIG_GEARSCORE = "Display GearScore"
+	CONFIG_GEARSCORE_DESC = "Assesses the equipment score of players."
+	CONFIG_GSTOOLTIP = "Display GearScore on tooltip"
+	CONFIG_GSTOOLTIP_DESC = "Display gearscore information in tooltip."
+	CONFIG_GSITEMSILVL = "Display item level on tooltip"
+	CONFIG_GSITEMSILVL_DESC = "Display item level information in tooltip."
+	CONFIG_GSCOMPARE = "Compare GearScore"
+	CONFIG_GSCOMPARE_DESC = "Compares you gearscore with selected target."
+	CONFIG_RESIST = "Show resistance frames"
+	CONFIG_RESIST_DESC = "Show or hide resistance frames on character pane (top right)."
+	CONFIG_COLORING = "Enable coloring by item level"
+	CONFIG_COLORING_DESC = "Сolor item levels by quality (character panel, opposite your gears)."
+	CONFIG_GSFORMAT = "Round GearScore value"
+	CONFIG_GSFORMAT_DESC = "Display round number, e.g.: 4.2k instead 4192."
+end

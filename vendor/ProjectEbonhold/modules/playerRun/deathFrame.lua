@@ -5,7 +5,8 @@ local playerRunData = {
     countCanSelfRezs = 0,
     countCanClassRezs = 0,
     costNextReset = 100,
-    soulPoints = 0
+    soulPoints = 0,
+    soulShards = 0
 }
 
 
@@ -74,6 +75,20 @@ local function CreateDeathFrame()
 
     deathFrame.buttons = {}
 
+    -- The recap panel rides along with the death frame. Every confirmation popup and the item
+    -- selection frame hide and re-show the death frame, so hooking visibility keeps the two in
+    -- sync without touching each of those call sites.
+    deathFrame:SetScript("OnShow", function()
+        if ProjectEbonhold.DeathRecap then
+            ProjectEbonhold.DeathRecap.ShowForDeathFrame()
+        end
+    end)
+    deathFrame:SetScript("OnHide", function()
+        if ProjectEbonhold.DeathRecap then
+            ProjectEbonhold.DeathRecap.Hide()
+        end
+    end)
+
     deathFrame:Hide()
     isDeathFrameInitialized = true
 end
@@ -119,10 +134,15 @@ local function ShowConfirmationPopup(title, message, onConfirm)
     local popupMessage =
         popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     popupMessage:SetPoint("TOP", popupTitle, "BOTTOM", 0, -15)
-    popupMessage:SetText(message)
-    popupMessage:SetTextColor(1, 1, 1)
     popupMessage:SetWidth(350)
     popupMessage:SetJustifyH("CENTER")
+    popupMessage:SetText(message)
+    popupMessage:SetTextColor(1, 1, 1)
+
+    -- Grow with the message so long texts never run under the buttons:
+    -- title (20 + its height) + 15 + message + 20 gap + buttons (30) + 25 bottom.
+    popup:SetHeight(math.max(200, 20 + popupTitle:GetStringHeight() + 15
+        + popupMessage:GetStringHeight() + 20 + 30 + 25))
 
 
     local yesButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
@@ -347,9 +367,176 @@ local function CreateItemSelectionFrame()
         table.insert(frame.itemRows, row)
     end
 
+    -- A dead player cannot reach a vendor: this opens the list of bag items he can sell from here.
+    local sellBtn = utils.CreateSimpleCustomButton(frame, "Sell bag items", function()
+        if ProjectEbonhold.DeathSellFrame then ProjectEbonhold.DeathSellFrame.Toggle(frame) end
+    end, 150, 26)
+    sellBtn:SetPoint("TOP", frame, "TOP", 0, -18)
+    frame.sellButton = sellBtn
+
+    frame:SetScript("OnHide", function()
+        if ProjectEbonhold.DeathSellFrame then ProjectEbonhold.DeathSellFrame.Hide() end
+    end)
+
     frame:Hide()
     itemSelectionFrame = frame
     return frame
+end
+
+
+-- Selling while dead (owner, 2026-10-22): at accept death the worn gear goes to the bags, and a
+-- full bag means losing pieces. The player is a corpse and cannot walk to a vendor, so the bag
+-- items with a vendor price are listed here and sold one click at a time (server:
+-- ItemsManager::SellBagItemWhileDead, dead players only). Selling only, no buying or repair.
+do
+    local ROW_HEIGHT = 26
+    local sellFrame
+
+    local function CollectSellableItems()
+        local list = {}
+        for bag = 0, 4 do
+            for slot = 1, (GetContainerNumSlots(bag) or 0) do
+                local link = GetContainerItemLink(bag, slot)
+                if link then
+                    local texture, count, locked = GetContainerItemInfo(bag, slot)
+                    local name, _, rarity, _, _, _, _, _, _, _, sellPrice = GetItemInfo(link)
+                    local entry = tonumber(link:match("item:(%d+)")) or 0
+                    if name and entry > 0 and (sellPrice or 0) > 0 and not locked then
+                        table.insert(list, {
+                            bag = bag, slot = slot, entry = entry, link = link, name = name,
+                            texture = texture, count = count or 1, rarity = rarity or 1,
+                            price = sellPrice * (count or 1),
+                        })
+                    end
+                end
+            end
+        end
+        table.sort(list, function(a, b) return a.price < b.price end)
+        return list
+    end
+
+    local function CreateRow(parent, index)
+        local row = CreateFrame("Button", nil, parent)
+        row:SetSize(250, ROW_HEIGHT)
+        row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_HEIGHT)
+        row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(22, 22)
+        row.icon:SetPoint("LEFT", 2, 0)
+
+        row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row.name:SetPoint("LEFT", row.icon, "RIGHT", 5, 0)
+        row.name:SetWidth(120)
+        row.name:SetJustifyH("LEFT")
+
+        row.price = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row.price:SetPoint("RIGHT", -2, 0)
+        row.price:SetJustifyH("RIGHT")
+
+        row:SetScript("OnEnter", function(self)
+            if self.item then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetHyperlink(self.item.link)
+                GameTooltip:AddLine("Click to sell.", 0.4, 1, 0.4)
+                GameTooltip:Show()
+            end
+        end)
+        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        row:SetScript("OnClick", function(self)
+            local item = self.item
+            if not item or not UnitIsDeadOrGhost("player") then return end
+            ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_DEATH_SELL_ITEM,
+                item.bag .. "," .. item.slot .. "," .. item.entry)
+            self:Disable()
+            self:SetAlpha(0.4)
+        end)
+        return row
+    end
+
+    local function Refresh()
+        if not sellFrame or not sellFrame:IsShown() then return end
+        local items = CollectSellableItems()
+        for i, item in ipairs(items) do
+            local row = sellFrame.rows[i] or CreateRow(sellFrame.scrollChild, i)
+            sellFrame.rows[i] = row
+            row.item = item
+            row.icon:SetTexture(item.texture)
+            local label = item.count > 1 and (item.name .. " x" .. item.count) or item.name
+            row.name:SetText(label)
+            local r, g, b = GetItemQualityColor(item.rarity)
+            row.name:SetTextColor(r, g, b)
+            row.price:SetText(GetCoinTextureString(item.price))
+            row:Enable()
+            row:SetAlpha(1)
+            row:Show()
+        end
+        for i = #items + 1, #sellFrame.rows do
+            sellFrame.rows[i].item = nil
+            sellFrame.rows[i]:Hide()
+        end
+        sellFrame.scrollChild:SetHeight(math.max(1, #items * ROW_HEIGHT))
+        if #items == 0 then sellFrame.empty:Show() else sellFrame.empty:Hide() end
+    end
+
+    local function Create()
+        local f = CreateFrame("Frame", "ProjectEbonholdDeathSellFrame", UIParent)
+        f:SetSize(300, 450)
+        f:SetFrameStrata("DIALOG")
+        f:SetFrameLevel(101)
+        f:EnableMouse(true)
+
+        local bg = utils.CreateDeathFrameBackground(f, 300, 450)
+        bg:SetPoint("CENTER", f, "CENTER", 0, 0)
+
+        local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOP", f, "TOP", 0, -50)
+        title:SetText("Sell bag items")
+
+        local hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        hint:SetPoint("TOP", title, "BOTTOM", 0, -8)
+        hint:SetWidth(240)
+        hint:SetText("Click an item to sell it at its vendor price.")
+        hint:SetTextColor(1, 1, 1, 0.7)
+
+        local scroll = CreateFrame("ScrollFrame", "ProjectEbonholdDeathSellScroll", f, "UIPanelScrollFrameTemplate")
+        scroll:SetPoint("TOPLEFT", 20, -100)
+        scroll:SetPoint("BOTTOMRIGHT", -40, 70)
+        local child = CreateFrame("Frame", nil, scroll)
+        child:SetSize(250, 1)
+        scroll:SetScrollChild(child)
+        f.scrollChild = child
+        f.rows = {}
+
+        f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+        f.empty:SetPoint("TOP", scroll, "TOP", 0, -20)
+        f.empty:SetText("Nothing to sell.")
+
+        local close = utils.CreateSimpleCustomButton(f, "Close", function() f:Hide() end, 200, 40)
+        close:SetPoint("BOTTOM", 0, 20)
+
+        f:RegisterEvent("BAG_UPDATE")
+        f:SetScript("OnEvent", Refresh)
+        f:SetScript("OnShow", Refresh)
+        f:Hide()
+        return f
+    end
+
+    ProjectEbonhold.DeathSellFrame = {
+        Toggle = function(anchor)
+            sellFrame = sellFrame or Create()
+            if sellFrame:IsShown() then
+                sellFrame:Hide()
+                return
+            end
+            sellFrame:ClearAllPoints()
+            sellFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 0)
+            sellFrame:Show()
+        end,
+        Hide = function()
+            if sellFrame then sellFrame:Hide() end
+        end,
+    }
 end
 
 
@@ -444,12 +631,52 @@ local function ShowItemSelectionFrame(items, freeSlots, onConfirm)
 end
 
 
+-- Kept out of deathFrame.buttons on purpose: that list is wiped and its entries re-parented to
+-- nil on every refresh, and this button needs to outlive that.
+local recapButton = nil
+
+local function UpdateRecapButton()
+    local recap = ProjectEbonhold.DeathRecap
+    if not recap or not recap.HasRecap() then
+        if recapButton then recapButton:Hide() end
+        return 0
+    end
+
+    if not recapButton then
+        -- Same 250x45 as the stacked options: a shorter button next to them just read as broken.
+        recapButton = utils.CreateSimpleCustomButton(deathFrame.buttonContainer,
+            ProjectEbonhold.DeathRecapTexts.button, function()
+                ProjectEbonhold.DeathRecap.Toggle()
+            end, 250, 45)
+
+        -- CreateCustomButton centres its label, so the label is nudged right by half the skull
+        -- and gap to keep the icon and text centred as a pair.
+        local skullSize, skullGap = 22, 6
+        recapButton.text:ClearAllPoints()
+        recapButton.text:SetPoint("CENTER", recapButton, "CENTER",
+            (skullSize + skullGap) / 2, 0)
+
+        local skull = recapButton:CreateTexture(nil, "OVERLAY")
+        skull:SetSize(skullSize, skullSize)
+        skull:SetPoint("RIGHT", recapButton.text, "LEFT", -skullGap, 0)
+        skull:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame-Skull")
+        recapButton.skull = skull
+    end
+
+    recapButton:ClearAllPoints()
+    recapButton:SetPoint("TOP", 0, -10 - (#deathFrame.buttons * 50))
+    recapButton:Show()
+    return 50
+end
+
+
 function UpdateDeathFrameButtons()
     if not deathFrame then return end
 
     for _, button in pairs(deathFrame.buttons) do button:Hide() end
     deathFrame.buttons = {}
     deathFrame.buttonContainer:Show()
+    if recapButton then recapButton:Hide() end
 
     -- Blocked / stuck state: replace all options with a single Unstuck button
     if isPlayerBlocked then
@@ -512,12 +739,14 @@ function UpdateDeathFrameButtons()
 
 
         local soulPointsGain = currentData.soulPoints or 0
+        -- Run Soul Shards are banked with the ashes on accept death (same life cycle)
+        local soulShardsGain = currentData.soulShards or 0
 
         local acceptDeathButton = CreateDeathButton("accepteDeath",
             deathFrame.buttonContainer,
             DeathTexts.buttons
             .acceptDeath(
-                soulPointsGain),
+                soulPointsGain, soulShardsGain),
             function()
                 local freeSlots, hasSpace = HasEnoughInventorySpace()
 
@@ -526,7 +755,7 @@ function UpdateDeathFrameButtons()
 
                     if #playerItems == 0 then
                         ShowConfirmationPopup(DeathTexts.confirmations.acceptDeath.title,
-                            DeathTexts.confirmations.acceptDeath.message(soulPointsGain),
+                            DeathTexts.confirmations.acceptDeath.message(soulPointsGain, soulShardsGain),
                             function()
                                 ProjectEbonhold.PlayerRunService.AcceptDeath("")
                                 ResetEchoesDisplay()
@@ -544,7 +773,7 @@ function UpdateDeathFrameButtons()
                             local itemData = table.concat(itemEntries, ",")
 
                             ShowConfirmationPopup(DeathTexts.confirmations.acceptDeath.title,
-                                DeathTexts.confirmations.acceptDeath.message(soulPointsGain),
+                                DeathTexts.confirmations.acceptDeath.message(soulPointsGain, soulShardsGain),
                                 function()
                                     ProjectEbonhold.PlayerRunService.AcceptDeath(itemData)
                                     ResetEchoesDisplay()
@@ -554,7 +783,7 @@ function UpdateDeathFrameButtons()
                     end
                 else
                     ShowConfirmationPopup(DeathTexts.confirmations.acceptDeath.title,
-                        DeathTexts.confirmations.acceptDeath.message(soulPointsGain),
+                        DeathTexts.confirmations.acceptDeath.message(soulPointsGain, soulShardsGain),
                         function()
                             ProjectEbonhold.PlayerRunService.AcceptDeath("")
                             ResetEchoesDisplay()
@@ -568,7 +797,7 @@ function UpdateDeathFrameButtons()
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:SetText(DeathTexts.tooltips.acceptDeath.title)
             GameTooltip:AddLine(DeathTexts.tooltips.acceptDeath.line1(
-                soulPointsGain), 0, 1, 0, true)
+                soulPointsGain, soulShardsGain), 0, 1, 0, true)
             GameTooltip:AddLine(DeathTexts.tooltips.acceptDeath.line2, 1, 1, 1,
                 true)
             GameTooltip:Show()
@@ -580,36 +809,30 @@ function UpdateDeathFrameButtons()
         table.insert(deathFrame.buttons, acceptDeathButton)
         yOffset = yOffset - buttonHeight
 
-        -- Fail closed: HardmodeService resets to Normal on every UI load and only learns the
-        -- real tier from an async server reply, so an unconfirmed tier is treated as Hardcore.
-        -- Otherwise a /reload while dead draws resurrection options the server will refuse.
-        local hardmodeService = ProjectEbonhold.HardmodeService
-        local isHardmode = not hardmodeService
-            or not hardmodeService.IsDifficultyKnown
-            or not hardmodeService.IsDifficultyKnown()
-            or hardmodeService.GetCurrentDifficulty() > 1
+        -- Hardcore no longer refuses resurrections (server side, 2026-09-06): the
+        -- resurrection buttons are drawn on every tier, the run budget alone decides.
+        local isHardmode = false
 
         if not isHardmode then
-            if currentData.countCanAcceptedRezs and currentData.countCanAcceptedRezs >
-                0 and resRequest then
+            -- Free, castable by anyone (no group constraint since 2026-09-17), but the run
+            -- only accepts one (countCanAcceptedRezs): a pending request and a charge left
+            -- are the two conditions; the server has the last word on the accept.
+            if resRequest and (currentData.countCanAcceptedRezs or 0) > 0 then
                 local playerRezButton = CreateDeathButton("acceptPlayerRez",
                     deathFrame.buttonContainer,
-                    DeathTexts.buttons
-                    .acceptPlayerRez(
-                        currentData.countCanAcceptedRezs),
+                    DeathTexts.buttons.acceptPlayerRez(currentData.countCanAcceptedRezs,
+                        (currentData.countCanAcceptedRezs or 0) + (tonumber(currentData.acceptedRezsUsed) or 0)),
                     function()
                         ShowConfirmationPopup(DeathTexts.confirmations.acceptPlayerRez
                             .title,
-                            DeathTexts.confirmations.acceptPlayerRez
-                            .message(
-                                currentData.countCanAcceptedRezs),
+                            DeathTexts.confirmations.acceptPlayerRez.message(),
                             function()
                                 AcceptResurrect()
                                 resRequest = false;
-                                -- Never hide optimistically: the server refuses the rez in
-                                -- Hardcore and once the run's budget is spent, and a hidden
-                                -- frame leaves the corpse with no options at all. PLAYER_ALIVE
-                                -- hides it when a resurrection actually goes through.
+                                -- Never hide optimistically: the server can still refuse
+                                -- the rez, and a hidden frame leaves the corpse with no
+                                -- options at all. PLAYER_ALIVE hides it when a
+                                -- resurrection actually goes through.
                             end)
                     end)
 
@@ -619,9 +842,8 @@ function UpdateDeathFrameButtons()
                     GameTooltip:SetText(DeathTexts.tooltips.acceptPlayerRez.title)
                     GameTooltip:AddLine(DeathTexts.tooltips.acceptPlayerRez.line1,
                         0, 1, 0, true)
-                    GameTooltip:AddLine(DeathTexts.tooltips.acceptPlayerRez.line2(
-                            currentData.countCanAcceptedRezs), 1, 1,
-                        1, true)
+                    GameTooltip:AddLine(DeathTexts.tooltips.acceptPlayerRez.line2,
+                        1, 1, 1, true)
                     GameTooltip:Show()
                 end)
                 playerRezButton:SetScript("OnLeave",
@@ -635,116 +857,73 @@ function UpdateDeathFrameButtons()
             end
 
 
-            if currentData.countCanSelfRezs and currentData.countCanSelfRezs > 0 then
-                local reviveButton = CreateDeathButton("selfRezs",
+            -- The paid resurrection (2026-09-17): unlimited while the run can pay. The server
+            -- prices the next one in run Soul Ashes and Soul Shards (costNextReset /
+            -- costNextResetShards) and says whether it is affordable (paidRezAvailable).
+            do
+                local affordable = currentData.paidRezAvailable and true or false
+                local ashesCost = currentData.costNextReset or 0
+                local shardsCost = currentData.costNextResetShards or 0
+                local ashesLeft = math.max(0, (currentData.soulPoints or 0) - ashesCost)
+                local shardsLeft = math.max(0, (currentData.soulShards or 0) - shardsCost)
+                local paidButton = CreateDeathButton("paidRez",
                     deathFrame.buttonContainer,
-                    DeathTexts.buttons
-                    .selfRezAvailable(
-                        currentData.countCanSelfRezs),
+                    DeathTexts.buttons.soulPointsAffordable(ashesCost, shardsCost),
                     function()
-                        ShowConfirmationPopup(DeathTexts.confirmations.selfRez.title,
-                            DeathTexts.confirmations.selfRez
-                            .message(currentData.countCanSelfRezs),
+                        if not affordable then return end
+                        ShowConfirmationPopup(DeathTexts.confirmations.soulPointsRez.title,
+                            DeathTexts.confirmations.soulPointsRez
+                            .message(ashesCost, shardsCost, ashesLeft, shardsLeft),
                             function()
-                                ProjectEbonhold.PlayerRunService
-                                    .AvoidResetFreeResurrection();
+                                ProjectEbonhold.PlayerRunService.AvoidResetWithSoulPoints();
                                 -- PLAYER_ALIVE hides the frame; the server can still refuse
                                 -- this (see acceptPlayerRez).
                             end)
                     end)
 
-
-                reviveButton:SetScript("OnEnter", function(self)
+                paidButton:SetScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetText(DeathTexts.tooltips.selfRez.title)
-                    GameTooltip:AddLine(DeathTexts.tooltips.selfRez.line1, 0, 1, 0,
+                    GameTooltip:SetText(DeathTexts.tooltips.soulPointsRez.title)
+                    GameTooltip:AddLine(DeathTexts.tooltips.soulPointsRez.line1(ashesCost, shardsCost),
+                        0, 1, 0, true)
+                    GameTooltip:AddLine(DeathTexts.tooltips.soulPointsRez.line2, 1, 1, 1, true)
+                    GameTooltip:AddLine(DeathTexts.tooltips.soulPointsRez.line3(
+                            currentData.paidRezsUsed or 0), 1, 1, 1,
                         true)
-                    GameTooltip:AddLine(DeathTexts.tooltips.selfRez.line2(
-                            currentData.countCanSelfRezs), 1, 1, 1,
-                        true)
+                    if not affordable then
+                        GameTooltip:AddLine(DeathTexts.tooltips.soulPointsRez.tooPoor, 1, 0.35, 0.35, true)
+                    end
                     GameTooltip:Show()
                 end)
-                reviveButton:SetScript("OnLeave",
+                paidButton:SetScript("OnLeave",
                     function(self) GameTooltip:Hide() end)
 
-                reviveButton:SetPoint("TOP", 0, yOffset)
-                table.insert(deathFrame.buttons, reviveButton)
+                -- Same button, disabled (grey texture + grey text) when the run cannot pay: the
+                -- price stays visible, and the tooltip still says why (3.3.5 buttons keep their
+                -- OnEnter while disabled).
+                if affordable then
+                    paidButton:Enable()
+                else
+                    paidButton:Disable()
+                    paidButton:SetTextColor(0.5, 0.5, 0.5)
+                end
+                paidButton:SetPoint("TOP", 0, yOffset)
+                table.insert(deathFrame.buttons, paidButton)
                 yOffset = yOffset - buttonHeight
             end
-            local playerLevel = UnitLevel("player")
-            local costRez = math.max(playerLevel, currentData.costNextReset or 0)
-            local currentSoulPoints = currentData.soulPoints or 0
-            local canAfford = currentSoulPoints >= costRez
 
-            local soulRezButton = CreateDeathButton("reviveWithSoulPoints",
-                deathFrame.buttonContainer,
-                DeathTexts.buttons
-                .soulPointsAffordable(
-                    costRez), function()
-                    if canAfford then
-                        ShowConfirmationPopup(DeathTexts.confirmations.soulPointsRez
-                            .title,
-                            DeathTexts.confirmations.soulPointsRez
-                            .message(costRez,
-                                currentSoulPoints - costRez),
-                            function()
-                                ProjectEbonhold.PlayerRunService.AvoidResetWithSoulPoints()
-                                -- PLAYER_ALIVE hides the frame; the server can still refuse
-                                -- this (see acceptPlayerRez).
-                            end)
-                    else
-                        DEFAULT_CHAT_FRAME:AddMessage(DeathTexts.messages
-                            .notEnoughSoulPoints)
-                    end
-                end)
-
-
-            soulRezButton:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetText(DeathTexts.tooltips.soulPointsRez.title)
-                if canAfford then
-                    GameTooltip:AddLine(DeathTexts.tooltips.soulPointsRez.canAfford
-                        .line1(costRez), 0, 1, 0, true)
-                    GameTooltip:AddLine(DeathTexts.tooltips.soulPointsRez.canAfford
-                        .line2, 1, 1, 1, true)
-                    GameTooltip:AddLine(DeathTexts.tooltips.soulPointsRez.canAfford
-                        .line3(currentSoulPoints - costRez), 1,
-                        1, 0, true)
-                else
-                    GameTooltip:AddLine(
-                        DeathTexts.tooltips.soulPointsRez.cantAfford.line1(costRez),
-                        1, 0, 0, true)
-                    GameTooltip:AddLine(
-                        DeathTexts.tooltips.soulPointsRez.cantAfford.line2(
-                            currentSoulPoints), 1, 1, 1, true)
-                end
-                GameTooltip:Show()
-            end)
-            soulRezButton:SetScript("OnLeave", function(self)
-                GameTooltip:Hide()
-            end)
-
-            soulRezButton:SetPoint("TOP", 0, yOffset)
-
-            if not canAfford then soulRezButton:Disable() end
-
-            table.insert(deathFrame.buttons, soulRezButton)
-            yOffset = yOffset - buttonHeight
-
-            if HasSoulstone() and currentData.countCanClassRezs and
-                currentData.countCanClassRezs > 0 then
+            -- Unlimited since 2026-09-07, like the player rez above: owning the
+            -- soulstone / reincarnation is the only condition.
+            if HasSoulstone() then
                 local text = HasSoulstone();
                 local soulstoneButton = CreateDeathButton("soulstone",
                     deathFrame.buttonContainer,
-                    DeathTexts.buttons
-                    .useSoulstone(text,
-                        currentData.countCanClassRezs),
+                    DeathTexts.buttons.useSoulstone(text),
                     function()
                         ShowConfirmationPopup(DeathTexts.confirmations.soulstone.title(
                                 text), DeathTexts.confirmations
                             .soulstone
-                            .message(text,
-                                currentData.countCanClassRezs),
+                            .message(text),
                             function()
                                 UseSoulstone()
                             end)
@@ -757,9 +936,8 @@ function UpdateDeathFrameButtons()
                     GameTooltip:SetText(DeathTexts.tooltips.soulstone.title(text))
                     GameTooltip:AddLine(DeathTexts.tooltips.soulstone.line1(text),
                         0, 1, 0, true)
-                    GameTooltip:AddLine(DeathTexts.tooltips.soulstone.line2(
-                            currentData.countCanClassRezs), 1, 1, 1,
-                        true)
+                    GameTooltip:AddLine(DeathTexts.tooltips.soulstone.line2,
+                        1, 1, 1, true)
                     GameTooltip:Show()
                 end)
                 soulstoneButton:SetScript("OnLeave",
@@ -777,7 +955,7 @@ function UpdateDeathFrameButtons()
 
     local baseHeight = 120
     local buttonSpacing = 50
-    local totalHeight = baseHeight + (#deathFrame.buttons * buttonSpacing)
+    local totalHeight = baseHeight + (#deathFrame.buttons * buttonSpacing) + UpdateRecapButton()
     local finalHeight = math.max(200, totalHeight)
 
 

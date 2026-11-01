@@ -203,6 +203,13 @@ if PE and PE.onEventReceived and PE.SS then
         end
         ez:RaiseEvent("TRANSMOG_OUTFITS_CHANGED")
     end)
+
+    -- Transmog option "show transmog in Shadowform / druid forms": "1" or "0".
+    -- The server's word only - the checkbox never trusts its own click.
+    PE.onEventReceived(SS.SEND_FORM_LOOK_STATE, function(body)
+        ez.FormLookHidden = (body == "1")
+        ez:RaiseEvent("TRANSMOG_FORM_LOOK_CHANGED")
+    end)
 end
 
 --=============================================================================
@@ -211,6 +218,7 @@ end
 local function send(op, body)
     if PE and PE.sendToServer and PE.CS and PE.CS[op] then PE.sendToServer(PE.CS[op], body or "") end
 end
+function ez:SetFormLookHiddenOnServer(hidden) send("REQUEST_FORM_LOOK_SET", hidden and "1" or "0") end
 -- id present -> overwrite that outfit; 255 -> new. Body: "id|name|slot:entry,..."
 function ez:SaveOutfitToServer(id, name, sourcesCsv) send("REQUEST_OUTFIT_SAVE", tostring(id or 255) .. "|" .. (name or "Outfit") .. "|" .. (sourcesCsv or "")) end
 function ez:RenameOutfitOnServer(id, name)       send("REQUEST_OUTFIT_RENAME", tostring(id) .. "|" .. (name or "")) end

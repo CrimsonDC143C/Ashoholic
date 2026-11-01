@@ -149,11 +149,11 @@ local function CreateConfigPanel()
   -- ── Sell everything ──
   local sellAll = MakeCheck("SellAll", "|cffff3333Sell EVERYTHING|r", 12, -254, "sellEverything",
     "|cffff3333Sell EVERYTHING|r",
-    "Sells every sellable item in your bags, ignoring the quality and type filters. Items protected with Alt-click are never sold.")
+    "Sells every sellable item in your bags, ignoring the quality and type filters. Legendary items and items protected with Alt-click are never sold.")
   sellAll:SetScript("OnClick", function(self)
     if self:GetChecked() == 1 then
       StaticPopupDialogs["PROJECTEBONHOLD_SELL_EVERYTHING"] = {
-        text = "|cffff2020Warning:|r this will sell EVERY sellable item in your bags, ignoring the quality and type filters. Only items protected with Alt-click are kept.\n\nEnable anyway?",
+        text = "|cffff2020Warning:|r this will sell EVERY sellable item in your bags, ignoring the quality and type filters. Only legendary items and items protected with Alt-click are kept.\n\nEnable anyway?",
         button1 = YES,
         button2 = NO,
         OnAccept = function()
@@ -326,7 +326,13 @@ function ScrapButton:UpdateState()
   else
     self:Show()
   end
-  
+
+  -- The bag scan waits for the next frame: a sale raises BAG_UPDATE once per bag
+  -- plus the two merchant hooks, each of which used to rescan every bag.
+  self.scanSoon:Show()
+end
+
+function ScrapButton:RefreshJunkIcon()
   local value = GetJunkValue()
   local hasJunk = value > 0
 
@@ -336,6 +342,13 @@ function ScrapButton:UpdateState()
   self.icon:SetAlpha(hasJunk and 1 or 0.5)
   self:Enable()
 end
+
+ScrapButton.scanSoon = CreateFrame("Frame")
+ScrapButton.scanSoon:Hide()
+ScrapButton.scanSoon:SetScript("OnUpdate", function(self)
+  self:Hide()
+  if ScrapButton:IsShown() then ScrapButton:RefreshJunkIcon() end
+end)
 
 function ScrapButton:OnClick(button)
   if button == "LeftButton" then

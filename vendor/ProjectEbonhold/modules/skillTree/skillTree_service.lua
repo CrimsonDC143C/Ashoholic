@@ -18,15 +18,25 @@ local function parseLoadoutData(dataString)
   end
 
 
-  local selectedLoadoutId, spendableSoulPoints, totalCommitedSoulPoints, maximumPermanentEchoes = globalPart:match(
-    "(%d+),(%d+),(%d+),(%d+)")
-  selectedLoadoutId = tonumber(selectedLoadoutId)
-  spendableSoulPoints = tonumber(spendableSoulPoints)
-  totalCommitedSoulPoints = tonumber(totalCommitedSoulPoints)
-  maximumPermanentEchoes = tonumber(maximumPermanentEchoes)
+  -- Header: selectedId,ashSpendable,ashBanked,permanentEchoes[,shardSpendable,shardBanked,
+  -- essenceSpendable,essenceBanked,artisanSpendable,artisanBanked]. The six trailing numbers
+  -- are the other currencies (2026-09); an older server simply omits them.
+  local nums = {}
+  for n in globalPart:gmatch("(%d+)") do table.insert(nums, tonumber(n)) end
+  local selectedLoadoutId, spendableSoulPoints, totalCommitedSoulPoints, maximumPermanentEchoes =
+    nums[1], nums[2], nums[3], nums[4]
 
   if not spendableSoulPoints then
     return nil
+  end
+
+  local pools = nil
+  if nums[10] then
+    pools = {
+      shard   = { spendable = nums[5], banked = nums[6] },
+      essence = { spendable = nums[7], banked = nums[8] },
+      artisan = { spendable = nums[9], banked = nums[10] },
+    }
   end
 
   local result = {
@@ -34,6 +44,7 @@ local function parseLoadoutData(dataString)
     spendableSoulPoints = spendableSoulPoints,
     totalCommitedSoulPoints = totalCommitedSoulPoints or 0,
     maximumPermanentEchoes = maximumPermanentEchoes,
+    pools = pools,
     loadouts = {}
   }
   if loadoutsPart and loadoutsPart ~= "" then
@@ -149,17 +160,51 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_SKILL_TREE_UPDATE_SPELL_
 
 
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_UPDATED_COMMITTED_SOUL_POINTS, function(body)
-  -- Parse les deux valeurs: totalSpendable,totalCommitted
-  local spendable, committed = body:match("(%d+),(%d+)")
-  local totalSpendable = tonumber(spendable)
-  local totalCommitted = tonumber(committed)
+  -- "ashSpendable,ashBanked" or, since 2026-09, the four pools as spendable,banked pairs
+  -- in currency order (ash, shards, essence, artisan) - eight numbers.
+  local nums = {}
+  for n in body:gmatch("(%d+)") do table.insert(nums, tonumber(n)) end
+  local totalSpendable = nums[1]
+  local totalCommitted = nums[2]
 
   if not totalSpendable or not totalCommitted then
     return
   end
 
+  local pools = nil
+  if nums[8] then
+    pools = {
+      shard   = { spendable = nums[3], banked = nums[4] },
+      essence = { spendable = nums[5], banked = nums[6] },
+      artisan = { spendable = nums[7], banked = nums[8] },
+    }
+  end
+
+  -- Texte flottant sur un gain : on compare le BANQUE (ce qui a ete gagne) et pas le
+  -- depensable, qui baisse aussi quand on achete un noeud. Rien au premier paquet, sinon
+  -- toute la banque defilerait a la connexion.
+  if pools then
+    local prev = ProjectEbonhold.lastBankedPools
+    if prev and ProjectEbonhold.PlayerRunService and ProjectEbonhold.PlayerRunService.ShowChangeAnimation
+       and not (ProjectEbonholdOptionsService and not ProjectEbonholdOptionsService:GetSetting("showFloatingText")) then
+      local n = 0
+      for _, cur in ipairs({ { "shard", "Soul Shard(s)" }, { "essence", "Soul Essence" }, { "artisan", "Artisan Soul" } }) do
+        local key, label = cur[1], cur[2]
+        local gained = (pools[key].banked or 0) - (prev[key] or 0)
+        if gained > 0 then
+          ProjectEbonhold.PlayerRunService.ShowChangeAnimation(
+            "|cff00FF00+" .. ProjectEbonhold.FormatThousands(gained) .. "|r " .. label, true, 50 + n * 40)
+          n = n + 1
+        end
+      end
+    end
+    ProjectEbonhold.lastBankedPools = {
+      shard = pools.shard.banked, essence = pools.essence.banked, artisan = pools.artisan.banked,
+    }
+  end
+
   if ProjectEbonhold and ProjectEbonhold.SkillTree and ProjectEbonhold.SkillTree.UpdateTotalSoulPoints then
-    ProjectEbonhold.SkillTree.UpdateTotalSoulPoints(totalSpendable, totalCommitted)
+    ProjectEbonhold.SkillTree.UpdateTotalSoulPoints(totalSpendable, totalCommitted, pools)
   else
   end
 

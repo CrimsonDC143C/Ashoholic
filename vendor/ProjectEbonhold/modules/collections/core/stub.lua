@@ -180,7 +180,11 @@ ez.AceAddon = {
     ScheduleTimer = function(_, fn, delay)
         if C_Timer and C_Timer.After then return C_Timer.After(delay, fn) end
     end,
-    CancelTimer = noop,
+    -- Was a noop: the wardrobe's item-cache tickers (0.1 s) then never stopped, and a
+    -- new one started each time an item was missing from the cache.
+    CancelTimer = function(_, handle)
+        if type(handle) == "table" and handle.Cancel then handle.Cancel() end
+    end,
     CancelAllTimers = noop,
 }
 
@@ -250,9 +254,17 @@ function ez:SendAddonCommand(msg) --[[ TODO: route to ProjectEbonhold.sendToServ
 -- a hidden tooltip SetHyperlink (the robust cache-warm method). The wardrobe
 -- polls GetItemInfo and dresses each model once its item arrives.
 local queryTooltip
+-- [itemID] = GetTime() of its last query. The wardrobe's 0.1 s cache tickers call
+-- this for every still-missing item on each pass: one server query per item every
+-- few seconds is enough, not ten a second (ids the server never answers included).
+local lastQueried = {}
+local REQUERY_DELAY = 5
 function ez:QueryItem(itemID)
     if type(itemID) ~= "number" or itemID == 0 then return end
     if GetItemInfo(itemID) then return end            -- already cached
+    local now = GetTime()
+    if lastQueried[itemID] and now - lastQueried[itemID] < REQUERY_DELAY then return end
+    lastQueried[itemID] = now
     if not queryTooltip then
         queryTooltip = CreateFrame("GameTooltip", "ezCollectionsItemQueryTooltip", nil, "GameTooltipTemplate")
     end

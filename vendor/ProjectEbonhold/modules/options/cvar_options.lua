@@ -130,14 +130,6 @@ local FONT_RENDERING_CVAR = {
     reloadRequired = true,
 }
 
-local STANCE_CVAR = {
-    name = "enableStancePatch",
-    label = "Enable Stance/Form Swap Patch",
-    desc = "Allows you to change stance/form and cast an ability in a single click when using macros.",
-    type = "toggle",
-    default = 1,
-}
-
 -- ────────────────────────────────────────────────────────────────────────────
 -- Helpers
 -- ────────────────────────────────────────────────────────────────────────────
@@ -406,7 +398,6 @@ function CVarOptions.Build(parent, yOffset, hookWheel, contentWidth)
 
     yOffset = buildSection(parent, "Camera",         CAMERA_CVARS,    yOffset, hookWheel, contentWidth, refreshList)
     yOffset = buildSection(parent, "Font Rendering", { FONT_RENDERING_CVAR }, yOffset, hookWheel, contentWidth, refreshList)
-    yOffset = buildSection(parent, "Stance Option",  { STANCE_CVAR },  yOffset, hookWheel, contentWidth, refreshList)
 
     CVarOptions._refreshList = refreshList
     return yOffset
@@ -423,19 +414,26 @@ function CVarOptions.Refresh()
     end
 end
 
--- Apply the one-time defaults the user asked for: Font Rendering enabled (1),
--- Stance Patch enabled (1). Stored via ProjectEbonholdOptionsService so we
--- only do this on first install.
+-- Apply the one-time defaults the user asked for: Font Rendering enabled (1).
+-- Stored via ProjectEbonholdOptionsService so we only do this on first install.
+--
+-- The Stance Patch is forced OFF on every load, not once: AwesomeWotlkLib's
+-- patch writes the new form byte through [object+4] instead of the
+-- descriptor pointer [object+8], one byte into an unrelated heap block on
+-- every form change. The client then crashes later in PlayerName / font code
+-- (pointers 0x03000000 / 0x05000000 / 0x08000000 = travel / bear / dire bear).
+-- Players who got it enabled keep it in Config.wtf, hence every load.
 function CVarOptions.ApplyInitialDefaults()
+    if GetCVar("enableStancePatch") ~= nil and GetCVar("enableStancePatch") ~= "0" then
+        SetCVar("enableStancePatch", 0)
+    end
+
     local svc = _G.ProjectEbonholdOptionsService
     if not svc then return end
     if svc:GetSetting("cvarInitialDefaultsApplied") then return end
 
     if GetCVar("MSDFMode") ~= nil then
         SetCVar("MSDFMode", 1)
-    end
-    if GetCVar("enableStancePatch") ~= nil then
-        SetCVar("enableStancePatch", 1)
     end
     -- Disable the base game's tutorial popups by default.
     SetCVar("showTutorials", 0)

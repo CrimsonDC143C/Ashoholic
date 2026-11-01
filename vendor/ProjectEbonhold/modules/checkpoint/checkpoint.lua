@@ -222,15 +222,22 @@ local function AcquirePin(index, parentFrame)
     pin:SetScript("OnEnter", function(self)
         checkpointTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
         checkpointTooltip:ClearLines()
-        checkpointTooltip:AddLine(self.nodeName or "Flight Path", 1, 0.82, 0)
+        checkpointTooltip:AddLine(self.nodeName or "Waystone", 1, 0.82, 0)
+        -- Discovery is account-wide (taximask / account_meetingstone_checkpoints): the undiscovered
+        -- side says so (2026-10-22); the discovered side stays one line (owner, 2026-10-26).
         if self.isUnlocked then
-            checkpointTooltip:AddLine("Click to travel to this checkpoint.", 1, 1, 1, true)
+            checkpointTooltip:AddLine("Click to travel to this waystone.", 1, 1, 1, true)
+            if self.viaGroup then
+                checkpointTooltip:AddLine("Opened by a member of your group.", 0.6, 0.8, 1, true)
+            end
         elseif self.kind == "MEETINGSTONE" or self.kind == "MEETINGSTONE_RAID" then
-            checkpointTooltip:AddLine("Not yet unlocked, visit the meeting stone to unlock this checkpoint and gain the ability to teleport.", 1, 0.35, 0.35,
+            checkpointTooltip:AddLine("Undiscovered. Walk onto this waystone to discover it.", 1, 0.35, 0.35,
                 true)
+            checkpointTooltip:AddLine("Once discovered, it opens for all your characters.", 0.6, 0.8, 1, true)
         else
-            checkpointTooltip:AddLine("Not yet unlocked, speak to the flight master to unlock it and gain the ability to teleport.", 1, 0.35, 0.35,
+            checkpointTooltip:AddLine("Undiscovered. Walk onto this waystone to discover it.", 1, 0.35, 0.35,
                 true)
+            checkpointTooltip:AddLine("Once discovered, it opens for all your characters.", 0.6, 0.8, 1, true)
         end
         checkpointTooltip:Show()
     end)
@@ -240,10 +247,6 @@ local function AcquirePin(index, parentFrame)
     end)
 
     pin:SetScript("OnClick", function(self)
-        if self.isFactionAllowed == false then
-            return
-        end
-
         if not self.isUnlocked then
             return
         end
@@ -272,7 +275,11 @@ function CheckpointUI.RefreshPins()
         HideUnusedPins(1)
         return
     end
-    if not WorldMapDetailFrame:IsShown() then
+    -- IsVisible, not IsShown: the detail frame is never hidden itself (its parent
+    -- is), so IsShown was true with the map closed and every WORLD_MAP_UPDATE
+    -- (the quest POI refresh raises one every 2 s) re-laid ~200 checkpoints.
+    -- Opening the map refreshes through the OnShow hook below.
+    if not WorldMapDetailFrame:IsVisible() then
         HideUnusedPins(1)
         return
     end
@@ -290,7 +297,7 @@ function CheckpointUI.RefreshPins()
     local checkpoints = ProjectEbonhold.CheckpointService.GetCheckpoints()
 
     for _, checkpoint in ipairs(checkpoints) do
-        if checkpoint.mapId == currentMapId and checkpoint.factionAllowed ~= false then
+        if checkpoint.mapId == currentMapId then
             local absX, absY = ConvertToContinentCoords(checkpoint.mapId, checkpoint.x, checkpoint.y)
             if absX and absY and IsInsideRect(currentMapId, absX, absY) then
                 local relX, relY = ConvertToMapRelativeCoords(currentMapId, absX, absY)
@@ -301,8 +308,8 @@ function CheckpointUI.RefreshPins()
                     pin:SetPoint("CENTER", mapFrame, "TOPLEFT", relX * width, -relY * height)
                     pin.checkpointId = checkpoint.id
                     pin.nodeName = checkpoint.name
-                    pin.isFactionAllowed = checkpoint.factionAllowed
                     pin.isUnlocked = checkpoint.unlocked
+                    pin.viaGroup = checkpoint.viaGroup
                     pin.kind = checkpoint.kind
 
                     -- Pins are pooled/reused, so set the icon and size per kind.

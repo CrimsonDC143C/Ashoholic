@@ -1,18 +1,10 @@
 ProjectEbonhold = ProjectEbonhold or {}
 
-LFD_RANDOM_REWARD_EXPLANATION1 = "The first 3 random dungeons that you complete each day will earn you:"
+-- Rewritten at runtime by modules/dungeonFinder (the orb count depends on the Torment picked).
+LFD_RANDOM_REWARD_EXPLANATION1 = "Every dungeon you complete through the Dungeon Finder earns Orbs of Lost Memories."
+LFD_RANDOM_REWARD_EXPLANATION2 = LFD_RANDOM_REWARD_EXPLANATION1
     
-ProjectEbonhold.ActionTypes = {
-    INSTANCE_RESET = 1,
-}
-
-ProjectEbonhold.InstanceResetConfig = {
-    BASE_COST = 50000,
-    COST_MULTIPLIER = 5,
-}
-
 ProjectEbonhold.Constants = {
-    MAX_INTENSITY = 475,
     MAX_SOUL_ASHES = 428303860,
     -- Committed Soul Ashes required to unlock a prestige (display value;
     -- must mirror PrestigeHandler::PRESTIGE_GATE_SOUL_ASHES server-side)
@@ -48,50 +40,10 @@ ProjectEbonhold.Constants = {
     -- which subtracts everything above PrestigeHandler::PRESTIGE_BONUS_MAX_TOTAL before any
     -- reward is computed; mirrored here only so the preview never promises past it.
     PRESTIGE_SOUL_ASH_BONUS_MAX_TOTAL = 100.0,
-    -- Intensity Levels
-    INTENSITY_LEVEL_1 = 75,
-    INTENSITY_LEVEL_2 = 200,
-    INTENSITY_LEVEL_3 = 275,
-    INTENSITY_LEVEL_4 = 400,
-    INTENSITY_LEVEL_5 = 475,
     ENABLE_BANISH_SYSTEM = true,
     -- Transmog
     TRANSMOG_DEBUG_ENABLED = false,
     OUTFIT_DEBUG_ENABLED = false,
-}
-
-ProjectEbonhold.IntensityEffects = {
-    {
-        name = "Intensity I",
-        icon = "Interface\\Icons\\spell_nzinsanity_chasedbyshadows",
-        description =
-        "Soul Ash gain increased by 20%.\n\nThe darkness grows restless. Corrupted creatures surge, their blows infused with shadow energy. These twisted beings are stronger and more resilient and are dealing shadow damage on hit.",
-    },
-    {
-        name = "Intensity II",
-        icon = "Interface\\Icons\\spell_shadow_twistedfaith",
-        description =
-            "Soul Ash gain increased by 30%.\n\nThe Lich King's gaze falls upon you. Periodically, a searing shadow mark scorches the ground beneath your feet, " ..
-            "dealing 5% of your maximum health as damage after 3 seconds, and then detonates and dealing shadow damage and those struck suffer increased shadow damage taken.",
-    },
-    {
-        name = "Intensity III",
-        icon = "Interface\\Icons\\achievement_boss_lichking",
-        description =
-        "Soul Ash gain increased by 40%.\n\nThe shadow marks grow more volatile. Up to 3 more can now scorch the ground simultaneously at random location, and their dark energy seeps into nearby creatures, healing them.",
-    },
-    {
-        name = "Intensity IV",
-        icon = "Interface\\Icons\\spell_shadow_unstableaffliction_3",
-        description =
-        "Soul Ash gain increased by 50%.\n\nThe Lich King unleashes periodically his Champions",
-    },
-    {
-        name = "Intensity V",
-        icon = "Interface\\Icons\\spell_shadow_deathscream",
-        description =
-        "If you survive for 10 minutes, the Lich King will send the Reaper after you.",
-    }
 }
 
 ProjectEbonhold.SoulAshesMilestones = {
@@ -102,8 +54,8 @@ ProjectEbonhold.SoulAshesMilestones = {
     { soulAshes = 215000000, spellID = 101263 }
 }
 
---- Committed Soul Ashes required to run a Hardcore difficulty tier, keyed by difficulty tier.
---- Tier 1 is Normal and is never gated; tier N (>= 2) is Hardcore N-1.
+--- Committed Soul Ashes required to run a Torment difficulty tier, keyed by difficulty tier.
+--- Tier 1 is Normal and is never gated; tier N (>= 2) is Torment N-1.
 ---
 --- NOT derived from the Soul Ashes milestones above: the two are unrelated, and reading the
 --- milestones gave gates up to three times too high. Written out in full for that reason.
@@ -113,8 +65,8 @@ ProjectEbonhold.SoulAshesMilestones = {
 --- re-checked on every difficulty-switch path; the two MUST be retuned together, exactly
 --- like PRESTIGE_GATE_SOUL_ASHES mirrors PrestigeHandler::PRESTIGE_GATE_SOUL_ASHES.
 ProjectEbonhold.HARDCORE_SOUL_ASH_GATES = {
-    -- EMPTY: no tier costs Soul Ashes anymore. Hardcore access is gated by the "Ahead of the
-    -- Curve" achievements alone (HARDCORE_ACHIEVEMENT_GATES below). Kept as a table because a
+    -- EMPTY: no tier costs Soul Ashes anymore. Torment access is gated by the "Unlocking
+    -- Torment" achievements alone (HARDCORE_ACHIEVEMENT_GATES below). Kept as a table because a
     -- realm can put a floor back from config (Ashendor.Hardmode.SoulAshGates) - mirror it here
     -- if that ever happens, or the UI will advertise a tier the server refuses.
 }
@@ -128,25 +80,33 @@ ProjectEbonhold.GetHardcoreSoulAshGate = function(tier)
     return ProjectEbonhold.HARDCORE_SOUL_ASH_GATES[tier] or 0
 end
 
---- Achievement required to run a Hardcore difficulty tier, keyed by difficulty tier.
---- "Ahead of the Curve" I-V (6478-6482): each asks for a raid final boss killed at the tier
---- BELOW the one it unlocks, so access is proven by content cleared rather than by a balance.
+--- Achievement required to run a Torment difficulty tier, keyed by difficulty tier.
+--- "Unlocking Torment" I-X (6478-6487): each asks for content cleared at the tier BELOW the one
+--- it unlocks - EITHER any raid boss OR ten Northrend dungeons at level 80 - so access is proven by content
+--- cleared rather than by a balance, and a group is never the only way up.
 ---
----   Hardcore 1 (tier 2) : Kel'Thuzad on Normal
----   Hardcore 2 (tier 3) : Yogg-Saron on Hardcore 1 or higher
----   Hardcore 3 (tier 4) : Anub'arak on Hardcore 2 or higher
----   Hardcore 4 (tier 5) : the Lich King (ICC 25) on Hardcore 3 or higher
----   Hardcore 5 (tier 6) : Halion on Hardcore 4 or higher
+---   Torment 1 (tier 2)  : cleared on Normal
+---   Torment 2 (tier 3)  : cleared on Torment 1
+---   ...
+---   Torment 10 (tier 11): cleared on Torment 9
 ---
---- CLIENT-SIDE ONLY, like the Soul Ash table above: the server re-checks its own copy on every
---- difficulty-switch path. Unlike Soul Ashes, achievement state is per CHARACTER and is known
---- to the client immediately, so nothing here has to wait on a server push.
+--- Torment 11-30 have NO achievement: they are cosmetic rungs above the ladder, health and
+--- damage only, and are gated by holding Torment 10 rather than by a feat of their own.
+---
+--- CLIENT-SIDE ONLY, like the Soul Ash table above: the server re-checks its own copy
+--- (HardmodeMgr::GetAchievementGate) on every difficulty-switch path. Unlike Soul Ashes,
+--- achievement state is known to the client immediately, so nothing here waits on a server push.
 ProjectEbonhold.HARDCORE_ACHIEVEMENT_GATES = {
-    [2] = 6478,   -- Ahead of the Curve I
-    [3] = 6479,   -- Ahead of the Curve II
-    [4] = 6480,   -- Ahead of the Curve III
-    [5] = 6481,   -- Ahead of the Curve IV
-    [6] = 6482,   -- Ahead of the Curve V
+    [2]  = 6478,   -- Unlocking Torment I
+    [3]  = 6479,   -- Unlocking Torment II
+    [4]  = 6480,   -- Unlocking Torment III
+    [5]  = 6481,   -- Unlocking Torment IV
+    [6]  = 6482,   -- Unlocking Torment V
+    [7]  = 6483,   -- Unlocking Torment VI
+    [8]  = 6484,   -- Unlocking Torment VII
+    [9]  = 6485,   -- Unlocking Torment VIII
+    [10] = 6486,   -- Unlocking Torment IX
+    [11] = 6487,   -- Unlocking Torment X
 }
 
 ---@param tier number difficulty tier (1 = Normal)
@@ -154,6 +114,10 @@ ProjectEbonhold.HARDCORE_ACHIEVEMENT_GATES = {
 ProjectEbonhold.GetHardcoreAchievementGate = function(tier)
     tier = tonumber(tier) or 1
     if tier < 2 then return 0 end
+
+    -- Torment 11-30 are cosmetic and have no achievement of their own: they are gated by the last
+    -- rung of the ladder, exactly as HardmodeMgr::GetAchievementGate does server-side.
+    if tier > 11 then tier = 11 end
 
     return ProjectEbonhold.HARDCORE_ACHIEVEMENT_GATES[tier] or 0
 end
@@ -180,7 +144,16 @@ ProjectEbonhold.UITexts = {
     tooltips = {
         soulPoints = {
             title = function(sp) return "Soul Ashes: " .. ProjectEbonhold.FormatThousands(sp) end,
-            line = "When you die, your Soul Ashes will be added to your Skill Tree.",
+            line = "Earned this run. Banked when you make an offering at a Spirit Healer or accept death.",
+        },
+        soulShards = {
+            title = function(n) return "Soul Shards: " .. ProjectEbonhold.FormatThousands(n) end,
+            line = "Earned this run. Banked with your Soul Ashes.",
+        },
+        shardMultiplier = {
+            title = function(pct) return "Soul Shard Multiplier: +" .. pct .. "%" end,
+            line =
+            "Raised by Endless Harvest."
         },
         multiplier = {
             title = function(mult)
@@ -188,33 +161,26 @@ ProjectEbonhold.UITexts = {
                     string.format("%.0f", mult * 100) .. "%"
             end,
             line =
-            "This is your Soul Ash gain multiplier. You can increase it by completing achievements and reaching higher Intensity levels."
-        },
-        reaper = {
-            title = "The Reaper",
-            spawned = function(areaName)
-                return "The Reaper is in |cffFF4500" .. areaName .. "|r"
-            end,
-            notSpawned = "The Reaper is not spawned"
+            "Raised by achievements and Endless Harvest."
         },
         survival = {
-            title = "Survival Stats",
-
-            playerRezs = "Player-Granted Resurrections (Max Allowed): ",
-            freeRezs = "Free Self-Resurrections (No Soul Ash Cost): ",
-            classRezs = "Class-Based Resurrections (Reincarnate, Soulstone): ",
-            cheatDeath = "Cheat Death Charges: ",
-            nextRezCost = "Cost of Next Resurrection: ",
-            nextCost = " Soul Ash"
-        },
-        intensity = {
-            title = function(intensity)
-                return "Intensity: " .. intensity
+            title = "Resurrections",
+            paidRezs = function(used, ashes, shards, affordable)
+                if affordable then
+                    return "Soul Ash resurrection: |cffEB0000" .. ashes .. " Ashes, " .. shards .. " Shards|r (" .. used .. " used this run)"
+                end
+                return "Soul Ash resurrection: |cff888888not enough Soul Ashes|r (" .. used .. " used this run)"
             end,
-            description1 =
-            "Defeating enemies more quickly raises your intensity faster, while killing grey enemies grants no intensity. Your intensity gradually decays while you are out of combat. Below are the effects of each intensity threshold. ",
-            warning =
-            "Warning: Staying alive at Intensity Level 5 for 10 minutes will unleash the Wrath of the Lich King!"
+            friendRezs = function(left, max)
+                return "Player resurrection: " .. left .. "/" .. max .. " this run"
+            end,
+            hint = "Each Soul Ash resurrection costs more than the last. Counters reset on accept death.",
+        },
+        -- The Reaper's Gaze bar (player_run_ui.lua): the explanation lives in the run tour
+        bracket = {
+            title = "The Reaper's Gaze",
+            rules =
+            "Dying loses the contracts in progress; the bonus stays. Accepting death ends the run: its ashes are banked without the bonus, and the bonus is gone.",
         }
     },
     ui = {
@@ -226,6 +192,17 @@ ProjectEbonhold.UITexts = {
 }
 
 
+-- Death buttons are narrow: 2515648 -> "2.5M", 314456 -> "314K", 256 -> "256".
+local function ShortNumber(n)
+    n = tonumber(n) or 0
+    if n >= 1e6 then return (string.format("%.1fM", n / 1e6):gsub("%.0M", "M")) end
+    if n >= 1e3 then return string.format("%dK", math.floor(n / 1e3)) end
+    return tostring(n)
+end
+
+local DEATH_ASH_ICON   = " |TInterface\\Icons\\inv_soulash:14:14:0:0|t"
+local DEATH_SHARD_ICON = " |TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_frost:14:14:0:0|t"
+
 ProjectEbonhold.DeathTexts = {
     frame = {
         title = "You are dead",
@@ -236,66 +213,68 @@ ProjectEbonhold.DeathTexts = {
     },
 
     buttons = {
-        acceptDeath = function(soulPointsGain)
-            return "Accept Death    |cff00FF00+" .. tostring(soulPointsGain) ..
-                " Soul Ashes|r"
+        acceptDeath = function(soulPointsGain, soulShardsGain)
+            local text = "Accept Death  |cff00FF00+" .. ShortNumber(soulPointsGain) .. "|r" .. DEATH_ASH_ICON
+            if (soulShardsGain or 0) > 0 then
+                text = text .. " |cff8080ff+" .. ShortNumber(soulShardsGain) .. "|r" .. DEATH_SHARD_ICON
+            end
+            return text
         end,
         releaseSpirit = "Release Spirit",
-        useSoulstone = function(text, countCanClassRezs)
-            return "Resurrect with " .. text .. " " ..
-                tostring(countCanClassRezs) .. " remaining"
+        useSoulstone = function(text)
+            return "Resurrect with " .. text
         end,
-        selfRezAvailable = function(count)
-            return "Resurrect without penalty " .. tostring(count) ..
-                " remaining"
+        soulPointsAffordable = function(ashes, shards)
+            local text = "Resurrect  |cffEB0000-" .. ShortNumber(ashes) .. "|r" .. DEATH_ASH_ICON
+            if (shards or 0) > 0 then
+                text = text .. " |cffEB0000-" .. ShortNumber(shards) .. "|r" .. DEATH_SHARD_ICON
+            end
+            return text
         end,
-        soulPointsAffordable = function(cost)
-            return "Resurrect |cffEB0000-" .. cost .. "|r Soul Ashes"
-        end,
-        acceptPlayerRez = function(count)
-            return "Player Resurrection (" .. tostring(count) .. " remaining)"
+        acceptPlayerRez = function(left, max)
+            return "Player Resurrection  (" .. tostring(left) .. "/" .. tostring(max) .. ")"
         end
     },
 
     confirmations = {
         acceptDeath = {
             title = "Confirm Accept Death",
-            message = function(soulPointsGain)
-                return "You will gain " .. soulPointsGain ..
-                    " Soul Ashes that you can spend in the Skill Tree.\n\nYour equipped gear will be sent to your inventory, and you will be reset to level 1 and teleported to your starting zone.\n\nAre you sure?"
-            end
-        },
-        selfRez = {
-            title = "Confirm Self Resurrection",
-            message = function(remaining)
-                return
-                    "Use one of your remaining self resurrections?\n\nYou will be resurrected at the nearest graveyard.\n\n(" ..
-                    remaining .. " remaining)"
+            message = function(soulPointsGain, soulShardsGain)
+                local gains = soulPointsGain .. " Soul Ashes"
+                if (soulShardsGain or 0) > 0 then
+                    gains = gains .. " and " .. soulShardsGain .. " Soul Shards"
+                end
+                -- What PlayerRunHandler::AcceptDeath really does (checked 2026-10-22): ResetPlayer
+                -- (level 1, quests, unlocked perks, start zone), CallboardMgr::OnAcceptDeath (board
+                -- contracts dropped), ComputeGearToKeepEquippedAtLevelOne + TransferAndDestroyEquippedItems
+                -- (wearable gear stays on, the rest to the bags), CommitAllSoulPoints (ashes + shards
+                -- banked), LearnAllTreeSkills / ApplyOwnedNodes (tree and class nodes re-applied).
+                return "|cffff4040You lose:|r your level, quests, contracts and unlocked echoes.\n\n" ..
+                    "|cff00ff00You keep:|r " .. gains .. ", your Skill Tree, locked echoes and gear.\n\n" ..
+                    "Are you sure?"
             end
         },
         soulPointsRez = {
             title = "Confirm Soul Ashes Resurrection",
-            message = function(cost, remaining)
-                return "Use " .. cost ..
-                    " Soul Ashes to resurrect?\n\nYou will have " ..
-                    remaining .. " Soul Ashes remaining and will be resurrected at the nearest graveyard."
+            message = function(ashes, shards, ashesLeft, shardsLeft)
+                return "Pay " .. ashes .. " Soul Ashes and " .. shards ..
+                    " Soul Shards from your run to resurrect?\n\nYour run will keep " ..
+                    ashesLeft .. " Soul Ashes and " .. shardsLeft .. " Soul Shards. You will be resurrected at the nearest graveyard."
             end
         },
         soulstone = {
             title = function(text)
                 return "Confirm " .. text .. " Usage"
             end,
-            message = function(text, remaining)
+            message = function(text)
                 return "Use your " ..
-                    text .. " to resurrect?\n\nYou will be resurrected at the nearest graveyard.\n\n(" ..
-                    remaining .. " class resurrections remaining)"
+                    text .. " to resurrect?\n\nYou will be resurrected at the nearest graveyard."
             end
         },
         acceptPlayerRez = {
             title = "Confirm Player Resurrection",
-            message = function(remaining)
-                return "Accept resurrection from another player?\n\nYou will be resurrected at your friend's location.\n\n(" ..
-                    remaining .. " accepted resurrections remaining)"
+            message = function()
+                return "Accept resurrection from another player?\n\nYou will be resurrected at your friend's location."
             end
         }
     },
@@ -304,57 +283,36 @@ ProjectEbonhold.DeathTexts = {
     tooltips = {
         acceptDeath = {
             title = "Accept Death",
-            line1 = function(soulPointsGain)
+            line1 = function(soulPointsGain, soulShardsGain)
+                if (soulShardsGain or 0) > 0 then
+                    return "You will gain " .. soulPointsGain .. " Soul Ashes and " .. soulShardsGain .. " Soul Shards."
+                end
                 return "You will gain " .. soulPointsGain .. " Soul Ashes."
             end,
             line2 = "Soul Ashes can be spent in the Skill Tree to unlock powerful abilities."
         },
-        selfRez = {
-            title = "Self Resurrection",
-            line1 = "Revive without any penalty.",
-            line2 = function(remaining)
-                return "You have " .. remaining .. " remaining."
-            end
-        },
         soulPointsRez = {
             title = "Soul Ashes Resurrection",
-            canAfford = {
-                line1 = function(cost)
-                    return "Use " .. cost .. " Soul Ashes to resurrect."
-                end,
-                line2 = "This will deduct Soul Ashes from your current run, not from your Skill Tree.",
-                line3 = function(remaining)
-                    return "You will have " .. remaining ..
-                        " Soul Ashes remaining in this run."
-                end
-            },
-            cantAfford = {
-                line1 = function(cost)
-                    return "You need " .. cost .. " Soul Ashes to resurrect."
-                end,
-                line2 = function(current)
-                    return "You currently have " .. current ..
-                        " Soul Ashes in this run."
-                end
-            }
+            line1 = function(ashes, shards)
+                return "Pay " .. ashes .. " Soul Ashes and " .. shards .. " Soul Shards from your run to resurrect."
+            end,
+            line2 = "Paid from your run, not your account. Each one costs more than the last.",
+            line3 = function(used)
+                return used .. " used this run."
+            end,
+            tooPoor = "Your run does not hold enough Soul Ashes."
         },
         soulstone = {
             title = function(text) return "Use " .. text end,
             line1 = function(text)
                 return "Use your " .. text .. " to resurrect."
             end,
-            line2 = function(remaining)
-                return "You have " .. remaining ..
-                    " class resurrections remaining."
-            end
+            line2 = "Unlimited uses, no penalty."
         },
         acceptPlayerRez = {
             title = "Accept Player Resurrection",
             line1 = "Accept resurrection from another player.",
-            line2 = function(remaining)
-                return "You have " .. remaining ..
-                    " accepted resurrections remaining."
-            end
+            line2 = "Free. You can accept one player resurrection per run. Any player can bring you back."
         }
     },
 
@@ -370,5 +328,68 @@ ProjectEbonhold.DeathTexts = {
             soulPointsRez = "Soul Ashes resurrection confirmed - Custom call to implement",
             acceptPlayerRez = "Accept Player Resurrection confirmed - Custom call to implement"
         }
+    }
+}
+
+
+ProjectEbonhold.DeathRecapTexts = {
+    button = "Death Recap",
+
+    frame = {
+        title = "Death Recap",
+        killedBy = function(name)
+            return "Killed by |cffFF4500" .. name .. "|r"
+        end,
+        killedByUnknown = "The killing blow was not recorded.",
+        empty = "No combat damage was recorded before this death."
+    },
+
+    labels = {
+        melee = "Melee",
+        instakill = "Instant Kill",
+        unknownSource = "Unknown",
+        secondsBefore = function(seconds)
+            return string.format("%.1fs before death", seconds)
+        end,
+        -- Row lines are narrow, so they use the short form and leave the full wording to tooltips.
+        secondsShort = function(seconds)
+            return string.format("%.1fs", seconds)
+        end,
+        hpLeft = function(current, max)
+            return string.format("%s / %s", current, max)
+        end
+    },
+
+    tooltip = {
+        damageTaken = function(amount)
+            return "Damage taken: |cffFF4040" .. amount .. "|r"
+        end,
+        healReceived = function(amount)
+            return "Healing received: |cff40FF40" .. amount .. "|r"
+        end,
+        critical = "Critical",
+        overkill = function(amount)
+            return "Overkill: " .. amount
+        end,
+        absorbed = function(amount)
+            return "Absorbed: " .. amount
+        end,
+        resisted = function(amount)
+            return "Resisted: " .. amount
+        end,
+        blocked = function(amount)
+            return "Blocked: " .. amount
+        end,
+        overhealing = function(amount)
+            return "Overhealing: " .. amount
+        end,
+        healthAfter = function(current, max, percent)
+            return string.format("Health: %s / %s (%d%%)", current, max, percent)
+        end,
+        healthNote = "Health is sampled when the event is received, so it can lag the log by a fraction of a second."
+    },
+
+    slash = {
+        noRecap = "|cffFFFF00Project Ebonhold:|r no death recap recorded yet."
     }
 }

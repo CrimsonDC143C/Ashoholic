@@ -17,6 +17,12 @@ Perks.maximumPermanentEchoes = 0
 Perks.pendingBanishIndex = nil -- Track which perk index is being banished
 Perks.pendingRollsCount = nil  -- Optional: if server sends "N|..." we use this; else we use level vs picksMade
 
+-- Echoes already taken whose stack the server has not sent back yet. A pick fires
+-- RequestChoice AND RequestGrantedPerks together, and the next choice can land
+-- first -- without this the automatic pick would read a stale count and take a
+-- second stack of something the build only asked once for.
+local pendingPicks = {}
+
 local _charKey = nil
 local function GetPerkPicksMadeCharKey()
     if not _charKey then
@@ -111,8 +117,10 @@ end)
 
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_PERK_CHOICE,
     function(body)
-        local wasReroll = Perks.pendingReroll and true or false
+        -- An orb redraw counts as a reroll too: both repopulate the cards in place
+        local wasReroll = (Perks.pendingReroll or Perks.pendingOrbReroll) and true or false
         Perks.pendingReroll = nil
+        Perks.pendingOrbReroll = nil
         Perks.pendingRequest = false
 
         if not body or body == "" then
@@ -139,18 +147,33 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_PERK_CHOICE,
 
         local choices = {}
         local count = 0
+        -- Spec draw (level 10 / 20 / ... 80): the server appends "S,<chosen spec family>".
+        -- chosen = 0 is the level 10 draw (one card per spec, the spec is being chosen),
+        -- otherwise the three cards are echoes of that spec. nil = an ordinary draw.
+        Perks.currentSpecDraw = nil
         for perkPair in string.gmatch(bodyToParse, "([^;]+)") do
-            local spellIdStr, qualityStr, isFrozenStr = perkPair:match("^([^,]+),([^,]+),?([^,]*)$")
+            local specChosenStr = perkPair:match("^S,(%d+)$")
+            if specChosenStr then
+                Perks.currentSpecDraw = { chosen = tonumber(specChosenStr) or 0 }
+            end
+            -- spellId,quality,flag[,memoryRemaining] - the 4th field only rides on the
+            -- memory card (flag 3): souvenir stacks the climb still owes.
+            local spellIdStr, qualityStr, isFrozenStr, extraStr = perkPair:match("^([^,]+),([^,]+),?([^,]*),?([^,]*)$")
             if spellIdStr and qualityStr then
                 local spellId = tonumber(spellIdStr)
                 local quality = tonumber(qualityStr)
                 local isFrozenVal = tonumber(isFrozenStr) or 0
                 local isFrozen = (isFrozenVal == 1)
                 local isCarried = (isFrozenVal == 2)
-                local isGuaranteed = (isFrozenVal == 3) -- injected from the active server build slot
+                -- Flag 3 = the MEMORY card: an echo of this loadout's engraved build, offered
+                -- next to the three random draws. Taking a random card instead sacrifices it
+                -- for the rest of the climb. Kept under the historical `isGuaranteed` key:
+                -- the styling and the banish/freeze refusals are the same.
+                local isGuaranteed = (isFrozenVal == 3)
                 if spellId and spellId ~= 0 and quality then
                     table.insert(choices,
-                        { spellId = spellId, quality = quality, isFrozen = isFrozen, isCarried = isCarried, isGuaranteed = isGuaranteed })
+                        { spellId = spellId, quality = quality, isFrozen = isFrozen, isCarried = isCarried,
+                          isGuaranteed = isGuaranteed, memoryRemaining = isGuaranteed and tonumber(extraStr) or nil })
                     count = count + 1
                 end
             end
@@ -171,13 +194,24 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_PERK_CHOICE,
         -- Auto-accept: when enabled and a choice belongs to the active echo
         -- loadout, pick it immediately (highest quality first) instead of
         -- showing the selection UI.
+        -- An Orb of Lost Memories draw is deliberately exempt: the player paid an
+        -- orb to forget an echo and re-pick it by hand, so swallowing that draw
+        -- automatically forced them to toggle the option off before every spend
+        -- and back on to keep levelling.
+        local orbSvc = ProjectEbonhold.OrbService
+        local orbOfferPending = orbSvc and orbSvc.IsOfferPending and orbSvc.IsOfferPending() and true or false
         local optSvc = _G["ProjectEbonholdOptionsService"]
         local autoAcceptSetting = optSvc and optSvc.GetSetting and optSvc:GetSetting("autoAcceptLoadoutEchoes")
-        if optSvc and optSvc.GetSetting and autoAcceptSetting
-            and ProjectEbonhold.PerkService.IsSpellInActiveEchoLoadout then
+        -- The level 10 spec draw is never auto-accepted: the card taken there picks the spec
+        -- of every later spec draw of the run, so the player makes that call.
+        local choosingSpec = Perks.currentSpecDraw and Perks.currentSpecDraw.chosen == 0
+        if optSvc and optSvc.GetSetting and autoAcceptSetting and not orbOfferPending and not choosingSpec
+            and ProjectEbonhold.PerkService.WantsMoreOfEcho then
             local best
             for _, choice in ipairs(choices) do
-                if ProjectEbonhold.PerkService.IsSpellInActiveEchoLoadout(choice.spellId) then
+                -- Only a card the build still asks for, at the rarity it asked for.
+                -- Refused echoes never qualify, so they need no test of their own.
+                if ProjectEbonhold.PerkService.WantsMoreOfEcho(choice.spellId) then
                     if not best or (choice.quality or 0) > (best.quality or 0) then
                         best = choice
                     end
@@ -212,9 +246,13 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_PERK_CHOICE,
 
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_PERK_SELECTION_RESULT,
     function(body)
+        local justPicked = Perks.pendingSelectSpellId
         Perks.pendingSelectSpellId = nil -- selection resolved, unblock picks
         -- Selection succeeded
         if body >= "1" then
+            if justPicked then
+                pendingPicks[justPicked] = (pendingPicks[justPicked] or 0) + 1
+            end
             -- The pick settles a pending Orb of Lost Memories offer, which re-enables
             -- reroll/banish/freeze for every later draw. It MUST live inside this handler:
             -- onEventReceived stores one function per opcode (ServerHandlers[id] = fn), so a
@@ -251,6 +289,8 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_PERK_GRANTED,
     function(body)
         Perks.grantedPerks = {}
         Perks.lockedPerks = {}
+        -- The authoritative list is here: anything counted ahead of it is now in it
+        for k in pairs(pendingPicks) do pendingPicks[k] = nil end
 
         if not body or body == "" then
             if ProjectEbonhold and ProjectEbonhold.PlayerRunUI and ProjectEbonhold.PlayerRunUI.UpdateGrantedPerks then
@@ -494,7 +534,7 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_ECHO_DISCOVERY,
             for id in pairs(discovered) do
                 if not before[id] then
                     local data = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[id]
-                    if data and data.requiredSpell and data.requiredSpell ~= 0
+                    if data and data.isTome
                         and ProjectEbonhold.EchoJournal and ProjectEbonhold.EchoJournal.NotifyTomeLearned then
                         ProjectEbonhold.EchoJournal.NotifyTomeLearned(id)
                     end
@@ -524,10 +564,16 @@ local function GetLoadoutStore()
     return ProjectEbonholdDB.echoLoadouts
 end
 
+-- id.quality.stacks, plus a trailing ".1" ONLY on an echo the build refuses.
+-- Kept optional on purpose: a build with no refusals exports byte for byte the
+-- string it always did, and an older client reading a newer string just drops
+-- the refused entries instead of choking on the whole build.
 local function SerializeEchoes(echoes)
     local parts = {}
     for _, e in ipairs(echoes or {}) do
-        table.insert(parts, e.spellId .. "." .. (e.quality or 0) .. "." .. (e.stacks or 1))
+        local part = e.spellId .. "." .. (e.quality or 0) .. "." .. (e.stacks or 1)
+        if e.avoid then part = part .. ".1" end
+        table.insert(parts, part)
     end
     return table.concat(parts, ",")
 end
@@ -535,10 +581,11 @@ end
 local function DeserializeEchoes(str)
     local echoes = {}
     for entry in string.gmatch(str or "", "([^,]+)") do
-        local id, q, st = entry:match("^(%d+)%.(%d+)%.?(%d*)$")
+        local id, q, st, av = entry:match("^(%d+)%.(%d+)%.?(%d*)%.?(%d*)$")
         id = tonumber(id)
         if id then
-            table.insert(echoes, { spellId = id, quality = tonumber(q) or 0, stacks = tonumber(st) or 1 })
+            table.insert(echoes, { spellId = id, quality = tonumber(q) or 0,
+                stacks = tonumber(st) or 1, avoid = (tonumber(av) == 1) or nil })
         end
     end
     return echoes
@@ -626,6 +673,13 @@ function Perks.RequestGrantedPerks()
         ProjectEbonhold.CS.REQUEST_PLAYER_GRANTED_PERKS, "")
 end
 
+-- The orb's "Use Orbs" redraw goes through its own opcode; this flags its answer as a
+-- reroll. Not used as an in-flight lock: a dropped orb request only leaves the next
+-- reveal auto-shown.
+function Perks.MarkOrbReroll()
+    Perks.pendingOrbReroll = true
+end
+
 function Perks.RequestReroll()
     if Perks.pendingReroll then return false end -- reroll already in flight
     Perks.pendingReroll = true
@@ -701,6 +755,7 @@ ProjectEbonhold.PerkService.RequestChoice = Perks.RequestChoice
 ProjectEbonhold.PerkService.SelectPerk = Perks.SelectPerk
 ProjectEbonhold.PerkService.RequestGrantedPerks = Perks.RequestGrantedPerks
 ProjectEbonhold.PerkService.RequestReroll = Perks.RequestReroll
+ProjectEbonhold.PerkService.MarkOrbReroll = Perks.MarkOrbReroll
 ProjectEbonhold.PerkService.BanishPerk = Perks.BanishPerk
 ProjectEbonhold.PerkService.FreezePerk = Perks.FreezePerk
 ProjectEbonhold.PerkService.GetCurrentChoice = function()
@@ -764,7 +819,7 @@ end
 -- run starts); the server answers with the refreshed discovery list.
 ProjectEbonhold.PerkService.ToggleTomeEcho = function(spellId)
     local data = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[spellId]
-    if not data or not data.requiredSpell or data.requiredSpell == 0 then return false end
+    if not (data and data.isTome) then return false end
     if (UnitLevel("player") or 1) ~= 1 then
         UIErrorsFrame:AddMessage("Tomes can be enabled or disabled at level 1 only.", 1, 0.2, 0.2)
         return false
@@ -946,9 +1001,41 @@ ProjectEbonhold.PerkService.ExportEchoLoadout = function(loadout)
         .. ":" .. SanitizeLoadoutClass(loadout.class)
         .. ":" .. SanitizeLoadoutName(loadout.name)
 end
+-- A link to the website's Echo Builder (".../tools/echo-builder?c=mage&b=200001.3-200020!200001"):
+-- "id" or "id.stacks" pairs joined by "-", no quality and no name. The locked slots after
+-- the "!" are a site-only planning aid and are dropped.
+local function ParseEchoBuilderLink(text)
+    if not text:find("echo%-builder") then return nil end
+    local query = text:match("%?(.*)$")
+    if not query then return nil end
+    query = query:gsub("#.*$", ""):gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
+    local build, slug
+    for key, value in query:gmatch("([^&=]+)=([^&]*)") do
+        if key == "b" then build = value elseif key == "c" then slug = value end
+    end
+    build = build and build:match("^([^!]*)")
+    if not build or build == "" then return nil end
+    local echoes = {}
+    local db = ProjectEbonhold.PerkDatabase or {}
+    for part in build:gmatch("[^%-]+") do
+        local id, st = part:match("^(%d+)%.?(%d*)$")
+        id = tonumber(id)
+        if id then
+            local perk = db[id]
+            table.insert(echoes, { spellId = id, quality = perk and perk.quality or 0,
+                stacks = tonumber(st) or 1 })
+        end
+    end
+    if #echoes == 0 then return nil end
+    -- "death-knight" -> "DEATHKNIGHT"; no class in the link = the player's own
+    return { name = "Website build", class = SanitizeLoadoutClass(slug), echoes = echoes }
+end
+
 ProjectEbonhold.PerkService.ImportEchoLoadout = function(text)
     if type(text) ~= "string" then return nil end
     text = text:gsub("^%s+", ""):gsub("%s+$", "")
+    local fromLink = ParseEchoBuilderLink(text)
+    if fromLink then return fromLink end
     local echoStr, class, name = text:match("^EBH1:([^:]*):([^:]*):(.+)$")
     if not echoStr then -- legacy format without the class segment
         echoStr, name = text:match("^EBH1:([^:]*):(.+)$")
@@ -966,17 +1053,21 @@ end
 
 -- ── Server build slots (Perk Loadouts) ───────────────────────────────────────
 -- Server-verified snapshots of the player's OWN build (5 slots per character,
--- stacks + locked flags). Unlike the local library above (a free-form wish
--- list, highlight-only), a build slot is authoritative: activated at level 1
--- it makes the server GUARANTEE one of its missing echoes in every draw
--- (choice flag 3); activated at level 80 it performs a full build swap.
--- Saving never uploads content - the server snapshots what the player has.
+-- stacks + locked flags).
+--
+-- Since the 2026-09 rework a build slot (1..maxSlots) is a LIVE loadout: an
+-- independent echo build with its own echoes, locks, banishes, rerolls,
+-- freezes and pending draws. Switching (any level, alive, out of combat,
+-- behind a short cast) swaps the whole state; the target is handed the draws
+-- its level owes it. Slot 1 always exists. Wishlists (ids > maxSlots) are
+-- designed content, highlight-only.
 
-Perks.serverBuildSlots = nil    -- nil until the first SEND_PERK_LOADOUTS reply; [slot] = { slot, name, echoes }
-Perks.serverUnlockedSlots = 5   -- highest usable slot (account-wide; from the 540 header)
+Perks.serverBuildSlots = nil    -- nil until the first SEND_PERK_LOADOUTS reply; [slot] = { slot, name, echoes, verified (true = live loadout), missing }
+Perks.serverUnlockedSlots = 1   -- highest usable slot (account-wide; from the 540 header)
 Perks.serverSlotCosts = {}      -- [slot] = unlock price in gold (0 = free)
-Perks.serverActiveSlot = 0      -- 0 = none
-Perks.serverMaxSlots = 5
+Perks.serverActiveSlot = 1      -- the live loadout being played (never 0)
+Perks.serverActiveDesign = 0    -- highlighted wishlist id, 0 = none
+Perks.serverMaxSlots = 10
 Perks.serverBuildSlotsEnabled = true
 Perks.pendingBuildSlotRequest = nil
 Perks.pendingBuildSlotRequestAt = 0
@@ -999,22 +1090,47 @@ local function MarkBuildSlotRequest(kind)
     Perks.pendingBuildSlotRequestAt = GetTime()
 end
 
--- ids/names of the ACTIVE server build's echoes, for draw highlighting and
--- auto-accept (both snapshot and designed builds). Lazy cache, invalidated on
--- every 540/542 update.
+-- ids/names of the highlighted WISHLIST's echoes, for draw highlighting and
+-- auto-accept. The live loadout is what the player already owns, so it never
+-- drives highlights. Lazy cache, invalidated on every 540/542 update.
 local serverActiveSet = nil
 
+-- want[spellId] = stacks asked for, avoid[spellId] = true. Keyed on the EXACT
+-- spell id, never on the echo's name: every rarity of an echo is its own spell,
+-- so "I want Immolation Aura, but only the rare one" needs nothing more than
+-- reading the id the player actually put in the build. (Matching by name is
+-- what used to make a common in the list highlight the rare too.)
 local function RebuildServerActiveSet()
-    serverActiveSet = { ids = {}, names = {} }
-    local slot = Perks.serverActiveSlot or 0
+    serverActiveSet = { want = {}, avoid = {} }
+    local slot = Perks.serverActiveDesign or 0
     local build = slot > 0 and Perks.serverBuildSlots and Perks.serverBuildSlots[slot]
     if build then
         for _, e in ipairs(build.echoes or {}) do
-            serverActiveSet.ids[e.spellId] = true
-            local nm = GetSpellInfo(e.spellId)
-            if nm then serverActiveSet.names[nm] = true end
+            if e.avoid then
+                serverActiveSet.avoid[e.spellId] = true
+            else
+                serverActiveSet.want[e.spellId] = math.max(
+                    serverActiveSet.want[e.spellId] or 0, e.stacks or 1)
+            end
         end
     end
+end
+
+-- Stacks of this exact echo already held this run (granted + permanent)
+local function OwnedStacksOf(spellId)
+    local n = 0
+    local granted = Perks.grantedPerks
+    if granted then
+        for _, instances in pairs(granted) do
+            for _, inst in ipairs(instances) do
+                if inst.spellId == spellId then n = n + (inst.stack or 1) end
+            end
+        end
+    end
+    for _, lp in ipairs(Perks.lockedPerks or {}) do
+        if lp.spellId == spellId then n = n + (lp.stack or 1) end
+    end
+    return n + (pendingPicks[spellId] or 0)
 end
 
 local function NotifyBuildSlotsChanged()
@@ -1027,14 +1143,17 @@ local function NotifyBuildSlotsChanged()
     end
 end
 
--- Body: activeSlot|maxSlots;slot|name|id.stack.locked,id.stack.locked,...;...
+-- Body: activeSlot|activeDesign|maxSlots|unlockedSlots|costG1.costG2...costGmax
+--       ;slot|name|1|missingDraws|id.stack.locked,...   (live loadout)
+--       ;slot|name|0|0|id.stack.locked,...              (wishlist)
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUTS,
     function(body)
         Perks.serverBuildSlots = {}
 
         if not body or body == "" then
             Perks.serverBuildSlotsEnabled = false
-            Perks.serverActiveSlot = 0
+            Perks.serverActiveSlot = 1
+            Perks.serverActiveDesign = 0
             NotifyBuildSlotsChanged()
             return
         end
@@ -1045,16 +1164,12 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUTS,
             table.insert(records, record)
         end
 
-        -- Header: activeSlot|maxSlots|unlockedSlots|costG1.costG2...costGmax
-        -- (unlocked/costs are absent on older servers - fall back gracefully)
         local header = records[1] or ""
-        local activeStr, maxStr, unlockedStr, costsStr = header:match("^(%d+)|(%d+)|(%d+)|(.*)$")
-        if not activeStr then
-            activeStr, maxStr = header:match("^(%d+)|(%d+)$")
-        end
-        Perks.serverActiveSlot = tonumber(activeStr) or 0
-        Perks.serverMaxSlots = tonumber(maxStr) or 5
-        Perks.serverUnlockedSlots = tonumber(unlockedStr) or Perks.serverMaxSlots
+        local activeStr, designStr, maxStr, unlockedStr, costsStr = header:match("^(%d+)|(%d+)|(%d+)|(%d+)|(.*)$")
+        Perks.serverActiveSlot = tonumber(activeStr) or 1
+        Perks.serverActiveDesign = tonumber(designStr) or 0
+        Perks.serverMaxSlots = tonumber(maxStr) or 10
+        Perks.serverUnlockedSlots = tonumber(unlockedStr) or 1
         Perks.serverSlotCosts = {}
         if costsStr and costsStr ~= "" then
             local slot = 1
@@ -1066,18 +1181,14 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUTS,
 
         local db = ProjectEbonhold.PerkDatabase or {}
         for i = 2, #records do
-            -- Row: slot|name|verified|toRecover|entries. Older servers drop the
-            -- toRecover field (4 fields), older still the verified one (3).
-            local slotStr, name, verifiedStr, recoverStr, entriesStr =
-                records[i]:match("^(%d+)|([^|]*)|([01])|([01])|(.*)$")
-            if not slotStr then
-                slotStr, name, verifiedStr, entriesStr = records[i]:match("^(%d+)|([^|]*)|([01])|(.*)$")
-                recoverStr = "0"
-            end
-            if not slotStr then
-                slotStr, name, entriesStr = records[i]:match("^(%d+)|([^|]*)|(.*)$")
-                verifiedStr, recoverStr = "1", "0"
-            end
+            -- Row: slot|name|kind|missing|entries. kind 1 = live loadout (kept
+            -- under the historical `verified` key), 0 = wishlist. `missing` =
+            -- draws a switch to that loadout would grant right now.
+            local slotStr, name, verifiedStr, infoStr, entriesStr, memoryStr =
+                records[i]:match("^(%d+)|([^|]*)|([01])|([%d%.]+)|([^|]*)|?(.*)$")
+            -- Live rows: missing.memoryRemaining.memoryTotal (draws a switch grants now,
+            -- souvenir stacks the climb still owes, size of the engraved build)
+            local missingStr, memRemStr, memTotStr = tostring(infoStr or ""):match("^(%d+)%.?(%d*)%.?(%d*)$")
             local slot = tonumber(slotStr)
             if slot then
                 -- Entries reuse the library's echo shape ({spellId, quality,
@@ -1089,19 +1200,50 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUTS,
                         local spellId = tonumber(idStr)
                         if spellId then
                             local perkDb = db[spellId]
+                            local flag = tonumber(lockedStr) == 1
+                            -- Live row: the flag is a permanent echo. Wishlist row
+                            -- (kind 0): the same flag means the build refuses it.
+                            local isLive = verifiedStr == "1"
                             table.insert(echoes, {
                                 spellId = spellId,
                                 quality = perkDb and perkDb.quality or 0,
                                 stacks = tonumber(stackStr) or 1,
-                                locked = tonumber(lockedStr) == 1,
+                                locked = flag and isLive or false,
+                                avoid = (flag and not isLive) or nil,
                             })
                         end
                     end
                 end
-                -- toRecover: this wishlist stands for a build the player really
-                -- owned and can be turned back into one (RecoverServerBuildSlot)
+                -- Memory of a live loadout: the engraved build ({spellId, stacks,
+                -- remaining}); `remaining` = stacks the current climb may still
+                -- reclaim, which the Journal ghosts next to the owned echoes
+                local memory = {}
+                if memoryStr and memoryStr ~= "" then
+                    for entry in string.gmatch(memoryStr, "([^,]+)") do
+                        local idStr, stacksStr, remStr = entry:match("^(%d+)%.(%d+)%.(%d+)$")
+                        local spellId = tonumber(idStr)
+                        if spellId then
+                            local perkDb = db[spellId]
+                            table.insert(memory, { spellId = spellId, quality = perkDb and perkDb.quality or 0,
+                                stacks = tonumber(stacksStr) or 1, remaining = tonumber(remStr) or 0 })
+                        end
+                    end
+                end
+                -- Wishes first, refusals last, each block by rarity: the row shows
+                -- its first few icons, and those should be what the build wants.
+                table.sort(echoes, function(a, b)
+                    local aa, ba = a.avoid and 1 or 0, b.avoid and 1 or 0
+                    if aa ~= ba then return aa < ba end
+                    if (a.quality or 0) ~= (b.quality or 0) then
+                        return (a.quality or 0) > (b.quality or 0)
+                    end
+                    return a.spellId < b.spellId
+                end)
+
                 Perks.serverBuildSlots[slot] = { slot = slot, name = name or "",
-                    verified = verifiedStr == "1", toRecover = recoverStr == "1", echoes = echoes }
+                    verified = verifiedStr == "1", missing = tonumber(missingStr) or 0,
+                    memoryRemaining = tonumber(memRemStr) or 0, memoryTotal = tonumber(memTotStr) or 0,
+                    echoes = echoes, memory = memory }
             end
         end
 
@@ -1115,50 +1257,37 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUT_RESULT,
 
         local status, op, detail = body:match("^([^,]+),([^,]+),(.*)$")
 
-        -- Remembered so the journal can flash the row once it renders. Both ops
-        -- lead with the slot id: "upload" is a designed build (the server picks
-        -- the id), "save" a snapshot into a slot you chose.
-        if status == "OK" and (op == "save" or op == "upload") then
+        -- Remembered so the journal can flash the row once it renders: "upload"
+        -- is a designed build (the server picks the id).
+        if status == "OK" and op == "upload" then
             local saved = tostring(detail):match("^(%d+)")
             if saved then Perks.lastSavedBuildSlot = tonumber(saved) end
-        elseif status == "OK" and op == "recover" then
-            -- "<wishlistSlot>,<targetSlot>": the build slot is the one to flash
-            local target = tostring(detail):match("^%d+,(%d+)$")
-            if target then Perks.lastSavedBuildSlot = tonumber(target) end
         end
 
         if status == "FAIL" then
             local reasons = {
-                disabled = "Build slots are disabled on this realm.",
-                slot = "Invalid build slot.",
-                empty = (op == "save") and "You have no echoes to save." or "This build slot is empty.",
-                level = (op == "save") and "You can only save a build snapshot at level 80."
-                    or "Saved builds can only be activated at level 80. While you level, every echo you are offered is drawn at random.",
-                combat = "You cannot switch builds in combat.",
-                dead = "You cannot switch builds while dead.",
-                rolls = "Spend your remaining echo rolls before switching builds.",
-                locked = "This build slot is locked - unlock it with gold first.",
-                max = "All build slots are already unlocked.",
+                disabled = "Echo loadouts are disabled on this realm.",
+                slot = (op == "delete") and "A loadout cannot be deleted - only wishlists can." or "Invalid loadout slot.",
+                empty = "This slot is empty.",
+                same = "You are already playing this loadout.",
+                combat = "You cannot switch loadouts in combat.",
+                dead = "You cannot switch loadouts while dead.",
+                locked = "This loadout slot is locked - unlock it with gold first.",
+                max = "All loadout slots are already unlocked.",
                 money = "You don't have enough gold to unlock this slot.",
-                designed = "Designed builds cannot be applied at level 80. Only snapshots of a build you actually played can.",
-                invalid = "This build contains no echoes usable by your class.",
-                full = (op == "recover") and "You have no free build slot. Free one up first."
-                    or "You have too many designed builds. Delete one first.",
-                norecover = "This wishlist cannot be recovered.",
-                occupied = "That build slot already holds a build.",
-                overbudget = (op == "recover")
-                    and "This wishlist holds more echoes than a run can grant, so it cannot be recovered."
-                    or "This build holds more echoes than a run can grant and cannot be applied.",
-                recoverable = "This wishlist is waiting to be recovered, so its content is locked. Recover it or delete it.",
+                invalid = (op == "switch") and "Your echoes are not loaded yet. Try again in a moment."
+                    or "This build contains no echoes usable by your class.",
+                full = "You have too many wishlists. Delete one first.",
             }
             UIErrorsFrame:AddMessage(reasons[detail]
-                or ("Build " .. tostring(op) .. " failed (" .. tostring(detail) .. ")."), 1, 0.2, 0.2)
+                or ("Loadout " .. tostring(op) .. " failed (" .. tostring(detail) .. ")."), 1, 0.2, 0.2)
         elseif status == "OK" and op == "switch" then
-            UIErrorsFrame:AddMessage("Build applied: your echoes were replaced.", 0.1, 1, 0.1)
-        elseif status == "OK" and op == "recover" then
-            UIErrorsFrame:AddMessage("Wishlist recovered: it is one of your builds again.", 0.1, 1, 0.1)
+            local slots = Perks.serverBuildSlots or {}
+            local build = slots[tonumber(detail) or 0]
+            local name = build and build.name ~= "" and build.name or ("Loadout " .. tostring(detail))
+            UIErrorsFrame:AddMessage("Now playing loadout " .. name .. ".", 0.1, 1, 0.1)
         elseif status == "OK" and op == "unlock" then
-            UIErrorsFrame:AddMessage("Build slot " .. tostring(detail) .. " unlocked (account-wide).", 0.1, 1, 0.1)
+            UIErrorsFrame:AddMessage("Loadout slot " .. tostring(detail) .. " unlocked (account-wide).", 0.1, 1, 0.1)
         elseif status == "OK" and op == "upload" then
             -- detail: "<slot>" or "<slot>,<skipped>" when echoes were dropped
             local slot, skipped = tostring(detail):match("^(%d+),?(%d*)$")
@@ -1175,10 +1304,12 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUT_RESULT,
         NotifyBuildSlotsChanged()
     end)
 
--- Body: the active slot ("0" = none); pushed on login and on every change
+-- Body: activeSlot|activeDesign (design 0 = none); pushed on login and on every change
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUT_ACTIVE,
     function(body)
-        Perks.serverActiveSlot = tonumber(body) or 0
+        local slotStr, designStr = tostring(body or ""):match("^(%d+)|(%d+)$")
+        Perks.serverActiveSlot = tonumber(slotStr) or tonumber(body) or 1
+        Perks.serverActiveDesign = tonumber(designStr) or 0
         -- Highlights and auto-pick need the build's CONTENT, not just its slot,
         -- and only the journal used to ask for it - so a player who never
         -- opened it got neither. The login push is the trigger; 540 fills
@@ -1201,14 +1332,6 @@ end
 ProjectEbonhold.PerkService.RequestServerBuildSlots = function()
     ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PERK_LOADOUTS, "")
 end
-ProjectEbonhold.PerkService.SaveServerBuildSlot = function(slot, name)
-    if not slot or slot < 1 then return false end
-    if BuildSlotRequestBusy() then return false end
-    MarkBuildSlotRequest("save")
-    ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PERK_LOADOUT_SAVE,
-        tostring(slot) .. "|" .. SanitizeLoadoutName(name or ""))
-    return true
-end
 ProjectEbonhold.PerkService.RenameServerBuildSlot = function(slot, name)
     if not slot or slot < 1 or not name or name == "" then return false end
     if BuildSlotRequestBusy() then return false end
@@ -1222,30 +1345,22 @@ end
 -- overwrite. echoes: { {spellId, stacks(, locked)}, ... }. Persistent
 -- server-side; drives the grey-out overview + draw highlight + auto-accept,
 -- but never the guarantee.
+-- The third field of an entry is the `locked` bit. On a LIVE loadout it means
+-- "permanent echo"; a wishlist has no permanents, so there it carries the one
+-- thing a wishlist needs and never had: this echo is refused. Same byte, same
+-- wire, same column -- nothing server-side had to learn a new word.
 ProjectEbonhold.PerkService.UploadServerBuildSlot = function(slot, name, echoes)
     if not slot or slot < 0 or not echoes or #echoes == 0 then return false end
     if BuildSlotRequestBusy() then return false end
     local parts = {}
     for _, e in ipairs(echoes) do
+        local flag = (e.avoid or e.locked) and 1 or 0
         table.insert(parts,
-            tostring(e.spellId) .. "." .. tostring(e.stacks or 1) .. "." .. (e.locked and 1 or 0))
+            tostring(e.spellId) .. "." .. tostring(e.stacks or 1) .. "." .. flag)
     end
     MarkBuildSlotRequest("upload")
     ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PERK_LOADOUT_UPLOAD,
         tostring(slot) .. "|" .. SanitizeLoadoutName(name or "") .. "|" .. table.concat(parts, ","))
-    return true
-end
--- Turns a RECOVERABLE wishlist (a build a reset downgraded, flagged server
--- side) back into a real build: the server moves it into a free build slot and
--- marks it verified again. targetSlot nil/0 = the first free unlocked slot.
--- Alive and out of combat; no level gate, since wearing it still goes through
--- the level-80 swap.
-ProjectEbonhold.PerkService.RecoverServerBuildSlot = function(slot, targetSlot)
-    if not slot or slot < 1 then return false end
-    if BuildSlotRequestBusy() then return false end
-    MarkBuildSlotRequest("recover")
-    ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PERK_LOADOUT_RECOVER,
-        tostring(slot) .. "|" .. tostring(targetSlot or 0))
     return true
 end
 -- Buys the NEXT locked slot with gold; the unlock is account-wide.
@@ -1268,7 +1383,9 @@ ProjectEbonhold.PerkService.DeleteServerBuildSlot = function(slot)
     ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_PERK_LOADOUT_DELETE, tostring(slot))
     return true
 end
--- slot 0 = deactivate (any level). Level 1 arms the run; level 80 = full swap.
+-- Live slot (1..maxSlots): switch to that loadout (any level, alive, out of
+-- combat; the server casts a short attunement first). Wishlist id: highlight
+-- it. 0 = clear the highlighted wishlist.
 ProjectEbonhold.PerkService.ActivateServerBuildSlot = function(slot)
     if not slot or slot < 0 then return false end
     if BuildSlotRequestBusy() then return false end
@@ -1279,28 +1396,48 @@ end
 ProjectEbonhold.PerkService.GetServerBuildSlots = function()
     return Perks.serverBuildSlots
 end
+-- The live loadout being played (1..maxSlots, never 0)
 ProjectEbonhold.PerkService.GetServerActiveSlot = function()
-    return Perks.serverActiveSlot or 0
+    return Perks.serverActiveSlot or 1
+end
+-- The highlighted wishlist (0 = none)
+ProjectEbonhold.PerkService.GetServerActiveDesign = function()
+    return Perks.serverActiveDesign or 0
 end
 ProjectEbonhold.PerkService.GetServerMaxSlots = function()
-    return Perks.serverMaxSlots or 5
+    return Perks.serverMaxSlots or 10
 end
 ProjectEbonhold.PerkService.AreServerBuildSlotsEnabled = function()
     return Perks.serverBuildSlotsEnabled
 end
--- Activation is only meaningful at the run's endpoints
+-- Loadouts switch at any level since the 2026-09 rework; kept for callers.
 ProjectEbonhold.PerkService.CanActivateServerBuildSlot = function()
-    local level = UnitLevel("player") or 1
-    return level == 1 or level == 80
+    return true
 end
 
--- The ACTIVE server build (snapshot or designed) feeds the highlight +
--- auto-accept pipeline, and it is the ONLY source: this used to fall back on
--- the account-wide copy above as well, which nothing ever cleared, so a
--- deleted or swapped build kept auto-picking its echoes for the rest of the run.
+-- The highlighted WISHLIST feeds the highlight + auto-accept pipeline, and it
+-- is the ONLY source: this used to fall back on the account-wide copy above as
+-- well, which nothing ever cleared, so a deleted or swapped build kept
+-- auto-picking its echoes for the rest of the run.
 ProjectEbonhold.PerkService.IsSpellInActiveEchoLoadout = function(spellId)
     if not serverActiveSet then RebuildServerActiveSet() end
-    if serverActiveSet.ids[spellId] then return true end
-    local nm = GetSpellInfo(spellId)
-    return (nm and serverActiveSet.names[nm]) == true
+    return serverActiveSet.want[spellId] ~= nil
+end
+
+-- "want", "avoid" or nil, from the highlighted wishlist
+ProjectEbonhold.PerkService.GetActiveEchoLoadoutRule = function(spellId)
+    if not serverActiveSet then RebuildServerActiveSet() end
+    if serverActiveSet.avoid[spellId] then return "avoid" end
+    if serverActiveSet.want[spellId] then return "want" end
+    return nil
+end
+
+-- True while the build still asks for stacks of this echo. A wish for 3 stacks
+-- stops being a wish at the third one, so the automatic pick hands the card back
+-- instead of spending the rest of the climb topping up something already done.
+ProjectEbonhold.PerkService.WantsMoreOfEcho = function(spellId)
+    if not serverActiveSet then RebuildServerActiveSet() end
+    local target = serverActiveSet.want[spellId]
+    if not target then return false end
+    return OwnedStacksOf(spellId) < target
 end

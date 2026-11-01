@@ -21,6 +21,7 @@ SlashCmdList["PECOLLDIAG"] = function()
     if not ez then line("ezCollections MISSING (stub failed to load)"); return end
     line("stub: ok  |  service helper GetMountFavoritesContainer: " .. tostring(type(ez.GetMountFavoritesContainer)))
     local cats, visuals = 0, 0
+    if ez.BuildAppearanceCatalog then ez.BuildAppearanceCatalog() end
     if ez.AppearanceCatalog then
         for _, c in pairs(ez.AppearanceCatalog) do cats = cats + 1; visuals = visuals + #c.order end
     end

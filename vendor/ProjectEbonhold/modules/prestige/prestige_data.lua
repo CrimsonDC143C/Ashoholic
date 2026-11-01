@@ -47,11 +47,10 @@
 --                     milestone tooltip (e.g. "Season 3 Gear"). Display only;
 --                     the actual content gating is server-side.
 --
--- The permanent Soul Ash gain bonus is NOT a milestone reward: EVERY prestige
--- grants one, PROPORTIONAL to the committed pool it destroys (20% per gate
--- worth burned, with diminishing returns, at every prestige number).
--- See PrestigeData.ComputeBonusPct at the
--- bottom of this file, which mirrors PrestigeHandler::ComputeSoulAshBonusPct.
+-- RETIRE le 2026-09-08 : un prestige n'accorde plus de bonus permanent de gain de
+-- cendres. Les cendres engagees sont detruites sans contrepartie, et la recompense
+-- est l'Essence que frappent les eclats banques (750 pour 1 depuis le 14/09). ComputeBonusPct, en
+-- bas de ce fichier, ne sert plus qu'a lire les bonus gagnes sous l'ancienne regle.
 -- ============================================================================
 
 local addonName, addon = ...

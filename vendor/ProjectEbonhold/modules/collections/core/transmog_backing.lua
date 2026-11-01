@@ -151,14 +151,15 @@ function TC.GetCategoryInfo(categoryID)
 end
 
 -- list of { visualID = repItemID, isCollected, isUsable, isFavorite, isHideVisual, uiOrder }
-function TC.GetCategoryAppearances(categoryID)
+function TC.GetCategoryAppearances(categoryID, slot)
     local order = ez:GetCategoryVisuals(categoryID)
     if not order then return {} end
     local out = {}
-    -- "Hide this slot" option, first, for armor slots (the server rejects hiding
-    -- weapon slots, so don't offer it there).
+    -- "Hide this slot" option, first, for armor slots and the off hand (hiding it
+    -- lets the main-hand look alone choose 1H or 2H animations). The server still
+    -- rejects hiding the main hand and ranged slots, so don't offer it there.
     local meta = ez:GetCategoryMeta(categoryID)
-    if meta and not meta.isWeapon then
+    if meta and (not meta.isWeapon or (slot == "SECONDARYHANDSLOT" and meta.canOffHand)) then
         out[#out + 1] = {
             visualID    = HIDE_VISUAL,
             isCollected = true,

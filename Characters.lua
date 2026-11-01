@@ -106,8 +106,8 @@ function ns:ActiveLockouts(charDB)
     return list
 end
 
--- Same rolling window LockoutInfo uses: 10 raid entries, each lasting an hour
--- from the last time that raid copy was entered or left.
+-- Same rolling window used by the instance cap: 10 entries, each lasting an
+-- hour from the last time that instance copy was entered or left.
 local HOURLY_LIMIT = 10
 local HOURLY_WINDOW = 3600
 local HOURLY_DIFF = { [1] = "10", [2] = "25", [3] = "10H", [4] = "25H" }
@@ -238,6 +238,10 @@ function ns:BuildList()
             end
             local money = charDB.money or 0
             local count10, count25, r10, r25 = computeLockouts(charDB)
+            -- A reset stores false. Anything that is not a recorded number stays
+            -- blank instead of falling through to the AceDB default of 1.
+            local level = charDB.level
+            if type(level) ~= "number" then level = nil end
 
             table.insert(characterList, {
                 linetype = INFO_CHARACTER_LINE,
@@ -246,7 +250,7 @@ function ns:BuildList()
                 sourceAccount = charDB._sourceAccount or charDB.account or "Main Account",
                 accKey = accKey,
                 name = charDB.name,
-                level = charDB.level or 1,
+                level = level,
                 class = charDB.class or "WARRIOR",
                 soulAsh = charRunAsh,           -- per-character share only
                 spendableAsh = accSpendable,     -- shared pool, for tooltip

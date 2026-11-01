@@ -1,3 +1,9 @@
+-- GENERATED 2026-09-16 from the skill tree builder export (final_tree.json). Do not hand-edit:
+-- regenerate with gen_lua.py. Mirrors characters.skill_tree_node exactly (ids, spells, costs,
+-- currency, permanent, infinite, starts) plus the layout (x, y).
+-- currency: "ash" (Soul Ashes), "shard" (Soul Shards), "essence" (Soul Essence), "artisan" (Artisan Soul).
+-- classId: set on the class constellation nodes (class_id 1-11, bought for good, see skillTree_classes.lua);
+-- classHubs: where each class icon + progress bar sits (same coordinate space as the nodes).
 TalentDatabase = {
     [0] = {
         name = "Default Soul Tree",
@@ -9,616 +15,648 @@ nodes = {
         x = -90,
         y = 330,
         spells = {100000},
-        soulPointsCosts = {50}
+        soulPointsCosts = {55},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 2,
         x = -30,
         y = 810,
         spells = {100140},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 5,
         x = 30,
         y = 330,
         spells = {100020},
-        soulPointsCosts = {50}
+        soulPointsCosts = {55},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 6,
         x = -210,
         y = 330,
         spells = {100040},
-        soulPointsCosts = {75}
+        soulPointsCosts = {83},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 7,
         x = -150,
         y = 390,
         spells = {100001},
-        soulPointsCosts = {150}
+        soulPointsCosts = {165},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 8,
         x = -210,
         y = 450,
         spells = {100002},
-        soulPointsCosts = {600}
+        soulPointsCosts = {660},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 9,
         x = -270,
         y = 510,
         spells = {100003},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 10,
         x = -330,
         y = 570,
         spells = {100004},
-        soulPointsCosts = {1600}
+        soulPointsCosts = {1760},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 11,
         x = -390,
         y = 630,
         spells = {100005},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 12,
         x = -450,
         y = 690,
         spells = {100006},
-        soulPointsCosts = {4000}
+        soulPointsCosts = {4400},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 13,
         x = -510,
         y = 750,
         spells = {100007},
-        soulPointsCosts = {7000}
+        soulPointsCosts = {7700},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 14,
         x = -570,
         y = 810,
         spells = {100008},
-        soulPointsCosts = {17000}
+        soulPointsCosts = {18700},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 15,
         x = -630,
         y = 870,
         spells = {100009},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {38500},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 16,
         x = -750,
         y = 930,
         spells = {110000},
-        soulPointsCosts = {52500}
+        soulPointsCosts = {57},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 17,
         x = 90,
         y = 390,
         spells = {100021},
-        soulPointsCosts = {150}
+        soulPointsCosts = {165},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 18,
         x = 150,
         y = 450,
         spells = {100022},
-        soulPointsCosts = {600}
+        soulPointsCosts = {660},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 19,
         x = 210,
         y = 510,
         spells = {100023},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 20,
         x = 270,
         y = 570,
         spells = {100024},
-        soulPointsCosts = {1600}
+        soulPointsCosts = {1760},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 21,
         x = 330,
         y = 630,
         spells = {100025},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 22,
         x = 390,
         y = 690,
         spells = {100026},
-        soulPointsCosts = {4000}
+        soulPointsCosts = {4400},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 23,
         x = 450,
         y = 750,
         spells = {100027},
-        soulPointsCosts = {7000}
+        soulPointsCosts = {7700},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 24,
         x = 510,
         y = 810,
         spells = {100028},
-        soulPointsCosts = {17000}
+        soulPointsCosts = {18700},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 25,
         x = 570,
         y = 870,
         spells = {100029},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {38500},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 26,
         x = 690,
         y = 930,
         spells = {110020},
-        soulPointsCosts = {52500}
+        soulPointsCosts = {57},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 27,
-        x = -270,
+        x = -240,
         y = 390,
         spells = {100041},
-        soulPointsCosts = {225}
+        soulPointsCosts = {248},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 28,
         x = -330,
         y = 450,
         spells = {100042},
-        soulPointsCosts = {750}
+        soulPointsCosts = {825},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 29,
         x = -390,
         y = 510,
         spells = {100043},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 30,
         x = -450,
         y = 570,
         spells = {100044},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 31,
         x = -510,
         y = 630,
         spells = {100045},
-        soulPointsCosts = {3250}
+        soulPointsCosts = {3575},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 32,
         x = -570,
         y = 690,
         spells = {100046},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 33,
         x = -630,
         y = 750,
         spells = {100047},
-        soulPointsCosts = {8500}
+        soulPointsCosts = {9350},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 34,
         x = -690,
         y = 810,
         spells = {100048},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 35,
         x = -750,
         y = 870,
         spells = {100049},
-        soulPointsCosts = {40000}
+        soulPointsCosts = {44000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 36,
         x = -810,
         y = 810,
         spells = {110040},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 37,
         x = -90,
         y = 450,
         spells = {100060},
-        soulPointsCosts = {75}
+        soulPointsCosts = {83},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 38,
         x = -150,
         y = 510,
         spells = {100061},
-        soulPointsCosts = {225}
+        soulPointsCosts = {248},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 39,
         x = -210,
         y = 570,
         spells = {100062},
-        soulPointsCosts = {750}
+        soulPointsCosts = {825},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 40,
         x = -270,
         y = 630,
         spells = {100063},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 41,
         x = -330,
         y = 690,
         spells = {100064},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 42,
         x = -390,
         y = 750,
         spells = {100065},
-        soulPointsCosts = {3250}
+        soulPointsCosts = {3575},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 43,
         x = -450,
         y = 810,
         spells = {100066},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 44,
         x = -510,
         y = 870,
         spells = {100067},
-        soulPointsCosts = {8500}
+        soulPointsCosts = {9350},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 45,
         x = -570,
         y = 930,
         spells = {100068},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 46,
         x = -630,
         y = 990,
         spells = {100069},
-        soulPointsCosts = {40000}
+        soulPointsCosts = {44000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 47,
         x = -570,
         y = 1050,
         spells = {110060},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 48,
         x = 150,
         y = 330,
         spells = {100100},
-        soulPointsCosts = {75}
+        soulPointsCosts = {83},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 49,
         x = 210,
         y = 390,
         spells = {100101},
-        soulPointsCosts = {225}
+        soulPointsCosts = {248},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 50,
         x = 270,
         y = 450,
         spells = {100102},
-        soulPointsCosts = {750}
+        soulPointsCosts = {825},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 51,
         x = 330,
         y = 510,
         spells = {100103},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 52,
         x = 390,
         y = 570,
         spells = {100104},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 53,
         x = 450,
         y = 630,
         spells = {100105},
-        soulPointsCosts = {3250}
+        soulPointsCosts = {3575},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 54,
         x = 510,
         y = 690,
         spells = {100106},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 55,
         x = 570,
         y = 750,
         spells = {100107},
-        soulPointsCosts = {8500}
+        soulPointsCosts = {9350},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 56,
         x = 630,
         y = 810,
         spells = {100108},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 57,
         x = 690,
         y = 870,
         spells = {100109},
-        soulPointsCosts = {40000}
+        soulPointsCosts = {44000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 58,
         x = 750,
         y = 810,
         spells = {110100},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 59,
         x = 30,
         y = 450,
         spells = {100120},
-        soulPointsCosts = {75}
+        soulPointsCosts = {83},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 60,
         x = 90,
         y = 510,
         spells = {100121},
-        soulPointsCosts = {225}
+        soulPointsCosts = {248},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 61,
         x = 150,
         y = 570,
         spells = {100122},
-        soulPointsCosts = {750}
+        soulPointsCosts = {825},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 62,
         x = 210,
         y = 630,
         spells = {100123},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 63,
         x = 270,
         y = 690,
         spells = {100124},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 64,
         x = 330,
         y = 750,
         spells = {100125},
-        soulPointsCosts = {3250}
+        soulPointsCosts = {3575},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 65,
         x = 390,
         y = 810,
         spells = {100126},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 66,
         x = 450,
         y = 870,
         spells = {100127},
-        soulPointsCosts = {8500}
+        soulPointsCosts = {9350},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 67,
         x = 510,
         y = 930,
         spells = {100128},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 68,
         x = 570,
         y = 990,
         spells = {100129},
-        soulPointsCosts = {40000}
+        soulPointsCosts = {44000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 69,
         x = 510,
         y = 1050,
         spells = {110120},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 70,
         x = -30,
         y = 870,
         spells = {100141},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 71,
         x = -30,
         y = 930,
         spells = {100142},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {27500},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 72,
         x = -30,
         y = 990,
         spells = {100143},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {55000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 73,
         x = -30,
         y = 1050,
         spells = {100144},
-        soulPointsCosts = {75000}
-    },
-    {
-        id = 74,
-        x = -90,
-        y = 510,
-        spells = {100180},
-        soulPointsCosts = {115}
-    },
-    {
-        id = 75,
-        x = -150,
-        y = 570,
-        spells = {100181},
-        soulPointsCosts = {350}
-    },
-    {
-        id = 76,
-        x = -210,
-        y = 630,
-        spells = {100182},
-        soulPointsCosts = {1125}
-    },
-    {
-        id = 77,
-        x = -270,
-        y = 690,
-        spells = {100183},
-        soulPointsCosts = {1875}
-    },
-    {
-        id = 78,
-        x = -330,
-        y = 750,
-        spells = {100184},
-        soulPointsCosts = {3000}
-    },
-    {
-        id = 79,
-        x = -270,
-        y = 330,
-        spells = {100260},
-        soulPointsCosts = {115}
-    },
-    {
-        id = 80,
-        x = -330,
-        y = 390,
-        spells = {100261},
-        soulPointsCosts = {350}
-    },
-    {
-        id = 81,
-        x = -390,
-        y = 450,
-        spells = {100262},
-        soulPointsCosts = {1125}
-    },
-    {
-        id = 82,
-        x = -450,
-        y = 510,
-        spells = {100263},
-        soulPointsCosts = {1875}
-    },
-    {
-        id = 83,
-        x = -510,
-        y = 570,
-        spells = {100264},
-        soulPointsCosts = {3000}
-    },
-    {
-        id = 84,
-        x = -570,
-        y = 630,
-        spells = {100265},
-        soulPointsCosts = {4875}
-    },
-    {
-        id = 85,
-        x = -630,
-        y = 690,
-        spells = {100266},
-        soulPointsCosts = {7500}
-    },
-    {
-        id = 86,
-        x = -690,
-        y = 750,
-        spells = {100267},
-        soulPointsCosts = {12750}
-    },
-    {
-        id = 87,
-        x = -750,
-        y = 810,
-        spells = {100268},
-        soulPointsCosts = {30000}
-    },
-    {
-        id = 88,
-        x = -810,
-        y = 870,
-        spells = {100269},
-        soulPointsCosts = {60000}
-    },
-    {
-        id = 89,
-        x = -870,
-        y = 810,
-        spells = {110260},
-        soulPointsCosts = {90000}
+        soulPointsCosts = {82500},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 90,
         x = -30,
-        y = 150,
+        y = 240,
         spells = {100280},
-        soulPointsCosts = {50},
+        soulPointsCosts = {55},
+        currency = "ash",
+        sector = "dh",
         isStart = true
     },
     {
@@ -626,291 +664,310 @@ nodes = {
         x = -150,
         y = 930,
         spells = {100160},
-        soulPointsCosts = {100}
+        soulPointsCosts = {110},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 92,
         x = -390,
         y = 1170,
         spells = {100161},
-        soulPointsCosts = {300}
+        soulPointsCosts = {330},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 93,
         x = -150,
         y = 990,
         spells = {100162},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 94,
         x = -390,
         y = 1230,
         spells = {100163},
-        soulPointsCosts = {1500}
+        soulPointsCosts = {1650},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 95,
         x = -150,
         y = 1050,
         spells = {100164},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 96,
         x = -390,
         y = 1290,
         spells = {100165},
-        soulPointsCosts = {3750}
+        soulPointsCosts = {4125},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 97,
         x = -150,
         y = 1110,
         spells = {100166},
-        soulPointsCosts = {6750}
+        soulPointsCosts = {7425},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 98,
         x = -390,
         y = 1350,
         spells = {100167},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 99,
         x = -150,
         y = 1170,
         spells = {100168},
-        soulPointsCosts = {22500}
-    },
-    {
-        id = 100,
-        x = -390,
-        y = 1410,
-        spells = {100169},
-        soulPointsCosts = {50000}
-    },
-    {
-        id = 101,
-        x = -510,
-        y = 1470,
-        spells = {110160},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {24750},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 102,
         x = -270,
         y = 1050,
         spells = {100220},
-        soulPointsCosts = {200}
+        soulPointsCosts = {220},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 103,
         x = -270,
         y = 1110,
         spells = {100221},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 104,
         x = -270,
         y = 1170,
         spells = {100222},
-        soulPointsCosts = {3125}
+        soulPointsCosts = {3438},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 105,
         x = -270,
         y = 1230,
         spells = {100223},
-        soulPointsCosts = {8375}
+        soulPointsCosts = {9213},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 106,
         x = -270,
         y = 1290,
         spells = {100224},
-        soulPointsCosts = {36250}
-    },
-    {
-        id = 107,
-        x = 90,
-        y = 930,
-        spells = {100200},
-        soulPointsCosts = {100}
-    },
-    {
-        id = 108,
-        x = 330,
-        y = 1170,
-        spells = {100201},
-        soulPointsCosts = {300}
-    },
-    {
-        id = 109,
-        x = 90,
-        y = 990,
-        spells = {100202},
-        soulPointsCosts = {1000}
-    },
-    {
-        id = 110,
-        x = 330,
-        y = 1230,
-        spells = {100203},
-        soulPointsCosts = {1500}
-    },
-    {
-        id = 111,
-        x = 90,
-        y = 1050,
-        spells = {100204},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {39875},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 112,
         x = 210,
         y = 1050,
         spells = {100240},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 113,
         x = 210,
         y = 1110,
         spells = {100241},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {16500},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 114,
         x = 210,
         y = 1170,
         spells = {100242},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {38500},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 115,
         x = 210,
         y = 1230,
         spells = {100243},
-        soulPointsCosts = {75000}
+        soulPointsCosts = {82500},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 116,
         x = 210,
         y = 1290,
         spells = {100244},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {110000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 117,
-        x = 270,
-        y = 30,
+        x = 390,
+        y = 60,
         spells = {100081},
-        soulPointsCosts = {225}
+        soulPointsCosts = {248},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 118,
         x = 450,
         y = 150,
         spells = {100082},
-        soulPointsCosts = {750}
+        soulPointsCosts = {825},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 119,
         x = 510,
         y = 210,
         spells = {100083},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 120,
         x = 570,
         y = 270,
         spells = {100084},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 121,
         x = 630,
         y = 330,
         spells = {100085},
-        soulPointsCosts = {3250}
+        soulPointsCosts = {3575},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 122,
         x = 690,
         y = 390,
         spells = {100086},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 123,
         x = 750,
         y = 450,
         spells = {100087},
-        soulPointsCosts = {8500}
+        soulPointsCosts = {9350},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 124,
         x = 810,
         y = 510,
         spells = {100088},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 125,
         x = 870,
         y = 570,
         spells = {100089},
-        soulPointsCosts = {40000}
+        soulPointsCosts = {44000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 126,
         x = 990,
         y = 570,
         spells = {110080},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 181,
-        x = -90,
-        y = -1290,
+        x = 1050,
+        y = 810,
         spells = {100340},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {16875},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
         id = 182,
-        x = -1350,
-        y = -90,
+        x = 690,
+        y = 450,
         spells = {100341},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {2625},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
         id = 183,
-        x = -1350,
-        y = -270,
+        x = 570,
+        y = 330,
         spells = {100342},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {1125},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
         id = 184,
-        x = -1230,
-        y = 510,
+        x = 510,
+        y = 270,
         spells = {100343},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {750},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
         id = 185,
-        x = -990,
-        y = -150,
+        x = 630,
+        y = 390,
         spells = {100344},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {1125},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
@@ -918,7 +975,9 @@ nodes = {
         x = -90,
         y = -630,
         spells = {100380},
-        soulPointsCosts = {75000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -926,7 +985,9 @@ nodes = {
         x = -90,
         y = -810,
         spells = {100381},
-        soulPointsCosts = {75000},
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -934,7 +995,9 @@ nodes = {
         x = -90,
         y = -990,
         spells = {100382},
-        soulPointsCosts = {75000},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -942,7 +1005,9 @@ nodes = {
         x = -150,
         y = -390,
         spells = {100400},
-        soulPointsCosts = {8000},
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -950,7 +1015,9 @@ nodes = {
         x = -150,
         y = -570,
         spells = {100401},
-        soulPointsCosts = {12000},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -958,7 +1025,9 @@ nodes = {
         x = -150,
         y = -750,
         spells = {100402},
-        soulPointsCosts = {18000},
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -966,7 +1035,9 @@ nodes = {
         x = -150,
         y = -930,
         spells = {100403},
-        soulPointsCosts = {25000},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -974,7 +1045,9 @@ nodes = {
         x = -150,
         y = -1110,
         spells = {100404},
-        soulPointsCosts = {40000},
+        soulPointsCosts = {32},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -982,343 +1055,422 @@ nodes = {
         x = -150,
         y = -1290,
         spells = {110400},
-        soulPointsCosts = {80000}
+        soulPointsCosts = {45},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 203,
-        x = -990,
-        y = -90,
+        x = 240,
+        y = 270,
         spells = {110420},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {2250},
+        currency = "shard",
+        sector = "en",
+        permanent = true
     },
     {
         id = 207,
-        x = -990,
-        y = -270,
+        x = 480,
+        y = 510,
         spells = {110460},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1500},
+        currency = "shard",
+        sector = "en",
+        permanent = true
     },
     {
         id = 216,
-        x = -750,
-        y = 90,
+        x = -450,
+        y = -420,
         spells = {100642},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 217,
-        x = -930,
-        y = 150,
+        x = -270,
+        y = -240,
         spells = {110640},
-        soulPointsCosts = {10000}
-    },
-    {
-        id = 226,
-        x = -990,
-        y = 690,
-        spells = {110660},
-        soulPointsCosts = {150000}
-    },
-    {
-        id = 229,
-        x = -630,
-        y = -270,
-        spells = {100321},
-        soulPointsCosts = {2500}
-    },
-    {
-        id = 232,
-        x = -1050,
-        y = -510,
-        spells = {100324},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 233,
         x = 90,
         y = -270,
         spells = {100760},
-        soulPointsCosts = {500}
+        soulPointsCosts = {550},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 234,
         x = 90,
         y = -450,
         spells = {100761},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 235,
         x = 90,
         y = -630,
         spells = {100762},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 236,
         x = 90,
         y = -810,
         spells = {100763},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 237,
         x = 90,
         y = -990,
         spells = {100764},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 238,
         x = 90,
         y = -1290,
         spells = {110760},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 239,
         x = 150,
         y = -270,
         spells = {100780},
-        soulPointsCosts = {500}
+        soulPointsCosts = {550},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 240,
         x = 150,
         y = -450,
         spells = {100781},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 241,
         x = 150,
         y = -630,
         spells = {100782},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 242,
         x = 150,
         y = -810,
         spells = {100783},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 243,
         x = 150,
         y = -990,
         spells = {100784},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 244,
         x = 210,
         y = -270,
         spells = {100800},
-        soulPointsCosts = {500}
+        soulPointsCosts = {550},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 245,
         x = 150,
         y = -1290,
         spells = {110780},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 246,
         x = 210,
         y = -450,
         spells = {100801},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 247,
         x = 210,
         y = -630,
         spells = {100802},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 248,
         x = 210,
         y = -810,
         spells = {100803},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 249,
         x = 210,
         y = -990,
         spells = {100804},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 250,
         x = 210,
         y = -1290,
         spells = {110800},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 251,
         x = 270,
         y = -270,
         spells = {100820},
-        soulPointsCosts = {500}
+        soulPointsCosts = {550},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 252,
         x = 270,
         y = -450,
         spells = {100821},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 253,
         x = 270,
         y = -630,
         spells = {100822},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 254,
         x = 270,
         y = -810,
         spells = {100823},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 255,
         x = 270,
         y = -990,
         spells = {100824},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 256,
         x = 270,
         y = -1290,
         spells = {110820},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 257,
         x = 330,
         y = -270,
         spells = {100840},
-        soulPointsCosts = {500}
+        soulPointsCosts = {550},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 259,
-        x = 210,
-        y = -210,
+        x = 90,
+        y = -180,
         spells = {100720},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "mi",
+        isStart = true
     },
     {
         id = 261,
         x = 210,
-        y = -570,
+        y = -540,
         spells = {100722},
-        soulPointsCosts = {12500}
+        soulPointsCosts = {13750},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 262,
         x = 210,
-        y = -750,
+        y = -720,
         spells = {100723},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {27500},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 263,
         x = 210,
-        y = -930,
+        y = -900,
         spells = {100724},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {55000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 265,
         x = 330,
         y = -630,
         spells = {100842},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 266,
         x = 330,
         y = -810,
         spells = {100843},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 267,
         x = 330,
         y = -990,
         spells = {100844},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 268,
         x = 330,
         y = -1290,
         spells = {110840},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 270,
         x = 210,
-        y = -390,
+        y = -360,
         spells = {100721},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 271,
         x = 330,
         y = -450,
         spells = {100841},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 272,
         x = 330,
         y = -30,
         spells = {100700},
-        soulPointsCosts = {75}
+        soulPointsCosts = {83},
+        currency = "ash",
+        sector = "am",
+        isStart = true
     },
     {
         id = 273,
         x = 450,
         y = -30,
         spells = {100701},
-        soulPointsCosts = {225}
+        soulPointsCosts = {248},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 275,
         x = 390,
         y = -210,
         spells = {100681},
-        soulPointsCosts = {225}
+        soulPointsCosts = {248},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 284,
         x = 1530,
         y = -150,
         spells = {110700},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 285,
         x = 330,
         y = -150,
         spells = {100680},
-        soulPointsCosts = {75}
+        soulPointsCosts = {83},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 287,
-        x = 90,
+        x = 210,
         y = -30,
         spells = {100080},
-        soulPointsCosts = {75},
+        soulPointsCosts = {83},
+        currency = "ash",
+        sector = "en",
         isStart = true
     },
     {
@@ -1326,599 +1478,635 @@ nodes = {
         x = 450,
         y = -270,
         spells = {100682},
-        soulPointsCosts = {750}
+        soulPointsCosts = {825},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 289,
         x = 510,
         y = -330,
         spells = {100683},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 290,
         x = 570,
         y = -390,
         spells = {100684},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 291,
         x = 630,
         y = -450,
         spells = {100685},
-        soulPointsCosts = {3250}
+        soulPointsCosts = {3575},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 292,
         x = 690,
         y = -510,
         spells = {100686},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 293,
         x = 750,
         y = -570,
         spells = {100687},
-        soulPointsCosts = {8500}
+        soulPointsCosts = {9350},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 294,
         x = 810,
         y = -630,
         spells = {100688},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 295,
         x = 870,
         y = -690,
         spells = {100689},
-        soulPointsCosts = {40000}
+        soulPointsCosts = {44000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 296,
         x = 990,
         y = -690,
         spells = {110680},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 297,
         x = 570,
         y = 90,
         spells = {100740},
-        soulPointsCosts = {300}
+        soulPointsCosts = {330},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 298,
         x = 810,
         y = 90,
         spells = {100741},
-        soulPointsCosts = {1750}
+        soulPointsCosts = {1925},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 299,
         x = 1050,
         y = 90,
         spells = {100742},
-        soulPointsCosts = {4000}
+        soulPointsCosts = {4400},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 300,
         x = 1290,
         y = 90,
         spells = {100743},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 301,
         x = 1530,
         y = 90,
         spells = {100744},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {55000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 307,
-        x = 810,
-        y = 390,
+        x = 690,
+        y = 270,
         spells = {110920},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 311,
         x = 990,
         y = -570,
         spells = {110880},
-        soulPointsCosts = {60000}
+        soulPointsCosts = {66},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 314,
         x = 750,
         y = -330,
         spells = {110980},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 316,
         x = 450,
         y = -750,
         spells = {111000},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 320,
         x = 570,
         y = -30,
         spells = {100702},
-        soulPointsCosts = {750}
+        soulPointsCosts = {825},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 321,
         x = 690,
         y = -30,
         spells = {100703},
-        soulPointsCosts = {1250}
+        soulPointsCosts = {1375},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 322,
         x = 810,
         y = -30,
         spells = {100704},
-        soulPointsCosts = {2000}
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 323,
         x = 930,
         y = -30,
         spells = {100705},
-        soulPointsCosts = {3250}
+        soulPointsCosts = {3575},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 324,
         x = 1050,
         y = -30,
         spells = {100706},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 325,
         x = 1170,
         y = -30,
         spells = {100707},
-        soulPointsCosts = {8500}
+        soulPointsCosts = {9350},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 326,
         x = 1290,
         y = -30,
         spells = {100708},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 327,
         x = 1410,
         y = -30,
         spells = {100709},
-        soulPointsCosts = {40000}
+        soulPointsCosts = {44000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 328,
         x = 690,
         y = -150,
         spells = {101050},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 329,
         x = 930,
         y = -150,
         spells = {101051},
-        soulPointsCosts = {2500}
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 330,
         x = 1170,
         y = -150,
         spells = {101052},
-        soulPointsCosts = {7500}
+        soulPointsCosts = {8250},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 334,
         x = 1050,
         y = -270,
         spells = {111030},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {17},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 335,
-        x = 1050,
-        y = 270,
+        x = 840,
+        y = 210,
         spells = {101090},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {5500},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 336,
-        x = 1170,
-        y = 270,
+        x = 960,
+        y = 210,
         spells = {101091},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {11000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 337,
-        x = 1290,
-        y = 270,
+        x = 1080,
+        y = 210,
         spells = {101092},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {16500},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 338,
-        x = 1410,
-        y = 270,
+        x = 1200,
+        y = 210,
         spells = {101093},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {22000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 339,
-        x = 1530,
-        y = 270,
+        x = 1320,
+        y = 210,
         spells = {101094},
-        soulPointsCosts = {25000}
-    },
-    {
-        id = 340,
-        x = 1290,
-        y = -150,
-        spells = {101070},
-        soulPointsCosts = {25000}
-    },
-    {
-        id = 341,
-        x = 1050,
-        y = 390,
-        spells = {101071},
-        soulPointsCosts = {25000}
-    },
-    {
-        id = 342,
-        x = 1170,
-        y = 390,
-        spells = {101110},
-        soulPointsCosts = {7500}
-    },
-    {
-        id = 343,
-        x = 1290,
-        y = 390,
-        spells = {101111},
-        soulPointsCosts = {12500}
-    },
-    {
-        id = 344,
-        x = 1410,
-        y = 390,
-        spells = {101112},
-        soulPointsCosts = {20000}
-    },
-    {
-        id = 345,
-        x = 1530,
-        y = 390,
-        spells = {101113},
-        soulPointsCosts = {25000}
-    },
-    {
-        id = 346,
-        x = 1650,
-        y = 390,
-        spells = {101114},
-        soulPointsCosts = {30000}
-    },
-    {
-        id = 347,
-        x = 930,
-        y = 270,
-        spells = {101130},
-        soulPointsCosts = {5000}
-    },
-    {
-        id = 348,
-        x = 750,
-        y = -450,
-        spells = {101131},
-        soulPointsCosts = {15000}
-    },
-    {
-        id = 349,
-        x = 1650,
-        y = 270,
-        spells = {101132},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {27500},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 355,
-        x = -630,
-        y = -90,
+        x = -360,
+        y = -300,
         spells = {100960},
-        soulPointsCosts = {1500}
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        isStart = true
     },
     {
         id = 356,
         x = -390,
-        y = -390,
+        y = -510,
         spells = {101200},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true,
+        isStart = true
     },
     {
         id = 357,
-        x = -510,
-        y = -570,
+        x = -450,
+        y = -600,
         spells = {101180},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true,
+        isStart = true
     },
     {
         id = 358,
         x = -570,
         y = -690,
         spells = {101181},
-        soulPointsCosts = {12500}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 359,
         x = -570,
         y = -810,
         spells = {101182},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 360,
         x = -570,
         y = -930,
         spells = {101183},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 362,
-        x = -570,
-        y = -390,
+        x = -600,
+        y = -450,
         spells = {101160},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true,
+        isStart = true
     },
     {
         id = 363,
         x = -750,
         y = -630,
         spells = {101161},
-        soulPointsCosts = {12500}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 364,
         x = -810,
         y = -750,
         spells = {101162},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 365,
         x = -810,
         y = -870,
         spells = {101163},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 366,
         x = -870,
         y = -990,
         spells = {101164},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 377,
         x = -510,
-        y = -450,
+        y = -480,
         spells = {101150, 101151, 101152, 101153, 101154},
-        soulPointsCosts = {10000, 20000, 30000, 40000, 50000}
+        soulPointsCosts = {1, 1, 1, 1, 1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true,
+        isStart = true
     },
     {
         id = 378,
-        x = -810,
-        y = -210,
+        x = 420,
+        y = 450,
         spells = {100460, 100461, 100462},
-        soulPointsCosts = {5000, 10000, 15000}
+        soulPointsCosts = {22000, 55000, 137500},
+        currency = "ash",
+        sector = "en",
+        permanent = true
     },
     {
         id = 379,
-        x = -810,
-        y = -90,
+        x = 180,
+        y = 210,
         spells = {100420, 100421, 100422},
-        soulPointsCosts = {1500, 3000, 5000}
+        soulPointsCosts = {11000, 27500, 68750},
+        currency = "ash",
+        sector = "en",
+        permanent = true,
+        isStart = true
     },
     {
         id = 380,
-        x = -630,
-        y = -150,
+        x = 300,
+        y = 330,
         spells = {100600, 100601, 100602},
-        soulPointsCosts = {2500, 5000, 10000}
-    },
-    {
-        id = 383,
-        x = -750,
-        y = -330,
-        spells = {100322},
-        soulPointsCosts = {5000}
-    },
-    {
-        id = 384,
-        x = -930,
-        y = -450,
-        spells = {100323},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {22000, 55000, 137500},
+        currency = "ash",
+        sector = "en",
+        permanent = true
     },
     {
         id = 385,
-        x = -570,
-        y = 30,
+        x = -540,
+        y = -360,
         spells = {100641},
-        soulPointsCosts = {1000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 388,
-        x = 930,
-        y = 390,
+        x = 780,
+        y = 270,
         spells = {100560, 100561, 100562},
-        soulPointsCosts = {7500, 15000, 25000}
+        soulPointsCosts = {8250, 16500, 27500},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 389,
-        x = 990,
-        y = 510,
+        x = 870,
+        y = 450,
         spells = {100860, 100861, 100862},
-        soulPointsCosts = {10000, 20000, 30000}
+        soulPointsCosts = {11000, 22000, 33000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 390,
         x = 870,
         y = -570,
         spells = {100880, 100881, 100882},
-        soulPointsCosts = {10000, 20000, 30000}
+        soulPointsCosts = {11000, 22000, 33000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 391,
-        x = 750,
-        y = 270,
+        x = 690,
+        y = 210,
         spells = {100920, 100921, 100922},
-        soulPointsCosts = {1500, 3000, 5000}
+        soulPointsCosts = {1650, 3300, 5500},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 392,
         x = 750,
         y = -210,
         spells = {100980, 100981, 100982, 100983},
-        soulPointsCosts = {5000, 10000, 15000, 150000}
+        soulPointsCosts = {5500, 11000, 16500, 165000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 393,
         x = 450,
-        y = -570,
+        y = -540,
         spells = {101000, 101001, 101002, 101003},
-        soulPointsCosts = {15000, 20000, 25000, 250000}
+        soulPointsCosts = {16500, 22000, 27500, 275000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 394,
         x = 1050,
         y = -150,
         spells = {101030, 101031, 101032, 101033},
-        soulPointsCosts = {5000, 10000, 15000, 150000}
+        soulPointsCosts = {5500, 11000, 16500, 165000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 395,
         x = 630,
         y = -330,
         spells = {101210, 101211, 101212, 101213, 101214, 101215},
-        soulPointsCosts = {1500, 3000, 5000, 10000, 25000, 250000}
+        soulPointsCosts = {1650, 3300, 5500, 11000, 27500, 275000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 396,
-        x = -150,
-        y = -30,
+        x = -390,
+        y = -60,
         spells = {100500},
-        soulPointsCosts = {250},
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
         isStart = true
     },
     {
         id = 397,
-        x = -570,
-        y = -30,
+        x = -480,
+        y = 30,
         spells = {100520, 100521, 100522, 100523},
-        soulPointsCosts = {5000, 10000, 25000, 50000}
+        soulPointsCosts = {2, 2, 2, 2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 398,
-        x = -750,
+        x = -720,
         y = -30,
         spells = {110520},
-        soulPointsCosts = {75000}
-    },
-    {
-        id = 399,
-        x = -330,
-        y = 30,
-        spells = {100660},
-        soulPointsCosts = {500}
-    },
-    {
-        id = 400,
-        x = -510,
-        y = 150,
-        spells = {100661},
-        soulPointsCosts = {1000}
-    },
-    {
-        id = 401,
-        x = -630,
-        y = 270,
-        spells = {100662},
-        soulPointsCosts = {2000}
-    },
-    {
-        id = 402,
-        x = -750,
-        y = 390,
-        spells = {100663},
-        soulPointsCosts = {5000}
-    },
-    {
-        id = 403,
-        x = -870,
-        y = 510,
-        spells = {100664},
-        soulPointsCosts = {10000}
-    },
-    {
-        id = 404,
-        x = -390,
-        y = -150,
-        spells = {100320},
-        soulPointsCosts = {500}
-    },
-    {
-        id = 405,
-        x = -390,
-        y = -90,
-        spells = {101230},
-        soulPointsCosts = {1000},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
+        id = 405,
+        x = -510,
+        y = -60,
+        spells = {101230},
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
+    },
+    {
         id = 406,
-        x = -390,
-        y = -30,
+        x = -450,
+        y = -330,
         spells = {100640},
-        soulPointsCosts = {500}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 407,
-        x = -810,
+        x = -840,
         y = -150,
         spells = {101250},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 408,
-        x = -1170,
+        x = -1140,
         y = -390,
         spells = {101251},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 409,
         x = -1110,
-        y = 30,
+        y = -30,
         spells = {101252},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -1926,7 +2114,9 @@ nodes = {
         x = -1110,
         y = 210,
         spells = {101253},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -1934,7 +2124,9 @@ nodes = {
         x = -1170,
         y = -90,
         spells = {101254},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -1942,15 +2134,19 @@ nodes = {
         x = -930,
         y = -30,
         spells = {101255},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 413,
-        x = -1170,
-        y = -630,
+        x = -510,
+        y = -150,
         spells = {101256},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -1958,7 +2154,9 @@ nodes = {
         x = -870,
         y = -1110,
         spells = {101257},
-        soulPointsCosts = {10000},
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -1966,39 +2164,9 @@ nodes = {
         x = -210,
         y = -1050,
         spells = {101258},
-        soulPointsCosts = {10000},
-        permanent = true
-    },
-    {
-        id = 416,
-        x = -630,
-        y = -210,
-        spells = {33391},
-        soulPointsCosts = {1500},
-        permanent = true
-    },
-    {
-        id = 417,
-        x = -810,
-        y = -270,
-        spells = {34090},
-        soulPointsCosts = {5000},
-        permanent = true
-    },
-    {
-        id = 418,
-        x = -1170,
-        y = -510,
-        spells = {34091},
-        soulPointsCosts = {50000},
-        permanent = true
-    },
-    {
-        id = 419,
-        x = -1170,
-        y = -450,
-        spells = {54197},
-        soulPointsCosts = {20000},
+        soulPointsCosts = {32},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -2006,540 +2174,485 @@ nodes = {
         x = -1050,
         y = 1110,
         spells = {101280, 101281, 101282, 101283},
-        soulPointsCosts = {100000, 150000, 250000, 500000}
+        soulPointsCosts = {110000, 165000, 275000, 550000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 421,
         x = -1110,
         y = 1050,
         spells = {111280},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 422,
         x = 90,
         y = 1350,
         spells = {101320, 101321, 101322, 101323},
-        soulPointsCosts = {100000, 150000, 250000, 500000}
+        soulPointsCosts = {110000, 165000, 275000, 550000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 423,
         x = 90,
         y = 1410,
         spells = {111320},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 424,
         x = 990,
         y = 1110,
         spells = {101340, 101341, 101342, 101343},
-        soulPointsCosts = {100000, 150000, 250000, 500000}
+        soulPointsCosts = {110000, 165000, 275000, 550000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 426,
         x = -150,
-        y = -270,
+        y = -330,
         spells = {101360},
-        soulPointsCosts = {5000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 427,
         x = -150,
         y = -450,
         spells = {101361},
-        soulPointsCosts = {8000}
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 428,
         x = -150,
         y = -630,
         spells = {101362},
-        soulPointsCosts = {12000}
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 429,
         x = -150,
         y = -810,
         spells = {101363},
-        soulPointsCosts = {18000}
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 430,
         x = -150,
         y = -990,
         spells = {101364},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 431,
-        x = -1230,
-        y = 690,
+        x = 540,
+        y = 1140,
         spells = {101380, 101381, 101382, 101383},
-        soulPointsCosts = {100000, 150000, 250000, 500000}
+        soulPointsCosts = {110000, 165000, 275000, 550000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 432,
-        x = -1350,
-        y = 750,
+        x = 450,
+        y = 1200,
         spells = {111380},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 433,
-        x = -1230,
-        y = 570,
+        x = 600,
+        y = 1080,
         spells = {101400, 101401, 101402, 101403},
-        soulPointsCosts = {100000, 150000, 250000, 500000}
+        soulPointsCosts = {110000, 165000, 275000, 550000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 434,
-        x = -1350,
-        y = 510,
+        x = 660,
+        y = 1200,
         spells = {111400},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 435,
         x = 1770,
         y = -150,
         spells = {101420, 101421, 101422, 101423},
-        soulPointsCosts = {100000, 150000, 250000, 500000}
+        soulPointsCosts = {110000, 165000, 275000, 550000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 436,
         x = 1890,
         y = -150,
         spells = {111420},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 437,
-        x = 1170,
-        y = 510,
-        spells = {101440, 101441, 101442, 101443},
-        soulPointsCosts = {100000, 150000, 250000, 500000}
-    },
-    {
-        id = 438,
-        x = 1350,
-        y = 630,
-        spells = {111440},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 439,
         x = -750,
         y = 990,
         spells = {100010},
-        soulPointsCosts = {175000}
+        soulPointsCosts = {192500},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 440,
         x = -810,
         y = 1050,
         spells = {100011},
-        soulPointsCosts = {350000}
+        soulPointsCosts = {385000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 441,
         x = -930,
         y = 1110,
         spells = {110001},
-        soulPointsCosts = {525000}
+        soulPointsCosts = {578},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 442,
         x = -870,
         y = 990,
         spells = {100050},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 443,
         x = -930,
         y = 1050,
         spells = {100051},
-        soulPointsCosts = {400000}
+        soulPointsCosts = {440000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 444,
         x = -990,
         y = 990,
         spells = {110041},
-        soulPointsCosts = {600000}
-    },
-    {
-        id = 445,
-        x = -930,
-        y = 990,
-        spells = {100270},
-        soulPointsCosts = {300000}
-    },
-    {
-        id = 446,
-        x = -990,
-        y = 1050,
-        spells = {100271},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 448,
         x = -750,
         y = 1110,
         spells = {100070},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 449,
         x = -810,
         y = 1170,
         spells = {100071},
-        soulPointsCosts = {400000}
-    },
-    {
-        id = 451,
-        x = -390,
-        y = 810,
-        spells = {100185},
-        soulPointsCosts = {4875}
+        soulPointsCosts = {440000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 452,
         x = 690,
         y = 990,
         spells = {100030},
-        soulPointsCosts = {175000}
+        soulPointsCosts = {192500},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 453,
         x = 750,
         y = 1050,
         spells = {100031},
-        soulPointsCosts = {350000}
+        soulPointsCosts = {385000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 454,
         x = 870,
         y = 1110,
         spells = {110021},
-        soulPointsCosts = {525000}
+        soulPointsCosts = {578},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 455,
         x = 810,
         y = 990,
         spells = {100110},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 456,
         x = 870,
         y = 1050,
         spells = {100111},
-        soulPointsCosts = {400000}
+        soulPointsCosts = {440000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 457,
         x = 930,
         y = 990,
         spells = {110101},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 458,
         x = 690,
         y = 1110,
         spells = {100130},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 459,
         x = 750,
         y = 1170,
         spells = {100131},
-        soulPointsCosts = {400000}
+        soulPointsCosts = {440000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 460,
-        x = 690,
+        x = 720,
         y = 1230,
         spells = {110121},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 461,
         x = -270,
         y = 1350,
         spells = {100225},
-        soulPointsCosts = {362500}
+        soulPointsCosts = {398750},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 462,
         x = -30,
         y = 1110,
         spells = {100145},
-        soulPointsCosts = {375000}
-    },
-    {
-        id = 463,
-        x = -150,
-        y = 1230,
-        spells = {100170},
-        soulPointsCosts = {225000}
-    },
-    {
-        id = 464,
-        x = -390,
-        y = 1470,
-        spells = {100171},
-        soulPointsCosts = {500000}
-    },
-    {
-        id = 466,
-        x = 330,
-        y = 1290,
-        spells = {100205},
-        soulPointsCosts = {3750}
+        soulPointsCosts = {412500},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 467,
         x = 210,
         y = 1350,
         spells = {100245},
-        soulPointsCosts = {1000000}
-    },
-    {
-        id = 468,
-        x = 210,
-        y = 330,
-        spells = {101460},
-        soulPointsCosts = {115}
-    },
-    {
-        id = 469,
-        x = 270,
-        y = 390,
-        spells = {101461},
-        soulPointsCosts = {350}
-    },
-    {
-        id = 470,
-        x = 330,
-        y = 450,
-        spells = {101462},
-        soulPointsCosts = {1125}
-    },
-    {
-        id = 471,
-        x = 390,
-        y = 510,
-        spells = {101463},
-        soulPointsCosts = {1875}
-    },
-    {
-        id = 472,
-        x = 450,
-        y = 570,
-        spells = {101464},
-        soulPointsCosts = {3000}
-    },
-    {
-        id = 473,
-        x = 510,
-        y = 630,
-        spells = {101465},
-        soulPointsCosts = {4875}
-    },
-    {
-        id = 474,
-        x = 570,
-        y = 690,
-        spells = {101466},
-        soulPointsCosts = {7500}
-    },
-    {
-        id = 475,
-        x = 630,
-        y = 750,
-        spells = {101467},
-        soulPointsCosts = {12750}
-    },
-    {
-        id = 476,
-        x = 690,
-        y = 810,
-        spells = {101468},
-        soulPointsCosts = {30000}
-    },
-    {
-        id = 477,
-        x = 750,
-        y = 870,
-        spells = {101469},
-        soulPointsCosts = {60000}
-    },
-    {
-        id = 478,
-        x = 870,
-        y = 990,
-        spells = {101470},
-        soulPointsCosts = {300000}
-    },
-    {
-        id = 479,
-        x = 930,
-        y = 1050,
-        spells = {101471},
-        soulPointsCosts = {600000}
-    },
-    {
-        id = 492,
-        x = 690,
-        y = 1170,
-        spells = {101500},
-        soulPointsCosts = {300000}
-    },
-    {
-        id = 493,
-        x = 750,
-        y = 1230,
-        spells = {101501},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 496,
         x = 930,
         y = 630,
         spells = {100090},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 497,
         x = 990,
         y = 690,
         spells = {100091},
-        soulPointsCosts = {400000}
+        soulPointsCosts = {440000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 498,
-        x = -930,
-        y = -1230,
+        x = 750,
+        y = 510,
         spells = {100345},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {4500},
+        currency = "shard",
+        sector = "en",
         permanent = true
-    },
-    {
-        id = 499,
-        x = -1170,
-        y = -570,
-        spells = {100325},
-        soulPointsCosts = {250000}
-    },
-    {
-        id = 500,
-        x = -990,
-        y = 630,
-        spells = {100665},
-        soulPointsCosts = {100000}
     },
     {
         id = 501,
         x = 930,
         y = -750,
         spells = {100690},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 502,
         x = 990,
         y = -810,
         spells = {100691},
-        soulPointsCosts = {400000}
+        soulPointsCosts = {440000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 503,
         x = 1530,
         y = -30,
         spells = {100710},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 504,
         x = 1650,
         y = -30,
         spells = {100711},
-        soulPointsCosts = {400000}
+        soulPointsCosts = {440000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 505,
         x = 1770,
         y = 90,
         spells = {100745},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 506,
         x = 210,
-        y = -1110,
+        y = -1080,
         spells = {100725},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 507,
         x = 90,
         y = -1170,
         spells = {100765},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {110000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 508,
         x = 150,
         y = -1170,
         spells = {100785},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {110000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 509,
         x = 210,
         y = -1170,
         spells = {100805},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {110000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 510,
         x = 270,
         y = -1170,
         spells = {100825},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {110000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 511,
         x = 330,
         y = -1170,
         spells = {100845},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {110000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 512,
         x = -930,
         y = -1110,
         spells = {101165},
-        soulPointsCosts = {250000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 513,
         x = -570,
         y = -1230,
         spells = {101185},
-        soulPointsCosts = {250000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 514,
         x = -390,
         y = -1410,
         spells = {101270},
-        soulPointsCosts = {100000},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -2547,375 +2660,259 @@ nodes = {
         x = -750,
         y = -1410,
         spells = {101271},
-        soulPointsCosts = {100000},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
         permanent = true
-    },
-    {
-        id = 518,
-        x = -450,
-        y = 870,
-        spells = {100186},
-        soulPointsCosts = {7500}
-    },
-    {
-        id = 519,
-        x = -510,
-        y = 930,
-        spells = {100187},
-        soulPointsCosts = {12750}
-    },
-    {
-        id = 521,
-        x = -630,
-        y = 1050,
-        spells = {100189},
-        soulPointsCosts = {60000}
-    },
-    {
-        id = 522,
-        x = -750,
-        y = 1170,
-        spells = {100190},
-        soulPointsCosts = {300000}
-    },
-    {
-        id = 523,
-        x = -810,
-        y = 1230,
-        spells = {100191},
-        soulPointsCosts = {600000}
-    },
-    {
-        id = 524,
-        x = 90,
-        y = 1110,
-        spells = {100206},
-        soulPointsCosts = {6750}
-    },
-    {
-        id = 525,
-        x = 330,
-        y = 1350,
-        spells = {100207},
-        soulPointsCosts = {10000}
-    },
-    {
-        id = 526,
-        x = 90,
-        y = 1170,
-        spells = {100208},
-        soulPointsCosts = {22500}
-    },
-    {
-        id = 527,
-        x = 330,
-        y = 1410,
-        spells = {100209},
-        soulPointsCosts = {50000}
-    },
-    {
-        id = 528,
-        x = 90,
-        y = 1230,
-        spells = {100210},
-        soulPointsCosts = {225000}
-    },
-    {
-        id = 529,
-        x = 330,
-        y = 1470,
-        spells = {100211},
-        soulPointsCosts = {500000}
-    },
-    {
-        id = 530,
-        x = 1770,
-        y = 390,
-        spells = {101115},
-        soulPointsCosts = {300000}
-    },
-    {
-        id = 531,
-        x = 1770,
-        y = 270,
-        spells = {101133},
-        soulPointsCosts = {500000}
-    },
-    {
-        id = 532,
-        x = 30,
-        y = 510,
-        spells = {101490},
-        soulPointsCosts = {115}
-    },
-    {
-        id = 533,
-        x = 90,
-        y = 570,
-        spells = {101491},
-        soulPointsCosts = {350}
-    },
-    {
-        id = 534,
-        x = 150,
-        y = 630,
-        spells = {101492},
-        soulPointsCosts = {1125}
-    },
-    {
-        id = 535,
-        x = 210,
-        y = 690,
-        spells = {101493},
-        soulPointsCosts = {1875}
-    },
-    {
-        id = 536,
-        x = 270,
-        y = 750,
-        spells = {101494},
-        soulPointsCosts = {3000}
-    },
-    {
-        id = 537,
-        x = 330,
-        y = 810,
-        spells = {101495},
-        soulPointsCosts = {4875}
-    },
-    {
-        id = 538,
-        x = 390,
-        y = 870,
-        spells = {101496},
-        soulPointsCosts = {7500}
-    },
-    {
-        id = 539,
-        x = 450,
-        y = 930,
-        spells = {101497},
-        soulPointsCosts = {12750}
-    },
-    {
-        id = 540,
-        x = 510,
-        y = 990,
-        spells = {101498},
-        soulPointsCosts = {30000}
-    },
-    {
-        id = 541,
-        x = 570,
-        y = 1050,
-        spells = {101499},
-        soulPointsCosts = {60000}
     },
     {
         id = 542,
         x = -630,
         y = -690,
         spells = {101540},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 543,
         x = -630,
         y = -810,
         spells = {101541},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 544,
         x = -630,
         y = -930,
         spells = {101542},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 545,
         x = -630,
         y = -1050,
         spells = {101543},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 546,
         x = -630,
         y = -1230,
         spells = {101544},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 547,
         x = -630,
         y = -1410,
         spells = {101545},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 548,
         x = -510,
         y = -690,
         spells = {101560},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 549,
         x = -510,
         y = -810,
         spells = {101561},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 550,
         x = -510,
         y = -930,
         spells = {101562},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 551,
         x = -510,
         y = -1050,
         spells = {101563},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 552,
         x = -510,
         y = -1230,
         spells = {101564},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 553,
         x = -510,
         y = -1410,
         spells = {101565},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 554,
-        x = -210,
+        x = -270,
         y = -450,
         spells = {101580},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 555,
-        x = -210,
-        y = -630,
+        x = -270,
+        y = -510,
         spells = {101581},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 556,
-        x = -210,
-        y = -810,
+        x = -270,
+        y = -570,
         spells = {101582},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 557,
-        x = -210,
-        y = -990,
+        x = -270,
+        y = -630,
         spells = {101583},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 558,
-        x = -210,
-        y = -1170,
+        x = -270,
+        y = -690,
         spells = {101584},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 559,
-        x = -210,
-        y = -1290,
+        x = -270,
+        y = -750,
         spells = {101585},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 560,
-        x = -1350,
-        y = -330,
+        x = 360,
+        y = 390,
         spells = {101520},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {264000},
+        currency = "ash",
+        sector = "en",
+        permanent = true
     },
     {
         id = 561,
-        x = -750,
-        y = -570,
+        x = -690,
+        y = -420,
         spells = {101620},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 562,
         x = -810,
-        y = -690,
+        y = -660,
         spells = {101621},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 563,
         x = -870,
         y = -810,
         spells = {101622},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 564,
         x = -930,
         y = -930,
         spells = {101623},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 565,
         x = -990,
         y = -1050,
         spells = {101624},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 566,
         x = -1050,
         y = -1170,
         spells = {101625},
-        soulPointsCosts = {200000}
-    },
-    {
-        id = 582,
-        x = -90,
-        y = -690,
-        spells = {101650, 101651, 101652, 101653, 101654},
-        soulPointsCosts = {100000, 200000, 300000, 400000, 500000},
-        permanent = true
-    },
-    {
-        id = 583,
-        x = -90,
-        y = -870,
-        spells = {101655, 101656, 101657, 101658, 101659},
-        soulPointsCosts = {600000, 700000, 800000, 900000, 1000000},
-        permanent = true
-    },
-    {
-        id = 584,
-        x = -90,
-        y = -1050,
-        spells = {101660, 101661, 101662, 101663, 101664},
-        soulPointsCosts = {1250000, 1500000, 1750000, 2000000, 2500000},
-        permanent = true
-    },
-    {
-        id = 585,
-        x = -90,
-        y = -1170,
-        spells = {101665, 101666},
-        soulPointsCosts = {5000000, 10000000},
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
         permanent = true
     },
     {
@@ -2923,197 +2920,196 @@ nodes = {
         x = -570,
         y = -1050,
         spells = {101184},
-        soulPointsCosts = {25000}
-    },
-    {
-        id = 587,
-        x = -450,
-        y = 30,
-        spells = {101670},
-        soulPointsCosts = {1500}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 588,
-        x = -630,
-        y = 150,
+        x = -690,
+        y = 360,
         spells = {101671},
-        soulPointsCosts = {3000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 589,
-        x = -750,
-        y = 270,
+        x = -1170,
+        y = 600,
         spells = {101672},
-        soulPointsCosts = {6000}
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 590,
-        x = -870,
-        y = 390,
+        x = -600,
+        y = 300,
         spells = {101673},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 591,
-        x = -990,
-        y = 510,
+        x = -780,
+        y = 420,
         spells = {101674},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 592,
-        x = -1110,
-        y = 570,
+        x = -870,
+        y = 480,
         spells = {101675},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 593,
-        x = -690,
-        y = 150,
+        x = -630,
+        y = 120,
         spells = {101690},
-        soulPointsCosts = {3000}
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 594,
-        x = -810,
-        y = 210,
+        x = -750,
+        y = 180,
         spells = {101691},
-        soulPointsCosts = {6000}
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 595,
         x = -930,
         y = 270,
         spells = {101692},
-        soulPointsCosts = {10000}
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 596,
         x = -1050,
         y = 330,
         spells = {101693},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 597,
         x = -1170,
         y = 390,
         spells = {101694},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 598,
         x = -1290,
         y = 390,
         spells = {101695},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 599,
         x = 1110,
         y = -810,
         spells = {110681},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 600,
-        x = -750,
+        x = -720,
         y = 1230,
         spells = {110061},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 601,
         x = 1110,
         y = 690,
         spells = {110081},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 608,
         x = 810,
         y = -150,
         spells = {101710, 101711, 101712, 101713, 101714},
-        soulPointsCosts = {50000, 100000, 150000, 200000, 250000}
+        soulPointsCosts = {55000, 110000, 165000, 220000, 275000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 609,
-        x = 930,
+        x = 900,
         y = -930,
         spells = {101730, 101731, 101732, 101733, 101734, 101735, 101736, 101737},
-        soulPointsCosts = {100000, 200000, 300000, 400000, 500000, 750000, 1000000, 1250000}
-    },
-    {
-        id = 610,
-        x = 510,
-        y = 1110,
-        spells = {111490},
-        soulPointsCosts = {90000}
-    },
-    {
-        id = 611,
-        x = 690,
-        y = 1290,
-        spells = {111491},
-        soulPointsCosts = {900000}
-    },
-    {
-        id = 612,
-        x = 810,
-        y = 810,
-        spells = {111460},
-        soulPointsCosts = {90000}
-    },
-    {
-        id = 613,
-        x = 990,
-        y = 990,
-        spells = {111461},
-        soulPointsCosts = {900000}
-    },
-    {
-        id = 614,
-        x = 1050,
-        y = 1050,
-        spells = {111340},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 615,
-        x = -1050,
-        y = 990,
-        spells = {110261},
-        soulPointsCosts = {900000}
+        soulPointsCosts = {110000, 220000, 330000, 440000, 550000, 825000, 1100000, 1375000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 616,
         x = -750,
         y = 1290,
         spells = {110181},
-        soulPointsCosts = {900000}
+        soulPointsCosts = {990000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 617,
         x = -570,
         y = 1110,
         spells = {110180},
-        soulPointsCosts = {90000}
-    },
-    {
-        id = 618,
-        x = 450,
-        y = 1470,
-        spells = {110200},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {99000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 619,
-        x = -630,
+        x = -600,
         y = -570,
         spells = {101640},
         soulPointsCosts = {50000},
-        permanent = true
+        currency = "ash",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 620,
@@ -3121,14 +3117,18 @@ nodes = {
         y = -630,
         spells = {101641},
         soulPointsCosts = {100000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
         id = 621,
         x = -750,
-        y = -750,
+        y = -720,
         spells = {101642},
         soulPointsCosts = {200000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3136,7 +3136,9 @@ nodes = {
         x = -750,
         y = -870,
         spells = {101643},
-        soulPointsCosts = {300000},
+        soulPointsCosts = {400000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3144,7 +3146,9 @@ nodes = {
         x = -810,
         y = -990,
         spells = {101644},
-        soulPointsCosts = {400000},
+        soulPointsCosts = {800000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3152,7 +3156,9 @@ nodes = {
         x = -810,
         y = -1110,
         spells = {101645},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {1600000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3160,7 +3166,9 @@ nodes = {
         x = -810,
         y = -1230,
         spells = {101646},
-        soulPointsCosts = {750000},
+        soulPointsCosts = {3200000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3168,37 +3176,39 @@ nodes = {
         x = -870,
         y = -1350,
         spells = {101647},
-        soulPointsCosts = {1000000},
+        soulPointsCosts = {6400000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
         id = 627,
-        x = -930,
-        y = -1470,
+        x = -870,
+        y = -1440,
         spells = {101648},
-        soulPointsCosts = {1500000},
+        soulPointsCosts = {12800000},
+        currency = "ash",
+        sector = "pr",
         permanent = true
     },
     {
-        id = 628,
-        x = 1110,
-        y = -750,
-        spells = {101072},
-        soulPointsCosts = {250000}
-    },
-    {
         id = 629,
-        x = -690,
-        y = -1350,
+        x = -570,
+        y = -1770,
         spells = {101600, 101601, 101602, 101603, 101604, 101605, 101606, 101607},
-        soulPointsCosts = {20000, 30000, 50000, 100000, 250000, 500000, 750000, 1000000}
+        soulPointsCosts = {1, 1, 1, 1, 1, 1, 1, 1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 630,
-        x = -1290,
-        y = 90,
+        x = -1230,
+        y = -30,
         spells = {600153},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3206,31 +3216,39 @@ nodes = {
         x = -1290,
         y = 210,
         spells = {600154},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 632,
-        x = -990,
+        x = -960,
         y = -210,
         spells = {600155},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 633,
-        x = -1350,
+        x = -1260,
         y = -150,
         spells = {600156},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 634,
-        x = -1290,
-        y = -690,
+        x = -630,
+        y = -210,
         spells = {600157},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3238,15 +3256,19 @@ nodes = {
         x = -870,
         y = -1170,
         spells = {600158},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 636,
         x = -750,
-        y = -1590,
+        y = -1530,
         spells = {600159},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3254,15 +3276,19 @@ nodes = {
         x = -390,
         y = -1590,
         spells = {600160},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 638,
         x = -270,
-        y = -1110,
+        y = -1080,
         spells = {600161},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {45},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3270,667 +3296,694 @@ nodes = {
         x = -1350,
         y = -390,
         spells = {600162},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
-        id = 640,
-        x = -390,
-        y = -210,
-        spells = {101750},
-        soulPointsCosts = {25000}
-    },
-    {
-        id = 641,
-        x = -630,
-        y = -330,
-        spells = {101760},
-        soulPointsCosts = {25000}
-    },
-    {
         id = 642,
-        x = -870,
-        y = -510,
+        x = -750,
+        y = -390,
         spells = {101790},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 643,
         x = -930,
         y = -510,
         spells = {101810},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 644,
         x = -990,
         y = -570,
         spells = {101811},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 645,
         x = -1050,
         y = -630,
         spells = {101812},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 646,
         x = -1110,
         y = -690,
         spells = {101813},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 647,
         x = -1170,
         y = -750,
         spells = {101814},
-        soulPointsCosts = {35000}
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 648,
         x = -1230,
         y = -810,
         spells = {101815},
-        soulPointsCosts = {350000}
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 649,
         x = -1170,
         y = -810,
         spells = {101795},
-        soulPointsCosts = {250000}
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 650,
         x = -1110,
         y = -750,
         spells = {101794},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 651,
         x = -1050,
         y = -690,
         spells = {101793},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 652,
         x = -990,
         y = -630,
         spells = {101792},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 653,
         x = -930,
         y = -570,
         spells = {101791},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 654,
-        x = 1890,
+        x = 1410,
         y = 210,
         spells = {101830},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 655,
         x = -930,
         y = 1170,
         spells = {100012},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 656,
         x = -990,
         y = 1230,
         spells = {100013},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 657,
-        x = -1110,
-        y = 1170,
-        spells = {100272},
-        soulPointsCosts = {900000}
-    },
-    {
-        id = 658,
-        x = -1170,
-        y = 1230,
-        spells = {100273},
-        soulPointsCosts = {1200000}
-    },
-    {
-        id = 659,
-        x = -1230,
-        y = 1170,
-        spells = {110262},
-        soulPointsCosts = {1800000}
-    },
-    {
-        id = 660,
-        x = -570,
-        y = 990,
-        spells = {100188},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 661,
         x = -1050,
         y = 1170,
         spells = {100052},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 662,
         x = -1110,
         y = 1230,
         spells = {100053},
-        soulPointsCosts = {800000}
+        soulPointsCosts = {880000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 663,
         x = -930,
-        y = 1290,
+        y = 1320,
         spells = {100072},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 664,
         x = -990,
         y = 1350,
         spells = {100073},
-        soulPointsCosts = {800000}
+        soulPointsCosts = {880000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 665,
         x = -30,
         y = 1350,
         spells = {100146},
-        soulPointsCosts = {500000}
-    },
-    {
-        id = 666,
-        x = -150,
-        y = 1470,
-        spells = {100172},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 667,
-        x = -390,
-        y = 1710,
-        spells = {100173},
-        soulPointsCosts = {1000000}
-    },
-    {
-        id = 668,
-        x = -930,
-        y = 1350,
-        spells = {100192},
-        soulPointsCosts = {900000}
-    },
-    {
-        id = 669,
-        x = -990,
-        y = 1410,
-        spells = {100193},
-        soulPointsCosts = {1200000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 670,
         x = -270,
         y = 1590,
         spells = {100226},
-        soulPointsCosts = {875000}
-    },
-    {
-        id = 671,
-        x = 90,
-        y = 1470,
-        spells = {100212},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 672,
-        x = 330,
-        y = 1710,
-        spells = {100213},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {962500},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 673,
         x = 210,
         y = 1590,
         spells = {100246},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 674,
         x = 870,
         y = 1170,
         spells = {100032},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 675,
         x = 930,
         y = 1230,
         spells = {100033},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 676,
         x = 990,
         y = 1170,
         spells = {100112},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 677,
         x = 1050,
         y = 1230,
         spells = {100113},
-        soulPointsCosts = {800000}
+        soulPointsCosts = {880000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 678,
         x = 870,
         y = 1290,
         spells = {100132},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 679,
         x = 930,
         y = 1350,
         spells = {100133},
-        soulPointsCosts = {800000}
-    },
-    {
-        id = 680,
-        x = 1050,
-        y = 1170,
-        spells = {101472},
-        soulPointsCosts = {900000}
-    },
-    {
-        id = 681,
-        x = 1110,
-        y = 1230,
-        spells = {101473},
-        soulPointsCosts = {1200000}
-    },
-    {
-        id = 682,
-        x = 870,
-        y = 1350,
-        spells = {101502},
-        soulPointsCosts = {900000}
-    },
-    {
-        id = 683,
-        x = 930,
-        y = 1410,
-        spells = {101503},
-        soulPointsCosts = {1200000}
+        soulPointsCosts = {880000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 684,
         x = -870,
-        y = 1230,
+        y = 1260,
         spells = {103400},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 685,
         x = -870,
-        y = 1290,
+        y = 1320,
         spells = {103401},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 686,
         x = -870,
-        y = 1350,
+        y = 1380,
         spells = {103402},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 687,
         x = -870,
-        y = 1410,
+        y = 1440,
         spells = {103403},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 688,
         x = -870,
-        y = 1470,
+        y = 1500,
         spells = {103404},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 689,
-        x = -870,
+        x = -810,
         y = 1530,
         spells = {103405},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 690,
-        x = -870,
+        x = -810,
         y = 1590,
         spells = {103406},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 691,
         x = -870,
         y = 1650,
         spells = {103407},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 692,
         x = -870,
         y = 1710,
         spells = {103408},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 693,
         x = -870,
         y = 1770,
         spells = {103409},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 694,
         x = 810,
         y = 1230,
         spells = {103420},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 695,
         x = 810,
         y = 1290,
         spells = {103421},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 696,
         x = 810,
         y = 1350,
         spells = {103422},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 697,
         x = 810,
         y = 1410,
         spells = {103423},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 698,
         x = 810,
         y = 1470,
         spells = {103424},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 699,
         x = 810,
         y = 1530,
         spells = {103425},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 700,
         x = 810,
         y = 1590,
         spells = {103426},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 701,
         x = 810,
         y = 1650,
         spells = {103427},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 702,
         x = 810,
         y = 1710,
         spells = {103428},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 703,
         x = 810,
         y = 1770,
         spells = {103429},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 704,
         x = -1110,
         y = 1290,
         spells = {110002},
-        soulPointsCosts = {1125000}
+        soulPointsCosts = {1238},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 705,
         x = -1170,
         y = 1170,
         spells = {110042},
-        soulPointsCosts = {1200000}
+        soulPointsCosts = {1320},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 706,
         x = -930,
         y = 1410,
         spells = {110062},
-        soulPointsCosts = {1200000}
+        soulPointsCosts = {1320},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 707,
-        x = -930,
+        x = -990,
         y = 1470,
         spells = {110182},
-        soulPointsCosts = {1800000}
+        soulPointsCosts = {1980000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 708,
         x = 1050,
         y = 1290,
         spells = {110022},
-        soulPointsCosts = {1125000}
+        soulPointsCosts = {1238},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 709,
         x = 1110,
         y = 1170,
         spells = {110102},
-        soulPointsCosts = {1200000}
-    },
-    {
-        id = 710,
-        x = 1170,
-        y = 1170,
-        spells = {111462},
-        soulPointsCosts = {1800000}
+        soulPointsCosts = {1320},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 711,
         x = 870,
         y = 1410,
         spells = {110122},
-        soulPointsCosts = {1200000}
-    },
-    {
-        id = 712,
-        x = 870,
-        y = 1470,
-        spells = {111492},
-        soulPointsCosts = {1800000}
+        soulPointsCosts = {1320},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 713,
         x = 870,
         y = 1830,
         spells = {113420},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {4125},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 714,
         x = -930,
         y = 1830,
         spells = {113400},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {4125},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 716,
         x = 210,
         y = 1470,
         spells = {101324},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 717,
         x = 1170,
         y = 1110,
         spells = {101344},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 718,
         x = -1230,
         y = 1110,
         spells = {101284},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 719,
-        x = -1110,
-        y = 750,
-        spells = {100666},
-        soulPointsCosts = {150000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 720,
         x = -690,
         y = 30,
         spells = {100524},
-        soulPointsCosts = {100000}
-    },
-    {
-        id = 721,
-        x = -1290,
-        y = -570,
-        spells = {100326},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 724,
         x = -1230,
         y = -870,
         spells = {101796},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 725,
         x = -1290,
         y = -870,
         spells = {101816},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 726,
-        x = -570,
-        y = 90,
+        x = -1290,
+        y = 600,
         spells = {103440},
-        soulPointsCosts = {25000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 727,
-        x = -690,
-        y = 210,
+        x = -660,
+        y = -300,
         spells = {103441},
-        soulPointsCosts = {25000},
+        soulPointsCosts = {36},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 728,
-        x = -810,
-        y = 330,
+        x = -570,
+        y = -270,
         spells = {103442},
-        soulPointsCosts = {25000},
+        soulPointsCosts = {26},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 729,
-        x = -930,
-        y = 450,
+        x = -330,
+        y = -180,
         spells = {103443},
-        soulPointsCosts = {50000},
-        permanent = true
+        soulPointsCosts = {13},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 731,
-        x = -1230,
-        y = 750,
+        x = -960,
+        y = 540,
         spells = {101676},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 732,
-        x = -1050,
-        y = 510,
+        x = -450,
+        y = -240,
         spells = {103444},
-        soulPointsCosts = {150000},
+        soulPointsCosts = {20},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 733,
-        x = -1290,
-        y = 810,
+        x = -420,
+        y = -150,
         spells = {103445},
-        soulPointsCosts = {200000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 734,
-        x = -1050,
+        x = -960,
         y = 150,
         spells = {103446},
-        soulPointsCosts = {50000},
-        permanent = true
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 735,
-        x = -1170,
+        x = -1140,
         y = -150,
         spells = {103447},
-        soulPointsCosts = {100000},
+        soulPointsCosts = {13},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 736,
-        x = -1350,
-        y = -450,
+        x = -1230,
+        y = -510,
         spells = {103448},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {13},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3938,23 +3991,19 @@ nodes = {
         x = -1170,
         y = -210,
         spells = {103449},
-        soulPointsCosts = {100000},
+        soulPointsCosts = {13},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 738,
-        x = -1410,
-        y = -690,
+        x = -1020,
+        y = -420,
         spells = {103450},
-        soulPointsCosts = {100000},
-        permanent = true
-    },
-    {
-        id = 739,
-        x = -1470,
-        y = -510,
-        spells = {103451},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {10},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3962,7 +4011,9 @@ nodes = {
         x = -1410,
         y = -870,
         spells = {103452},
-        soulPointsCosts = {1000000},
+        soulPointsCosts = {69},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3970,7 +4021,9 @@ nodes = {
         x = -1230,
         y = -990,
         spells = {103453},
-        soulPointsCosts = {750000},
+        soulPointsCosts = {50},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3978,7 +4031,9 @@ nodes = {
         x = -210,
         y = -390,
         spells = {103454},
-        soulPointsCosts = {25000},
+        soulPointsCosts = {10},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3986,7 +4041,9 @@ nodes = {
         x = -210,
         y = -570,
         spells = {103455},
-        soulPointsCosts = {50000},
+        soulPointsCosts = {20},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -3994,7 +4051,9 @@ nodes = {
         x = -210,
         y = -750,
         spells = {103456},
-        soulPointsCosts = {75000},
+        soulPointsCosts = {36},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4002,7 +4061,9 @@ nodes = {
         x = -210,
         y = -930,
         spells = {103457},
-        soulPointsCosts = {100000},
+        soulPointsCosts = {69},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4010,7 +4071,9 @@ nodes = {
         x = -150,
         y = -1350,
         spells = {103459},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {188},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4018,7 +4081,9 @@ nodes = {
         x = -870,
         y = -1230,
         spells = {103461},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {69},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4026,35 +4091,49 @@ nodes = {
         x = -990,
         y = -1230,
         spells = {101166},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 759,
         x = -570,
         y = -1410,
         spells = {101186},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 760,
         x = -630,
         y = -1590,
         spells = {101546},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 761,
         x = -510,
         y = -1590,
         spells = {101566},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 764,
-        x = -990,
-        y = -1350,
+        x = 930,
+        y = 690,
         spells = {100346},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {6375},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
@@ -4062,175 +4141,207 @@ nodes = {
         x = -1110,
         y = -1290,
         spells = {101626},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 771,
-        x = -690,
-        y = -1170,
+        x = -570,
+        y = -1890,
         spells = {103460},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {26},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 772,
-        x = -210,
-        y = -1410,
+        x = -270,
+        y = -810,
         spells = {101586},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 773,
-        x = -1410,
-        y = 690,
+        x = 540,
+        y = 1260,
         spells = {101384},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 774,
-        x = -1410,
-        y = 570,
+        x = 600,
+        y = 1200,
         spells = {101404},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 775,
         x = -1410,
         y = 390,
         spells = {101696},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 776,
         x = -1530,
-        y = 450,
+        y = 480,
         spells = {101273},
-        soulPointsCosts = {200000},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 792,
-        x = -150,
-        y = -1470,
+        x = -210,
+        y = -1350,
         spells = {101275},
-        soulPointsCosts = {200000},
+        soulPointsCosts = {123},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 793,
-        x = -750,
-        y = -510,
+        x = -810,
+        y = -600,
         spells = {103480},
-        soulPointsCosts = {12500}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 794,
-        x = -870,
-        y = -630,
+        x = -900,
+        y = -720,
         spells = {103481},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 795,
         x = -990,
-        y = -750,
+        y = -840,
         spells = {103482},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 796,
-        x = -1050,
-        y = -870,
+        x = -1080,
+        y = -960,
         spells = {103483},
-        soulPointsCosts = {25000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 797,
-        x = -1110,
-        y = -990,
+        x = -1170,
+        y = -1080,
         spells = {103484},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 798,
-        x = -1170,
-        y = -1110,
+        x = -1260,
+        y = -1200,
         spells = {103485},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 799,
-        x = -1230,
-        y = -1230,
+        x = -1350,
+        y = -1320,
         spells = {103486},
-        soulPointsCosts = {150000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 807,
-        x = -1470,
-        y = 210,
+        x = 810,
+        y = 570,
         spells = {100347},
-        soulPointsCosts = {750000},
+        soulPointsCosts = {4500},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
         id = 808,
-        x = -1470,
-        y = 90,
+        x = 870,
+        y = 630,
         spells = {100348},
-        soulPointsCosts = {750000},
+        soulPointsCosts = {4500},
+        currency = "shard",
+        sector = "en",
         permanent = true
     },
     {
-        id = 809,
-        x = -930,
-        y = -1290,
-        spells = {103520},
-        soulPointsCosts = {500000}
-    },
-    {
-        id = 810,
-        x = -690,
-        y = -1530,
-        spells = {103521},
-        soulPointsCosts = {250000}
-    },
-    {
-        id = 811,
-        x = -90,
-        y = -1350,
-        spells = {103522},
-        soulPointsCosts = {100000}
-    },
-    {
         id = 812,
-        x = -1530,
-        y = 330,
+        x = -1410,
+        y = 300,
         spells = {103560},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 813,
         x = -90,
         y = -1410,
         spells = {103540},
-        soulPointsCosts = {500000},
+        soulPointsCosts = {88},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 814,
-        x = -1410,
-        y = -1290,
+        x = -1290,
+        y = -1110,
         spells = {103541},
-        soulPointsCosts = {150000},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 815,
-        x = -1410,
-        y = -750,
+        x = -870,
+        y = -390,
         spells = {103542},
-        soulPointsCosts = {75000},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4238,7 +4349,9 @@ nodes = {
         x = -1470,
         y = -390,
         spells = {103543},
-        soulPointsCosts = {75000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4246,7 +4359,9 @@ nodes = {
         x = -1470,
         y = -210,
         spells = {103544},
-        soulPointsCosts = {250000},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4254,7 +4369,9 @@ nodes = {
         x = -1170,
         y = -1290,
         spells = {600163},
-        soulPointsCosts = {100000},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4262,7 +4379,9 @@ nodes = {
         x = -1110,
         y = -1170,
         spells = {101272},
-        soulPointsCosts = {200000},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4270,7 +4389,9 @@ nodes = {
         x = -1470,
         y = -270,
         spells = {101274},
-        soulPointsCosts = {200000},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4278,322 +4399,378 @@ nodes = {
         x = 870,
         y = -330,
         spells = {100984},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 822,
         x = 1050,
         y = 750,
         spells = {100092},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 823,
         x = 1110,
         y = 810,
         spells = {100093},
-        soulPointsCosts = {800000}
+        soulPointsCosts = {880000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 824,
         x = 1230,
         y = 810,
         spells = {110082},
-        soulPointsCosts = {1200000}
+        soulPointsCosts = {1320},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 825,
         x = 1170,
         y = 750,
         spells = {103570},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 826,
         x = 1230,
         y = 750,
         spells = {103571},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 827,
         x = 1290,
         y = 750,
         spells = {103572},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 828,
         x = 1350,
         y = 750,
         spells = {103573},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 829,
         x = 1410,
         y = 750,
         spells = {103574},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 830,
         x = 1470,
         y = 750,
         spells = {103575},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 831,
         x = 1530,
         y = 750,
         spells = {103576},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 832,
         x = 1590,
         y = 750,
         spells = {103577},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 833,
         x = 1650,
         y = 750,
         spells = {103578},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 834,
         x = 1710,
         y = 750,
         spells = {103579},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 835,
         x = 1050,
         y = -870,
         spells = {100692},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 836,
         x = 1110,
         y = -930,
         spells = {100693},
-        soulPointsCosts = {800000}
+        soulPointsCosts = {880000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 837,
         x = 1770,
         y = -30,
         spells = {100712},
-        soulPointsCosts = {600000}
+        soulPointsCosts = {660000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 838,
         x = 1890,
         y = -30,
         spells = {100713},
-        soulPointsCosts = {800000}
+        soulPointsCosts = {880000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 839,
         x = 210,
-        y = -1410,
+        y = -1380,
         spells = {100726},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 840,
         x = 90,
         y = -1470,
         spells = {100766},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 841,
         x = 150,
         y = -1470,
         spells = {100786},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 842,
         x = 210,
         y = -1470,
         spells = {100806},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 843,
         x = 270,
         y = -1470,
         spells = {100826},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 844,
         x = 330,
         y = -1470,
         spells = {100846},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {220000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 845,
         x = 570,
         y = -690,
         spells = {101004},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 846,
         x = 1170,
         y = -270,
         spells = {101034},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 847,
         x = 2010,
         y = 90,
         spells = {100746},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 848,
-        x = 1230,
-        y = 690,
-        spells = {101073},
-        soulPointsCosts = {500000}
-    },
-    {
-        id = 849,
-        x = 1890,
-        y = 390,
-        spells = {101116},
-        soulPointsCosts = {600000}
-    },
-    {
-        id = 850,
-        x = 1890,
-        y = 270,
-        spells = {101134},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 851,
         x = 1170,
         y = -870,
         spells = {103590},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 852,
         x = 1230,
         y = -870,
         spells = {103591},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 853,
         x = 1290,
         y = -870,
         spells = {103592},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 854,
         x = 1350,
         y = -870,
         spells = {103593},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 855,
         x = 1410,
         y = -870,
         spells = {103594},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 856,
         x = 1470,
         y = -870,
         spells = {103595},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 857,
         x = 1530,
         y = -870,
         spells = {103596},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 858,
         x = 1590,
         y = -870,
         spells = {103597},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 859,
         x = 1650,
         y = -870,
         spells = {103598},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 860,
         x = 1710,
         y = -870,
         spells = {103599},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 861,
         x = 1770,
         y = 810,
         spells = {113570},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 862,
         x = 1770,
         y = -930,
         spells = {113590},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 863,
         x = 1230,
         y = -930,
         spells = {110682},
-        soulPointsCosts = {1200000}
+        soulPointsCosts = {1320},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 864,
         x = 1890,
         y = -270,
         spells = {101424},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 865,
-        x = 1350,
-        y = 510,
-        spells = {101444},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 867,
         x = -210,
         y = -1110,
         spells = {103458},
-        soulPointsCosts = {250000},
+        soulPointsCosts = {135},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -4601,544 +4778,541 @@ nodes = {
         x = -1110,
         y = 1350,
         spells = {100014},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 869,
         x = -1170,
         y = 1410,
         spells = {100015},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 870,
         x = 1050,
         y = 1350,
         spells = {100034},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 871,
         x = 1110,
         y = 1410,
         spells = {100035},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 872,
         x = -1230,
         y = 1350,
         spells = {100054},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 873,
         x = -1290,
         y = 1410,
         spells = {100055},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 874,
         x = -1110,
         y = 1470,
         spells = {100075},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 875,
         x = -1170,
         y = 1530,
         spells = {100074},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 876,
         x = 1170,
         y = 1350,
         spells = {100114},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 877,
         x = 1230,
         y = 1410,
         spells = {100115},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 878,
         x = 1050,
         y = 1470,
         spells = {100134},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 879,
         x = 1110,
         y = 1530,
         spells = {100135},
-        soulPointsCosts = {1500000}
-    },
-    {
-        id = 880,
-        x = -150,
-        y = 1530,
-        spells = {100174},
-        soulPointsCosts = {1250000}
-    },
-    {
-        id = 881,
-        x = -390,
-        y = 1770,
-        spells = {100175},
-        soulPointsCosts = {1500000}
-    },
-    {
-        id = 882,
-        x = -1110,
-        y = 1530,
-        spells = {100194},
-        soulPointsCosts = {1500000}
-    },
-    {
-        id = 883,
-        x = -1170,
-        y = 1590,
-        spells = {100195},
-        soulPointsCosts = {1750000}
-    },
-    {
-        id = 884,
-        x = 90,
-        y = 1530,
-        spells = {100214},
-        soulPointsCosts = {1250000}
-    },
-    {
-        id = 885,
-        x = 330,
-        y = 1770,
-        spells = {100215},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 886,
         x = 210,
         y = 1650,
         spells = {100247},
-        soulPointsCosts = {1750000}
+        soulPointsCosts = {1925000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 887,
         x = -270,
         y = 1650,
         spells = {100227},
-        soulPointsCosts = {1000000}
-    },
-    {
-        id = 888,
-        x = -1290,
-        y = 1350,
-        spells = {100274},
-        soulPointsCosts = {1500000}
-    },
-    {
-        id = 889,
-        x = -1350,
-        y = 1410,
-        spells = {100275},
-        soulPointsCosts = {1750000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 890,
         x = 1170,
         y = 870,
         spells = {100094},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 891,
         x = 1230,
         y = 930,
         spells = {100095},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 892,
         x = -810,
         y = 30,
         spells = {100525},
-        soulPointsCosts = {200000}
-    },
-    {
-        id = 893,
-        x = -1470,
-        y = -570,
-        spells = {100327},
-        soulPointsCosts = {400000}
-    },
-    {
-        id = 894,
-        x = -1230,
-        y = 870,
-        spells = {100667},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 895,
         x = 1170,
         y = -990,
         spells = {100694},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 896,
         x = 1230,
         y = -1050,
         spells = {100695},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 897,
         x = 2010,
         y = -30,
         spells = {100714},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 898,
         x = 2130,
         y = -30,
         spells = {100715},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "am"
     },
     {
         id = 899,
         x = 210,
-        y = -1590,
+        y = -1560,
         spells = {100727},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 900,
         x = 90,
         y = -1650,
         spells = {100767},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 901,
         x = 150,
         y = -1650,
         spells = {100787},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 902,
         x = 210,
         y = -1650,
         spells = {100807},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 903,
         x = 270,
         y = -1650,
         spells = {100827},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 904,
         x = 330,
         y = -1650,
         spells = {100847},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {330000},
+        currency = "ash",
+        sector = "re"
     },
     {
         id = 905,
         x = 990,
         y = -450,
         spells = {100985},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 906,
         x = 2250,
         y = 90,
         spells = {100747},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 907,
-        x = 1290,
-        y = -390,
+        x = 1230,
+        y = -330,
         spells = {101035},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 908,
         x = 690,
         y = -810,
         spells = {101005},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 909,
-        x = 2130,
-        y = -150,
-        spells = {101074},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 910,
-        x = 2010,
-        y = 270,
-        spells = {101135},
-        soulPointsCosts = {1000000}
-    },
-    {
-        id = 911,
-        x = 2010,
-        y = 390,
-        spells = {101117},
-        soulPointsCosts = {900000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 912,
         x = -570,
         y = -1590,
         spells = {101187},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 913,
         x = -1050,
         y = -1350,
         spells = {101167},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 916,
         x = -1350,
-        y = 1230,
+        y = 1110,
         spells = {101285},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "cr"
     },
     {
         id = 917,
         x = 330,
         y = 1590,
         spells = {101325},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 918,
         x = 1290,
         y = 1230,
         spells = {101345},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 919,
-        x = -1530,
-        y = 690,
+        x = 540,
+        y = 1380,
         spells = {101385},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 920,
-        x = -1530,
-        y = 570,
+        x = 630,
+        y = 1260,
         spells = {101405},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 921,
-        x = -1710,
-        y = 510,
+        x = -420,
+        y = 240,
         spells = {101276},
-        soulPointsCosts = {300000},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 922,
-        x = -1710,
-        y = 750,
+        x = -420,
+        y = 180,
         spells = {101277},
-        soulPointsCosts = {300000},
-        permanent = true
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 923,
         x = 2010,
         y = -390,
         spells = {101425},
-        soulPointsCosts = {1000000}
-    },
-    {
-        id = 924,
-        x = 1530,
-        y = 510,
-        spells = {101445},
-        soulPointsCosts = {1000000}
-    },
-    {
-        id = 925,
-        x = 1230,
-        y = 1350,
-        spells = {101474},
-        soulPointsCosts = {1500000}
-    },
-    {
-        id = 926,
-        x = 1290,
-        y = 1410,
-        spells = {101475},
-        soulPointsCosts = {1750000}
-    },
-    {
-        id = 927,
-        x = 1050,
-        y = 1530,
-        spells = {101504},
-        soulPointsCosts = {1500000}
-    },
-    {
-        id = 928,
-        x = 1110,
-        y = 1590,
-        spells = {101505},
-        soulPointsCosts = {1750000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "mi"
     },
     {
         id = 929,
         x = -630,
         y = -1710,
         spells = {101547},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 930,
         x = -510,
         y = -1710,
         spells = {101567},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 931,
         x = -1170,
         y = -1410,
         spells = {101627},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 932,
-        x = -210,
-        y = -1530,
+        x = -270,
+        y = -870,
         spells = {101587},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 933,
-        x = -1350,
-        y = 870,
+        x = -1050,
+        y = 600,
         spells = {101677},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 934,
         x = -1530,
         y = 390,
         spells = {101697},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 935,
         x = -1290,
         y = -930,
         spells = {101797},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 936,
         x = -1350,
         y = -930,
         spells = {101817},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 937,
         x = -870,
         y = 1830,
         spells = {103410},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 938,
         x = -870,
         y = 1890,
         spells = {103411},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 939,
         x = 810,
         y = 1830,
         spells = {103430},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 940,
         x = 810,
         y = 1890,
         spells = {103431},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 942,
         x = -1650,
         y = 390,
         spells = {103462},
-        soulPointsCosts = {1000000},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 943,
-        x = -1470,
-        y = 870,
+        x = -300,
+        y = 180,
         spells = {103463},
-        soulPointsCosts = {1000000},
-        permanent = true
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
     },
     {
         id = 945,
-        x = -1290,
-        y = -1350,
+        x = -1440,
+        y = -1440,
         spells = {103487},
-        soulPointsCosts = {250000}
-    },
-    {
-        id = 946,
-        x = -1410,
-        y = -1410,
-        spells = {103464},
-        soulPointsCosts = {1000000},
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
         permanent = true
     },
     {
-        id = 947,
-        x = -150,
-        y = -1590,
-        spells = {103523},
-        soulPointsCosts = {750000}
+        id = 946,
+        x = -1380,
+        y = -1200,
+        spells = {103464},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 948,
         x = -1050,
-        y = -1470,
+        y = -1440,
         spells = {103545},
-        soulPointsCosts = {350000},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -5146,637 +5320,773 @@ nodes = {
         x = 1770,
         y = 750,
         spells = {103580},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 950,
         x = 1830,
         y = 750,
         spells = {103581},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 951,
         x = 1770,
         y = -870,
         spells = {103600},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 952,
         x = 1830,
         y = -870,
         spells = {103601},
-        soulPointsCosts = {1500000}
+        soulPointsCosts = {1650000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 953,
         x = -30,
         y = 1410,
         spells = {100147},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 954,
         x = -30,
         y = 1530,
         spells = {103610, 103611, 103612, 103613, 103614, 103615},
-        soulPointsCosts = {1250000, 1500000, 1750000, 2000000, 2250000, 2500000}
+        soulPointsCosts = {1375000, 1650000, 1925000, 2200000, 2475000, 2750000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 955,
         x = -1290,
         y = 1530,
         spells = {103630, 103631, 103632, 103633, 103634, 103635},
-        soulPointsCosts = {1250000, 1500000, 1750000, 2000000, 2250000, 2500000}
+        soulPointsCosts = {1375000, 1650000, 1925000, 2200000, 2475000, 2750000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 956,
         x = 1230,
-        y = 1530,
+        y = 1560,
         spells = {103650, 103651, 103652, 103653, 103654, 103655},
-        soulPointsCosts = {1250000, 1500000, 1750000, 2000000, 2250000, 2500000}
+        soulPointsCosts = {1375000, 1650000, 1925000, 2200000, 2475000, 2750000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 957,
-        x = -930,
-        y = 30,
+        x = -900,
+        y = 60,
         spells = {103670},
-        soulPointsCosts = {250000}
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 958,
         x = -690,
         y = -750,
         spells = {103680},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 959,
         x = -690,
         y = -870,
         spells = {103681},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 960,
         x = -690,
         y = -990,
         spells = {103682},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 961,
         x = -690,
         y = -1110,
         spells = {103683},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 962,
         x = -690,
         y = -1290,
         spells = {103684},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 963,
         x = -690,
         y = -1470,
         spells = {103685},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 964,
         x = -690,
         y = -1650,
         spells = {103686},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 965,
         x = -690,
         y = -1770,
         spells = {103687},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 966,
         x = -450,
         y = -750,
         spells = {103700},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 967,
         x = -450,
         y = -870,
         spells = {103701},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 968,
         x = -450,
         y = -990,
         spells = {103702},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 969,
         x = -450,
         y = -1110,
         spells = {103703},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 970,
         x = -450,
         y = -1290,
         spells = {103704},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 971,
         x = -450,
         y = -1470,
         spells = {103705},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 972,
         x = -450,
         y = -1650,
         spells = {103706},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 973,
         x = -450,
         y = -1770,
         spells = {103707},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 974,
-        x = -810,
-        y = -630,
+        x = -750,
+        y = -480,
         spells = {103720},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 975,
-        x = -870,
-        y = -750,
+        x = -810,
+        y = -540,
         spells = {103721},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 976,
-        x = -930,
-        y = -870,
+        x = -870,
+        y = -600,
         spells = {103722},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 977,
-        x = -990,
-        y = -990,
+        x = -930,
+        y = -660,
         spells = {103723},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 978,
-        x = -1050,
-        y = -1110,
+        x = -990,
+        y = -720,
         spells = {103724},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 979,
-        x = -1110,
-        y = -1230,
+        x = -1050,
+        y = -780,
         spells = {103725},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 980,
-        x = -1170,
-        y = -1350,
+        x = -1110,
+        y = -840,
         spells = {103726},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 981,
-        x = -1230,
-        y = -1470,
+        x = -1170,
+        y = -900,
         spells = {103727},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 982,
-        x = -390,
+        x = -330,
         y = -570,
         spells = {103740},
-        soulPointsCosts = {15000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true,
+        isStart = true
     },
     {
         id = 983,
         x = -390,
         y = -690,
         spells = {103741},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 984,
         x = -390,
         y = -810,
         spells = {103742},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 985,
         x = -390,
         y = -930,
         spells = {103743},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 986,
         x = -390,
         y = -1050,
         spells = {103744},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 987,
         x = -390,
         y = -1170,
         spells = {103745},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 988,
         x = -330,
         y = -1350,
         spells = {103746},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 989,
         x = -330,
         y = -1530,
         spells = {103747},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 990,
         x = -330,
-        y = -630,
+        y = -690,
         spells = {103760},
-        soulPointsCosts = {20000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 991,
         x = -330,
         y = -750,
         spells = {103761},
-        soulPointsCosts = {30000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 992,
         x = -330,
         y = -870,
         spells = {103762},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 993,
         x = -330,
         y = -990,
         spells = {103763},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 994,
         x = -330,
         y = -1110,
         spells = {103764},
-        soulPointsCosts = {200000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 995,
         x = -330,
         y = -1230,
         spells = {103765},
-        soulPointsCosts = {300000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 996,
         x = -270,
         y = -1410,
         spells = {103766},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 997,
-        x = -270,
+        x = -210,
         y = -1590,
         spells = {103767},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {1},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
+    },
+    {
+        id = 998,
+        x = -480,
+        y = -540,
+        spells = {2310010},
+        soulPointsCosts = {11},
+        currency = "artisan",
+        sector = "pf",
+        permanent = true
     },
     {
         id = 999,
-        x = -1770,
-        y = 630,
+        x = 630,
+        y = 1320,
         spells = {103780, 103781, 103782, 103783, 103784, 103785},
-        soulPointsCosts = {1250000, 1500000, 1750000, 2000000, 2250000, 2500000}
+        soulPointsCosts = {1375000, 1650000, 1925000, 2200000, 2475000, 2750000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 1001,
-        x = -1650,
-        y = 270,
+        x = -1530,
+        y = 300,
         spells = {103800},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {32},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
     },
     {
         id = 1008,
-        x = 390,
-        y = -330,
+        x = 480,
+        y = -150,
         spells = {103810},
-        soulPointsCosts = {50000}
+        soulPointsCosts = {55000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1009,
         x = 510,
         y = -450,
         spells = {103811},
-        soulPointsCosts = {100000}
+        soulPointsCosts = {110000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1010,
         x = 630,
         y = -570,
         spells = {103812},
-        soulPointsCosts = {150000}
+        soulPointsCosts = {165000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1011,
         x = 750,
         y = -690,
         spells = {103813},
-        soulPointsCosts = {250000}
+        soulPointsCosts = {275000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1012,
         x = 870,
         y = -810,
         spells = {103814},
-        soulPointsCosts = {500000}
+        soulPointsCosts = {550000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1013,
         x = 990,
-        y = -930,
+        y = -900,
         spells = {103815},
-        soulPointsCosts = {750000}
+        soulPointsCosts = {825000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1014,
         x = 1110,
         y = -1050,
         spells = {103816},
-        soulPointsCosts = {1000000}
+        soulPointsCosts = {1100000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1015,
         x = 1230,
         y = -1170,
         spells = {103817},
-        soulPointsCosts = {1250000}
-    },
-    {
-        id = 1016,
-        x = 690,
-        y = 150,
-        spells = {103830},
-        soulPointsCosts = {50000}
-    },
-    {
-        id = 1017,
-        x = 930,
-        y = 150,
-        spells = {103831},
-        soulPointsCosts = {100000}
-    },
-    {
-        id = 1018,
-        x = 1170,
-        y = 150,
-        spells = {103832},
-        soulPointsCosts = {150000}
-    },
-    {
-        id = 1019,
-        x = 1410,
-        y = 150,
-        spells = {103833},
-        soulPointsCosts = {250000}
-    },
-    {
-        id = 1020,
-        x = 1650,
-        y = 150,
-        spells = {103834},
-        soulPointsCosts = {500000}
-    },
-    {
-        id = 1021,
-        x = 1890,
-        y = 150,
-        spells = {103835},
-        soulPointsCosts = {750000}
-    },
-    {
-        id = 1022,
-        x = 2130,
-        y = 150,
-        spells = {103836},
-        soulPointsCosts = {1000000}
-    },
-    {
-        id = 1023,
-        x = 2370,
-        y = 150,
-        spells = {103837},
-        soulPointsCosts = {1250000}
+        soulPointsCosts = {1375000},
+        currency = "ash",
+        sector = "sp"
     },
     {
         id = 1024,
         x = 1470,
         y = 930,
         spells = {103850, 103851, 103852, 103853, 103854, 103855},
-        soulPointsCosts = {20000, 50000, 100000, 150000, 250000, 500000}
+        soulPointsCosts = {22000, 55000, 110000, 165000, 275000, 550000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 1025,
         x = 2250,
         y = -30,
         spells = {103870, 103871, 103872, 103873, 103874, 103875},
-        soulPointsCosts = {1250000, 1500000, 1750000, 2000000, 2250000, 2500000}
+        soulPointsCosts = {1375000, 1650000, 1925000, 2200000, 2475000, 2750000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 1026,
         x = 1350,
         y = -1170,
         spells = {103890, 103891, 103892, 103893, 103894, 103895, 103896, 103897},
-        soulPointsCosts = {100000, 200000, 300000, 400000, 500000, 750000, 1000000, 1250000}
+        soulPointsCosts = {110000, 220000, 330000, 440000, 550000, 825000, 1100000, 1375000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 1027,
         x = -1290,
         y = 1470,
         spells = {110003},
-        soulPointsCosts = {1875000}
+        soulPointsCosts = {2063},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 1028,
         x = 1230,
         y = 1470,
         spells = {110023},
-        soulPointsCosts = {1875000}
+        soulPointsCosts = {2063},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 1029,
-        x = -1350,
-        y = 1350,
+        x = -1380,
+        y = 1410,
         spells = {110043},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 1030,
         x = -1110,
         y = 1590,
         spells = {110063},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 1031,
         x = 1350,
         y = 930,
         spells = {110083},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 1032,
         x = 1290,
         y = 1350,
         spells = {110103},
-        soulPointsCosts = {2250000}
-    },
-    {
-        id = 1033,
-        x = 1350,
-        y = 1350,
-        spells = {111463},
-        soulPointsCosts = {2625000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 1034,
         x = 1050,
         y = 1590,
         spells = {110123},
-        soulPointsCosts = {2250000}
-    },
-    {
-        id = 1035,
-        x = 1050,
-        y = 1650,
-        spells = {111493},
-        soulPointsCosts = {2625000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 1036,
-        x = -1110,
+        x = -1170,
         y = 1650,
         spells = {110183},
-        soulPointsCosts = {2625000}
-    },
-    {
-        id = 1037,
-        x = -1410,
-        y = 1350,
-        spells = {110263},
-        soulPointsCosts = {2625000}
+        soulPointsCosts = {2887500},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 1038,
         x = -930,
         y = 1950,
         spells = {113401},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {6188},
+        currency = "shard",
+        sector = "ap"
     },
     {
         id = 1039,
         x = 870,
         y = 1950,
         spells = {113421},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {6188},
+        currency = "shard",
+        sector = "sp"
     },
     {
         id = 1040,
         x = 1350,
         y = -1050,
         spells = {110683},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 1041,
         x = 1890,
         y = 810,
         spells = {113571},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 1042,
         x = 1890,
         y = -930,
         spells = {113591},
-        soulPointsCosts = {2250000}
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "en"
     },
     {
         id = 1043,
         x = -30,
         y = 1650,
         spells = {113610},
-        soulPointsCosts = {3750000}
+        soulPointsCosts = {4125000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 1044,
         x = -1410,
         y = 1650,
         spells = {113630},
-        soulPointsCosts = {3750000}
+        soulPointsCosts = {4125000},
+        currency = "ash",
+        sector = "ap"
     },
     {
         id = 1045,
-        x = 1350,
+        x = 1230,
         y = 1650,
         spells = {113650},
-        soulPointsCosts = {3750000}
+        soulPointsCosts = {4125000},
+        currency = "ash",
+        sector = "dh"
     },
     {
         id = 1046,
-        x = -1890,
-        y = 630,
+        x = 690,
+        y = 1380,
         spells = {113780},
-        soulPointsCosts = {3750000}
+        soulPointsCosts = {4125000},
+        currency = "ash",
+        sector = "so"
     },
     {
         id = 1047,
-        x = -2010,
-        y = 630,
+        x = -420,
+        y = 300,
         spells = {101278},
-        soulPointsCosts = {300000},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
@@ -5784,39 +6094,47 @@ nodes = {
         x = 2370,
         y = -150,
         spells = {113870},
-        soulPointsCosts = {3750000}
+        soulPointsCosts = {4125000},
+        currency = "ash",
+        sector = "en"
     },
     {
         id = 1049,
-        x = -1590,
-        y = 870,
+        x = -360,
+        y = 240,
         spells = {600169},
-        soulPointsCosts = {200000},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
         permanent = true
     },
     {
         id = 2000,
-        x = -90,
-        y = 50,
+        x = -120,
+        y = 30,
         spells = {102300},
-        soulPointsCosts = {2000},
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "pr",
         permanent = true,
+        isStart = true,
         infinite = true,
         infiniteGrowth = 1.25,
-        isStart = true,
         gainsPerRank = { { amount = 5, label = "Stamina" } },
         computedDesc = "Increases your Stamina by %s."
     },
     {
         id = 2001,
-        x = 30,
-        y = 50,
+        x = 60,
+        y = 30,
         spells = {102301},
-        soulPointsCosts = {2000},
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "pr",
         permanent = true,
+        isStart = true,
         infinite = true,
         infiniteGrowth = 1.25,
-        isStart = true,
         gainsPerRank = { { amount = 10, label = "Attack Power" }, { amount = 5, label = "Spell Power" } },
         gainsExclusive = true,
         computedDesc = "Increases your attack power by %s or your spell power by %s, whichever is higher."
@@ -5824,143 +6142,10608 @@ nodes = {
     {
         id = 2002,
         x = -30,
-        y = -30,
+        y = -60,
         spells = {102302},
-        soulPointsCosts = {2000},
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "pr",
         permanent = true,
+        isStart = true,
         infinite = true,
         infiniteGrowth = 1.25,
-        isStart = true,
         gainsPerRank = { { ramp = true, label = "Highest Attribute" } },
         computedDesc = "Increases your Strength, Agility, Intellect or Spirit by %s, whichever is highest."
+    },
+    {
+        id = 30000,
+        x = -30,
+        y = 120,
+        spells = {120120},
+        soulPointsCosts = {2200},
+        currency = "ash",
+        sector = "pr",
+        permanent = true,
+        isStart = true,
+        infinite = true,
+        infiniteGrowth = 1.25,
+        gainsPerRank = { { amount = 40, label = "Flat reduction" } },
+        computedDesc = "Reduces damage taken by %s from any hit that exceeds 9%% of your maximum health."
+    },
+    {
+        id = 30001,
+        x = -1290,
+        y = -810,
+        spells = {120110},
+        soulPointsCosts = {33},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30002,
+        x = -630,
+        y = -630,
+        spells = {120111},
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30003,
+        x = -1020,
+        y = 60,
+        spells = {120112},
+        soulPointsCosts = {18},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30004,
+        x = -1290,
+        y = 330,
+        spells = {120113},
+        soulPointsCosts = {33},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30005,
+        x = -330,
+        y = -1590,
+        spells = {120114},
+        soulPointsCosts = {64},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30006,
+        x = -210,
+        y = 180,
+        spells = {120080},
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 30007,
+        x = -210,
+        y = 240,
+        spells = {120081},
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30008,
+        x = -300,
+        y = 240,
+        spells = {120082},
+        soulPointsCosts = {2},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30009,
+        x = -360,
+        y = 300,
+        spells = {120083},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30010,
+        x = -420,
+        y = 360,
+        spells = {120084},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30011,
+        x = -480,
+        y = 360,
+        spells = {120085},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30012,
+        x = -540,
+        y = 360,
+        spells = {120086},
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30013,
+        x = -480,
+        y = 300,
+        spells = {120087},
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30014,
+        x = -480,
+        y = 240,
+        spells = {120088},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30015,
+        x = -540,
+        y = 180,
+        spells = {120089},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30016,
+        x = -600,
+        y = 240,
+        spells = {120090},
+        soulPointsCosts = {32},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30017,
+        x = -690,
+        y = 270,
+        spells = {120091},
+        soulPointsCosts = {45},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30018,
+        x = -780,
+        y = 330,
+        spells = {120092},
+        soulPointsCosts = {63},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30019,
+        x = -900,
+        y = 390,
+        spells = {120093},
+        soulPointsCosts = {88},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30020,
+        x = -990,
+        y = 450,
+        spells = {120094},
+        soulPointsCosts = {123},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30021,
+        x = -1110,
+        y = 510,
+        spells = {120095},
+        soulPointsCosts = {172},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30022,
+        x = -1290,
+        y = 510,
+        spells = {120096},
+        soulPointsCosts = {240},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30023,
+        x = -1410,
+        y = 510,
+        spells = {120097},
+        soulPointsCosts = {336},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30024,
+        x = -1410,
+        y = 600,
+        spells = {120098},
+        soulPointsCosts = {470},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30025,
+        x = -1410,
+        y = 690,
+        spells = {120099},
+        soulPointsCosts = {658},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30026,
+        x = 240,
+        y = 150,
+        spells = {101130},
+        soulPointsCosts = {1100},
+        currency = "ash",
+        sector = "en",
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 30027,
+        x = 300,
+        y = 210,
+        spells = {101131},
+        soulPointsCosts = {2750},
+        currency = "ash",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30028,
+        x = 360,
+        y = 270,
+        spells = {101132},
+        soulPointsCosts = {6820},
+        currency = "ash",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30029,
+        x = 420,
+        y = 330,
+        spells = {101133},
+        soulPointsCosts = {17600},
+        currency = "ash",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30030,
+        x = 480,
+        y = 390,
+        spells = {101134},
+        soulPointsCosts = {42900},
+        currency = "ash",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30031,
+        x = 540,
+        y = 450,
+        spells = {101135},
+        soulPointsCosts = {107800},
+        currency = "ash",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30032,
+        x = 600,
+        y = 510,
+        spells = {120100},
+        soulPointsCosts = {264000},
+        currency = "ash",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30033,
+        x = 660,
+        y = 570,
+        spells = {120101},
+        soulPointsCosts = {671000},
+        currency = "ash",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30036,
+        x = -210,
+        y = -1470,
+        spells = {120040},
+        soulPointsCosts = {515},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30037,
+        x = -30,
+        y = -1410,
+        spells = {120041},
+        soulPointsCosts = {370},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30038,
+        x = -90,
+        y = -1260,
+        spells = {120042},
+        soulPointsCosts = {188},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30039,
+        x = -870,
+        y = -1500,
+        spells = {120043},
+        soulPointsCosts = {135},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30040,
+        x = -270,
+        y = -1140,
+        spells = {120044},
+        soulPointsCosts = {188},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30041,
+        x = -210,
+        y = -1170,
+        spells = {120045},
+        soulPointsCosts = {188},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30042,
+        x = -1530,
+        y = -1200,
+        spells = {120046},
+        soulPointsCosts = {135},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30043,
+        x = -870,
+        y = -1590,
+        spells = {120047},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30044,
+        x = -360,
+        y = -1650,
+        spells = {120048},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30045,
+        x = -870,
+        y = -1290,
+        spells = {120049},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30046,
+        x = -1410,
+        y = -1110,
+        spells = {120050},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30047,
+        x = -1230,
+        y = -1290,
+        spells = {120051},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30048,
+        x = -1740,
+        y = 390,
+        spells = {120052},
+        soulPointsCosts = {135},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30049,
+        x = -1050,
+        y = -1500,
+        spells = {120053},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30050,
+        x = -1620,
+        y = 300,
+        spells = {120054},
+        soulPointsCosts = {135},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30051,
+        x = -30,
+        y = -990,
+        spells = {120055},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30052,
+        x = -1410,
+        y = -930,
+        spells = {120056},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30053,
+        x = -210,
+        y = -990,
+        spells = {120057},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30054,
+        x = -930,
+        y = -1350,
+        spells = {120058},
+        soulPointsCosts = {69},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30055,
+        x = -1530,
+        y = 570,
+        spells = {120059},
+        soulPointsCosts = {96},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30056,
+        x = -810,
+        y = 930,
+        spells = {120000},
+        soulPointsCosts = {68},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30057,
+        x = -930,
+        y = 990,
+        spells = {120001},
+        soulPointsCosts = {81},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30058,
+        x = -990,
+        y = 900,
+        spells = {120002},
+        soulPointsCosts = {98},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30059,
+        x = -1080,
+        y = 900,
+        spells = {120003},
+        soulPointsCosts = {118},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30060,
+        x = -870,
+        y = 1170,
+        spells = {120004},
+        soulPointsCosts = {693},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30061,
+        x = -810,
+        y = 1290,
+        spells = {120005},
+        soulPointsCosts = {832},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30062,
+        x = -810,
+        y = 1410,
+        spells = {120006},
+        soulPointsCosts = {998},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30063,
+        x = -810,
+        y = 1470,
+        spells = {120007},
+        soulPointsCosts = {1197},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30064,
+        x = -1170,
+        y = 1290,
+        spells = {120008},
+        soulPointsCosts = {1485},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30065,
+        x = -1260,
+        y = 1290,
+        spells = {120009},
+        soulPointsCosts = {1782},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30066,
+        x = -1320,
+        y = 1320,
+        spells = {120010},
+        soulPointsCosts = {2138},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30067,
+        x = -1350,
+        y = 1530,
+        spells = {120011},
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30068,
+        x = -1410,
+        y = 1590,
+        spells = {120012},
+        soulPointsCosts = {2970},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30069,
+        x = -1470,
+        y = 1650,
+        spells = {120013},
+        soulPointsCosts = {3564},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30070,
+        x = -990,
+        y = 1890,
+        spells = {120014},
+        soulPointsCosts = {4950},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30071,
+        x = -1050,
+        y = 1950,
+        spells = {120015},
+        soulPointsCosts = {5940},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30072,
+        x = -1110,
+        y = 2010,
+        spells = {120016},
+        soulPointsCosts = {7128},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30073,
+        x = -990,
+        y = 2010,
+        spells = {120017},
+        soulPointsCosts = {7425},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30074,
+        x = -1050,
+        y = 2070,
+        spells = {120018},
+        soulPointsCosts = {8910},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30075,
+        x = -1110,
+        y = 2130,
+        spells = {120019},
+        soulPointsCosts = {10692},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30076,
+        x = 750,
+        y = 930,
+        spells = {120020},
+        soulPointsCosts = {68},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30077,
+        x = 810,
+        y = 930,
+        spells = {120021},
+        soulPointsCosts = {81},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30078,
+        x = 870,
+        y = 900,
+        spells = {120022},
+        soulPointsCosts = {98},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30079,
+        x = 930,
+        y = 900,
+        spells = {120023},
+        soulPointsCosts = {118},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30080,
+        x = 810,
+        y = 1170,
+        spells = {120024},
+        soulPointsCosts = {693},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30081,
+        x = 750,
+        y = 1290,
+        spells = {120025},
+        soulPointsCosts = {832},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30082,
+        x = 750,
+        y = 1380,
+        spells = {120026},
+        soulPointsCosts = {998},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30083,
+        x = 750,
+        y = 1470,
+        spells = {120027},
+        soulPointsCosts = {1197},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30084,
+        x = 1170,
+        y = 1290,
+        spells = {120028},
+        soulPointsCosts = {1485},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30085,
+        x = 1290,
+        y = 1290,
+        spells = {120029},
+        soulPointsCosts = {1782},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30086,
+        x = 1470,
+        y = 1290,
+        spells = {120030},
+        soulPointsCosts = {2138},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30087,
+        x = 1290,
+        y = 1530,
+        spells = {120031},
+        soulPointsCosts = {2475},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30088,
+        x = 1350,
+        y = 1590,
+        spells = {120032},
+        soulPointsCosts = {2970},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30089,
+        x = 1410,
+        y = 1650,
+        spells = {120033},
+        soulPointsCosts = {3564},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30090,
+        x = 930,
+        y = 1890,
+        spells = {120034},
+        soulPointsCosts = {4950},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30091,
+        x = 990,
+        y = 1950,
+        spells = {120035},
+        soulPointsCosts = {5940},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30092,
+        x = 1050,
+        y = 2010,
+        spells = {120036},
+        soulPointsCosts = {7128},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30093,
+        x = 930,
+        y = 2010,
+        spells = {120037},
+        soulPointsCosts = {7425},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30094,
+        x = 990,
+        y = 2070,
+        spells = {120038},
+        soulPointsCosts = {8910},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30095,
+        x = 1050,
+        y = 2130,
+        spells = {120039},
+        soulPointsCosts = {10692},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30096,
+        x = -90,
+        y = -1350,
+        spells = {120060},
+        soulPointsCosts = {63},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30097,
+        x = -90,
+        y = -1110,
+        spells = {120061},
+        soulPointsCosts = {45},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30098,
+        x = -90,
+        y = -1050,
+        spells = {120062},
+        soulPointsCosts = {32},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30099,
+        x = -90,
+        y = -930,
+        spells = {120063},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30100,
+        x = -90,
+        y = -870,
+        spells = {120064},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30101,
+        x = -90,
+        y = -750,
+        spells = {120065},
+        soulPointsCosts = {12},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30102,
+        x = -90,
+        y = -690,
+        spells = {120066},
+        soulPointsCosts = {9},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30103,
+        x = -90,
+        y = -570,
+        spells = {120067},
+        soulPointsCosts = {7},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30104,
+        x = -90,
+        y = -450,
+        spells = {120068},
+        soulPointsCosts = {4},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30105,
+        x = -90,
+        y = -390,
+        spells = {120069},
+        soulPointsCosts = {3},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30106,
+        x = -150,
+        y = -180,
+        spells = {120070},
+        soulPointsCosts = {1},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 30107,
+        x = -30,
+        y = -1320,
+        spells = {120071},
+        soulPointsCosts = {63},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30108,
+        x = -90,
+        y = -1170,
+        spells = {120072},
+        soulPointsCosts = {45},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30109,
+        x = -30,
+        y = -1050,
+        spells = {120073},
+        soulPointsCosts = {32},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30110,
+        x = -210,
+        y = -870,
+        spells = {120074},
+        soulPointsCosts = {23},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30111,
+        x = -30,
+        y = -870,
+        spells = {120075},
+        soulPointsCosts = {17},
+        currency = "essence",
+        sector = "pr",
+        permanent = true
+    },
+    {
+        id = 30112,
+        x = -30,
+        y = 30,
+        spells = {120121},
+        soulPointsCosts = {6},
+        currency = "essence",
+        sector = "pr",
+        permanent = true,
+        isStart = true,
+        infinite = true,
+        infiniteGrowth = 1.15,
+        gainsPerRank = { { lin = 0.10, bump = 2, label = "Soul Ashes" }, { lin = 0.01, bump = 2, label = "Soul Shards" } },
+        computedDesc = "Increases Soul Ashes gained by %s and Soul Shards gained by %s (+10%% and +1%% per rank, doubled every 10 ranks)."
+    },
+    {
+        id = 30113,
+        x = 990,
+        y = 750,
+        spells = {120104},
+        soulPointsCosts = {8625},
+        currency = "shard",
+        sector = "en",
+        permanent = true
+    },
+    {
+        id = 30121,
+        x = -270,
+        y = 330,
+        spells = {120140},
+        soulPointsCosts = {11},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30122,
+        x = -330,
+        y = 390,
+        spells = {120141},
+        soulPointsCosts = {17},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30123,
+        x = -420,
+        y = 450,
+        spells = {120142},
+        soulPointsCosts = {22},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30124,
+        x = -480,
+        y = 510,
+        spells = {120143},
+        soulPointsCosts = {28},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30125,
+        x = -540,
+        y = 570,
+        spells = {120144},
+        soulPointsCosts = {33},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30126,
+        x = -90,
+        y = 510,
+        spells = {120145},
+        soulPointsCosts = {11},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30127,
+        x = -150,
+        y = 570,
+        spells = {120146},
+        soulPointsCosts = {17},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30128,
+        x = -210,
+        y = 630,
+        spells = {120147},
+        soulPointsCosts = {22},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30129,
+        x = -270,
+        y = 690,
+        spells = {120148},
+        soulPointsCosts = {28},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30130,
+        x = -330,
+        y = 750,
+        spells = {120149},
+        soulPointsCosts = {33},
+        currency = "shard",
+        sector = "ap"
+    },
+    {
+        id = 30131,
+        x = 210,
+        y = 330,
+        spells = {120150},
+        soulPointsCosts = {11},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30132,
+        x = 270,
+        y = 390,
+        spells = {120151},
+        soulPointsCosts = {17},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30133,
+        x = 330,
+        y = 450,
+        spells = {120152},
+        soulPointsCosts = {22},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30134,
+        x = 390,
+        y = 510,
+        spells = {120153},
+        soulPointsCosts = {28},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30135,
+        x = 450,
+        y = 570,
+        spells = {120154},
+        soulPointsCosts = {33},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30136,
+        x = 30,
+        y = 510,
+        spells = {120155},
+        soulPointsCosts = {11},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30137,
+        x = 90,
+        y = 570,
+        spells = {120156},
+        soulPointsCosts = {17},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30138,
+        x = 150,
+        y = 630,
+        spells = {120157},
+        soulPointsCosts = {22},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30139,
+        x = 210,
+        y = 690,
+        spells = {120158},
+        soulPointsCosts = {28},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30140,
+        x = 270,
+        y = 750,
+        spells = {120159},
+        soulPointsCosts = {33},
+        currency = "shard",
+        sector = "sp"
+    },
+    {
+        id = 30141,
+        x = 420,
+        y = -90,
+        spells = {120160},
+        soulPointsCosts = {11},
+        currency = "shard",
+        sector = "en"
+    },
+    {
+        id = 30142,
+        x = 390,
+        y = 120,
+        spells = {120161},
+        soulPointsCosts = {17},
+        currency = "shard",
+        sector = "en"
+    },
+    {
+        id = 30143,
+        x = 450,
+        y = 210,
+        spells = {120162},
+        soulPointsCosts = {22},
+        currency = "shard",
+        sector = "en"
+    },
+    {
+        id = 30144,
+        x = 510,
+        y = 150,
+        spells = {120163},
+        soulPointsCosts = {28},
+        currency = "shard",
+        sector = "en"
+    },
+    {
+        id = 30145,
+        x = 630,
+        y = 270,
+        spells = {120164},
+        soulPointsCosts = {33},
+        currency = "shard",
+        sector = "en"
+    },
+    {
+        id = 30146,
+        x = -360,
+        y = 1440,
+        spells = {120165, 120166, 120167, 120168, 120169},
+        soulPointsCosts = {33000, 49500, 74250, 111100, 167200},
+        currency = "ash",
+        sector = "cr"
+    },
+    {
+        id = 30147,
+        x = 30,
+        y = 570,
+        spells = {120170, 120171, 120172},
+        soulPointsCosts = {55, 275, 1100},
+        currency = "ash",
+        sector = "mn"
+    },
+    {
+        id = 31000,
+        x = 270,
+        y = 3330,
+        spells = {120200},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 1,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31001,
+        x = 210,
+        y = 3390,
+        spells = {120201},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31002,
+        x = 180,
+        y = 3450,
+        spells = {120202},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31003,
+        x = 180,
+        y = 3510,
+        spells = {120203},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31004,
+        x = 120,
+        y = 3540,
+        spells = {120204},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31005,
+        x = 120,
+        y = 3450,
+        spells = {120205},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31006,
+        x = 120,
+        y = 3390,
+        spells = {120206},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31007,
+        x = 150,
+        y = 3330,
+        spells = {120207},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31008,
+        x = 210,
+        y = 3300,
+        spells = {120208},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31009,
+        x = 270,
+        y = 3270,
+        spells = {120209},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31010,
+        x = 270,
+        y = 3180,
+        spells = {120210},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31011,
+        x = 210,
+        y = 3210,
+        spells = {120211},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31012,
+        x = 150,
+        y = 3240,
+        spells = {120212},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31013,
+        x = 120,
+        y = 3270,
+        spells = {120213},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31014,
+        x = 60,
+        y = 3330,
+        spells = {120214},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31015,
+        x = 30,
+        y = 3390,
+        spells = {120215},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31016,
+        x = 30,
+        y = 3450,
+        spells = {120216},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31017,
+        x = 30,
+        y = 3510,
+        spells = {120217},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31018,
+        x = 60,
+        y = 3570,
+        spells = {120218},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31019,
+        x = -30,
+        y = 3600,
+        spells = {120219},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31020,
+        x = -30,
+        y = 3540,
+        spells = {120220},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31021,
+        x = -30,
+        y = 3480,
+        spells = {120221},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31022,
+        x = -30,
+        y = 3420,
+        spells = {120222},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31023,
+        x = -30,
+        y = 3360,
+        spells = {120223},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31024,
+        x = 0,
+        y = 3300,
+        spells = {120224},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31025,
+        x = 30,
+        y = 3240,
+        spells = {120225},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31026,
+        x = 90,
+        y = 3180,
+        spells = {120226},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31027,
+        x = 150,
+        y = 3150,
+        spells = {120227},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31028,
+        x = 210,
+        y = 3120,
+        spells = {120228},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31029,
+        x = 270,
+        y = 3120,
+        spells = {120229},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31030,
+        x = 240,
+        y = 3600,
+        spells = {120230},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 1,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31031,
+        x = 300,
+        y = 3630,
+        spells = {120231},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31032,
+        x = 360,
+        y = 3630,
+        spells = {120232},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31033,
+        x = 420,
+        y = 3600,
+        spells = {120233},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31034,
+        x = 480,
+        y = 3660,
+        spells = {120234},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31035,
+        x = 420,
+        y = 3690,
+        spells = {120235},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31036,
+        x = 360,
+        y = 3690,
+        spells = {120236},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31037,
+        x = 300,
+        y = 3690,
+        spells = {120237},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31038,
+        x = 240,
+        y = 3690,
+        spells = {120238},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31039,
+        x = 180,
+        y = 3660,
+        spells = {120239},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31040,
+        x = 90,
+        y = 3660,
+        spells = {120240},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31041,
+        x = 150,
+        y = 3720,
+        spells = {120241},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31042,
+        x = 210,
+        y = 3750,
+        spells = {120242},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31043,
+        x = 270,
+        y = 3780,
+        spells = {120243},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31044,
+        x = 330,
+        y = 3780,
+        spells = {120244},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31045,
+        x = 390,
+        y = 3780,
+        spells = {120245},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31046,
+        x = 450,
+        y = 3750,
+        spells = {120246},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31047,
+        x = 510,
+        y = 3720,
+        spells = {120247},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31048,
+        x = 570,
+        y = 3660,
+        spells = {120248},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31049,
+        x = 630,
+        y = 3720,
+        spells = {120249},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31050,
+        x = 570,
+        y = 3780,
+        spells = {120250},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31051,
+        x = 510,
+        y = 3810,
+        spells = {120251},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31052,
+        x = 450,
+        y = 3840,
+        spells = {120252},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31053,
+        x = 390,
+        y = 3840,
+        spells = {120253},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31054,
+        x = 330,
+        y = 3840,
+        spells = {120254},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31055,
+        x = 270,
+        y = 3840,
+        spells = {120255},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31056,
+        x = 210,
+        y = 3840,
+        spells = {120256},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31057,
+        x = 150,
+        y = 3810,
+        spells = {120257},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31058,
+        x = 90,
+        y = 3780,
+        spells = {120258},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31059,
+        x = 30,
+        y = 3720,
+        spells = {120259},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31060,
+        x = 480,
+        y = 3510,
+        spells = {120260},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 1,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31061,
+        x = 480,
+        y = 3450,
+        spells = {120261},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31062,
+        x = 450,
+        y = 3390,
+        spells = {120262},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31063,
+        x = 390,
+        y = 3330,
+        spells = {120263},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31064,
+        x = 390,
+        y = 3270,
+        spells = {120264},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31065,
+        x = 450,
+        y = 3300,
+        spells = {120265},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31066,
+        x = 510,
+        y = 3330,
+        spells = {120266},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31067,
+        x = 540,
+        y = 3390,
+        spells = {120267},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31068,
+        x = 540,
+        y = 3450,
+        spells = {120268},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31069,
+        x = 540,
+        y = 3540,
+        spells = {120269},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31070,
+        x = 630,
+        y = 3600,
+        spells = {120270},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31071,
+        x = 630,
+        y = 3510,
+        spells = {120271},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31072,
+        x = 630,
+        y = 3450,
+        spells = {120272},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31073,
+        x = 630,
+        y = 3390,
+        spells = {120273},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31074,
+        x = 600,
+        y = 3330,
+        spells = {120274},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31075,
+        x = 540,
+        y = 3270,
+        spells = {120275},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31076,
+        x = 510,
+        y = 3240,
+        spells = {120276},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31077,
+        x = 450,
+        y = 3210,
+        spells = {120277},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31078,
+        x = 390,
+        y = 3180,
+        spells = {120278},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31079,
+        x = 390,
+        y = 3120,
+        spells = {120279},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31080,
+        x = 450,
+        y = 3120,
+        spells = {120280},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31081,
+        x = 510,
+        y = 3150,
+        spells = {120281},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31082,
+        x = 570,
+        y = 3180,
+        spells = {120282},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31083,
+        x = 630,
+        y = 3240,
+        spells = {120283},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31084,
+        x = 660,
+        y = 3300,
+        spells = {120284},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31085,
+        x = 690,
+        y = 3360,
+        spells = {120285},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31086,
+        x = 690,
+        y = 3420,
+        spells = {120286},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31087,
+        x = 690,
+        y = 3480,
+        spells = {120287},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31088,
+        x = 690,
+        y = 3540,
+        spells = {120288},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31089,
+        x = 690,
+        y = 3600,
+        spells = {120289},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 1,
+        permanent = true
+    },
+    {
+        id = 31100,
+        x = 2130,
+        y = 2760,
+        spells = {120290},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 2,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31101,
+        x = 2100,
+        y = 2820,
+        spells = {120291},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31102,
+        x = 2100,
+        y = 2910,
+        spells = {120292},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31103,
+        x = 2160,
+        y = 2970,
+        spells = {120293},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31104,
+        x = 2100,
+        y = 3030,
+        spells = {120294},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31105,
+        x = 2070,
+        y = 2970,
+        spells = {120295},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31106,
+        x = 2040,
+        y = 2910,
+        spells = {120296},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31107,
+        x = 2040,
+        y = 2850,
+        spells = {120297},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31108,
+        x = 2040,
+        y = 2790,
+        spells = {120298},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31109,
+        x = 2070,
+        y = 2730,
+        spells = {120299},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31110,
+        x = 2040,
+        y = 2640,
+        spells = {120300},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31111,
+        x = 2010,
+        y = 2700,
+        spells = {120301},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31112,
+        x = 1980,
+        y = 2760,
+        spells = {120302},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31113,
+        x = 1950,
+        y = 2820,
+        spells = {120303},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31114,
+        x = 1950,
+        y = 2880,
+        spells = {120304},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31115,
+        x = 1980,
+        y = 2940,
+        spells = {120305},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31116,
+        x = 1980,
+        y = 3000,
+        spells = {120306},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31117,
+        x = 2040,
+        y = 3060,
+        spells = {120307},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31118,
+        x = 2070,
+        y = 3090,
+        spells = {120308},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31119,
+        x = 2040,
+        y = 3150,
+        spells = {120309},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31120,
+        x = 1980,
+        y = 3120,
+        spells = {120310},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31121,
+        x = 1920,
+        y = 3060,
+        spells = {120311},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31122,
+        x = 1890,
+        y = 3000,
+        spells = {120312},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31123,
+        x = 1890,
+        y = 2940,
+        spells = {120313},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31124,
+        x = 1890,
+        y = 2880,
+        spells = {120314},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31125,
+        x = 1890,
+        y = 2820,
+        spells = {120315},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31126,
+        x = 1890,
+        y = 2760,
+        spells = {120316},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31127,
+        x = 1920,
+        y = 2700,
+        spells = {120317},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31128,
+        x = 1950,
+        y = 2640,
+        spells = {120318},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31129,
+        x = 1980,
+        y = 2580,
+        spells = {120319},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31130,
+        x = 2250,
+        y = 3000,
+        spells = {120320},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 2,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31131,
+        x = 2310,
+        y = 3000,
+        spells = {120321},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31132,
+        x = 2370,
+        y = 2940,
+        spells = {120322},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31133,
+        x = 2400,
+        y = 2880,
+        spells = {120323},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31134,
+        x = 2460,
+        y = 2910,
+        spells = {120324},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31135,
+        x = 2460,
+        y = 2970,
+        spells = {120325},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31136,
+        x = 2400,
+        y = 3000,
+        spells = {120326},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31137,
+        x = 2340,
+        y = 3060,
+        spells = {120327},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31138,
+        x = 2280,
+        y = 3060,
+        spells = {120328},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31139,
+        x = 2220,
+        y = 3060,
+        spells = {120329},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31140,
+        x = 2190,
+        y = 3150,
+        spells = {120330},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31141,
+        x = 2250,
+        y = 3150,
+        spells = {120331},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31142,
+        x = 2310,
+        y = 3150,
+        spells = {120332},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31143,
+        x = 2370,
+        y = 3120,
+        spells = {120333},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31144,
+        x = 2430,
+        y = 3090,
+        spells = {120334},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31145,
+        x = 2490,
+        y = 3060,
+        spells = {120335},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31146,
+        x = 2520,
+        y = 3000,
+        spells = {120336},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31147,
+        x = 2550,
+        y = 2940,
+        spells = {120337},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31148,
+        x = 2550,
+        y = 2880,
+        spells = {120338},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31149,
+        x = 2610,
+        y = 2880,
+        spells = {120339},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31150,
+        x = 2610,
+        y = 2940,
+        spells = {120340},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31151,
+        x = 2580,
+        y = 3000,
+        spells = {120341},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31152,
+        x = 2550,
+        y = 3060,
+        spells = {120342},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31153,
+        x = 2520,
+        y = 3120,
+        spells = {120343},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31154,
+        x = 2460,
+        y = 3150,
+        spells = {120344},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31155,
+        x = 2400,
+        y = 3180,
+        spells = {120345},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31156,
+        x = 2340,
+        y = 3210,
+        spells = {120346},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31157,
+        x = 2280,
+        y = 3210,
+        spells = {120347},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31158,
+        x = 2220,
+        y = 3210,
+        spells = {120348},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31159,
+        x = 2160,
+        y = 3210,
+        spells = {120349},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31160,
+        x = 2370,
+        y = 2790,
+        spells = {120350},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 2,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31161,
+        x = 2340,
+        y = 2730,
+        spells = {120351},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31162,
+        x = 2280,
+        y = 2700,
+        spells = {120352},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31163,
+        x = 2220,
+        y = 2700,
+        spells = {120353},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31164,
+        x = 2190,
+        y = 2640,
+        spells = {120354},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31165,
+        x = 2250,
+        y = 2640,
+        spells = {120355},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31166,
+        x = 2310,
+        y = 2640,
+        spells = {120356},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31167,
+        x = 2370,
+        y = 2670,
+        spells = {120357},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31168,
+        x = 2430,
+        y = 2700,
+        spells = {120358},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31169,
+        x = 2460,
+        y = 2760,
+        spells = {120359},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31170,
+        x = 2550,
+        y = 2760,
+        spells = {120360},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31171,
+        x = 2520,
+        y = 2700,
+        spells = {120361},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31172,
+        x = 2490,
+        y = 2640,
+        spells = {120362},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31173,
+        x = 2430,
+        y = 2610,
+        spells = {120363},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31174,
+        x = 2370,
+        y = 2580,
+        spells = {120364},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31175,
+        x = 2310,
+        y = 2550,
+        spells = {120365},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31176,
+        x = 2250,
+        y = 2550,
+        spells = {120366},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31177,
+        x = 2190,
+        y = 2550,
+        spells = {120367},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31178,
+        x = 2130,
+        y = 2580,
+        spells = {120368},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31179,
+        x = 2070,
+        y = 2520,
+        spells = {120369},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31180,
+        x = 2130,
+        y = 2490,
+        spells = {120370},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31181,
+        x = 2220,
+        y = 2490,
+        spells = {120371},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31182,
+        x = 2280,
+        y = 2490,
+        spells = {120372},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31183,
+        x = 2340,
+        y = 2490,
+        spells = {120373},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31184,
+        x = 2400,
+        y = 2520,
+        spells = {120374},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31185,
+        x = 2460,
+        y = 2550,
+        spells = {120375},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31186,
+        x = 2520,
+        y = 2580,
+        spells = {120376},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31187,
+        x = 2550,
+        y = 2640,
+        spells = {120377},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31188,
+        x = 2580,
+        y = 2700,
+        spells = {120378},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31189,
+        x = 2610,
+        y = 2760,
+        spells = {120379},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 2,
+        permanent = true
+    },
+    {
+        id = 31200,
+        x = 3300,
+        y = 1200,
+        spells = {120380},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 3,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31201,
+        x = 3330,
+        y = 1260,
+        spells = {120381},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31202,
+        x = 3360,
+        y = 1320,
+        spells = {120382},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31203,
+        x = 3420,
+        y = 1350,
+        spells = {120383},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31204,
+        x = 3420,
+        y = 1410,
+        spells = {120384},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31205,
+        x = 3360,
+        y = 1410,
+        spells = {120385},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31206,
+        x = 3300,
+        y = 1380,
+        spells = {120386},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31207,
+        x = 3270,
+        y = 1320,
+        spells = {120387},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31208,
+        x = 3240,
+        y = 1260,
+        spells = {120388},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31209,
+        x = 3240,
+        y = 1200,
+        spells = {120389},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31210,
+        x = 3150,
+        y = 1170,
+        spells = {120390},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31211,
+        x = 3150,
+        y = 1230,
+        spells = {120391},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31212,
+        x = 3150,
+        y = 1290,
+        spells = {120392},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31213,
+        x = 3180,
+        y = 1350,
+        spells = {120393},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31214,
+        x = 3240,
+        y = 1410,
+        spells = {120394},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31215,
+        x = 3270,
+        y = 1440,
+        spells = {120395},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31216,
+        x = 3330,
+        y = 1470,
+        spells = {120396},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31217,
+        x = 3390,
+        y = 1500,
+        spells = {120397},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31218,
+        x = 3450,
+        y = 1500,
+        spells = {120398},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31219,
+        x = 3480,
+        y = 1560,
+        spells = {120399},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31220,
+        x = 3390,
+        y = 1560,
+        spells = {120400},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31221,
+        x = 3330,
+        y = 1560,
+        spells = {120401},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31222,
+        x = 3270,
+        y = 1530,
+        spells = {120402},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31223,
+        x = 3210,
+        y = 1500,
+        spells = {120403},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31224,
+        x = 3180,
+        y = 1440,
+        spells = {120404},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31225,
+        x = 3120,
+        y = 1410,
+        spells = {120405},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31226,
+        x = 3090,
+        y = 1350,
+        spells = {120406},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31227,
+        x = 3090,
+        y = 1290,
+        spells = {120407},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31228,
+        x = 3090,
+        y = 1200,
+        spells = {120408},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31229,
+        x = 3090,
+        y = 1140,
+        spells = {120409},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31230,
+        x = 3510,
+        y = 1350,
+        spells = {120410},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 3,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31231,
+        x = 3570,
+        y = 1290,
+        spells = {120411},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31232,
+        x = 3600,
+        y = 1200,
+        spells = {120412},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31233,
+        x = 3600,
+        y = 1140,
+        spells = {120413},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31234,
+        x = 3660,
+        y = 1110,
+        spells = {120414},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31235,
+        x = 3660,
+        y = 1170,
+        spells = {120415},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31236,
+        x = 3660,
+        y = 1230,
+        spells = {120416},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31237,
+        x = 3660,
+        y = 1290,
+        spells = {120417},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31238,
+        x = 3600,
+        y = 1350,
+        spells = {120418},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31239,
+        x = 3570,
+        y = 1380,
+        spells = {120419},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31240,
+        x = 3570,
+        y = 1470,
+        spells = {120420},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31241,
+        x = 3630,
+        y = 1440,
+        spells = {120421},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31242,
+        x = 3660,
+        y = 1410,
+        spells = {120422},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31243,
+        x = 3720,
+        y = 1350,
+        spells = {120423},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31244,
+        x = 3750,
+        y = 1290,
+        spells = {120424},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31245,
+        x = 3750,
+        y = 1230,
+        spells = {120425},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31246,
+        x = 3750,
+        y = 1170,
+        spells = {120426},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31247,
+        x = 3720,
+        y = 1110,
+        spells = {120427},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31248,
+        x = 3690,
+        y = 1050,
+        spells = {120428},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31249,
+        x = 3780,
+        y = 990,
+        spells = {120429},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31250,
+        x = 3810,
+        y = 1050,
+        spells = {120430},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31251,
+        x = 3810,
+        y = 1110,
+        spells = {120431},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31252,
+        x = 3810,
+        y = 1200,
+        spells = {120432},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31253,
+        x = 3810,
+        y = 1260,
+        spells = {120433},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31254,
+        x = 3810,
+        y = 1320,
+        spells = {120434},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31255,
+        x = 3780,
+        y = 1380,
+        spells = {120435},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31256,
+        x = 3750,
+        y = 1440,
+        spells = {120436},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31257,
+        x = 3690,
+        y = 1470,
+        spells = {120437},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31258,
+        x = 3660,
+        y = 1530,
+        spells = {120438},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31259,
+        x = 3600,
+        y = 1560,
+        spells = {120439},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31260,
+        x = 3540,
+        y = 1080,
+        spells = {120440},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 3,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31261,
+        x = 3450,
+        y = 1050,
+        spells = {120441},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31262,
+        x = 3390,
+        y = 1050,
+        spells = {120442},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31263,
+        x = 3330,
+        y = 1110,
+        spells = {120443},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31264,
+        x = 3270,
+        y = 1080,
+        spells = {120444},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31265,
+        x = 3300,
+        y = 1020,
+        spells = {120445},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31266,
+        x = 3360,
+        y = 990,
+        spells = {120446},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31267,
+        x = 3450,
+        y = 990,
+        spells = {120447},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31268,
+        x = 3510,
+        y = 990,
+        spells = {120448},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31269,
+        x = 3570,
+        y = 1020,
+        spells = {120449},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31270,
+        x = 3630,
+        y = 960,
+        spells = {120450},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31271,
+        x = 3570,
+        y = 930,
+        spells = {120451},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31272,
+        x = 3510,
+        y = 900,
+        spells = {120452},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31273,
+        x = 3450,
+        y = 900,
+        spells = {120453},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31274,
+        x = 3390,
+        y = 900,
+        spells = {120454},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31275,
+        x = 3330,
+        y = 930,
+        spells = {120455},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31276,
+        x = 3270,
+        y = 960,
+        spells = {120456},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31277,
+        x = 3210,
+        y = 1020,
+        spells = {120457},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31278,
+        x = 3180,
+        y = 1050,
+        spells = {120458},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31279,
+        x = 3120,
+        y = 1020,
+        spells = {120459},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31280,
+        x = 3150,
+        y = 960,
+        spells = {120460},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31281,
+        x = 3210,
+        y = 930,
+        spells = {120461},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31282,
+        x = 3240,
+        y = 870,
+        spells = {120462},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31283,
+        x = 3300,
+        y = 840,
+        spells = {120463},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31284,
+        x = 3360,
+        y = 840,
+        spells = {120464},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31285,
+        x = 3450,
+        y = 840,
+        spells = {120465},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31286,
+        x = 3510,
+        y = 840,
+        spells = {120466},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31287,
+        x = 3570,
+        y = 840,
+        spells = {120467},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31288,
+        x = 3630,
+        y = 870,
+        spells = {120468},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31289,
+        x = 3690,
+        y = 900,
+        spells = {120469},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 3,
+        permanent = true
+    },
+    {
+        id = 31300,
+        x = 3330,
+        y = -750,
+        spells = {120470},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 4,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31301,
+        x = 3390,
+        y = -690,
+        spells = {120471},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31302,
+        x = 3450,
+        y = -690,
+        spells = {120472},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31303,
+        x = 3510,
+        y = -690,
+        spells = {120473},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31304,
+        x = 3570,
+        y = -660,
+        spells = {120474},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31305,
+        x = 3510,
+        y = -630,
+        spells = {120475},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31306,
+        x = 3450,
+        y = -630,
+        spells = {120476},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31307,
+        x = 3360,
+        y = -630,
+        spells = {120477},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31308,
+        x = 3300,
+        y = -660,
+        spells = {120478},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31309,
+        x = 3270,
+        y = -720,
+        spells = {120479},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31310,
+        x = 3180,
+        y = -690,
+        spells = {120480},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31311,
+        x = 3210,
+        y = -660,
+        spells = {120481},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31312,
+        x = 3270,
+        y = -600,
+        spells = {120482},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31313,
+        x = 3330,
+        y = -570,
+        spells = {120483},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31314,
+        x = 3390,
+        y = -540,
+        spells = {120484},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31315,
+        x = 3450,
+        y = -540,
+        spells = {120485},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31316,
+        x = 3510,
+        y = -540,
+        spells = {120486},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31317,
+        x = 3570,
+        y = -570,
+        spells = {120487},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31318,
+        x = 3630,
+        y = -600,
+        spells = {120488},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31319,
+        x = 3690,
+        y = -540,
+        spells = {120489},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31320,
+        x = 3630,
+        y = -510,
+        spells = {120490},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31321,
+        x = 3570,
+        y = -480,
+        spells = {120491},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31322,
+        x = 3510,
+        y = -480,
+        spells = {120492},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31323,
+        x = 3450,
+        y = -480,
+        spells = {120493},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31324,
+        x = 3360,
+        y = -480,
+        spells = {120494},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31325,
+        x = 3300,
+        y = -480,
+        spells = {120495},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31326,
+        x = 3240,
+        y = -510,
+        spells = {120496},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31327,
+        x = 3210,
+        y = -570,
+        spells = {120497},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31328,
+        x = 3150,
+        y = -600,
+        spells = {120498},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31329,
+        x = 3120,
+        y = -660,
+        spells = {120499},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31330,
+        x = 3600,
+        y = -720,
+        spells = {120500},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 4,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31331,
+        x = 3600,
+        y = -810,
+        spells = {120501},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31332,
+        x = 3600,
+        y = -900,
+        spells = {120502},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31333,
+        x = 3540,
+        y = -960,
+        spells = {120503},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31334,
+        x = 3570,
+        y = -1020,
+        spells = {120504},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31335,
+        x = 3600,
+        y = -990,
+        spells = {120505},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31336,
+        x = 3660,
+        y = -930,
+        spells = {120506},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31337,
+        x = 3660,
+        y = -870,
+        spells = {120507},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31338,
+        x = 3660,
+        y = -810,
+        spells = {120508},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31339,
+        x = 3660,
+        y = -750,
+        spells = {120509},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31340,
+        x = 3690,
+        y = -690,
+        spells = {120510},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31341,
+        x = 3720,
+        y = -750,
+        spells = {120511},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31342,
+        x = 3750,
+        y = -810,
+        spells = {120512},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31343,
+        x = 3750,
+        y = -870,
+        spells = {120513},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31344,
+        x = 3750,
+        y = -930,
+        spells = {120514},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31345,
+        x = 3720,
+        y = -990,
+        spells = {120515},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31346,
+        x = 3660,
+        y = -1050,
+        spells = {120516},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31347,
+        x = 3630,
+        y = -1080,
+        spells = {120517},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31348,
+        x = 3570,
+        y = -1110,
+        spells = {120518},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31349,
+        x = 3600,
+        y = -1200,
+        spells = {120519},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31350,
+        x = 3660,
+        y = -1170,
+        spells = {120520},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31351,
+        x = 3690,
+        y = -1110,
+        spells = {120521},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31352,
+        x = 3750,
+        y = -1080,
+        spells = {120522},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31353,
+        x = 3780,
+        y = -1020,
+        spells = {120523},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31354,
+        x = 3810,
+        y = -960,
+        spells = {120524},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31355,
+        x = 3810,
+        y = -900,
+        spells = {120525},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31356,
+        x = 3810,
+        y = -840,
+        spells = {120526},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31357,
+        x = 3810,
+        y = -750,
+        spells = {120527},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31358,
+        x = 3810,
+        y = -690,
+        spells = {120528},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31359,
+        x = 3780,
+        y = -630,
+        spells = {120529},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31360,
+        x = 3450,
+        y = -990,
+        spells = {120530},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 4,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31361,
+        x = 3360,
+        y = -960,
+        spells = {120531},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31362,
+        x = 3330,
+        y = -900,
+        spells = {120532},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31363,
+        x = 3300,
+        y = -840,
+        spells = {120533},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31364,
+        x = 3240,
+        y = -810,
+        spells = {120534},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31365,
+        x = 3240,
+        y = -900,
+        spells = {120535},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31366,
+        x = 3270,
+        y = -960,
+        spells = {120536},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31367,
+        x = 3300,
+        y = -1020,
+        spells = {120537},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31368,
+        x = 3360,
+        y = -1050,
+        spells = {120538},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31369,
+        x = 3420,
+        y = -1050,
+        spells = {120539},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31370,
+        x = 3450,
+        y = -1140,
+        spells = {120540},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31371,
+        x = 3390,
+        y = -1140,
+        spells = {120541},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31372,
+        x = 3330,
+        y = -1110,
+        spells = {120542},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31373,
+        x = 3270,
+        y = -1080,
+        spells = {120543},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31374,
+        x = 3240,
+        y = -1050,
+        spells = {120544},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31375,
+        x = 3180,
+        y = -990,
+        spells = {120545},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31376,
+        x = 3150,
+        y = -930,
+        spells = {120546},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31377,
+        x = 3150,
+        y = -870,
+        spells = {120547},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31378,
+        x = 3150,
+        y = -810,
+        spells = {120548},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31379,
+        x = 3090,
+        y = -780,
+        spells = {120549},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31380,
+        x = 3090,
+        y = -840,
+        spells = {120550},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31381,
+        x = 3090,
+        y = -930,
+        spells = {120551},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31382,
+        x = 3090,
+        y = -990,
+        spells = {120552},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31383,
+        x = 3120,
+        y = -1050,
+        spells = {120553},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31384,
+        x = 3180,
+        y = -1080,
+        spells = {120554},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31385,
+        x = 3210,
+        y = -1140,
+        spells = {120555},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31386,
+        x = 3270,
+        y = -1170,
+        spells = {120556},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31387,
+        x = 3330,
+        y = -1200,
+        spells = {120557},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31388,
+        x = 3390,
+        y = -1200,
+        spells = {120558},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31389,
+        x = 3480,
+        y = -1200,
+        spells = {120559},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 4,
+        permanent = true
+    },
+    {
+        id = 31400,
+        x = 2220,
+        y = -2340,
+        spells = {120560},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 5,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31401,
+        x = 2280,
+        y = -2340,
+        spells = {120561},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31402,
+        x = 2340,
+        y = -2370,
+        spells = {120562},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31403,
+        x = 2370,
+        y = -2430,
+        spells = {120563},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31404,
+        x = 2460,
+        y = -2400,
+        spells = {120564},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31405,
+        x = 2430,
+        y = -2340,
+        spells = {120565},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31406,
+        x = 2370,
+        y = -2310,
+        spells = {120566},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31407,
+        x = 2310,
+        y = -2280,
+        spells = {120567},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31408,
+        x = 2250,
+        y = -2280,
+        spells = {120568},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31409,
+        x = 2190,
+        y = -2280,
+        spells = {120569},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31410,
+        x = 2130,
+        y = -2220,
+        spells = {120570},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31411,
+        x = 2190,
+        y = -2190,
+        spells = {120571},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31412,
+        x = 2250,
+        y = -2190,
+        spells = {120572},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31413,
+        x = 2310,
+        y = -2190,
+        spells = {120573},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31414,
+        x = 2370,
+        y = -2220,
+        spells = {120574},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31415,
+        x = 2430,
+        y = -2250,
+        spells = {120575},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31416,
+        x = 2490,
+        y = -2280,
+        spells = {120576},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31417,
+        x = 2520,
+        y = -2340,
+        spells = {120577},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31418,
+        x = 2550,
+        y = -2400,
+        spells = {120578},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31419,
+        x = 2610,
+        y = -2400,
+        spells = {120579},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31420,
+        x = 2580,
+        y = -2340,
+        spells = {120580},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31421,
+        x = 2550,
+        y = -2280,
+        spells = {120581},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31422,
+        x = 2520,
+        y = -2220,
+        spells = {120582},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31423,
+        x = 2460,
+        y = -2190,
+        spells = {120583},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31424,
+        x = 2400,
+        y = -2160,
+        spells = {120584},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31425,
+        x = 2340,
+        y = -2130,
+        spells = {120585},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31426,
+        x = 2280,
+        y = -2130,
+        spells = {120586},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31427,
+        x = 2220,
+        y = -2130,
+        spells = {120587},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31428,
+        x = 2130,
+        y = -2130,
+        spells = {120588},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31429,
+        x = 2070,
+        y = -2160,
+        spells = {120589},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31430,
+        x = 2400,
+        y = -2520,
+        spells = {120590},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 5,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31431,
+        x = 2370,
+        y = -2580,
+        spells = {120591},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31432,
+        x = 2310,
+        y = -2640,
+        spells = {120592},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31433,
+        x = 2250,
+        y = -2640,
+        spells = {120593},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31434,
+        x = 2220,
+        y = -2700,
+        spells = {120594},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31435,
+        x = 2280,
+        y = -2700,
+        spells = {120595},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31436,
+        x = 2340,
+        y = -2700,
+        spells = {120596},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31437,
+        x = 2400,
+        y = -2640,
+        spells = {120597},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31438,
+        x = 2460,
+        y = -2610,
+        spells = {120598},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31439,
+        x = 2460,
+        y = -2550,
+        spells = {120599},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31440,
+        x = 2550,
+        y = -2520,
+        spells = {120600},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31441,
+        x = 2550,
+        y = -2580,
+        spells = {120601},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31442,
+        x = 2520,
+        y = -2640,
+        spells = {120602},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31443,
+        x = 2490,
+        y = -2700,
+        spells = {120603},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31444,
+        x = 2430,
+        y = -2730,
+        spells = {120604},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31445,
+        x = 2370,
+        y = -2760,
+        spells = {120605},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31446,
+        x = 2310,
+        y = -2790,
+        spells = {120606},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31447,
+        x = 2250,
+        y = -2790,
+        spells = {120607},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31448,
+        x = 2190,
+        y = -2790,
+        spells = {120608},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31449,
+        x = 2160,
+        y = -2850,
+        spells = {120609},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31450,
+        x = 2220,
+        y = -2850,
+        spells = {120610},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31451,
+        x = 2280,
+        y = -2850,
+        spells = {120611},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31452,
+        x = 2340,
+        y = -2850,
+        spells = {120612},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31453,
+        x = 2400,
+        y = -2820,
+        spells = {120613},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31454,
+        x = 2460,
+        y = -2790,
+        spells = {120614},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31455,
+        x = 2520,
+        y = -2760,
+        spells = {120615},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31456,
+        x = 2550,
+        y = -2700,
+        spells = {120616},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31457,
+        x = 2580,
+        y = -2640,
+        spells = {120617},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31458,
+        x = 2610,
+        y = -2580,
+        spells = {120618},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31459,
+        x = 2610,
+        y = -2520,
+        spells = {120619},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31460,
+        x = 2160,
+        y = -2610,
+        spells = {120620},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 5,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31461,
+        x = 2100,
+        y = -2550,
+        spells = {120621},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31462,
+        x = 2100,
+        y = -2460,
+        spells = {120622},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31463,
+        x = 2130,
+        y = -2400,
+        spells = {120623},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31464,
+        x = 2070,
+        y = -2370,
+        spells = {120624},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31465,
+        x = 2040,
+        y = -2430,
+        spells = {120625},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31466,
+        x = 2040,
+        y = -2490,
+        spells = {120626},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31467,
+        x = 2040,
+        y = -2550,
+        spells = {120627},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31468,
+        x = 2070,
+        y = -2610,
+        spells = {120628},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31469,
+        x = 2100,
+        y = -2670,
+        spells = {120629},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31470,
+        x = 2100,
+        y = -2760,
+        spells = {120630},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31471,
+        x = 2040,
+        y = -2700,
+        spells = {120631},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31472,
+        x = 1980,
+        y = -2640,
+        spells = {120632},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31473,
+        x = 1980,
+        y = -2580,
+        spells = {120633},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31474,
+        x = 1950,
+        y = -2520,
+        spells = {120634},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31475,
+        x = 1950,
+        y = -2460,
+        spells = {120635},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31476,
+        x = 1980,
+        y = -2400,
+        spells = {120636},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31477,
+        x = 2010,
+        y = -2340,
+        spells = {120637},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31478,
+        x = 2040,
+        y = -2280,
+        spells = {120638},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31479,
+        x = 1980,
+        y = -2220,
+        spells = {120639},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31480,
+        x = 1950,
+        y = -2280,
+        spells = {120640},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31481,
+        x = 1920,
+        y = -2340,
+        spells = {120641},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31482,
+        x = 1890,
+        y = -2400,
+        spells = {120642},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31483,
+        x = 1890,
+        y = -2460,
+        spells = {120643},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31484,
+        x = 1890,
+        y = -2520,
+        spells = {120644},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31485,
+        x = 1890,
+        y = -2580,
+        spells = {120645},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31486,
+        x = 1920,
+        y = -2670,
+        spells = {120646},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31487,
+        x = 1950,
+        y = -2700,
+        spells = {120647},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31488,
+        x = 1980,
+        y = -2760,
+        spells = {120648},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31489,
+        x = 2040,
+        y = -2820,
+        spells = {120649},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 5,
+        permanent = true
+    },
+    {
+        id = 31500,
+        x = 360,
+        y = -2970,
+        spells = {120650},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 6,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31501,
+        x = 450,
+        y = -3030,
+        spells = {120651},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31502,
+        x = 480,
+        y = -3090,
+        spells = {120652},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31503,
+        x = 480,
+        y = -3150,
+        spells = {120653},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31504,
+        x = 540,
+        y = -3180,
+        spells = {120654},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31505,
+        x = 540,
+        y = -3090,
+        spells = {120655},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31506,
+        x = 540,
+        y = -3030,
+        spells = {120656},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31507,
+        x = 510,
+        y = -2970,
+        spells = {120657},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31508,
+        x = 450,
+        y = -2940,
+        spells = {120658},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31509,
+        x = 390,
+        y = -2910,
+        spells = {120659},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31510,
+        x = 390,
+        y = -2820,
+        spells = {120660},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31511,
+        x = 450,
+        y = -2850,
+        spells = {120661},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31512,
+        x = 510,
+        y = -2880,
+        spells = {120662},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31513,
+        x = 540,
+        y = -2910,
+        spells = {120663},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31514,
+        x = 600,
+        y = -2970,
+        spells = {120664},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31515,
+        x = 630,
+        y = -3030,
+        spells = {120665},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31516,
+        x = 630,
+        y = -3090,
+        spells = {120666},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31517,
+        x = 630,
+        y = -3150,
+        spells = {120667},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31518,
+        x = 600,
+        y = -3210,
+        spells = {120668},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31519,
+        x = 690,
+        y = -3240,
+        spells = {120669},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31520,
+        x = 690,
+        y = -3180,
+        spells = {120670},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31521,
+        x = 690,
+        y = -3120,
+        spells = {120671},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31522,
+        x = 690,
+        y = -3060,
+        spells = {120672},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31523,
+        x = 690,
+        y = -3000,
+        spells = {120673},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31524,
+        x = 660,
+        y = -2940,
+        spells = {120674},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31525,
+        x = 630,
+        y = -2880,
+        spells = {120675},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31526,
+        x = 570,
+        y = -2820,
+        spells = {120676},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31527,
+        x = 510,
+        y = -2790,
+        spells = {120677},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31528,
+        x = 450,
+        y = -2760,
+        spells = {120678},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31529,
+        x = 360,
+        y = -2760,
+        spells = {120679},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31530,
+        x = 450,
+        y = -3210,
+        spells = {120680},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 6,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31531,
+        x = 360,
+        y = -3270,
+        spells = {120681},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31532,
+        x = 300,
+        y = -3270,
+        spells = {120682},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31533,
+        x = 240,
+        y = -3240,
+        spells = {120683},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31534,
+        x = 180,
+        y = -3300,
+        spells = {120684},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31535,
+        x = 240,
+        y = -3330,
+        spells = {120685},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31536,
+        x = 300,
+        y = -3330,
+        spells = {120686},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31537,
+        x = 360,
+        y = -3330,
+        spells = {120687},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31538,
+        x = 420,
+        y = -3330,
+        spells = {120688},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31539,
+        x = 480,
+        y = -3300,
+        spells = {120689},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31540,
+        x = 570,
+        y = -3300,
+        spells = {120690},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31541,
+        x = 510,
+        y = -3360,
+        spells = {120691},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31542,
+        x = 450,
+        y = -3390,
+        spells = {120692},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31543,
+        x = 390,
+        y = -3420,
+        spells = {120693},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31544,
+        x = 330,
+        y = -3420,
+        spells = {120694},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31545,
+        x = 270,
+        y = -3420,
+        spells = {120695},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31546,
+        x = 210,
+        y = -3390,
+        spells = {120696},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31547,
+        x = 150,
+        y = -3360,
+        spells = {120697},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31548,
+        x = 90,
+        y = -3300,
+        spells = {120698},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31549,
+        x = 30,
+        y = -3360,
+        spells = {120699},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31550,
+        x = 90,
+        y = -3420,
+        spells = {120700},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31551,
+        x = 150,
+        y = -3450,
+        spells = {120701},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31552,
+        x = 210,
+        y = -3480,
+        spells = {120702},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31553,
+        x = 270,
+        y = -3480,
+        spells = {120703},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31554,
+        x = 330,
+        y = -3480,
+        spells = {120704},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31555,
+        x = 390,
+        y = -3480,
+        spells = {120705},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31556,
+        x = 450,
+        y = -3480,
+        spells = {120706},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31557,
+        x = 510,
+        y = -3450,
+        spells = {120707},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31558,
+        x = 570,
+        y = -3420,
+        spells = {120708},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31559,
+        x = 630,
+        y = -3360,
+        spells = {120709},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31560,
+        x = 180,
+        y = -3180,
+        spells = {120710},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 6,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31561,
+        x = 180,
+        y = -3090,
+        spells = {120711},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31562,
+        x = 210,
+        y = -3030,
+        spells = {120712},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31563,
+        x = 270,
+        y = -2970,
+        spells = {120713},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31564,
+        x = 270,
+        y = -2910,
+        spells = {120714},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31565,
+        x = 210,
+        y = -2940,
+        spells = {120715},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31566,
+        x = 150,
+        y = -2970,
+        spells = {120716},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31567,
+        x = 120,
+        y = -3030,
+        spells = {120717},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31568,
+        x = 120,
+        y = -3090,
+        spells = {120718},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31569,
+        x = 120,
+        y = -3180,
+        spells = {120719},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31570,
+        x = 60,
+        y = -3210,
+        spells = {120720},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31571,
+        x = 30,
+        y = -3150,
+        spells = {120721},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31572,
+        x = 30,
+        y = -3090,
+        spells = {120722},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31573,
+        x = 30,
+        y = -3030,
+        spells = {120723},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31574,
+        x = 60,
+        y = -2970,
+        spells = {120724},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31575,
+        x = 120,
+        y = -2910,
+        spells = {120725},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31576,
+        x = 150,
+        y = -2880,
+        spells = {120726},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31577,
+        x = 210,
+        y = -2850,
+        spells = {120727},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31578,
+        x = 270,
+        y = -2820,
+        spells = {120728},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31579,
+        x = 270,
+        y = -2760,
+        spells = {120729},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31580,
+        x = 210,
+        y = -2760,
+        spells = {120730},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31581,
+        x = 150,
+        y = -2790,
+        spells = {120731},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31582,
+        x = 90,
+        y = -2820,
+        spells = {120732},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31583,
+        x = 30,
+        y = -2880,
+        spells = {120733},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31584,
+        x = 0,
+        y = -2940,
+        spells = {120734},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31585,
+        x = -30,
+        y = -3000,
+        spells = {120735},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31586,
+        x = -30,
+        y = -3060,
+        spells = {120736},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31587,
+        x = -30,
+        y = -3120,
+        spells = {120737},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31588,
+        x = -30,
+        y = -3180,
+        spells = {120738},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31589,
+        x = -30,
+        y = -3240,
+        spells = {120739},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 6,
+        permanent = true
+    },
+    {
+        id = 31600,
+        x = -1500,
+        y = -2370,
+        spells = {120740},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 7,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31601,
+        x = -1470,
+        y = -2460,
+        spells = {120741},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31602,
+        x = -1470,
+        y = -2550,
+        spells = {120742},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31603,
+        x = -1500,
+        y = -2580,
+        spells = {120743},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31604,
+        x = -1470,
+        y = -2670,
+        spells = {120744},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31605,
+        x = -1440,
+        y = -2610,
+        spells = {120745},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31606,
+        x = -1410,
+        y = -2550,
+        spells = {120746},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31607,
+        x = -1410,
+        y = -2490,
+        spells = {120747},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31608,
+        x = -1410,
+        y = -2430,
+        spells = {120748},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31609,
+        x = -1440,
+        y = -2370,
+        spells = {120749},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31610,
+        x = -1410,
+        y = -2280,
+        spells = {120750},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31611,
+        x = -1380,
+        y = -2340,
+        spells = {120751},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31612,
+        x = -1350,
+        y = -2400,
+        spells = {120752},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31613,
+        x = -1320,
+        y = -2460,
+        spells = {120753},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31614,
+        x = -1320,
+        y = -2520,
+        spells = {120754},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31615,
+        x = -1350,
+        y = -2580,
+        spells = {120755},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31616,
+        x = -1350,
+        y = -2640,
+        spells = {120756},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31617,
+        x = -1410,
+        y = -2700,
+        spells = {120757},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31618,
+        x = -1440,
+        y = -2730,
+        spells = {120758},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31619,
+        x = -1410,
+        y = -2790,
+        spells = {120759},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31620,
+        x = -1350,
+        y = -2760,
+        spells = {120760},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31621,
+        x = -1320,
+        y = -2700,
+        spells = {120761},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31622,
+        x = -1290,
+        y = -2670,
+        spells = {120762},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31623,
+        x = -1260,
+        y = -2580,
+        spells = {120763},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31624,
+        x = -1260,
+        y = -2520,
+        spells = {120764},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31625,
+        x = -1260,
+        y = -2460,
+        spells = {120765},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31626,
+        x = -1260,
+        y = -2400,
+        spells = {120766},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31627,
+        x = -1290,
+        y = -2340,
+        spells = {120767},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31628,
+        x = -1320,
+        y = -2280,
+        spells = {120768},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31629,
+        x = -1350,
+        y = -2220,
+        spells = {120769},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31630,
+        x = -1590,
+        y = -2640,
+        spells = {120770},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 7,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31631,
+        x = -1680,
+        y = -2640,
+        spells = {120771},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31632,
+        x = -1740,
+        y = -2580,
+        spells = {120772},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31633,
+        x = -1770,
+        y = -2520,
+        spells = {120773},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31634,
+        x = -1830,
+        y = -2550,
+        spells = {120774},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31635,
+        x = -1830,
+        y = -2610,
+        spells = {120775},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31636,
+        x = -1770,
+        y = -2640,
+        spells = {120776},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31637,
+        x = -1710,
+        y = -2700,
+        spells = {120777},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31638,
+        x = -1650,
+        y = -2700,
+        spells = {120778},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31639,
+        x = -1590,
+        y = -2700,
+        spells = {120779},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31640,
+        x = -1560,
+        y = -2790,
+        spells = {120780},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31641,
+        x = -1620,
+        y = -2790,
+        spells = {120781},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31642,
+        x = -1680,
+        y = -2790,
+        spells = {120782},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31643,
+        x = -1740,
+        y = -2760,
+        spells = {120783},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31644,
+        x = -1800,
+        y = -2730,
+        spells = {120784},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31645,
+        x = -1860,
+        y = -2700,
+        spells = {120785},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31646,
+        x = -1890,
+        y = -2640,
+        spells = {120786},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31647,
+        x = -1920,
+        y = -2580,
+        spells = {120787},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31648,
+        x = -1920,
+        y = -2520,
+        spells = {120788},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31649,
+        x = -1980,
+        y = -2520,
+        spells = {120789},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31650,
+        x = -1980,
+        y = -2580,
+        spells = {120790},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31651,
+        x = -1950,
+        y = -2640,
+        spells = {120791},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31652,
+        x = -1920,
+        y = -2700,
+        spells = {120792},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31653,
+        x = -1890,
+        y = -2760,
+        spells = {120793},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31654,
+        x = -1830,
+        y = -2790,
+        spells = {120794},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31655,
+        x = -1770,
+        y = -2820,
+        spells = {120795},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31656,
+        x = -1710,
+        y = -2850,
+        spells = {120796},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31657,
+        x = -1650,
+        y = -2850,
+        spells = {120797},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31658,
+        x = -1590,
+        y = -2850,
+        spells = {120798},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31659,
+        x = -1530,
+        y = -2850,
+        spells = {120799},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31660,
+        x = -1740,
+        y = -2430,
+        spells = {120800},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 7,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31661,
+        x = -1710,
+        y = -2370,
+        spells = {120801},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31662,
+        x = -1650,
+        y = -2340,
+        spells = {120802},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31663,
+        x = -1590,
+        y = -2340,
+        spells = {120803},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31664,
+        x = -1560,
+        y = -2280,
+        spells = {120804},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31665,
+        x = -1620,
+        y = -2280,
+        spells = {120805},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31666,
+        x = -1680,
+        y = -2280,
+        spells = {120806},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31667,
+        x = -1740,
+        y = -2310,
+        spells = {120807},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31668,
+        x = -1800,
+        y = -2340,
+        spells = {120808},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31669,
+        x = -1830,
+        y = -2400,
+        spells = {120809},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31670,
+        x = -1920,
+        y = -2400,
+        spells = {120810},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31671,
+        x = -1890,
+        y = -2340,
+        spells = {120811},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31672,
+        x = -1860,
+        y = -2280,
+        spells = {120812},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31673,
+        x = -1800,
+        y = -2250,
+        spells = {120813},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31674,
+        x = -1740,
+        y = -2220,
+        spells = {120814},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31675,
+        x = -1680,
+        y = -2190,
+        spells = {120815},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31676,
+        x = -1620,
+        y = -2190,
+        spells = {120816},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31677,
+        x = -1560,
+        y = -2190,
+        spells = {120817},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31678,
+        x = -1500,
+        y = -2220,
+        spells = {120818},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31679,
+        x = -1440,
+        y = -2160,
+        spells = {120819},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31680,
+        x = -1500,
+        y = -2130,
+        spells = {120820},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31681,
+        x = -1590,
+        y = -2130,
+        spells = {120821},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31682,
+        x = -1650,
+        y = -2130,
+        spells = {120822},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31683,
+        x = -1710,
+        y = -2130,
+        spells = {120823},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31684,
+        x = -1770,
+        y = -2160,
+        spells = {120824},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31685,
+        x = -1830,
+        y = -2190,
+        spells = {120825},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31686,
+        x = -1890,
+        y = -2220,
+        spells = {120826},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31687,
+        x = -1920,
+        y = -2280,
+        spells = {120827},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31688,
+        x = -1950,
+        y = -2340,
+        spells = {120828},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31689,
+        x = -1980,
+        y = -2400,
+        spells = {120829},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 7,
+        permanent = true
+    },
+    {
+        id = 31700,
+        x = -2670,
+        y = -840,
+        spells = {120830},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 8,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31701,
+        x = -2700,
+        y = -900,
+        spells = {120831},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31702,
+        x = -2730,
+        y = -960,
+        spells = {120832},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31703,
+        x = -2790,
+        y = -990,
+        spells = {120833},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31704,
+        x = -2790,
+        y = -1050,
+        spells = {120834},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31705,
+        x = -2730,
+        y = -1050,
+        spells = {120835},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31706,
+        x = -2670,
+        y = -1020,
+        spells = {120836},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31707,
+        x = -2640,
+        y = -960,
+        spells = {120837},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31708,
+        x = -2610,
+        y = -900,
+        spells = {120838},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31709,
+        x = -2610,
+        y = -840,
+        spells = {120839},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31710,
+        x = -2520,
+        y = -810,
+        spells = {120840},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31711,
+        x = -2520,
+        y = -870,
+        spells = {120841},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31712,
+        x = -2520,
+        y = -930,
+        spells = {120842},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31713,
+        x = -2550,
+        y = -990,
+        spells = {120843},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31714,
+        x = -2610,
+        y = -1050,
+        spells = {120844},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31715,
+        x = -2640,
+        y = -1080,
+        spells = {120845},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31716,
+        x = -2700,
+        y = -1110,
+        spells = {120846},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31717,
+        x = -2760,
+        y = -1140,
+        spells = {120847},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31718,
+        x = -2820,
+        y = -1140,
+        spells = {120848},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31719,
+        x = -2850,
+        y = -1200,
+        spells = {120849},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31720,
+        x = -2760,
+        y = -1200,
+        spells = {120850},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31721,
+        x = -2700,
+        y = -1200,
+        spells = {120851},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31722,
+        x = -2640,
+        y = -1170,
+        spells = {120852},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31723,
+        x = -2580,
+        y = -1140,
+        spells = {120853},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31724,
+        x = -2550,
+        y = -1080,
+        spells = {120854},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31725,
+        x = -2490,
+        y = -1050,
+        spells = {120855},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31726,
+        x = -2460,
+        y = -990,
+        spells = {120856},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31727,
+        x = -2460,
+        y = -930,
+        spells = {120857},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31728,
+        x = -2460,
+        y = -840,
+        spells = {120858},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31729,
+        x = -2460,
+        y = -780,
+        spells = {120859},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31730,
+        x = -2880,
+        y = -990,
+        spells = {120860},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 8,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31731,
+        x = -2940,
+        y = -930,
+        spells = {120861},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31732,
+        x = -2970,
+        y = -840,
+        spells = {120862},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31733,
+        x = -2940,
+        y = -780,
+        spells = {120863},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31734,
+        x = -3000,
+        y = -720,
+        spells = {120864},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31735,
+        x = -3030,
+        y = -810,
+        spells = {120865},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31736,
+        x = -3030,
+        y = -870,
+        spells = {120866},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31737,
+        x = -3030,
+        y = -930,
+        spells = {120867},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31738,
+        x = -2970,
+        y = -990,
+        spells = {120868},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31739,
+        x = -2910,
+        y = -1050,
+        spells = {120869},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31740,
+        x = -2940,
+        y = -1110,
+        spells = {120870},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31741,
+        x = -3000,
+        y = -1080,
+        spells = {120871},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31742,
+        x = -3030,
+        y = -1050,
+        spells = {120872},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31743,
+        x = -3090,
+        y = -990,
+        spells = {120873},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31744,
+        x = -3120,
+        y = -930,
+        spells = {120874},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31745,
+        x = -3120,
+        y = -870,
+        spells = {120875},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31746,
+        x = -3120,
+        y = -810,
+        spells = {120876},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31747,
+        x = -3090,
+        y = -750,
+        spells = {120877},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31748,
+        x = -3060,
+        y = -690,
+        spells = {120878},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31749,
+        x = -3150,
+        y = -630,
+        spells = {120879},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31750,
+        x = -3180,
+        y = -690,
+        spells = {120880},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31751,
+        x = -3210,
+        y = -750,
+        spells = {120881},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31752,
+        x = -3210,
+        y = -840,
+        spells = {120882},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31753,
+        x = -3210,
+        y = -900,
+        spells = {120883},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31754,
+        x = -3180,
+        y = -960,
+        spells = {120884},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31755,
+        x = -3150,
+        y = -1020,
+        spells = {120885},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31756,
+        x = -3120,
+        y = -1080,
+        spells = {120886},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31757,
+        x = -3090,
+        y = -1140,
+        spells = {120887},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31758,
+        x = -3030,
+        y = -1170,
+        spells = {120888},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31759,
+        x = -2970,
+        y = -1200,
+        spells = {120889},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31760,
+        x = -2880,
+        y = -690,
+        spells = {120890},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 8,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31761,
+        x = -2820,
+        y = -690,
+        spells = {120891},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31762,
+        x = -2760,
+        y = -690,
+        spells = {120892},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31763,
+        x = -2700,
+        y = -750,
+        spells = {120893},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31764,
+        x = -2640,
+        y = -720,
+        spells = {120894},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31765,
+        x = -2670,
+        y = -660,
+        spells = {120895},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31766,
+        x = -2730,
+        y = -630,
+        spells = {120896},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31767,
+        x = -2820,
+        y = -630,
+        spells = {120897},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31768,
+        x = -2880,
+        y = -630,
+        spells = {120898},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31769,
+        x = -2940,
+        y = -660,
+        spells = {120899},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31770,
+        x = -3000,
+        y = -600,
+        spells = {120900},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31771,
+        x = -2940,
+        y = -570,
+        spells = {120901},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31772,
+        x = -2880,
+        y = -540,
+        spells = {120902},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31773,
+        x = -2820,
+        y = -540,
+        spells = {120903},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31774,
+        x = -2760,
+        y = -540,
+        spells = {120904},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31775,
+        x = -2700,
+        y = -570,
+        spells = {120905},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31776,
+        x = -2640,
+        y = -600,
+        spells = {120906},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31777,
+        x = -2580,
+        y = -660,
+        spells = {120907},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31778,
+        x = -2550,
+        y = -690,
+        spells = {120908},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31779,
+        x = -2490,
+        y = -660,
+        spells = {120909},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31780,
+        x = -2520,
+        y = -600,
+        spells = {120910},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31781,
+        x = -2580,
+        y = -570,
+        spells = {120911},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31782,
+        x = -2610,
+        y = -510,
+        spells = {120912},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31783,
+        x = -2670,
+        y = -480,
+        spells = {120913},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31784,
+        x = -2730,
+        y = -480,
+        spells = {120914},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31785,
+        x = -2820,
+        y = -480,
+        spells = {120915},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31786,
+        x = -2880,
+        y = -480,
+        spells = {120916},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31787,
+        x = -2940,
+        y = -480,
+        spells = {120917},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31788,
+        x = -3000,
+        y = -510,
+        spells = {120918},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31789,
+        x = -3060,
+        y = -540,
+        spells = {120919},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 8,
+        permanent = true
+    },
+    {
+        id = 31800,
+        x = -2700,
+        y = 1110,
+        spells = {120920},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 9,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31801,
+        x = -2760,
+        y = 1050,
+        spells = {120921},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31802,
+        x = -2820,
+        y = 1050,
+        spells = {120922},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31803,
+        x = -2880,
+        y = 1050,
+        spells = {120923},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31804,
+        x = -2940,
+        y = 1020,
+        spells = {120924},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31805,
+        x = -2880,
+        y = 990,
+        spells = {120925},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31806,
+        x = -2820,
+        y = 990,
+        spells = {120926},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31807,
+        x = -2730,
+        y = 990,
+        spells = {120927},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31808,
+        x = -2670,
+        y = 1020,
+        spells = {120928},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31809,
+        x = -2640,
+        y = 1080,
+        spells = {120929},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31810,
+        x = -2550,
+        y = 1050,
+        spells = {120930},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31811,
+        x = -2580,
+        y = 1020,
+        spells = {120931},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31812,
+        x = -2640,
+        y = 960,
+        spells = {120932},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31813,
+        x = -2700,
+        y = 930,
+        spells = {120933},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31814,
+        x = -2760,
+        y = 900,
+        spells = {120934},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31815,
+        x = -2820,
+        y = 900,
+        spells = {120935},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31816,
+        x = -2880,
+        y = 900,
+        spells = {120936},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31817,
+        x = -2940,
+        y = 930,
+        spells = {120937},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31818,
+        x = -3000,
+        y = 960,
+        spells = {120938},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31819,
+        x = -3060,
+        y = 900,
+        spells = {120939},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31820,
+        x = -3000,
+        y = 870,
+        spells = {120940},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31821,
+        x = -2940,
+        y = 840,
+        spells = {120941},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31822,
+        x = -2880,
+        y = 840,
+        spells = {120942},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31823,
+        x = -2820,
+        y = 840,
+        spells = {120943},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31824,
+        x = -2730,
+        y = 840,
+        spells = {120944},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31825,
+        x = -2670,
+        y = 840,
+        spells = {120945},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31826,
+        x = -2610,
+        y = 870,
+        spells = {120946},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31827,
+        x = -2550,
+        y = 900,
+        spells = {120947},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31828,
+        x = -2520,
+        y = 960,
+        spells = {120948},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31829,
+        x = -2490,
+        y = 1020,
+        spells = {120949},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31830,
+        x = -2940,
+        y = 1140,
+        spells = {120950},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 9,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31831,
+        x = -2970,
+        y = 1200,
+        spells = {120951},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31832,
+        x = -2940,
+        y = 1290,
+        spells = {120952},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31833,
+        x = -2880,
+        y = 1350,
+        spells = {120953},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31834,
+        x = -2910,
+        y = 1410,
+        spells = {120954},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31835,
+        x = -2970,
+        y = 1350,
+        spells = {120955},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31836,
+        x = -3030,
+        y = 1290,
+        spells = {120956},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31837,
+        x = -3030,
+        y = 1230,
+        spells = {120957},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31838,
+        x = -3030,
+        y = 1170,
+        spells = {120958},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31839,
+        x = -3030,
+        y = 1110,
+        spells = {120959},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31840,
+        x = -3060,
+        y = 1050,
+        spells = {120960},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31841,
+        x = -3090,
+        y = 1110,
+        spells = {120961},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31842,
+        x = -3120,
+        y = 1170,
+        spells = {120962},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31843,
+        x = -3120,
+        y = 1230,
+        spells = {120963},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31844,
+        x = -3120,
+        y = 1290,
+        spells = {120964},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31845,
+        x = -3090,
+        y = 1350,
+        spells = {120965},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31846,
+        x = -3030,
+        y = 1410,
+        spells = {120966},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31847,
+        x = -3000,
+        y = 1440,
+        spells = {120967},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31848,
+        x = -2940,
+        y = 1470,
+        spells = {120968},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31849,
+        x = -2970,
+        y = 1560,
+        spells = {120969},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31850,
+        x = -3030,
+        y = 1530,
+        spells = {120970},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31851,
+        x = -3060,
+        y = 1470,
+        spells = {120971},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31852,
+        x = -3120,
+        y = 1440,
+        spells = {120972},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31853,
+        x = -3150,
+        y = 1380,
+        spells = {120973},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31854,
+        x = -3180,
+        y = 1320,
+        spells = {120974},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31855,
+        x = -3210,
+        y = 1260,
+        spells = {120975},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31856,
+        x = -3210,
+        y = 1200,
+        spells = {120976},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31857,
+        x = -3210,
+        y = 1110,
+        spells = {120977},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31858,
+        x = -3180,
+        y = 1050,
+        spells = {120978},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31859,
+        x = -3150,
+        y = 990,
+        spells = {120979},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31860,
+        x = -2790,
+        y = 1350,
+        spells = {120980},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 9,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31861,
+        x = -2730,
+        y = 1320,
+        spells = {120981},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31862,
+        x = -2700,
+        y = 1260,
+        spells = {120982},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31863,
+        x = -2670,
+        y = 1200,
+        spells = {120983},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31864,
+        x = -2610,
+        y = 1200,
+        spells = {120984},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31865,
+        x = -2610,
+        y = 1260,
+        spells = {120985},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31866,
+        x = -2640,
+        y = 1320,
+        spells = {120986},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31867,
+        x = -2670,
+        y = 1380,
+        spells = {120987},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31868,
+        x = -2730,
+        y = 1410,
+        spells = {120988},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31869,
+        x = -2790,
+        y = 1410,
+        spells = {120989},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31870,
+        x = -2820,
+        y = 1500,
+        spells = {120990},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31871,
+        x = -2760,
+        y = 1500,
+        spells = {120991},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31872,
+        x = -2700,
+        y = 1470,
+        spells = {120992},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31873,
+        x = -2640,
+        y = 1440,
+        spells = {120993},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31874,
+        x = -2610,
+        y = 1410,
+        spells = {120994},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31875,
+        x = -2550,
+        y = 1350,
+        spells = {120995},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31876,
+        x = -2520,
+        y = 1290,
+        spells = {120996},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31877,
+        x = -2520,
+        y = 1230,
+        spells = {120997},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31878,
+        x = -2520,
+        y = 1170,
+        spells = {120998},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31879,
+        x = -2460,
+        y = 1140,
+        spells = {120999},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31880,
+        x = -2460,
+        y = 1200,
+        spells = {121000},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31881,
+        x = -2460,
+        y = 1290,
+        spells = {121001},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31882,
+        x = -2460,
+        y = 1350,
+        spells = {121002},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31883,
+        x = -2490,
+        y = 1410,
+        spells = {121003},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31884,
+        x = -2550,
+        y = 1440,
+        spells = {121004},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31885,
+        x = -2580,
+        y = 1500,
+        spells = {121005},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31886,
+        x = -2640,
+        y = 1530,
+        spells = {121006},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31887,
+        x = -2700,
+        y = 1560,
+        spells = {121007},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31888,
+        x = -2760,
+        y = 1560,
+        spells = {121008},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31889,
+        x = -2850,
+        y = 1560,
+        spells = {121009},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 9,
+        permanent = true
+    },
+    {
+        id = 31900,
+        x = -1560,
+        y = 2700,
+        spells = {121010},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 11,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31901,
+        x = -1650,
+        y = 2700,
+        spells = {121011},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31902,
+        x = -1710,
+        y = 2730,
+        spells = {121012},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31903,
+        x = -1740,
+        y = 2790,
+        spells = {121013},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31904,
+        x = -1830,
+        y = 2760,
+        spells = {121014},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31905,
+        x = -1800,
+        y = 2700,
+        spells = {121015},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31906,
+        x = -1740,
+        y = 2670,
+        spells = {121016},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31907,
+        x = -1680,
+        y = 2640,
+        spells = {121017},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31908,
+        x = -1620,
+        y = 2640,
+        spells = {121018},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31909,
+        x = -1560,
+        y = 2640,
+        spells = {121019},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31910,
+        x = -1500,
+        y = 2580,
+        spells = {121020},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31911,
+        x = -1560,
+        y = 2550,
+        spells = {121021},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31912,
+        x = -1620,
+        y = 2550,
+        spells = {121022},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31913,
+        x = -1680,
+        y = 2550,
+        spells = {121023},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31914,
+        x = -1740,
+        y = 2580,
+        spells = {121024},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31915,
+        x = -1800,
+        y = 2610,
+        spells = {121025},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31916,
+        x = -1860,
+        y = 2640,
+        spells = {121026},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31917,
+        x = -1890,
+        y = 2700,
+        spells = {121027},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31918,
+        x = -1920,
+        y = 2760,
+        spells = {121028},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31919,
+        x = -1980,
+        y = 2760,
+        spells = {121029},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31920,
+        x = -1950,
+        y = 2700,
+        spells = {121030},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31921,
+        x = -1920,
+        y = 2640,
+        spells = {121031},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31922,
+        x = -1890,
+        y = 2580,
+        spells = {121032},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31923,
+        x = -1830,
+        y = 2550,
+        spells = {121033},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31924,
+        x = -1770,
+        y = 2520,
+        spells = {121034},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31925,
+        x = -1710,
+        y = 2490,
+        spells = {121035},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31926,
+        x = -1650,
+        y = 2490,
+        spells = {121036},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31927,
+        x = -1590,
+        y = 2490,
+        spells = {121037},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31928,
+        x = -1500,
+        y = 2490,
+        spells = {121038},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31929,
+        x = -1440,
+        y = 2520,
+        spells = {121039},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31930,
+        x = -1770,
+        y = 2880,
+        spells = {121040},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 11,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31931,
+        x = -1740,
+        y = 2940,
+        spells = {121041},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31932,
+        x = -1680,
+        y = 3000,
+        spells = {121042},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31933,
+        x = -1620,
+        y = 3000,
+        spells = {121043},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31934,
+        x = -1590,
+        y = 3060,
+        spells = {121044},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31935,
+        x = -1650,
+        y = 3060,
+        spells = {121045},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31936,
+        x = -1710,
+        y = 3060,
+        spells = {121046},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31937,
+        x = -1770,
+        y = 3000,
+        spells = {121047},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31938,
+        x = -1830,
+        y = 2970,
+        spells = {121048},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31939,
+        x = -1830,
+        y = 2910,
+        spells = {121049},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31940,
+        x = -1920,
+        y = 2880,
+        spells = {121050},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31941,
+        x = -1920,
+        y = 2940,
+        spells = {121051},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31942,
+        x = -1890,
+        y = 3000,
+        spells = {121052},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31943,
+        x = -1860,
+        y = 3060,
+        spells = {121053},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31944,
+        x = -1800,
+        y = 3090,
+        spells = {121054},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31945,
+        x = -1740,
+        y = 3120,
+        spells = {121055},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31946,
+        x = -1680,
+        y = 3150,
+        spells = {121056},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31947,
+        x = -1620,
+        y = 3150,
+        spells = {121057},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31948,
+        x = -1560,
+        y = 3150,
+        spells = {121058},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31949,
+        x = -1530,
+        y = 3210,
+        spells = {121059},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31950,
+        x = -1590,
+        y = 3210,
+        spells = {121060},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31951,
+        x = -1650,
+        y = 3210,
+        spells = {121061},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31952,
+        x = -1710,
+        y = 3210,
+        spells = {121062},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31953,
+        x = -1770,
+        y = 3180,
+        spells = {121063},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31954,
+        x = -1830,
+        y = 3150,
+        spells = {121064},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31955,
+        x = -1890,
+        y = 3120,
+        spells = {121065},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31956,
+        x = -1920,
+        y = 3060,
+        spells = {121066},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31957,
+        x = -1950,
+        y = 3000,
+        spells = {121067},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31958,
+        x = -1980,
+        y = 2940,
+        spells = {121068},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31959,
+        x = -1980,
+        y = 2880,
+        spells = {121069},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31960,
+        x = -1530,
+        y = 2970,
+        spells = {121070},
+        soulPointsCosts = {110000},
+        currency = "ash",
+        classId = 11,
+        permanent = true,
+        isStart = true
+    },
+    {
+        id = 31961,
+        x = -1470,
+        y = 2910,
+        spells = {121071},
+        soulPointsCosts = {116600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31962,
+        x = -1470,
+        y = 2820,
+        spells = {121072},
+        soulPointsCosts = {123200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31963,
+        x = -1500,
+        y = 2760,
+        spells = {121073},
+        soulPointsCosts = {130900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31964,
+        x = -1440,
+        y = 2730,
+        spells = {121074},
+        soulPointsCosts = {138600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31965,
+        x = -1410,
+        y = 2790,
+        spells = {121075},
+        soulPointsCosts = {147400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31966,
+        x = -1410,
+        y = 2850,
+        spells = {121076},
+        soulPointsCosts = {156200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31967,
+        x = -1410,
+        y = 2910,
+        spells = {121077},
+        soulPointsCosts = {165000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31968,
+        x = -1440,
+        y = 2970,
+        spells = {121078},
+        soulPointsCosts = {174900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31969,
+        x = -1470,
+        y = 3030,
+        spells = {121079},
+        soulPointsCosts = {185900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31970,
+        x = -1470,
+        y = 3090,
+        spells = {121080},
+        soulPointsCosts = {196900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31971,
+        x = -1380,
+        y = 3060,
+        spells = {121081},
+        soulPointsCosts = {209000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31972,
+        x = -1350,
+        y = 3000,
+        spells = {121082},
+        soulPointsCosts = {221100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31973,
+        x = -1350,
+        y = 2940,
+        spells = {121083},
+        soulPointsCosts = {234300},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31974,
+        x = -1320,
+        y = 2880,
+        spells = {121084},
+        soulPointsCosts = {248600},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31975,
+        x = -1320,
+        y = 2820,
+        spells = {121085},
+        soulPointsCosts = {262900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31976,
+        x = -1350,
+        y = 2760,
+        spells = {121086},
+        soulPointsCosts = {279400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31977,
+        x = -1380,
+        y = 2700,
+        spells = {121087},
+        soulPointsCosts = {295900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31978,
+        x = -1410,
+        y = 2640,
+        spells = {121088},
+        soulPointsCosts = {313500},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31979,
+        x = -1350,
+        y = 2580,
+        spells = {121089},
+        soulPointsCosts = {332200},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31980,
+        x = -1320,
+        y = 2640,
+        spells = {121090},
+        soulPointsCosts = {352000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31981,
+        x = -1290,
+        y = 2700,
+        spells = {121091},
+        soulPointsCosts = {372900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31982,
+        x = -1260,
+        y = 2760,
+        spells = {121092},
+        soulPointsCosts = {394900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31983,
+        x = -1260,
+        y = 2820,
+        spells = {121093},
+        soulPointsCosts = {419100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31984,
+        x = -1260,
+        y = 2880,
+        spells = {121094},
+        soulPointsCosts = {444400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31985,
+        x = -1260,
+        y = 2940,
+        spells = {121095},
+        soulPointsCosts = {470800},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31986,
+        x = -1290,
+        y = 3030,
+        spells = {121096},
+        soulPointsCosts = {499400},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31987,
+        x = -1320,
+        y = 3060,
+        spells = {121097},
+        soulPointsCosts = {529100},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31988,
+        x = -1350,
+        y = 3120,
+        spells = {121098},
+        soulPointsCosts = {559900},
+        currency = "ash",
+        classId = 11,
+        permanent = true
+    },
+    {
+        id = 31989,
+        x = -1410,
+        y = 3150,
+        spells = {121099},
+        soulPointsCosts = {594000},
+        currency = "ash",
+        classId = 11,
+        permanent = true
     }
 },
 links = {
+    { 356, 554 },
+    { 554, 555 },
+    { 555, 556 },
+    { 556, 557 },
+    { 557, 558 },
+    { 558, 559 },
+    { 559, 772 },
+    { 772, 932 },
+    { 430, 415 },
+    { 199, 792 },
+    { 379, 203 },
+    { 203, 380 },
+    { 380, 560 },
+    { 560, 378 },
+    { 378, 207 },
+    { 198, 30038 },
+    { 407, 735 },
+    { 758, 30054 },
+    { 30143, 184 },
+    { 184, 183 },
+    { 183, 185 },
+    { 185, 182 },
+    { 182, 498 },
+    { 498, 807 },
+    { 807, 808 },
+    { 808, 764 },
+    { 764, 30113 },
+    { 30113, 181 },
     { 1, 6 },
     { 1, 7 },
-    { 7, 8 },
-    { 8, 9 },
-    { 9, 10 },
-    { 10, 11 },
-    { 11, 12 },
-    { 12, 13 },
-    { 13, 14 },
-    { 14, 15 },
-    { 15, 16 },
-    { 7, 27 },
-    { 8, 28 },
-    { 9, 29 },
-    { 10, 30 },
-    { 11, 31 },
-    { 12, 32 },
-    { 13, 33 },
-    { 14, 34 },
-    { 35, 36 },
-    { 15, 35 },
     { 1, 37 },
-    { 7, 38 },
-    { 8, 39 },
-    { 9, 40 },
-    { 10, 41 },
-    { 11, 42 },
-    { 12, 43 },
-    { 13, 44 },
-    { 14, 45 },
-    { 15, 46 },
-    { 46, 47 },
-    { 5, 17 },
-    { 17, 18 },
-    { 18, 19 },
-    { 19, 20 },
-    { 20, 21 },
-    { 21, 22 },
-    { 22, 23 },
-    { 23, 24 },
-    { 24, 25 },
-    { 25, 26 },
-    { 5, 48 },
-    { 17, 49 },
-    { 18, 50 },
-    { 19, 51 },
-    { 20, 52 },
-    { 21, 53 },
-    { 22, 54 },
-    { 23, 55 },
-    { 24, 56 },
-    { 25, 57 },
-    { 57, 58 },
-    { 5, 59 },
-    { 17, 60 },
-    { 18, 61 },
-    { 19, 62 },
-    { 20, 63 },
-    { 21, 64 },
-    { 22, 65 },
-    { 23, 66 },
-    { 24, 67 },
-    { 25, 68 },
-    { 68, 69 },
-    { 71, 72 },
-    { 70, 71 },
-    { 72, 73 },
-    { 6, 79 },
-    { 27, 80 },
-    { 28, 81 },
-    { 29, 82 },
-    { 30, 83 },
-    { 31, 84 },
-    { 32, 85 },
-    { 33, 86 },
-    { 34, 87 },
-    { 35, 88 },
-    { 90, 1 },
-    { 90, 5 },
-    { 90, 2 },
     { 2, 70 },
     { 2, 91 },
-    { 91, 102 },
-    { 102, 92 },
-    { 93, 103 },
-    { 103, 94 },
+    { 2, 112 },
+    { 5, 17 },
+    { 5, 48 },
+    { 5, 59 },
+    { 6, 30121 },
+    { 7, 8 },
+    { 7, 27 },
+    { 7, 38 },
+    { 8, 9 },
+    { 8, 28 },
+    { 8, 39 },
+    { 9, 10 },
+    { 9, 29 },
+    { 9, 40 },
+    { 10, 11 },
+    { 10, 30 },
+    { 10, 41 },
+    { 11, 12 },
+    { 11, 31 },
+    { 11, 42 },
+    { 12, 13 },
+    { 12, 32 },
+    { 12, 43 },
+    { 13, 14 },
+    { 13, 33 },
+    { 13, 44 },
+    { 14, 15 },
+    { 14, 34 },
+    { 14, 45 },
+    { 15, 16 },
+    { 15, 35 },
+    { 15, 46 },
+    { 15, 439 },
+    { 16, 30056 },
+    { 17, 18 },
+    { 17, 49 },
+    { 17, 60 },
+    { 18, 19 },
+    { 18, 50 },
+    { 18, 61 },
+    { 19, 20 },
+    { 19, 51 },
+    { 19, 62 },
+    { 20, 21 },
+    { 20, 52 },
+    { 20, 63 },
+    { 21, 22 },
+    { 21, 53 },
+    { 21, 64 },
+    { 22, 23 },
+    { 22, 54 },
+    { 22, 65 },
+    { 23, 24 },
+    { 23, 55 },
+    { 23, 66 },
+    { 24, 25 },
+    { 24, 56 },
+    { 24, 67 },
+    { 25, 26 },
+    { 25, 57 },
+    { 25, 68 },
+    { 25, 452 },
+    { 26, 30076 },
+    { 27, 30122 },
+    { 28, 30123 },
+    { 29, 30124 },
+    { 30, 30125 },
+    { 35, 36 },
+    { 37, 30126 },
+    { 38, 30127 },
+    { 39, 30128 },
+    { 40, 30129 },
+    { 41, 30130 },
+    { 46, 47 },
+    { 46, 617 },
+    { 48, 30131 },
+    { 49, 30132 },
+    { 50, 30133 },
+    { 51, 30134 },
+    { 52, 30135 },
+    { 57, 58 },
+    { 59, 30136 },
+    { 60, 30137 },
+    { 61, 30138 },
+    { 62, 30139 },
+    { 63, 30140 },
+    { 68, 69 },
+    { 68, 433 },
+    { 69, 431 },
+    { 70, 71 },
     { 70, 93 },
+    { 70, 113 },
+    { 71, 72 },
     { 71, 95 },
-    { 95, 104 },
-    { 104, 96 },
+    { 71, 114 },
+    { 72, 73 },
     { 72, 97 },
-    { 97, 105 },
-    { 105, 98 },
+    { 72, 115 },
     { 73, 99 },
+    { 73, 116 },
+    { 73, 462 },
+    { 90, 1 },
+    { 90, 2 },
+    { 90, 5 },
+    { 91, 102 },
+    { 93, 103 },
+    { 95, 104 },
+    { 97, 105 },
     { 99, 106 },
-    { 106, 100 },
-    { 2, 107 },
-    { 107, 112 },
+    { 102, 92 },
+    { 103, 94 },
+    { 104, 96 },
+    { 105, 98 },
+    { 117, 118 },
+    { 117, 30142 },
+    { 118, 119 },
+    { 118, 30143 },
+    { 119, 120 },
+    { 119, 391 },
+    { 119, 30144 },
+    { 120, 121 },
+    { 120, 30145 },
+    { 121, 122 },
+    { 122, 123 },
+    { 123, 124 },
+    { 123, 389 },
+    { 124, 125 },
+    { 125, 126 },
+    { 125, 496 },
+    { 193, 30051 },
+    { 194, 427 },
+    { 194, 742 },
+    { 194, 30105 },
     { 195, 191 },
-    { 198, 199 },
-    { 197, 193 },
+    { 195, 428 },
+    { 195, 743 },
+    { 195, 30103 },
     { 196, 192 },
-    { 198, 181 },
-    { 216, 217 },
-    { 207, 183 },
+    { 196, 429 },
+    { 196, 744 },
+    { 196, 30101 },
+    { 197, 193 },
+    { 197, 430 },
+    { 197, 745 },
+    { 197, 30099 },
+    { 197, 30110 },
+    { 198, 199 },
+    { 198, 867 },
+    { 198, 30097 },
+    { 198, 30108 },
+    { 199, 747 },
+    { 199, 30096 },
+    { 199, 30107 },
+    { 233, 270 },
+    { 234, 261 },
+    { 235, 262 },
+    { 236, 263 },
+    { 237, 506 },
+    { 238, 839 },
+    { 239, 270 },
+    { 240, 261 },
+    { 241, 262 },
+    { 242, 263 },
+    { 243, 506 },
+    { 244, 270 },
+    { 245, 839 },
+    { 246, 261 },
+    { 247, 262 },
+    { 248, 263 },
+    { 249, 506 },
+    { 250, 839 },
+    { 251, 270 },
+    { 252, 261 },
+    { 253, 262 },
+    { 254, 263 },
+    { 255, 506 },
+    { 256, 839 },
+    { 257, 270 },
     { 259, 233 },
     { 259, 239 },
     { 259, 244 },
     { 259, 251 },
     { 259, 257 },
-    { 233, 270 },
-    { 239, 270 },
-    { 244, 270 },
-    { 251, 270 },
-    { 257, 270 },
-    { 270, 234 },
-    { 270, 240 },
-    { 270, 246 },
-    { 270, 252 },
-    { 270, 271 },
     { 261, 235 },
     { 261, 241 },
     { 261, 247 },
     { 261, 253 },
     { 261, 265 },
+    { 261, 393 },
     { 262, 236 },
     { 262, 242 },
     { 262, 248 },
@@ -5971,388 +16754,273 @@ links = {
     { 263, 249 },
     { 263, 255 },
     { 263, 267 },
-    { 236, 263 },
-    { 242, 263 },
-    { 248, 263 },
-    { 254, 263 },
-    { 266, 263 },
-    { 235, 262 },
-    { 241, 262 },
-    { 247, 262 },
-    { 253, 262 },
     { 265, 262 },
-    { 234, 261 },
-    { 240, 261 },
-    { 246, 261 },
-    { 252, 261 },
+    { 266, 263 },
+    { 267, 506 },
+    { 268, 839 },
+    { 270, 234 },
+    { 270, 240 },
+    { 270, 246 },
+    { 270, 252 },
+    { 270, 271 },
     { 271, 261 },
-    { 117, 118 },
-    { 118, 119 },
-    { 119, 120 },
-    { 120, 121 },
-    { 121, 122 },
-    { 122, 123 },
-    { 123, 124 },
-    { 124, 125 },
-    { 125, 126 },
+    { 272, 117 },
+    { 272, 273 },
+    { 273, 297 },
+    { 273, 320 },
     { 275, 288 },
+    { 275, 1008 },
+    { 285, 275 },
+    { 285, 30141 },
+    { 287, 272 },
+    { 287, 285 },
     { 288, 289 },
     { 289, 290 },
+    { 289, 395 },
+    { 289, 1009 },
     { 290, 291 },
     { 291, 292 },
+    { 291, 1010 },
     { 292, 293 },
     { 293, 294 },
+    { 293, 390 },
+    { 293, 1011 },
     { 294, 295 },
     { 295, 296 },
-    { 273, 320 },
+    { 295, 501 },
+    { 295, 1012 },
     { 320, 321 },
+    { 320, 328 },
+    { 321, 298 },
     { 321, 322 },
+    { 321, 392 },
+    { 321, 608 },
     { 322, 323 },
+    { 322, 329 },
+    { 323, 299 },
     { 323, 324 },
+    { 323, 394 },
     { 324, 325 },
+    { 324, 330 },
+    { 325, 300 },
     { 325, 326 },
     { 326, 327 },
-    { 273, 297 },
-    { 321, 298 },
-    { 323, 299 },
-    { 325, 300 },
+    { 327, 284 },
     { 327, 301 },
-    { 324, 330 },
-    { 322, 329 },
-    { 320, 328 },
+    { 327, 503 },
     { 335, 336 },
     { 336, 337 },
     { 337, 338 },
     { 338, 339 },
-    { 335, 342 },
-    { 336, 343 },
-    { 337, 344 },
-    { 338, 345 },
-    { 339, 346 },
-    { 339, 349 },
-    { 356, 357 },
+    { 339, 654 },
     { 357, 358 },
+    { 357, 542 },
+    { 357, 548 },
     { 358, 359 },
     { 359, 360 },
-    { 356, 362 },
+    { 360, 586 },
     { 362, 363 },
+    { 362, 561 },
+    { 362, 793 },
     { 363, 364 },
+    { 363, 562 },
     { 364, 365 },
+    { 364, 563 },
     { 365, 366 },
-    { 378, 207 },
-    { 379, 203 },
-    { 229, 383 },
-    { 383, 384 },
+    { 365, 564 },
+    { 366, 512 },
+    { 366, 565 },
+    { 377, 998 },
     { 385, 216 },
-    { 355, 379 },
-    { 391, 307 },
-    { 392, 314 },
-    { 393, 316 },
-    { 394, 334 },
     { 390, 311 },
-    { 119, 391 },
-    { 289, 395 },
-    { 291, 348 },
-    { 293, 390 },
-    { 321, 392 },
-    { 323, 394 },
-    { 325, 340 },
-    { 123, 389 },
-    { 391, 347 },
-    { 347, 335 },
-    { 388, 341 },
-    { 397, 398 },
-    { 396, 399 },
-    { 399, 400 },
-    { 401, 402 },
-    { 402, 403 },
-    { 406, 385 },
-    { 404, 229 },
-    { 396, 404 },
-    { 396, 405 },
-    { 396, 406 },
-    { 405, 355 },
-    { 405, 380 },
-    { 400, 401 },
-    { 261, 393 },
+    { 391, 307 },
+    { 391, 335 },
     { 391, 388 },
-    { 380, 407 },
-    { 407, 185 },
-    { 207, 408 },
-    { 217, 410 },
-    { 203, 411 },
-    { 411, 182 },
-    { 405, 416 },
-    { 416, 378 },
-    { 416, 417 },
-    { 417, 418 },
-    { 417, 419 },
+    { 392, 314 },
+    { 392, 821 },
+    { 393, 316 },
+    { 393, 845 },
+    { 394, 334 },
+    { 394, 846 },
+    { 396, 413 },
+    { 396, 733 },
+    { 397, 398 },
+    { 397, 720 },
+    { 398, 412 },
+    { 406, 385 },
+    { 407, 632 },
+    { 408, 639 },
+    { 408, 736 },
+    { 409, 630 },
+    { 410, 631 },
+    { 410, 734 },
+    { 411, 633 },
     { 412, 409 },
-    { 422, 423 },
+    { 413, 634 },
+    { 414, 635 },
+    { 415, 638 },
     { 420, 421 },
-    { 194, 427 },
-    { 195, 428 },
-    { 196, 429 },
+    { 420, 718 },
+    { 422, 423 },
+    { 422, 716 },
+    { 424, 717 },
+    { 426, 194 },
+    { 427, 195 },
+    { 427, 30104 },
+    { 428, 196 },
+    { 428, 30102 },
     { 429, 197 },
-    { 197, 430 },
+    { 429, 30100 },
+    { 429, 30111 },
     { 430, 198 },
+    { 430, 30098 },
+    { 430, 30109 },
     { 431, 432 },
+    { 431, 773 },
     { 433, 434 },
+    { 433, 774 },
     { 435, 436 },
-    { 389, 437 },
-    { 437, 438 },
-    { 440, 441 },
+    { 435, 864 },
     { 439, 440 },
     { 439, 442 },
-    { 440, 443 },
-    { 443, 444 },
-    { 442, 445 },
-    { 443, 446 },
     { 439, 448 },
+    { 440, 441 },
+    { 440, 443 },
     { 440, 449 },
-    { 452, 453 },
-    { 453, 454 },
-    { 456, 457 },
-    { 452, 455 },
-    { 453, 456 },
-    { 459, 460 },
-    { 452, 458 },
-    { 453, 459 },
-    { 463, 461 },
-    { 461, 464 },
-    { 462, 463 },
-    { 73, 462 },
-    { 48, 468 },
-    { 49, 469 },
-    { 50, 470 },
-    { 51, 471 },
-    { 52, 472 },
-    { 53, 473 },
-    { 54, 474 },
-    { 55, 475 },
-    { 56, 476 },
-    { 57, 477 },
-    { 477, 612 },
-    { 455, 478 },
-    { 456, 479 },
-    { 61, 534 },
-    { 62, 535 },
-    { 63, 536 },
-    { 64, 537 },
-    { 65, 538 },
-    { 66, 539 },
-    { 67, 540 },
-    { 68, 541 },
-    { 541, 610 },
-    { 458, 492 },
-    { 459, 493 },
-    { 125, 496 },
-    { 496, 497 },
-    { 454, 424 },
+    { 440, 655 },
     { 441, 420 },
-    { 384, 232 },
-    { 232, 499 },
-    { 403, 500 },
-    { 500, 226 },
-    { 295, 501 },
+    { 441, 30060 },
+    { 443, 444 },
+    { 449, 600 },
+    { 449, 616 },
+    { 452, 453 },
+    { 452, 455 },
+    { 452, 458 },
+    { 453, 454 },
+    { 453, 456 },
+    { 453, 459 },
+    { 453, 674 },
+    { 453, 30080 },
+    { 454, 424 },
+    { 456, 457 },
+    { 459, 460 },
+    { 462, 422 },
+    { 462, 461 },
+    { 462, 467 },
+    { 462, 665 },
+    { 496, 497 },
+    { 497, 601 },
+    { 497, 822 },
     { 501, 502 },
+    { 502, 599 },
+    { 502, 609 },
+    { 502, 835 },
+    { 502, 1013 },
     { 503, 504 },
     { 504, 435 },
-    { 237, 506 },
-    { 243, 506 },
-    { 249, 506 },
-    { 255, 506 },
-    { 267, 506 },
-    { 506, 511 },
-    { 506, 510 },
-    { 506, 509 },
-    { 506, 508 },
+    { 504, 505 },
+    { 504, 837 },
     { 506, 507 },
+    { 506, 508 },
+    { 506, 509 },
+    { 506, 510 },
+    { 506, 511 },
     { 507, 238 },
     { 508, 245 },
     { 509, 250 },
     { 510, 256 },
     { 511, 268 },
-    { 366, 512 },
-    { 462, 422 },
-    { 37, 74 },
-    { 38, 75 },
-    { 39, 76 },
-    { 40, 77 },
-    { 41, 78 },
-    { 42, 451 },
-    { 43, 518 },
-    { 44, 519 },
-    { 46, 521 },
-    { 112, 108 },
-    { 70, 109 },
-    { 109, 113 },
-    { 113, 110 },
-    { 71, 111 },
-    { 111, 114 },
-    { 114, 466 },
-    { 72, 524 },
-    { 524, 115 },
-    { 115, 525 },
-    { 73, 526 },
-    { 526, 116 },
-    { 116, 527 },
-    { 462, 528 },
-    { 528, 467 },
-    { 467, 529 },
-    { 464, 101 },
-    { 349, 530 },
-    { 349, 531 },
-    { 59, 532 },
-    { 60, 533 },
-    { 406, 397 },
-    { 357, 542 },
-    { 357, 548 },
-    { 358, 543 },
-    { 358, 549 },
-    { 359, 544 },
-    { 359, 550 },
-    { 360, 545 },
-    { 360, 551 },
-    { 513, 547 },
-    { 513, 553 },
-    { 547, 515 },
-    { 553, 514 },
-    { 194, 554 },
-    { 195, 555 },
-    { 196, 556 },
-    { 197, 557 },
-    { 198, 558 },
-    { 558, 559 },
-    { 207, 560 },
     { 512, 414 },
-    { 362, 561 },
-    { 363, 562 },
-    { 364, 563 },
-    { 365, 564 },
-    { 366, 565 },
     { 512, 566 },
-    { 356, 377 },
-    { 193, 584 },
-    { 192, 583 },
-    { 191, 582 },
-    { 584, 585 },
-    { 360, 586 },
-    { 586, 546 },
-    { 586, 552 },
-    { 396, 356 },
-    { 557, 415 },
-    { 396, 426 },
-    { 426, 194 },
-    { 427, 195 },
-    { 428, 196 },
-    { 232, 413 },
+    { 512, 758 },
+    { 513, 759 },
+    { 514, 637 },
+    { 515, 636 },
+    { 542, 958 },
+    { 543, 959 },
+    { 544, 960 },
+    { 545, 961 },
+    { 546, 962 },
+    { 547, 515 },
+    { 547, 963 },
+    { 548, 966 },
+    { 549, 967 },
+    { 550, 968 },
+    { 551, 969 },
+    { 552, 970 },
+    { 553, 514 },
+    { 553, 971 },
+    { 566, 819 },
+    { 586, 513 },
+    { 588, 591 },
+    { 589, 726 },
+    { 590, 588 },
+    { 591, 592 },
+    { 592, 731 },
     { 593, 594 },
     { 594, 595 },
+    { 595, 596 },
     { 596, 597 },
     { 597, 598 },
-    { 398, 412 },
-    { 502, 599 },
-    { 449, 600 },
-    { 497, 601 },
-    { 502, 609 },
-    { 321, 608 },
-    { 479, 613 },
-    { 493, 611 },
-    { 424, 614 },
-    { 88, 89 },
-    { 446, 615 },
-    { 523, 616 },
-    { 521, 617 },
-    { 448, 522 },
-    { 449, 523 },
-    { 529, 618 },
-    { 15, 439 },
-    { 25, 452 },
-    { 500, 431 },
-    { 500, 433 },
-    { 399, 587 },
-    { 400, 588 },
-    { 401, 589 },
-    { 402, 590 },
-    { 403, 591 },
-    { 500, 592 },
-    { 592, 184 },
-    { 586, 513 },
-    { 588, 593 },
-    { 595, 596 },
-    { 504, 505 },
-    { 327, 284 },
-    { 327, 503 },
-    { 287, 259 },
-    { 502, 628 },
-    { 513, 629 },
-    { 357, 619 },
-    { 362, 619 },
+    { 598, 775 },
+    { 598, 30004 },
     { 619, 620 },
     { 620, 621 },
+    { 620, 30002 },
     { 621, 622 },
     { 622, 623 },
     { 623, 624 },
     { 624, 625 },
     { 625, 626 },
     { 626, 627 },
-    { 512, 498 },
-    { 410, 631 },
-    { 409, 630 },
-    { 411, 633 },
-    { 407, 632 },
-    { 413, 634 },
-    { 414, 635 },
-    { 515, 636 },
-    { 514, 637 },
-    { 415, 638 },
-    { 408, 639 },
-    { 396, 640 },
-    { 640, 641 },
-    { 641, 642 },
-    { 642, 653 },
+    { 627, 30039 },
+    { 632, 737 },
+    { 634, 738 },
+    { 634, 815 },
+    { 635, 749 },
+    { 636, 30043 },
+    { 637, 30005 },
+    { 637, 30044 },
+    { 638, 30040 },
+    { 639, 816 },
     { 642, 643 },
-    { 653, 652 },
-    { 652, 651 },
-    { 651, 650 },
-    { 650, 649 },
+    { 642, 653 },
     { 643, 644 },
     { 644, 645 },
     { 645, 646 },
     { 646, 647 },
     { 647, 648 },
-    { 531, 654 },
-    { 45, 660 },
-    { 440, 655 },
+    { 648, 725 },
+    { 648, 30001 },
+    { 649, 724 },
+    { 650, 649 },
+    { 651, 650 },
+    { 652, 651 },
+    { 653, 652 },
     { 655, 656 },
     { 655, 661 },
-    { 656, 662 },
     { 655, 663 },
+    { 655, 684 },
+    { 656, 662 },
     { 656, 664 },
-    { 662, 658 },
-    { 661, 657 },
-    { 658, 659 },
-    { 462, 665 },
-    { 665, 666 },
-    { 663, 668 },
-    { 664, 669 },
-    { 665, 671 },
-    { 671, 673 },
-    { 673, 672 },
-    { 666, 670 },
-    { 670, 667 },
-    { 453, 674 },
+    { 656, 704 },
+    { 656, 868 },
+    { 662, 705 },
+    { 664, 706 },
+    { 664, 707 },
+    { 665, 670 },
+    { 665, 673 },
+    { 665, 953 },
     { 674, 675 },
     { 674, 676 },
-    { 675, 677 },
     { 674, 678 },
+    { 674, 694 },
+    { 675, 677 },
     { 675, 679 },
-    { 676, 680 },
-    { 677, 681 },
-    { 678, 682 },
-    { 679, 683 },
-    { 655, 684 },
+    { 675, 708 },
+    { 675, 870 },
+    { 677, 709 },
+    { 679, 711 },
     { 684, 685 },
     { 685, 686 },
     { 686, 687 },
@@ -6362,6 +17030,8 @@ links = {
     { 690, 691 },
     { 691, 692 },
     { 692, 693 },
+    { 693, 714 },
+    { 693, 937 },
     { 694, 695 },
     { 695, 696 },
     { 696, 697 },
@@ -6371,89 +17041,59 @@ links = {
     { 700, 701 },
     { 701, 702 },
     { 702, 703 },
-    { 656, 704 },
-    { 662, 705 },
-    { 664, 706 },
-    { 669, 707 },
-    { 675, 708 },
-    { 677, 709 },
-    { 681, 710 },
-    { 683, 712 },
-    { 679, 711 },
     { 703, 713 },
-    { 693, 714 },
-    { 422, 716 },
-    { 424, 717 },
-    { 420, 718 },
-    { 500, 719 },
-    { 397, 720 },
-    { 499, 721 },
-    { 649, 724 },
-    { 648, 725 },
-    { 403, 729 },
-    { 402, 728 },
-    { 401, 727 },
-    { 400, 726 },
-    { 719, 731 },
-    { 719, 733 },
-    { 500, 732 },
-    { 217, 734 },
-    { 185, 735 },
-    { 408, 736 },
-    { 632, 737 },
-    { 721, 739 },
-    { 634, 738 },
-    { 725, 740 },
+    { 703, 939 },
+    { 704, 30064 },
+    { 708, 30084 },
+    { 713, 30090 },
+    { 714, 30070 },
+    { 716, 917 },
+    { 717, 918 },
+    { 718, 916 },
+    { 720, 892 },
     { 724, 741 },
-    { 194, 742 },
-    { 195, 743 },
-    { 196, 744 },
-    { 197, 745 },
-    { 198, 746 },
-    { 635, 749 },
-    { 199, 747 },
-    { 512, 758 },
+    { 724, 935 },
+    { 725, 740 },
+    { 725, 936 },
+    { 728, 727 },
+    { 729, 732 },
+    { 731, 933 },
+    { 732, 728 },
+    { 737, 817 },
+    { 740, 30052 },
+    { 745, 30053 },
+    { 747, 813 },
+    { 749, 30045 },
     { 758, 765 },
-    { 758, 764 },
-    { 513, 759 },
-    { 759, 760 },
-    { 759, 761 },
-    { 586, 771 },
-    { 431, 773 },
-    { 433, 774 },
-    { 598, 775 },
+    { 758, 913 },
+    { 759, 912 },
+    { 760, 964 },
+    { 761, 972 },
+    { 765, 818 },
+    { 773, 919 },
+    { 774, 920 },
     { 775, 776 },
-    { 559, 772 },
-    { 772, 792 },
-    { 362, 793 },
+    { 775, 812 },
+    { 775, 934 },
+    { 776, 30055 },
+    { 792, 30036 },
     { 793, 794 },
     { 794, 795 },
     { 795, 796 },
     { 796, 797 },
     { 797, 798 },
     { 798, 799 },
-    { 631, 807 },
-    { 630, 808 },
-    { 199, 811 },
-    { 759, 810 },
-    { 758, 809 },
-    { 775, 812 },
-    { 747, 813 },
-    { 634, 815 },
-    { 639, 816 },
-    { 566, 819 },
-    { 765, 818 },
-    { 183, 820 },
-    { 392, 821 },
-    { 497, 822 },
+    { 799, 814 },
+    { 799, 945 },
+    { 812, 1001 },
+    { 813, 30037 },
+    { 814, 30046 },
+    { 818, 30047 },
+    { 821, 905 },
     { 822, 823 },
-    { 287, 117 },
-    { 287, 285 },
-    { 287, 272 },
-    { 272, 273 },
-    { 285, 275 },
-    { 823, 824 },
     { 822, 825 },
+    { 823, 824 },
+    { 823, 890 },
     { 825, 826 },
     { 826, 827 },
     { 827, 828 },
@@ -6463,220 +17103,1110 @@ links = {
     { 831, 832 },
     { 832, 833 },
     { 833, 834 },
-    { 502, 835 },
+    { 834, 861 },
+    { 834, 949 },
     { 835, 836 },
-    { 504, 837 },
+    { 835, 851 },
+    { 836, 863 },
+    { 836, 895 },
+    { 836, 1014 },
     { 837, 838 },
-    { 238, 839 },
-    { 245, 839 },
-    { 250, 839 },
-    { 256, 839 },
-    { 268, 839 },
+    { 838, 847 },
+    { 838, 897 },
     { 839, 840 },
     { 839, 841 },
     { 839, 842 },
     { 839, 843 },
     { 839, 844 },
-    { 393, 845 },
-    { 394, 846 },
-    { 838, 847 },
-    { 601, 848 },
-    { 531, 849 },
-    { 531, 850 },
-    { 835, 851 },
-    { 851, 852 },
-    { 852, 853 },
-    { 853, 854 },
-    { 854, 855 },
-    { 855, 856 },
-    { 857, 858 },
-    { 856, 857 },
-    { 858, 859 },
-    { 859, 860 },
-    { 834, 861 },
-    { 860, 862 },
-    { 836, 863 },
-    { 435, 864 },
-    { 437, 865 },
-    { 799, 814 },
-    { 674, 694 },
-    { 198, 867 },
-    { 737, 817 },
-    { 656, 868 },
-    { 868, 869 },
-    { 675, 870 },
-    { 870, 871 },
-    { 868, 872 },
-    { 869, 873 },
-    { 868, 874 },
-    { 869, 875 },
-    { 870, 876 },
-    { 871, 877 },
-    { 870, 878 },
-    { 871, 879 },
-    { 874, 882 },
-    { 875, 883 },
-    { 884, 886 },
-    { 886, 885 },
-    { 880, 887 },
-    { 887, 881 },
-    { 872, 888 },
-    { 873, 889 },
-    { 823, 890 },
-    { 890, 891 },
-    { 720, 892 },
-    { 721, 893 },
-    { 719, 894 },
-    { 836, 895 },
-    { 895, 896 },
-    { 838, 897 },
-    { 897, 898 },
     { 840, 899 },
     { 841, 899 },
     { 842, 899 },
     { 843, 899 },
     { 844, 899 },
+    { 845, 908 },
+    { 846, 907 },
+    { 851, 852 },
+    { 852, 853 },
+    { 853, 854 },
+    { 854, 855 },
+    { 855, 856 },
+    { 856, 857 },
+    { 857, 858 },
+    { 858, 859 },
+    { 859, 860 },
+    { 860, 862 },
+    { 860, 951 },
+    { 864, 923 },
+    { 867, 30041 },
+    { 868, 869 },
+    { 868, 872 },
+    { 868, 874 },
+    { 869, 873 },
+    { 869, 875 },
+    { 869, 955 },
+    { 869, 1027 },
+    { 870, 871 },
+    { 870, 876 },
+    { 870, 878 },
+    { 871, 877 },
+    { 871, 879 },
+    { 871, 956 },
+    { 871, 1028 },
+    { 873, 1029 },
+    { 875, 1030 },
+    { 875, 1036 },
+    { 877, 1032 },
+    { 879, 1034 },
+    { 890, 891 },
+    { 891, 1031 },
+    { 892, 957 },
+    { 895, 896 },
+    { 896, 1015 },
+    { 896, 1026 },
+    { 896, 1040 },
+    { 897, 898 },
+    { 898, 906 },
+    { 898, 1025 },
     { 899, 900 },
     { 899, 901 },
     { 899, 902 },
     { 899, 903 },
     { 899, 904 },
-    { 821, 905 },
-    { 898, 906 },
-    { 846, 907 },
-    { 845, 908 },
-    { 897, 909 },
-    { 850, 910 },
-    { 850, 911 },
-    { 759, 912 },
-    { 758, 913 },
-    { 718, 916 },
-    { 716, 917 },
-    { 717, 918 },
-    { 773, 919 },
-    { 919, 922 },
-    { 774, 920 },
-    { 920, 921 },
-    { 864, 923 },
-    { 865, 924 },
-    { 878, 927 },
-    { 879, 928 },
-    { 876, 925 },
-    { 877, 926 },
-    { 912, 930 },
-    { 912, 929 },
     { 913, 931 },
-    { 772, 932 },
-    { 894, 933 },
-    { 775, 934 },
-    { 725, 936 },
-    { 724, 935 },
-    { 693, 937 },
-    { 937, 938 },
-    { 703, 939 },
-    { 939, 940 },
-    { 934, 942 },
-    { 933, 943 },
-    { 799, 945 },
-    { 945, 946 },
-    { 932, 947 },
     { 913, 948 },
-    { 834, 949 },
-    { 949, 950 },
-    { 860, 951 },
-    { 951, 952 },
-    { 665, 953 },
-    { 953, 880 },
-    { 953, 884 },
-    { 953, 954 },
-    { 869, 955 },
-    { 871, 956 },
-    { 892, 957 },
-    { 929, 965 },
-    { 760, 964 },
-    { 547, 963 },
-    { 546, 962 },
-    { 545, 961 },
-    { 544, 960 },
-    { 543, 959 },
-    { 542, 958 },
-    { 553, 971 },
-    { 930, 973 },
-    { 761, 972 },
-    { 552, 970 },
-    { 551, 969 },
-    { 550, 968 },
-    { 549, 967 },
-    { 548, 966 },
-    { 931, 981 },
-    { 765, 980 },
-    { 566, 979 },
-    { 565, 978 },
-    { 564, 977 },
-    { 563, 976 },
-    { 562, 975 },
-    { 561, 974 },
-    { 356, 982 },
-    { 982, 990 },
-    { 982, 983 },
-    { 983, 984 },
-    { 984, 985 },
-    { 985, 986 },
-    { 986, 987 },
-    { 987, 988 },
-    { 988, 989 },
-    { 987, 995 },
-    { 988, 996 },
-    { 986, 994 },
-    { 985, 993 },
-    { 984, 992 },
-    { 983, 991 },
-    { 989, 997 },
     { 919, 999 },
     { 920, 999 },
-    { 812, 1001 },
-    { 275, 1008 },
-    { 289, 1009 },
-    { 291, 1010 },
-    { 293, 1011 },
-    { 295, 1012 },
-    { 502, 1013 },
-    { 836, 1014 },
-    { 896, 1015 },
-    { 297, 1016 },
-    { 298, 1017 },
-    { 299, 1018 },
-    { 300, 1019 },
-    { 301, 1020 },
-    { 505, 1021 },
-    { 847, 1022 },
-    { 906, 1023 },
-    { 898, 1025 },
-    { 896, 1026 },
-    { 869, 1027 },
-    { 871, 1028 },
-    { 875, 1030 },
-    { 873, 1029 },
-    { 891, 1031 },
-    { 1031, 1024 },
-    { 877, 1032 },
-    { 926, 1033 },
-    { 879, 1034 },
-    { 928, 1035 },
-    { 889, 1037 },
-    { 883, 1036 },
-    { 940, 1039 },
+    { 921, 1047 },
+    { 922, 921 },
+    { 929, 965 },
+    { 930, 973 },
+    { 933, 589 },
+    { 934, 942 },
+    { 937, 938 },
     { 938, 1038 },
-    { 896, 1040 },
+    { 939, 940 },
+    { 940, 1039 },
+    { 942, 30048 },
+    { 943, 1049 },
+    { 945, 946 },
+    { 946, 30042 },
+    { 948, 30049 },
+    { 949, 950 },
     { 950, 1041 },
+    { 951, 952 },
     { 952, 1042 },
+    { 953, 886 },
+    { 953, 887 },
+    { 953, 954 },
     { 954, 1043 },
     { 955, 1044 },
     { 956, 1045 },
+    { 957, 30003 },
+    { 982, 983 },
+    { 982, 990 },
+    { 983, 984 },
+    { 983, 991 },
+    { 984, 985 },
+    { 984, 992 },
+    { 985, 986 },
+    { 985, 993 },
+    { 986, 987 },
+    { 986, 994 },
+    { 987, 988 },
+    { 987, 995 },
+    { 988, 989 },
+    { 988, 996 },
+    { 989, 997 },
     { 999, 1046 },
-    { 1046, 1047 },
+    { 1001, 30050 },
     { 1025, 1048 },
-    { 943, 1049 }
+    { 1027, 30067 },
+    { 1028, 30087 },
+    { 1031, 1024 },
+    { 1038, 30073 },
+    { 1039, 30093 },
+    { 30006, 30007 },
+    { 30007, 30008 },
+    { 30008, 30009 },
+    { 30009, 30010 },
+    { 30010, 30011 },
+    { 30011, 30012 },
+    { 30012, 30013 },
+    { 30013, 30014 },
+    { 30014, 30015 },
+    { 30015, 30016 },
+    { 30016, 30017 },
+    { 30017, 30018 },
+    { 30018, 30019 },
+    { 30019, 30020 },
+    { 30020, 30021 },
+    { 30021, 30022 },
+    { 30022, 30023 },
+    { 30023, 30024 },
+    { 30024, 30025 },
+    { 30026, 30027 },
+    { 30027, 30028 },
+    { 30028, 30029 },
+    { 30029, 30030 },
+    { 30030, 30031 },
+    { 30031, 30032 },
+    { 30032, 30033 },
+    { 30056, 30057 },
+    { 30057, 30058 },
+    { 30058, 30059 },
+    { 30060, 30061 },
+    { 30061, 30062 },
+    { 30062, 30063 },
+    { 30064, 30065 },
+    { 30065, 30066 },
+    { 30067, 30068 },
+    { 30068, 30069 },
+    { 30070, 30071 },
+    { 30071, 30072 },
+    { 30073, 30074 },
+    { 30074, 30075 },
+    { 30076, 30077 },
+    { 30077, 30078 },
+    { 30078, 30079 },
+    { 30080, 30081 },
+    { 30081, 30082 },
+    { 30082, 30083 },
+    { 30084, 30085 },
+    { 30085, 30086 },
+    { 30087, 30088 },
+    { 30088, 30089 },
+    { 30090, 30091 },
+    { 30091, 30092 },
+    { 30093, 30094 },
+    { 30094, 30095 },
+    { 30106, 426 },
+    { 31000, 31001 },
+    { 31001, 31002 },
+    { 31002, 31003 },
+    { 31003, 31004 },
+    { 31004, 31005 },
+    { 31005, 31006 },
+    { 31006, 31007 },
+    { 31007, 31008 },
+    { 31008, 31009 },
+    { 31009, 31010 },
+    { 31010, 31011 },
+    { 31011, 31012 },
+    { 31012, 31013 },
+    { 31013, 31014 },
+    { 31014, 31015 },
+    { 31015, 31016 },
+    { 31016, 31017 },
+    { 31017, 31018 },
+    { 31018, 31019 },
+    { 31019, 31020 },
+    { 31020, 31021 },
+    { 31021, 31022 },
+    { 31022, 31023 },
+    { 31023, 31024 },
+    { 31024, 31025 },
+    { 31025, 31026 },
+    { 31026, 31027 },
+    { 31027, 31028 },
+    { 31028, 31029 },
+    { 31030, 31031 },
+    { 31031, 31032 },
+    { 31032, 31033 },
+    { 31033, 31034 },
+    { 31034, 31035 },
+    { 31035, 31036 },
+    { 31036, 31037 },
+    { 31037, 31038 },
+    { 31038, 31039 },
+    { 31039, 31040 },
+    { 31040, 31041 },
+    { 31041, 31042 },
+    { 31042, 31043 },
+    { 31043, 31044 },
+    { 31044, 31045 },
+    { 31045, 31046 },
+    { 31046, 31047 },
+    { 31047, 31048 },
+    { 31048, 31049 },
+    { 31049, 31050 },
+    { 31050, 31051 },
+    { 31051, 31052 },
+    { 31052, 31053 },
+    { 31053, 31054 },
+    { 31054, 31055 },
+    { 31055, 31056 },
+    { 31056, 31057 },
+    { 31057, 31058 },
+    { 31058, 31059 },
+    { 31060, 31061 },
+    { 31061, 31062 },
+    { 31062, 31063 },
+    { 31063, 31064 },
+    { 31064, 31065 },
+    { 31065, 31066 },
+    { 31066, 31067 },
+    { 31067, 31068 },
+    { 31068, 31069 },
+    { 31069, 31070 },
+    { 31070, 31071 },
+    { 31071, 31072 },
+    { 31072, 31073 },
+    { 31073, 31074 },
+    { 31074, 31075 },
+    { 31075, 31076 },
+    { 31076, 31077 },
+    { 31077, 31078 },
+    { 31078, 31079 },
+    { 31079, 31080 },
+    { 31080, 31081 },
+    { 31081, 31082 },
+    { 31082, 31083 },
+    { 31083, 31084 },
+    { 31084, 31085 },
+    { 31085, 31086 },
+    { 31086, 31087 },
+    { 31087, 31088 },
+    { 31088, 31089 },
+    { 31100, 31101 },
+    { 31101, 31102 },
+    { 31102, 31103 },
+    { 31103, 31104 },
+    { 31104, 31105 },
+    { 31105, 31106 },
+    { 31106, 31107 },
+    { 31107, 31108 },
+    { 31108, 31109 },
+    { 31109, 31110 },
+    { 31110, 31111 },
+    { 31111, 31112 },
+    { 31112, 31113 },
+    { 31113, 31114 },
+    { 31114, 31115 },
+    { 31115, 31116 },
+    { 31116, 31117 },
+    { 31117, 31118 },
+    { 31118, 31119 },
+    { 31119, 31120 },
+    { 31120, 31121 },
+    { 31121, 31122 },
+    { 31122, 31123 },
+    { 31123, 31124 },
+    { 31124, 31125 },
+    { 31125, 31126 },
+    { 31126, 31127 },
+    { 31127, 31128 },
+    { 31128, 31129 },
+    { 31130, 31131 },
+    { 31131, 31132 },
+    { 31132, 31133 },
+    { 31133, 31134 },
+    { 31134, 31135 },
+    { 31135, 31136 },
+    { 31136, 31137 },
+    { 31137, 31138 },
+    { 31138, 31139 },
+    { 31139, 31140 },
+    { 31140, 31141 },
+    { 31141, 31142 },
+    { 31142, 31143 },
+    { 31143, 31144 },
+    { 31144, 31145 },
+    { 31145, 31146 },
+    { 31146, 31147 },
+    { 31147, 31148 },
+    { 31148, 31149 },
+    { 31149, 31150 },
+    { 31150, 31151 },
+    { 31151, 31152 },
+    { 31152, 31153 },
+    { 31153, 31154 },
+    { 31154, 31155 },
+    { 31155, 31156 },
+    { 31156, 31157 },
+    { 31157, 31158 },
+    { 31158, 31159 },
+    { 31160, 31161 },
+    { 31161, 31162 },
+    { 31162, 31163 },
+    { 31163, 31164 },
+    { 31164, 31165 },
+    { 31165, 31166 },
+    { 31166, 31167 },
+    { 31167, 31168 },
+    { 31168, 31169 },
+    { 31169, 31170 },
+    { 31170, 31171 },
+    { 31171, 31172 },
+    { 31172, 31173 },
+    { 31173, 31174 },
+    { 31174, 31175 },
+    { 31175, 31176 },
+    { 31176, 31177 },
+    { 31177, 31178 },
+    { 31178, 31179 },
+    { 31179, 31180 },
+    { 31180, 31181 },
+    { 31181, 31182 },
+    { 31182, 31183 },
+    { 31183, 31184 },
+    { 31184, 31185 },
+    { 31185, 31186 },
+    { 31186, 31187 },
+    { 31187, 31188 },
+    { 31188, 31189 },
+    { 31200, 31201 },
+    { 31201, 31202 },
+    { 31202, 31203 },
+    { 31203, 31204 },
+    { 31204, 31205 },
+    { 31205, 31206 },
+    { 31206, 31207 },
+    { 31207, 31208 },
+    { 31208, 31209 },
+    { 31209, 31210 },
+    { 31210, 31211 },
+    { 31211, 31212 },
+    { 31212, 31213 },
+    { 31213, 31214 },
+    { 31214, 31215 },
+    { 31215, 31216 },
+    { 31216, 31217 },
+    { 31217, 31218 },
+    { 31218, 31219 },
+    { 31219, 31220 },
+    { 31220, 31221 },
+    { 31221, 31222 },
+    { 31222, 31223 },
+    { 31223, 31224 },
+    { 31224, 31225 },
+    { 31225, 31226 },
+    { 31226, 31227 },
+    { 31227, 31228 },
+    { 31228, 31229 },
+    { 31230, 31231 },
+    { 31231, 31232 },
+    { 31232, 31233 },
+    { 31233, 31234 },
+    { 31234, 31235 },
+    { 31235, 31236 },
+    { 31236, 31237 },
+    { 31237, 31238 },
+    { 31238, 31239 },
+    { 31239, 31240 },
+    { 31240, 31241 },
+    { 31241, 31242 },
+    { 31242, 31243 },
+    { 31243, 31244 },
+    { 31244, 31245 },
+    { 31245, 31246 },
+    { 31246, 31247 },
+    { 31247, 31248 },
+    { 31248, 31249 },
+    { 31249, 31250 },
+    { 31250, 31251 },
+    { 31251, 31252 },
+    { 31252, 31253 },
+    { 31253, 31254 },
+    { 31254, 31255 },
+    { 31255, 31256 },
+    { 31256, 31257 },
+    { 31257, 31258 },
+    { 31258, 31259 },
+    { 31260, 31261 },
+    { 31261, 31262 },
+    { 31262, 31263 },
+    { 31263, 31264 },
+    { 31264, 31265 },
+    { 31265, 31266 },
+    { 31266, 31267 },
+    { 31267, 31268 },
+    { 31268, 31269 },
+    { 31269, 31270 },
+    { 31270, 31271 },
+    { 31271, 31272 },
+    { 31272, 31273 },
+    { 31273, 31274 },
+    { 31274, 31275 },
+    { 31275, 31276 },
+    { 31276, 31277 },
+    { 31277, 31278 },
+    { 31278, 31279 },
+    { 31279, 31280 },
+    { 31280, 31281 },
+    { 31281, 31282 },
+    { 31282, 31283 },
+    { 31283, 31284 },
+    { 31284, 31285 },
+    { 31285, 31286 },
+    { 31286, 31287 },
+    { 31287, 31288 },
+    { 31288, 31289 },
+    { 31300, 31301 },
+    { 31301, 31302 },
+    { 31302, 31303 },
+    { 31303, 31304 },
+    { 31304, 31305 },
+    { 31305, 31306 },
+    { 31306, 31307 },
+    { 31307, 31308 },
+    { 31308, 31309 },
+    { 31309, 31310 },
+    { 31310, 31311 },
+    { 31311, 31312 },
+    { 31312, 31313 },
+    { 31313, 31314 },
+    { 31314, 31315 },
+    { 31315, 31316 },
+    { 31316, 31317 },
+    { 31317, 31318 },
+    { 31318, 31319 },
+    { 31319, 31320 },
+    { 31320, 31321 },
+    { 31321, 31322 },
+    { 31322, 31323 },
+    { 31323, 31324 },
+    { 31324, 31325 },
+    { 31325, 31326 },
+    { 31326, 31327 },
+    { 31327, 31328 },
+    { 31328, 31329 },
+    { 31330, 31331 },
+    { 31331, 31332 },
+    { 31332, 31333 },
+    { 31333, 31334 },
+    { 31334, 31335 },
+    { 31335, 31336 },
+    { 31336, 31337 },
+    { 31337, 31338 },
+    { 31338, 31339 },
+    { 31339, 31340 },
+    { 31340, 31341 },
+    { 31341, 31342 },
+    { 31342, 31343 },
+    { 31343, 31344 },
+    { 31344, 31345 },
+    { 31345, 31346 },
+    { 31346, 31347 },
+    { 31347, 31348 },
+    { 31348, 31349 },
+    { 31349, 31350 },
+    { 31350, 31351 },
+    { 31351, 31352 },
+    { 31352, 31353 },
+    { 31353, 31354 },
+    { 31354, 31355 },
+    { 31355, 31356 },
+    { 31356, 31357 },
+    { 31357, 31358 },
+    { 31358, 31359 },
+    { 31360, 31361 },
+    { 31361, 31362 },
+    { 31362, 31363 },
+    { 31363, 31364 },
+    { 31364, 31365 },
+    { 31365, 31366 },
+    { 31366, 31367 },
+    { 31367, 31368 },
+    { 31368, 31369 },
+    { 31369, 31370 },
+    { 31370, 31371 },
+    { 31371, 31372 },
+    { 31372, 31373 },
+    { 31373, 31374 },
+    { 31374, 31375 },
+    { 31375, 31376 },
+    { 31376, 31377 },
+    { 31377, 31378 },
+    { 31378, 31379 },
+    { 31379, 31380 },
+    { 31380, 31381 },
+    { 31381, 31382 },
+    { 31382, 31383 },
+    { 31383, 31384 },
+    { 31384, 31385 },
+    { 31385, 31386 },
+    { 31386, 31387 },
+    { 31387, 31388 },
+    { 31388, 31389 },
+    { 31400, 31401 },
+    { 31401, 31402 },
+    { 31402, 31403 },
+    { 31403, 31404 },
+    { 31404, 31405 },
+    { 31405, 31406 },
+    { 31406, 31407 },
+    { 31407, 31408 },
+    { 31408, 31409 },
+    { 31409, 31410 },
+    { 31410, 31411 },
+    { 31411, 31412 },
+    { 31412, 31413 },
+    { 31413, 31414 },
+    { 31414, 31415 },
+    { 31415, 31416 },
+    { 31416, 31417 },
+    { 31417, 31418 },
+    { 31418, 31419 },
+    { 31419, 31420 },
+    { 31420, 31421 },
+    { 31421, 31422 },
+    { 31422, 31423 },
+    { 31423, 31424 },
+    { 31424, 31425 },
+    { 31425, 31426 },
+    { 31426, 31427 },
+    { 31427, 31428 },
+    { 31428, 31429 },
+    { 31430, 31431 },
+    { 31431, 31432 },
+    { 31432, 31433 },
+    { 31433, 31434 },
+    { 31434, 31435 },
+    { 31435, 31436 },
+    { 31436, 31437 },
+    { 31437, 31438 },
+    { 31438, 31439 },
+    { 31439, 31440 },
+    { 31440, 31441 },
+    { 31441, 31442 },
+    { 31442, 31443 },
+    { 31443, 31444 },
+    { 31444, 31445 },
+    { 31445, 31446 },
+    { 31446, 31447 },
+    { 31447, 31448 },
+    { 31448, 31449 },
+    { 31449, 31450 },
+    { 31450, 31451 },
+    { 31451, 31452 },
+    { 31452, 31453 },
+    { 31453, 31454 },
+    { 31454, 31455 },
+    { 31455, 31456 },
+    { 31456, 31457 },
+    { 31457, 31458 },
+    { 31458, 31459 },
+    { 31460, 31461 },
+    { 31461, 31462 },
+    { 31462, 31463 },
+    { 31463, 31464 },
+    { 31464, 31465 },
+    { 31465, 31466 },
+    { 31466, 31467 },
+    { 31467, 31468 },
+    { 31468, 31469 },
+    { 31469, 31470 },
+    { 31470, 31471 },
+    { 31471, 31472 },
+    { 31472, 31473 },
+    { 31473, 31474 },
+    { 31474, 31475 },
+    { 31475, 31476 },
+    { 31476, 31477 },
+    { 31477, 31478 },
+    { 31478, 31479 },
+    { 31479, 31480 },
+    { 31480, 31481 },
+    { 31481, 31482 },
+    { 31482, 31483 },
+    { 31483, 31484 },
+    { 31484, 31485 },
+    { 31485, 31486 },
+    { 31486, 31487 },
+    { 31487, 31488 },
+    { 31488, 31489 },
+    { 31500, 31501 },
+    { 31501, 31502 },
+    { 31502, 31503 },
+    { 31503, 31504 },
+    { 31504, 31505 },
+    { 31505, 31506 },
+    { 31506, 31507 },
+    { 31507, 31508 },
+    { 31508, 31509 },
+    { 31509, 31510 },
+    { 31510, 31511 },
+    { 31511, 31512 },
+    { 31512, 31513 },
+    { 31513, 31514 },
+    { 31514, 31515 },
+    { 31515, 31516 },
+    { 31516, 31517 },
+    { 31517, 31518 },
+    { 31518, 31519 },
+    { 31519, 31520 },
+    { 31520, 31521 },
+    { 31521, 31522 },
+    { 31522, 31523 },
+    { 31523, 31524 },
+    { 31524, 31525 },
+    { 31525, 31526 },
+    { 31526, 31527 },
+    { 31527, 31528 },
+    { 31528, 31529 },
+    { 31530, 31531 },
+    { 31531, 31532 },
+    { 31532, 31533 },
+    { 31533, 31534 },
+    { 31534, 31535 },
+    { 31535, 31536 },
+    { 31536, 31537 },
+    { 31537, 31538 },
+    { 31538, 31539 },
+    { 31539, 31540 },
+    { 31540, 31541 },
+    { 31541, 31542 },
+    { 31542, 31543 },
+    { 31543, 31544 },
+    { 31544, 31545 },
+    { 31545, 31546 },
+    { 31546, 31547 },
+    { 31547, 31548 },
+    { 31548, 31549 },
+    { 31549, 31550 },
+    { 31550, 31551 },
+    { 31551, 31552 },
+    { 31552, 31553 },
+    { 31553, 31554 },
+    { 31554, 31555 },
+    { 31555, 31556 },
+    { 31556, 31557 },
+    { 31557, 31558 },
+    { 31558, 31559 },
+    { 31560, 31561 },
+    { 31561, 31562 },
+    { 31562, 31563 },
+    { 31563, 31564 },
+    { 31564, 31565 },
+    { 31565, 31566 },
+    { 31566, 31567 },
+    { 31567, 31568 },
+    { 31568, 31569 },
+    { 31569, 31570 },
+    { 31570, 31571 },
+    { 31571, 31572 },
+    { 31572, 31573 },
+    { 31573, 31574 },
+    { 31574, 31575 },
+    { 31575, 31576 },
+    { 31576, 31577 },
+    { 31577, 31578 },
+    { 31578, 31579 },
+    { 31579, 31580 },
+    { 31580, 31581 },
+    { 31581, 31582 },
+    { 31582, 31583 },
+    { 31583, 31584 },
+    { 31584, 31585 },
+    { 31585, 31586 },
+    { 31586, 31587 },
+    { 31587, 31588 },
+    { 31588, 31589 },
+    { 31600, 31601 },
+    { 31601, 31602 },
+    { 31602, 31603 },
+    { 31603, 31604 },
+    { 31604, 31605 },
+    { 31605, 31606 },
+    { 31606, 31607 },
+    { 31607, 31608 },
+    { 31608, 31609 },
+    { 31609, 31610 },
+    { 31610, 31611 },
+    { 31611, 31612 },
+    { 31612, 31613 },
+    { 31613, 31614 },
+    { 31614, 31615 },
+    { 31615, 31616 },
+    { 31616, 31617 },
+    { 31617, 31618 },
+    { 31618, 31619 },
+    { 31619, 31620 },
+    { 31620, 31621 },
+    { 31621, 31622 },
+    { 31622, 31623 },
+    { 31623, 31624 },
+    { 31624, 31625 },
+    { 31625, 31626 },
+    { 31626, 31627 },
+    { 31627, 31628 },
+    { 31628, 31629 },
+    { 31630, 31631 },
+    { 31631, 31632 },
+    { 31632, 31633 },
+    { 31633, 31634 },
+    { 31634, 31635 },
+    { 31635, 31636 },
+    { 31636, 31637 },
+    { 31637, 31638 },
+    { 31638, 31639 },
+    { 31639, 31640 },
+    { 31640, 31641 },
+    { 31641, 31642 },
+    { 31642, 31643 },
+    { 31643, 31644 },
+    { 31644, 31645 },
+    { 31645, 31646 },
+    { 31646, 31647 },
+    { 31647, 31648 },
+    { 31648, 31649 },
+    { 31649, 31650 },
+    { 31650, 31651 },
+    { 31651, 31652 },
+    { 31652, 31653 },
+    { 31653, 31654 },
+    { 31654, 31655 },
+    { 31655, 31656 },
+    { 31656, 31657 },
+    { 31657, 31658 },
+    { 31658, 31659 },
+    { 31660, 31661 },
+    { 31661, 31662 },
+    { 31662, 31663 },
+    { 31663, 31664 },
+    { 31664, 31665 },
+    { 31665, 31666 },
+    { 31666, 31667 },
+    { 31667, 31668 },
+    { 31668, 31669 },
+    { 31669, 31670 },
+    { 31670, 31671 },
+    { 31671, 31672 },
+    { 31672, 31673 },
+    { 31673, 31674 },
+    { 31674, 31675 },
+    { 31675, 31676 },
+    { 31676, 31677 },
+    { 31677, 31678 },
+    { 31678, 31679 },
+    { 31679, 31680 },
+    { 31680, 31681 },
+    { 31681, 31682 },
+    { 31682, 31683 },
+    { 31683, 31684 },
+    { 31684, 31685 },
+    { 31685, 31686 },
+    { 31686, 31687 },
+    { 31687, 31688 },
+    { 31688, 31689 },
+    { 31700, 31701 },
+    { 31701, 31702 },
+    { 31702, 31703 },
+    { 31703, 31704 },
+    { 31704, 31705 },
+    { 31705, 31706 },
+    { 31706, 31707 },
+    { 31707, 31708 },
+    { 31708, 31709 },
+    { 31709, 31710 },
+    { 31710, 31711 },
+    { 31711, 31712 },
+    { 31712, 31713 },
+    { 31713, 31714 },
+    { 31714, 31715 },
+    { 31715, 31716 },
+    { 31716, 31717 },
+    { 31717, 31718 },
+    { 31718, 31719 },
+    { 31719, 31720 },
+    { 31720, 31721 },
+    { 31721, 31722 },
+    { 31722, 31723 },
+    { 31723, 31724 },
+    { 31724, 31725 },
+    { 31725, 31726 },
+    { 31726, 31727 },
+    { 31727, 31728 },
+    { 31728, 31729 },
+    { 31730, 31731 },
+    { 31731, 31732 },
+    { 31732, 31733 },
+    { 31733, 31734 },
+    { 31734, 31735 },
+    { 31735, 31736 },
+    { 31736, 31737 },
+    { 31737, 31738 },
+    { 31738, 31739 },
+    { 31739, 31740 },
+    { 31740, 31741 },
+    { 31741, 31742 },
+    { 31742, 31743 },
+    { 31743, 31744 },
+    { 31744, 31745 },
+    { 31745, 31746 },
+    { 31746, 31747 },
+    { 31747, 31748 },
+    { 31748, 31749 },
+    { 31749, 31750 },
+    { 31750, 31751 },
+    { 31751, 31752 },
+    { 31752, 31753 },
+    { 31753, 31754 },
+    { 31754, 31755 },
+    { 31755, 31756 },
+    { 31756, 31757 },
+    { 31757, 31758 },
+    { 31758, 31759 },
+    { 31760, 31761 },
+    { 31761, 31762 },
+    { 31762, 31763 },
+    { 31763, 31764 },
+    { 31764, 31765 },
+    { 31765, 31766 },
+    { 31766, 31767 },
+    { 31767, 31768 },
+    { 31768, 31769 },
+    { 31769, 31770 },
+    { 31770, 31771 },
+    { 31771, 31772 },
+    { 31772, 31773 },
+    { 31773, 31774 },
+    { 31774, 31775 },
+    { 31775, 31776 },
+    { 31776, 31777 },
+    { 31777, 31778 },
+    { 31778, 31779 },
+    { 31779, 31780 },
+    { 31780, 31781 },
+    { 31781, 31782 },
+    { 31782, 31783 },
+    { 31783, 31784 },
+    { 31784, 31785 },
+    { 31785, 31786 },
+    { 31786, 31787 },
+    { 31787, 31788 },
+    { 31788, 31789 },
+    { 31800, 31801 },
+    { 31801, 31802 },
+    { 31802, 31803 },
+    { 31803, 31804 },
+    { 31804, 31805 },
+    { 31805, 31806 },
+    { 31806, 31807 },
+    { 31807, 31808 },
+    { 31808, 31809 },
+    { 31809, 31810 },
+    { 31810, 31811 },
+    { 31811, 31812 },
+    { 31812, 31813 },
+    { 31813, 31814 },
+    { 31814, 31815 },
+    { 31815, 31816 },
+    { 31816, 31817 },
+    { 31817, 31818 },
+    { 31818, 31819 },
+    { 31819, 31820 },
+    { 31820, 31821 },
+    { 31821, 31822 },
+    { 31822, 31823 },
+    { 31823, 31824 },
+    { 31824, 31825 },
+    { 31825, 31826 },
+    { 31826, 31827 },
+    { 31827, 31828 },
+    { 31828, 31829 },
+    { 31830, 31831 },
+    { 31831, 31832 },
+    { 31832, 31833 },
+    { 31833, 31834 },
+    { 31834, 31835 },
+    { 31835, 31836 },
+    { 31836, 31837 },
+    { 31837, 31838 },
+    { 31838, 31839 },
+    { 31839, 31840 },
+    { 31840, 31841 },
+    { 31841, 31842 },
+    { 31842, 31843 },
+    { 31843, 31844 },
+    { 31844, 31845 },
+    { 31845, 31846 },
+    { 31846, 31847 },
+    { 31847, 31848 },
+    { 31848, 31849 },
+    { 31849, 31850 },
+    { 31850, 31851 },
+    { 31851, 31852 },
+    { 31852, 31853 },
+    { 31853, 31854 },
+    { 31854, 31855 },
+    { 31855, 31856 },
+    { 31856, 31857 },
+    { 31857, 31858 },
+    { 31858, 31859 },
+    { 31860, 31861 },
+    { 31861, 31862 },
+    { 31862, 31863 },
+    { 31863, 31864 },
+    { 31864, 31865 },
+    { 31865, 31866 },
+    { 31866, 31867 },
+    { 31867, 31868 },
+    { 31868, 31869 },
+    { 31869, 31870 },
+    { 31870, 31871 },
+    { 31871, 31872 },
+    { 31872, 31873 },
+    { 31873, 31874 },
+    { 31874, 31875 },
+    { 31875, 31876 },
+    { 31876, 31877 },
+    { 31877, 31878 },
+    { 31878, 31879 },
+    { 31879, 31880 },
+    { 31880, 31881 },
+    { 31881, 31882 },
+    { 31882, 31883 },
+    { 31883, 31884 },
+    { 31884, 31885 },
+    { 31885, 31886 },
+    { 31886, 31887 },
+    { 31887, 31888 },
+    { 31888, 31889 },
+    { 31900, 31901 },
+    { 31901, 31902 },
+    { 31902, 31903 },
+    { 31903, 31904 },
+    { 31904, 31905 },
+    { 31905, 31906 },
+    { 31906, 31907 },
+    { 31907, 31908 },
+    { 31908, 31909 },
+    { 31909, 31910 },
+    { 31910, 31911 },
+    { 31911, 31912 },
+    { 31912, 31913 },
+    { 31913, 31914 },
+    { 31914, 31915 },
+    { 31915, 31916 },
+    { 31916, 31917 },
+    { 31917, 31918 },
+    { 31918, 31919 },
+    { 31919, 31920 },
+    { 31920, 31921 },
+    { 31921, 31922 },
+    { 31922, 31923 },
+    { 31923, 31924 },
+    { 31924, 31925 },
+    { 31925, 31926 },
+    { 31926, 31927 },
+    { 31927, 31928 },
+    { 31928, 31929 },
+    { 31930, 31931 },
+    { 31931, 31932 },
+    { 31932, 31933 },
+    { 31933, 31934 },
+    { 31934, 31935 },
+    { 31935, 31936 },
+    { 31936, 31937 },
+    { 31937, 31938 },
+    { 31938, 31939 },
+    { 31939, 31940 },
+    { 31940, 31941 },
+    { 31941, 31942 },
+    { 31942, 31943 },
+    { 31943, 31944 },
+    { 31944, 31945 },
+    { 31945, 31946 },
+    { 31946, 31947 },
+    { 31947, 31948 },
+    { 31948, 31949 },
+    { 31949, 31950 },
+    { 31950, 31951 },
+    { 31951, 31952 },
+    { 31952, 31953 },
+    { 31953, 31954 },
+    { 31954, 31955 },
+    { 31955, 31956 },
+    { 31956, 31957 },
+    { 31957, 31958 },
+    { 31958, 31959 },
+    { 31960, 31961 },
+    { 31961, 31962 },
+    { 31962, 31963 },
+    { 31963, 31964 },
+    { 31964, 31965 },
+    { 31965, 31966 },
+    { 31966, 31967 },
+    { 31967, 31968 },
+    { 31968, 31969 },
+    { 31969, 31970 },
+    { 31970, 31971 },
+    { 31971, 31972 },
+    { 31972, 31973 },
+    { 31973, 31974 },
+    { 31974, 31975 },
+    { 31975, 31976 },
+    { 31976, 31977 },
+    { 31977, 31978 },
+    { 31978, 31979 },
+    { 31979, 31980 },
+    { 31980, 31981 },
+    { 31981, 31982 },
+    { 31982, 31983 },
+    { 31983, 31984 },
+    { 31984, 31985 },
+    { 31985, 31986 },
+    { 31986, 31987 },
+    { 31987, 31988 },
+    { 31988, 31989 },
+    { 461, 30146 },
+    { 60, 30147 },
+    { 548, 549 },
+    { 549, 550 },
+    { 550, 551 },
+    { 551, 552 },
+    { 552, 553 },
+    { 553, 761 },
+    { 761, 930 },
+    { 542, 543 },
+    { 543, 544 },
+    { 544, 545 },
+    { 545, 546 },
+    { 546, 547 },
+    { 547, 760 },
+    { 760, 929 },
+    { 362, 974 },
+    { 974, 975 },
+    { 975, 976 },
+    { 976, 977 },
+    { 977, 978 },
+    { 978, 979 },
+    { 979, 980 },
+    { 980, 981 },
+    { 912, 629 },
+    { 629, 771 }
+},
+sectorColors = {
+    ["ap"] = "C4342E",
+    ["sp"] = "8B5BD4",
+    ["so"] = "E0B341",
+    ["dh"] = "B0604A",
+    ["cr"] = "D28A3C",
+    ["en"] = "3FA86A",
+    ["re"] = "35A8B0",
+    ["mi"] = "5B7FC4",
+    ["am"] = "A8763F",
+    ["mn"] = "4A7FD8",
+    ["ut"] = "8a8798",
+    ["pr"] = "FF3FA4",
+    ["pf"] = "7c9a5a",
+    ["mv"] = "6cb7a8",
+    ["xp"] = "c8c05a",
+    ["in"] = "F0EAD8",
+    ["ot"] = "6d6a78"
+},
+classHubs = {
+    [1] = { x = 330, y = 3480, name = "Warrior", token = "WARRIOR", color = "C79C6E" },
+    [2] = { x = 2250, y = 2850, name = "Paladin", token = "PALADIN", color = "F58CBA" },
+    [3] = { x = 3450, y = 1200, name = "Hunter", token = "HUNTER", color = "ABD473" },
+    [4] = { x = 3450, y = -840, name = "Rogue", token = "ROGUE", color = "FFF569" },
+    [5] = { x = 2250, y = -2490, name = "Priest", token = "PRIEST", color = "D8D8D8" },
+    [6] = { x = 330, y = -3120, name = "Death Knight", token = "DEATHKNIGHT", color = "C41F3B" },
+    [7] = { x = -1620, y = -2490, name = "Shaman", token = "SHAMAN", color = "0070DE" },
+    [8] = { x = -2820, y = -840, name = "Mage", token = "MAGE", color = "69CCF0" },
+    [9] = { x = -2820, y = 1200, name = "Warlock", token = "WARLOCK", color = "9482C9" },
+    [11] = { x = -1620, y = 2850, name = "Druid", token = "DRUID", color = "FF7D0A" }
 }
     }
 }

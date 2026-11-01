@@ -40,6 +40,7 @@ local function getCoreMicroButtons()
     addButton(SocialsMicroButton)
     addButton(EchoJournalMicroButton) -- created in modules/perks/echo_journal.lua
     addButton(LFDMicroButton)
+    addButton(ToolbeltMicroButton) -- created in modules/toolbelt/toolbelt.lua
     addButton(MainMenuMicroButton)
     addButton(HelpMicroButton)
     return ordered
@@ -181,17 +182,25 @@ hooksecurefunc("VehicleMenuBar_MoveMicroButtons", function(skinName)
     end
 end)
 
+-- The level lockouts of the Talent / Dungeon Finder / Achievement buttons are lifted by
+-- re-enabling them after every UpdateMicroButtons (the hooksecurefunc below), NEVER by writing
+-- their minLevel / Disable / disabledTooltip. UpdateMicroButtons reads minLevel and calls
+-- Disable(): a value or method written by the addon taints that Blizzard call, and
+-- SpellBookFrame_OnShow makes it right before rebuilding the spell list. The spell buttons then
+-- carry the taint and clicking a spell is refused ("ProjectEbonhold has been blocked from an
+-- action only available to the Blizzard UI", 2026-10-13).
 if TalentMicroButton then
-    TalentMicroButton.minLevel = 1
-    TalentMicroButton.disabledTooltip = nil
-    -- Neutralize the default UI's level-10 lockout: prevent any future Disable()
-    TalentMicroButton.Disable = function() end
     TalentMicroButton:Enable()
     TalentMicroButton:SetScript("OnEvent", nil)
 
     -- ToggleTalentFrame() early-returns below level 10. Replace the click handler
-    -- with one that loads and shows the talent UI directly.
+    -- with one that opens the three-tree talent window (talents/talent_frame.lua),
+    -- falling back to the stock talent UI if that module is missing.
     TalentMicroButton:SetScript("OnClick", function(self)
+        if ProjectEbonhold and ProjectEbonhold.TalentFrame then
+            ProjectEbonhold.TalentFrame.Toggle()
+            return
+        end
         if not PlayerTalentFrame then
             local loaded, reason = LoadAddOn("Blizzard_TalentUI")
             if not loaded and DEFAULT_CHAT_FRAME then
@@ -209,10 +218,6 @@ if TalentMicroButton then
 end
 
 if LFDMicroButton then
-    LFDMicroButton.minLevel = 1
-    LFDMicroButton.disabledTooltip = nil
-    -- Neutralize the default UI's level-15 lockout: prevent any future Disable()
-    LFDMicroButton.Disable = function() end
     LFDMicroButton:Enable()
     LFDMicroButton:SetScript("OnEvent", nil)
 
@@ -227,8 +232,95 @@ if LFDMicroButton then
     end)
 end
 
+-- The summary page asks GetAchievementInfo for the latest completed achievements; an id the
+-- client's Achievement.dbc does not know comes back with nil points and AchievementShield_SetPoints
+-- errors on the comparison. Treat missing points as 0 so the window still opens.
+local achievementShieldGuarded = false
+local function guardAchievementShield()
+    if achievementShieldGuarded or not AchievementShield_SetPoints then return end
+    achievementShieldGuarded = true
+    local orig = AchievementShield_SetPoints
+    AchievementShield_SetPoints = function(points, ...)
+        return orig(points or 0, ...)
+    end
+
+    -- With nothing completed the summary pads itself with stock default ids (6, 503, 1150...).
+    -- Ashendor's Achievement.dbc (patch-6) is a custom catalogue of 909 rows that holds none of
+    -- them, so GetAchievementInfo returns nil and the page errors. Point the defaults at ids the
+    -- catalogue really has: the first achievement of the first categories.
+    local defaults = ACHIEVEMENTUI_DEFAULTSUMMARYACHIEVEMENTS
+    if defaults and GetCategoryList and GetAchievementInfo then
+        local found = {}
+        for _, cat in ipairs(GetCategoryList() or {}) do
+            local id = GetAchievementInfo(cat, 1)
+            if id then found[#found + 1] = id end
+            if #found >= 8 then break end
+        end
+        if #found > 0 then
+            for i = #defaults, 1, -1 do defaults[i] = nil end
+            for i, id in ipairs(found) do defaults[i] = id end
+        end
+    end
+
+    -- Safety net: keep the stock behaviour when it works, hide the summary rows when it does not.
+    local origSummary = AchievementFrameSummary_UpdateAchievements
+    if origSummary then
+        AchievementFrameSummary_UpdateAchievements = function(...)
+            local ok = pcall(origSummary, ...)
+            if not ok then
+                for i = 1, 12 do
+                    local row = _G["AchievementFrameSummaryAchievement" .. i]
+                    if row then row:Hide() end
+                end
+            end
+        end
+    end
+end
+
+local achievementGuardFrame = CreateFrame("Frame")
+achievementGuardFrame:RegisterEvent("ADDON_LOADED")
+achievementGuardFrame:SetScript("OnEvent", function(self, event, name)
+    if name == "Blizzard_AchievementUI" then
+        guardAchievementShield()
+        self:UnregisterEvent("ADDON_LOADED")
+    end
+end)
+guardAchievementShield()
+
+if AchievementMicroButton then
+    AchievementMicroButton:Enable()
+
+    -- Open the achievement window at any level (the stock handler can refuse below 10).
+    AchievementMicroButton:SetScript("OnClick", function(self)
+        -- Blizzard_AchievementUI is load-on-demand; ToggleAchievementFrame silently
+        -- returns when CanShowAchievementUI() is false, so drive the frame directly.
+        if not AchievementFrame and AchievementFrame_LoadUI then
+            pcall(AchievementFrame_LoadUI)
+        end
+        if not AchievementFrame then
+            pcall(LoadAddOn, "Blizzard_AchievementUI")
+        end
+        guardAchievementShield()
+        if AchievementFrame then
+            if AchievementFrame:IsShown() then
+                HideUIPanel(AchievementFrame)
+            else
+                ShowUIPanel(AchievementFrame)
+            end
+        elseif DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[ProjectEbonhold]|r Achievement UI failed to load.")
+        end
+    end)
+end
+
 hooksecurefunc("UpdateMicroButtons", function()
     -- Keep the removed PvP micro button hidden (the default UI re-shows it)
+
+    -- Enable() only: see the note above TalentMicroButton (no minLevel / disabledTooltip writes)
+    if AchievementMicroButton then
+        AchievementMicroButton:Enable()
+    end
+
     if PVPMicroButton then
         PVPMicroButton:Hide()
     end
@@ -238,14 +330,10 @@ hooksecurefunc("UpdateMicroButtons", function()
     SkillTreeMicroButton:Hide()
 
     if TalentMicroButton then
-        TalentMicroButton.minLevel = 1
-        TalentMicroButton.disabledTooltip = nil
         TalentMicroButton:Enable()
     end
 
     if LFDMicroButton then
-        LFDMicroButton.minLevel = 1
-        LFDMicroButton.disabledTooltip = nil
         LFDMicroButton:Enable()
     end
 end)
@@ -314,27 +402,39 @@ SkillTreeMicroButton.Alert.Text = SkillTreeMicroButton.Alert:CreateFontString(ni
 SkillTreeMicroButton.Alert.Text:SetJustifyV("TOP")
 SkillTreeMicroButton.Alert.Text:SetSize(188, 0)
 SkillTreeMicroButton.Alert.Text:SetPoint("TOPLEFT", 16, -24)
-SkillTreeMicroButton.Alert.Text:SetText(
-    "You have unspent Skill Points! Open your Skill Tree to empower yourself with new abilities.")
+local DEFAULT_ALERT_TEXT =
+    "You have unspent Skill Points! Open your Skill Tree to empower yourself with new abilities."
+SkillTreeMicroButton.Alert.Text:SetText(DEFAULT_ALERT_TEXT)
 
 SkillTreeMicroButton.Alert.CloseButton = CreateFrame("Button", nil, SkillTreeMicroButton.Alert, "UIPanelCloseButton")
 SkillTreeMicroButton.Alert.CloseButton:SetPoint("TOPRIGHT", 6, 6)
 SkillTreeMicroButton.Alert.CloseButton:SetScript("OnClick", function()
-    SkillTreeMicroButton.Alert:Hide()
+    SkillTreeMicroButton_HideAlert()
 end)
 
 SkillTreeMicroButton.Alert.Arrow = CreateFrame("Frame", nil, SkillTreeMicroButton.Alert, "GlowBoxArrowTemplate")
 SkillTreeMicroButton.Alert.Arrow:SetPoint("TOP", SkillTreeMicroButton.Alert, "BOTTOM", 0, 4)
 
 
-function SkillTreeMicroButton_ShowAlert()
-    if SkillTreeMicroButton.Alert then
-        SkillTreeMicroButton.Alert:Show()
+-- text: optional message (e.g. a class level reached). A message given here stays
+-- until the player closes the bubble or opens the window: the plain "unspent points"
+-- nudge fires on every currency update and must not overwrite it a second later.
+function SkillTreeMicroButton_ShowAlert(text)
+    local alert = SkillTreeMicroButton.Alert
+    if not alert then return end
+    if text then
+        alert.pinned = true
+        alert.Text:SetText(text)
+    elseif not alert.pinned then
+        alert.Text:SetText(DEFAULT_ALERT_TEXT)
     end
+    alert:SetHeight(math.max(85, alert.Text:GetStringHeight() + 40))
+    alert:Show()
 end
 
 function SkillTreeMicroButton_HideAlert()
     if SkillTreeMicroButton.Alert then
+        SkillTreeMicroButton.Alert.pinned = nil
         SkillTreeMicroButton.Alert:Hide()
     end
 end
