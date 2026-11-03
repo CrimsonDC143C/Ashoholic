@@ -16,4 +16,5 @@ HourlyWidget.lua
 Minimap.lua
 Themes.lua
 UI.lua
+PreviewUI.lua
 NexusDock.lua
