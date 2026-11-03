@@ -738,7 +738,7 @@ local SELL_TYPES = {
 }
 
 local function BuildPeddler(panel, c)
-    local function Sell() PlaySound("LOOTWINDOWCOINSOUND"); Service.Sell() end
+    local function Sell() if Service.Sell() then PlaySound("LOOTWINDOWCOINSOUND") end end
     local function Repair() PlaySound("ITEM_REPAIR"); Service.Repair() end
 
     panel.sell = SlotButton(c, "ProjectEbonholdPeddlerSell", "Interface\\Icons\\INV_Misc_Coin_01", 16, -70, "Sell", Sell,

@@ -128,12 +128,41 @@ end
 
 -- Same rules as the merchant Scrap button (scrap_service.lua): qualities, item
 -- types and the Alt-click lists live in the addon options.
+-- An item sent once is taken as sold: it leaves the preview and the button is
+-- not offered again for it. One the server refuses (still refundable, quest...)
+-- stays in the bag but is never sent twice - spamming the button for those sent
+-- enough addon messages for the server's anti-flood kick.
+local sentSlots = {}   -- ["bag:slot"] = the item link sent from that slot
+
+local function GetUnsentSellable()
+    if not (ScrapService and ScrapService.GetSellableItems) then return {} end
+    -- a slot the item left (sold, moved) is forgotten, so what lands there later counts again
+    for key, link in pairs(sentSlots) do
+        local bag, slot = key:match("^(%d+):(%d+)$")
+        if GetContainerItemLink(tonumber(bag), tonumber(slot)) ~= link then sentSlots[key] = nil end
+    end
+    local items = {}
+    for _, item in ipairs(ScrapService.GetSellableItems()) do
+        if sentSlots[item.bag .. ":" .. item.slot] ~= item.link then
+            table.insert(items, item)
+        end
+    end
+    return items
+end
+
 function Service.Sell()
+    local items = GetUnsentSellable()
+    if #items == 0 then return false end
+    for _, item in ipairs(items) do
+        sentSlots[item.bag .. ":" .. item.slot] = item.link
+    end
     local body = ""
     if ScrapService and ScrapService.BuildSellRulesBody then
         body = ScrapService.BuildSellRulesBody()
     end
     ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_TOOLBELT_SELL, body)
+    Notify()
+    return true
 end
 
 function Service.Repair()
@@ -189,9 +218,7 @@ end
 -- Number of items and total value the current rules would sell (client-side
 -- estimate from the bags; the server decides the real list).
 function Service.GetSellPreview()
-    if ScrapService and ScrapService.CountSellable then return ScrapService.CountSellable() end
-    if not (ScrapService and ScrapService.GetSellableItems) then return 0, 0 end
-    local items = ScrapService.GetSellableItems()
+    local items = GetUnsentSellable()
     local value = 0
     for _, item in ipairs(items) do value = value + item.value end
     return #items, value

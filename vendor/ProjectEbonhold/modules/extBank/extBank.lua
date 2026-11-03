@@ -1474,6 +1474,14 @@ ev:SetScript("OnEvent", function(_, event)
     if event == "BANKFRAME_OPENED" then
         bankOpen = true
         tabWait = 0    -- find whichever bank window shows and pin the tabs to it
+        -- The snapshot comes back on opcode 0x515, which the stock client handles as
+        -- SMSG_OPEN_LFG_DUNGEON_FINDER until ebonhold.dll registers its own handler, and
+        -- only ExtBankOpen() does that: without it the Dungeon Finder opened with the bank.
+        -- ExtBankOpen() also turns deposit suppression on, off again while the plain bank shows.
+        if type(ExtBankOpen) == "function" then
+            ExtBankOpen()
+            if ExtBankSetActive then ExtBankSetActive(0) end
+        end
         -- the snapshot's tail says whether the Warband bank is unlocked (padlock on its tab)
         if type(ExtBankMove) == "function" then SelectStore(0) end
     elseif event == "BANKFRAME_CLOSED" then

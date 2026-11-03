@@ -49,8 +49,10 @@ local QUALITY_FLAG = {
 -- Localized item class name -> setting key, built from GetAuctionItemClasses
 -- so the mapping works on any client locale.
 local TYPE_FLAG = {}
+local QUEST_TYPE   -- the server never sells quest items, so they are never counted either
 do
-    local weapon, armor, _, consumable, glyph, tradeGoods, _, _, recipe, gem, misc = GetAuctionItemClasses()
+    local weapon, armor, _, consumable, glyph, tradeGoods, _, _, recipe, gem, misc, quest = GetAuctionItemClasses()
+    QUEST_TYPE = quest or "Quest"
     TYPE_FLAG[weapon or "Weapon"]           = "sellTypeWeapon"
     TYPE_FLAG[armor or "Armor"]             = "sellTypeArmor"
     TYPE_FLAG[consumable or "Consumable"]   = "sellTypeConsumable"
@@ -94,7 +96,7 @@ local function ForEachSellable(fn)
                 local _, _, quality, _, _, itemType, _, _, _, _, vendorPrice = GetItemInfo(link)
 
                 -- Legendary and above (5+) are never bulk-sold; the server refuses them too.
-                if vendorPrice and vendorPrice > 0 and quality and quality < 5 then
+                if vendorPrice and vendorPrice > 0 and quality and quality < 5 and itemType ~= QUEST_TYPE then
                     local shouldSell = db.alwaysSell[itemID]
                         or GetSetting("sellEverything")
                         or (quality == 0 and SellsPoorQuality())

@@ -3328,6 +3328,149 @@ local function downgradeNodeRank(nodeId)
     return true
 end
 
+-- Ranks of a node bought since the last Apply (0 when none): the only ones a revert may take.
+local function pendingRanks(btn)
+    local validated = getValidatedRank(btn.id)
+    if btn.isMultipleChoice then
+        return ((nodeChoices[btn.id] or 0) ~= 0 and validated == 0) and 1 or 0
+    end
+    return math.max(0, getNodeRank(btn.id) - validated)
+end
+
+-- Reverse of unlockPath: the node goes back to its applied rank, and every talent after it
+-- that no longer has its prerequisites (ALL parents maxed) goes back to nothing. Returns
+-- { nodes = { {id, toRank}, ... }, refund = { [currency] = n } } or nil, reason. Read only.
+local function computeRevertLine(nodeId)
+    local root = nodesById[nodeId]
+    if not root or root.classId then return nil, "not an ash node" end
+    if pendingRanks(root) == 0 then return nil, "nothing to take back since the last Apply" end
+
+    local children = {}
+    for id in pairs(nodesById) do
+        for _, parentId in ipairs(parentsOf[id] or {}) do
+            children[parentId] = children[parentId] or {}
+            table.insert(children[parentId], id)
+        end
+    end
+
+    local newRank = { [nodeId] = getValidatedRank(nodeId) }
+    local order = { nodeId }
+    local function rankOf(id) return newRank[id] or getNodeRank(id) end
+    local function activeAfter(id)
+        local btn = nodesById[id]
+        if not btn then return false end
+        if btn.isMultipleChoice then return newRank[id] == nil and (nodeChoices[id] or 0) ~= 0 end
+        return rankOf(id) > 0
+    end
+
+    local queue, head = { nodeId }, 1
+    while queue[head] do
+        local id = queue[head]
+        head = head + 1
+        for _, childId in ipairs(children[id] or {}) do
+            local child = nodesById[childId]
+            if child and not newRank[childId] and not child.classId and activeAfter(childId)
+                and not isStartingNode(childId) then
+                local ok = true
+                for _, parentId in ipairs(parentsOf[childId] or {}) do
+                    if not activeAfter(parentId) or rankOf(parentId) < getMaxRank(parentId) then
+                        ok = false
+                        break
+                    end
+                end
+                if not ok then
+                    if getValidatedRank(childId) > 0 then
+                        return nil, "an applied talent depends on it"
+                    end
+                    newRank[childId] = 0
+                    table.insert(order, childId)
+                    table.insert(queue, childId)
+                end
+            end
+        end
+    end
+
+    local nodes, refund = {}, {}
+    for _, id in ipairs(order) do
+        local btn = nodesById[id]
+        local cur = getNodeCurrency(btn)
+        if btn.isMultipleChoice then
+            refund[cur] = (refund[cur] or 0) + getNodeCost(btn, 1)
+        else
+            for r = newRank[id] + 1, getNodeRank(id) do
+                refund[cur] = (refund[cur] or 0) + getNodeCost(btn, r)
+            end
+        end
+        table.insert(nodes, { id = id, toRank = newRank[id] })
+    end
+    return { nodes = nodes, refund = refund }
+end
+
+local function revertLine(nodeId)
+    local plan, why = computeRevertLine(nodeId)
+    if not plan then
+        DebugPrint("|cffFF0000Cannot take the line back: " .. (why or "?") .. "|r")
+        return false
+    end
+    for cur, n in pairs(plan.refund) do poolAdd(cur, n) end
+    for _, step in ipairs(plan.nodes) do
+        local btn = nodesById[step.id]
+        if btn.isApex and activeApexNodeId == step.id and step.toRank == 0 then activeApexNodeId = nil end
+        nodeRanks[step.id] = step.toRank
+        if btn.isMultipleChoice then
+            nodeChoices[step.id] = 0
+            btn.selectedSpell = nil
+            if btn.spells and #btn.spells > 0 then
+                setNodeIconTexture(btn, getSpellIconSafe(btn.spells[1]))
+            end
+        end
+    end
+    DebugPrint("|cffFFFF00Line taken back: " .. #plan.nodes .. " talents.|r")
+    MarkUnsavedChanges()
+    return true
+end
+
+-- Shift + right-click: confirm, then take back the node and the whole line after it.
+local function ConfirmRevertLine(btn, onDone)
+    local plan, why = computeRevertLine(btn.id)
+    if not plan then
+        DebugPrint("|cffFF0000Cannot take the line back: " .. (why or "?") .. "|r")
+        return
+    end
+    local parts = {}
+    for _, cur in ipairs(CURRENCY_ORDER) do
+        if plan.refund[cur] then
+            table.insert(parts, FormatThousands(plan.refund[cur]) .. " " .. currencyIcon(cur))
+        end
+    end
+    local name = btn.spells and btn.spells[1] and GetSpellInfo(btn.spells[1]) or ("node " .. btn.id)
+    local others = #plan.nodes - 1
+    local text = "Take back |cffFFD700" .. name .. "|r"
+    if others > 0 then
+        text = text .. " and the " .. others .. (others > 1 and " talents" or " talent") .. " after it"
+    end
+    text = text .. "?\n\nOnly what was added since the last Apply is undone.\nRefund: " ..
+        (#parts > 0 and table.concat(parts, "  ") or "nothing")
+
+    StaticPopupDialogs["SKILLTREE_REVERT_LINE"] = StaticPopupDialogs["SKILLTREE_REVERT_LINE"] or {
+        text = "%s",
+        button1 = "Take back",
+        button2 = CANCEL,
+        OnAccept = function(self, data)
+            if data and not UnitAffectingCombat("player") and revertLine(data.id) then
+                data.onDone()
+            end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+    }
+    local popup = StaticPopup_Show("SKILLTREE_REVERT_LINE", text, nil, { id = btn.id, onDone = onDone })
+    if popup then
+        popup:SetFrameStrata("TOOLTIP")
+    end
+end
+
 -- "active", or learned below max with the next rank unaffordable (same rule as applyNodeVisual):
 -- a 1/3 node that cannot buy its 2nd rank is still learned, its links stay lit.
 local function linkLearned(n)
@@ -3875,6 +4018,8 @@ local function CreateNodes()
                     else
                         CurrentRankTooltip:AddLine(
                             "|cffAAAAAARight-click to unlearn|r", 1, 1, 1, true)
+                        CurrentRankTooltip:AddLine(
+                            "|cffAAAAAAShift + right-click to take back the whole line|r", 1, 1, 1, true)
                     end
                     CurrentRankTooltip:Show();
                 elseif node.state == "ready" then
@@ -4028,6 +4173,8 @@ local function CreateNodes()
                         else
                             CurrentRankTooltip:AddLine(
                                 "|cffAAAAAARight-click to unlearn|r", 1, 1, 1, true)
+                            CurrentRankTooltip:AddLine(
+                                "|cffAAAAAAShift + right-click to take back the whole line|r", 1, 1, 1, true)
                         end
                         CurrentRankTooltip:Show();
                     elseif self.state == "ready" then
@@ -4177,6 +4324,16 @@ local function CreateNodes()
             elseif button == "RightButton" then
                 if self.isMultipleChoice and #self.choiceButtons > 0 then
                     HideChoiceButtons(self)
+                    if not IsShiftKeyDown() then return end
+                end
+
+                -- Shift + right-click: take back this node and the whole line after it
+                if IsShiftKeyDown() then
+                    local btnSelf = self
+                    ConfirmRevertLine(self, function()
+                        refreshAccessibility()
+                        refreshNodeTooltip(btnSelf)
+                    end)
                     return
                 end
 

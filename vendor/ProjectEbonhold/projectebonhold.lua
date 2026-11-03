@@ -165,6 +165,14 @@ local CS = {
     -- 1252 skipped: the self-whisper echoes a request under its own number, and SS 1252 is the queue tick.
     REQUEST_LFG_MODE_SET                      = 1253, -- body: "<mode>" (0 = Group, 1 = Solo), answered by SEND_LFG_TORMENT_DATA
 
+    -- Raid Finder (modules/raidFinder/raid_finder.lua). Never the number of an SS event (the self-whisper echo).
+    REQUEST_RAID_FINDER_DATA                  = 1254, -- body: ""
+    REQUEST_RAID_FINDER_ROLES                 = 1255, -- body: "<mask>" (2 tank, 4 healer, 8 damage)
+    REQUEST_RAID_FINDER_JOIN                  = 1256, -- body: "<mapId>|<tier>"
+    REQUEST_RAID_FINDER_LEAVE                 = 1257, -- body: ""
+    REQUEST_RAID_FINDER_ANSWER                = 1266, -- body: "1" accept / "0" decline
+    REQUEST_RAID_FINDER_SEARCH                = 1267, -- body: "1" start / "0" stop the search for replacements
+
     -- The Trials (modules/trials). Start is honoured next to the Trial Warden only.
     REQUEST_TRIAL_STATE                       = 1260, -- body: ""
     REQUEST_TRIAL_START                       = 1261, -- body: "<trial>" (1 Destruction, 2 Endurance)
@@ -311,6 +319,11 @@ local SS = {
     SEND_LFG_TORMENT_DATA                     = 1250,
     SEND_LFG_TORMENT_RESULT                   = 1251,
     SEND_LFG_QUEUE_STATE                      = 1252,
+
+    -- Raid Finder. DATA / STATE / RESULT: see the wire block at the top of modules/raidFinder/raid_finder.lua.
+    SEND_RAID_FINDER_DATA                     = 1258,
+    SEND_RAID_FINDER_STATE                    = 1259,
+    SEND_RAID_FINDER_RESULT                   = 1265,
 
     -- The Trials. STATE: "<trial>|<phase>|<remainingMs>|<errors>|<maxErrors>|<score>|<elapsedMs>|<attempt>" (empty = off).
     -- RESULT: "<trial>|<score>|<rank>|<total>|<topPermilleX10>|<pb>|<previousBest>|<reason>|<elapsedMs>".

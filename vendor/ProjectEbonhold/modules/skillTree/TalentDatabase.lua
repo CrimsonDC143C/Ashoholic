@@ -1796,6 +1796,7 @@ nodes = {
         soulPointsCosts = {1},
         currency = "essence",
         sector = "pr",
+        permanent = true,
         isStart = true
     },
     {

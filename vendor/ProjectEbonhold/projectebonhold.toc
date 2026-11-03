@@ -139,6 +139,8 @@ modules\torment\torment_item_tooltip.lua
 modules\torment\champion_marker.lua
 
 modules\dungeonFinder\dungeon_finder.lua
+# The "Raids" tab of the Dungeon Finder window (server: Ashendor/RaidFinder).
+modules\raidFinder\raid_finder.lua
 
 modules\spellUnlearn\spell_unlearn_service.lua
 
