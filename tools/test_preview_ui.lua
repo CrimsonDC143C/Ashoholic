@@ -164,6 +164,10 @@ assert(environment.GameTooltip.lines[1] == "SOUL ESSENCE")
 Click("Swap")
 Text("Swap to Aster")
 Click("OK")
+local defaultRoster = environment.AshoholicPreviewRosterScroll
+assert(environment.AshoholicPreviewFrame:GetWidth() == 1320, "Preview must use the wider default window")
+assert(defaultRoster.child:GetWidth() <= defaultRoster:GetWidth(),
+    "Default roster columns and Swap buttons must fit beside the details panel without sideways scrolling")
 for _, object in ipairs(objects) do
     assert(not (object.kind == "Button" and object.text and object.text:GetText() == "Columns"),
         "Character details must not contain a Columns button")

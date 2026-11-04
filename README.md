@@ -80,6 +80,10 @@ If you play on multiple WoW accounts and want to see all your characters in one 
 Use `/ash preview` for the separate, session-local design preview. All characters,
 balances, activity objectives, timers and records are samples, not live tracking.
 Account One contains ten sample characters for testing a fuller roster and raid matrix.
+The preview window defaults to 1320 UI units wide, giving the roster more space
+for its default columns and Swap buttons beside the character details panel.
+It scales down to fit smaller screens; extra columns and enlarged fonts can
+still require horizontal scrolling.
 Closing preserves preview choices until `/reload`; it does not change your saved roster.
 Hover the currency cards for explanations of their account-level totals.
 Preview roster Swap buttons explain switching without logging out or passing
