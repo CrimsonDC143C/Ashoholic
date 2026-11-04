@@ -1,6 +1,6 @@
 # 🍷 Ashoholic - Ebonhold Roster
 
-[![Download Latest Release](https://img.shields.io/github/v/release/CrimsonDC143C/Ashoholic?label=Download&style=for-the-badge&color=blue)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
+<!-- [![Download Latest Release](https://img.shields.io/github/v/release/CrimsonDC143C/Ashoholic?label=Download&style=for-the-badge&color=blue)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
 
 **A highly customizable character, gold, and Soul Ash tracker for Project Ebonhold (WotLK 3.3.5).**
 
@@ -49,7 +49,7 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 2.  Extract it into `Ebonhold\Interface\AddOns\`. The zip contains three addon folders: `Ashoholic`, `FastSwap`, and `SharedMedia`. Each has its own `.toc` file.
 3.  Launch Ebonhold with `Ashoholic.bat` at least once to install the FastSwap character-selection hook. FastSwap will not switch characters until the hook has been synced. Launch with the batch file again after Ebonhold updates.
 4.  Make sure you have the **ProjectEbonhold** addon enabled.
-5.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster!
+5.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster! -->
 
 ## PTR testing download
 
@@ -66,13 +66,13 @@ Close WoW, back up your PTR SavedVariables, and extract the ZIP into your **PTR 
 - Repository rules must allow GitHub Actions to create releases and update the dedicated `ptr-latest` tag. Do not use that tag for a stable release.
 - Nothing is published until these changes are committed and pushed. If the workflow fails, the download may still be the previous successful build; check the Actions run before announcing an update.
 
-## Multi-Account Syncing (Optional)
+<!-- ## Multi-Account Syncing (Optional)
 
 If you play on multiple WoW accounts and want to see all your characters in one list:
 1. Log into each account once and play briefly so the addon generates/updates the `SavedVariables/Ashoholic.lua` file for that account.
 2. Locate the `Ashoholic.bat` file in the addon folder.
 3. Use it to launch the game instead of `Wow.exe`. It will automatically merge all your account data before launching.
-
+ -->
 ## Commands
 
 ### UI design preview (PTR)
@@ -110,10 +110,10 @@ WoW widgets, including resize minimums, all columns, ten populated raid columns,
 account filtering, encounter collapsing and custom preset save/restore.
 This does not validate game-client rendering or real server behavior.
 
-*   `/ash` or `/ashoholic` - Toggles the main roster window.
+<!-- *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.
 *   `/ash memory` - Collects Lua garbage and reports addon memory before and after collection. Run between repeated test batches to check whether retained memory keeps growing; this does not measure the game client's native memory or font cache.
-
+ -->
 ## Feedback & Issues
 
 If you find any bugs, have feature requests, or want to share your custom themes, please open an **Issue** here on GitHub! 
