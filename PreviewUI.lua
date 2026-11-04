@@ -1074,8 +1074,7 @@ local LOGOS = {
 }
 local SECTIONS = {
     { "Themes", "Pick a complete look. Every preset recolors the whole preview instantly." },
-    { "Colors", "Build your own theme, slot by slot. Save it, export it, share it." },
-    { "Text & Layout", "Fonts, text size, row density, window scale and transparency." },
+    { "Customize Theme", "Colors, opacity, fonts and layout together. Jump to a group or scroll through every control." },
     { "Icons", "Currency icons, class icons, raid status symbols and the Ashoholic logo." },
     { "Roster Columns", "Choose which character details become columns, and in which order." },
     { "Tabs & Views", "Hide tabs you never use and choose what opens first." },
@@ -1558,7 +1557,7 @@ local function BuildSettings()
                 end)
                 Button(row, "Edit", 380, 0, 70, 28, function()
                     ApplyCustomTheme(row.theme)
-                    settings.ShowSection("Colors")
+                    settings.ShowSection("Customize Theme")
                 end)
                 Button(row, "Rename", 458, 0, 82, 28, function()
                     local target = row.theme
@@ -1606,14 +1605,19 @@ local function BuildSettings()
         themeGallery:SetHeight(height)
         themeScroll:SetVerticalScroll(math.min(themeScroll:GetVerticalScroll(), math.max(0, height - 350)))
     end
-    Button(themeBody, "Customize...", 0, 360, 180, 30, function() settings.ShowSection("Colors") end)
+    Button(themeBody, "Customize...", 0, 360, 180, 30, function() settings.ShowSection("Customize Theme") end)
     Button(themeBody, "Save as custom...", 188, 360, 210, 30, function() SaveCustomTheme() end)
     Button(themeBody, "Import...", 406, 360, 210, 30, function() settings.ShowSection("Profiles & Sharing") end)
     Label(themeBody, "Default presets are read-only. Custom presets are session-local; account filters are never included.", 0, 400, 660, 10, MUTED)
 
-    -- Colors (custom theme editor)
-    local colorPage = bodies.Colors
-    local _, colorBody = Scroll(colorPage, "AshoholicPreviewColorEditor", 0, 0, 660, 350)
+    local colorPage = bodies["Customize Theme"]
+    local editorScroll, editorBody = Scroll(colorPage, "AshoholicPreviewThemeEditor", 0, 34, 660, 316)
+    editorScroll:EnableMouseWheel(true)
+    editorScroll:SetScript("OnMouseWheel", ScrollBy)
+    local colorBody = CreateFrame("Frame", nil, editorBody)
+    colorBody:SetPoint("TOPLEFT", 0, 0)
+    colorBody:SetWidth(634)
+    Label(colorBody, "COLORS & OPACITY", 0, 0, 630, 11, GOLD)
     local slots = {
         { "Window background", BACKGROUND }, { "Panels & rows", PANEL }, { "Borders", BORDER },
         { "Buttons", BUTTON_BG }, { "Accent / headings", GOLD }, { "Body text", TEXT },
@@ -1630,7 +1634,7 @@ local function BuildSettings()
     local swatches = {}
     for i, slot in ipairs(slots) do
         local target, title = slot[2], slot[1]
-        local x, y = ((i - 1) % 2) * 320, math.floor((i - 1) / 2) * 52
+        local x, y = ((i - 1) % 2) * 320, 28 + math.floor((i - 1) / 2) * 52
         local row = Surface(colorBody, x, y, 310, 44)
         Label(row, title, 9, 15, 143, 11)
         local swatch = row:CreateTexture(nil, "OVERLAY")
@@ -1651,7 +1655,8 @@ local function BuildSettings()
     settings.groups[#settings.groups + 1] = { Update = function()
         for _, entry in ipairs(swatches) do entry[1]:SetVertexColor(entry[2][1], entry[2][2], entry[2][3], entry[2][4] or 1) end
     end }
-    colorBody:SetHeight(math.ceil(#slots / 2) * 52)
+    local colorHeight = 28 + math.ceil(#slots / 2) * 52
+    colorBody:SetHeight(colorHeight)
     Button(colorPage, "Save as new...", 0, 360, 190, 30, function() SaveCustomTheme() end)
     Button(colorPage, "Update selected", 198, 360, 210, 30, UpdateCustomTheme)
     Button(colorPage, "Revert to default", 416, 360, 210, 30, function()
@@ -1660,11 +1665,13 @@ local function BuildSettings()
         end
         Say("Reverted to " .. (state.lastPreset or "Ember & Ash") .. ".")
     end)
-    Label(colorPage, "Each slot supports RGBA hex. Class colors and status colors remain semantic, not theme overrides.", 0, 400, 660, 10, MUTED)
+    Label(colorPage, "Colors, fonts, icons and row layout save together. Class and loot-status colors keep their meaning.", 0, 400, 660, 10, MUTED)
 
-    -- Text & Layout
-    local _, textBody = Scroll(bodies["Text & Layout"], "AshoholicPreviewTextEditor", 0, 0, 660, 414)
-    Label(textBody, "FONT", 0, 0, 300, 11, GOLD)
+    local textBody = CreateFrame("Frame", nil, editorBody)
+    local textY = colorHeight + 24
+    textBody:SetPoint("TOPLEFT", 0, -textY)
+    textBody:SetWidth(634)
+    Label(textBody, "GLOBAL FONT", 0, 0, 300, 11, GOLD)
     Choices(textBody, {
         { "Fonts\\FRIZQT__.TTF", "Friz Quadrata" }, { "Fonts\\ARIALN.TTF", "Arial Narrow" },
         { "Fonts\\MORPHEUS.TTF", "Morpheus" }, { "Fonts\\skurri.ttf", "Skurri" },
@@ -1672,26 +1679,7 @@ local function BuildSettings()
     Label(textBody, "TEXT SIZE", 0, 72, 300, 11, GOLD)
     Choices(textBody, { { -1, "Small" }, { 0, "Normal" }, { 1, "Large" }, { 2, "Larger" } }, 0, 94, 152, 4,
         function() return state.fontDelta end, function(value) state.fontDelta = value; ApplyAppearance() end)
-    Label(textBody, "ROSTER ROW DENSITY", 0, 144, 300, 11, GOLD)
-    Choices(textBody, { { "compact", "Compact" }, { "comfortable", "Comfortable" }, { "spacious", "Spacious" } }, 0, 166, 210, 3,
-        function() return state.density end, function(value) state.density = value; state.rowHeight = nil; refresh() end)
-    SliderRow(textBody, "WINDOW SCALE", 0, 218, 0.7, 1.2, 0.05, function() return state.scale end, function(value)
-        state.scale = value
-        frame:SetScale((frame.baseScale or 1) * value)
-    end, function(value) return string.format("%.0f%%", value * 100) end)
-    SliderRow(textBody, "BACKGROUND OPACITY", 0, 278, 0.4, 1, 0.05, function() return BACKGROUND[4] end, function(value)
-        BACKGROUND[4] = value
-        frame:SetBackdropColor(unpack(BACKGROUND))
-    end, function(value) return string.format("%.0f%%", value * 100) end)
-    Label(textBody, "Compact hides the hint line under each character. Scale and opacity affect only the main window.", 0, 346, 660, 10, MUTED)
     local function Pixels(value) return string.format("%d px", value) end
-    SliderRow(textBody, "ROSTER ROW HEIGHT (content minimum applies)", 0, 388, 30, 70, 1,
-        function() return state.rowHeight or (state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44)) end,
-        function(value) state.rowHeight = value; refresh() end, Pixels)
-    SliderRow(textBody, "ROSTER ROW SPACING", 0, 450, 0, 12, 1,
-        function() return state.rowGap end, function(value) state.rowGap = value; refresh() end, Pixels)
-    SliderRow(textBody, "PANEL & BUTTON BORDER THICKNESS", 0, 512, 1, 4, 1,
-        function() return state.borderSize end, function(value) state.borderSize = value; ApplyAppearance() end, Pixels)
     local fontChoices = {
         { "inherit", "Global font" }, { "Fonts\\FRIZQT__.TTF", "Friz Quadrata" },
         { "Fonts\\ARIALN.TTF", "Arial Narrow" }, { "Fonts\\MORPHEUS.TTF", "Morpheus" },
@@ -1700,7 +1688,7 @@ local function BuildSettings()
     for i, role in ipairs({ { "title", "Titles" }, { "header", "Column headers" }, { "character", "Character values" },
         { "account", "Account names" }, { "button", "Buttons" }, { "hint", "Hints" } }) do
         local key, title = role[1], role[2]
-        local y = 584 + (i - 1) * 156
+        local y = 156 + (i - 1) * 156
         Label(textBody, string.upper(title) .. " FONT", 0, y, 630, 11, GOLD)
         Choices(textBody, fontChoices, 0, y + 22, 200, 3,
             function() return (state.fontRoles[key] or {}).font or "inherit" end,
@@ -1717,7 +1705,38 @@ local function BuildSettings()
                 ApplyAppearance()
             end, Pixels)
     end
-    textBody:SetHeight(584 + 6 * 156)
+    local textHeight = 156 + 6 * 156
+    textBody:SetHeight(textHeight)
+    local layoutBody = CreateFrame("Frame", nil, editorBody)
+    local layoutY = textY + textHeight + 24
+    layoutBody:SetPoint("TOPLEFT", 0, -layoutY)
+    layoutBody:SetSize(634, 444)
+    Label(layoutBody, "ROSTER ROW DENSITY", 0, 0, 300, 11, GOLD)
+    Choices(layoutBody, { { "compact", "Compact" }, { "comfortable", "Comfortable" }, { "spacious", "Spacious" } }, 0, 22, 204, 3,
+        function() return state.density end, function(value) state.density = value; state.rowHeight = nil; refresh() end)
+    SliderRow(layoutBody, "WINDOW SCALE", 0, 74, 0.7, 1.2, 0.05, function() return state.scale end, function(value)
+        state.scale = value
+        frame:SetScale((frame.baseScale or 1) * value)
+    end, function(value) return string.format("%.0f%%", value * 100) end)
+    SliderRow(layoutBody, "BACKGROUND OPACITY", 0, 134, 0, 1, 0.01, function() return BACKGROUND[4] end, function(value)
+        BACKGROUND[4] = value
+        frame:SetBackdropColor(unpack(BACKGROUND))
+    end, function(value) return string.format("%.0f%%", value * 100) end)
+    Label(layoutBody, "Compact hides character hints. Scale and background opacity affect only the main window.", 0, 202, 630, 10, MUTED)
+    SliderRow(layoutBody, "ROSTER ROW HEIGHT (content minimum applies)", 0, 244, 30, 70, 1,
+        function() return state.rowHeight or (state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44)) end,
+        function(value) state.rowHeight = value; refresh() end, Pixels)
+    SliderRow(layoutBody, "ROSTER ROW SPACING", 0, 306, 0, 12, 1,
+        function() return state.rowGap end, function(value) state.rowGap = value; refresh() end, Pixels)
+    SliderRow(layoutBody, "PANEL & BUTTON BORDER THICKNESS", 0, 368, 1, 4, 1,
+        function() return state.borderSize end, function(value) state.borderSize = value; ApplyAppearance() end, Pixels)
+    editorBody:SetHeight(layoutY + layoutBody:GetHeight())
+    for i, jump in ipairs({ { "Colors", 0 }, { "Fonts", textY }, { "Layout", layoutY } }) do
+        local offset = jump[2]
+        Button(colorPage, jump[1], (i - 1) * 218, 0, 210, 28, function()
+            editorScroll:SetVerticalScroll(math.min(offset, editorBody:GetHeight() - editorScroll:GetHeight()))
+        end)
+    end
 
     -- Icons
     local iconBody = bodies.Icons
@@ -1976,12 +1995,12 @@ local function BuildSettings()
         local section = settings.current
         Dialog("Reset " .. section, "Restore the default settings for '" .. section .. "'?", {
             primary = "Reset", onAccept = function()
-                if section == "Themes" or section == "Colors" then ApplyPreset(THEMES[1])
-                elseif section == "Text & Layout" then
+                if section == "Themes" then ApplyPreset(THEMES[1])
+                elseif section == "Customize Theme" then
                     state.font, state.fontDelta, state.density, state.scale, BACKGROUND[4] = FONT, 0, "comfortable", 1, 0.99
                     state.fontRoles, state.rowHeight, state.rowGap, state.borderSize = {}, nil, 3, 1
                     frame:SetScale(frame.baseScale or 1)
-                    ApplyAppearance()
+                    ApplyPreset(THEMES[1])
                 elseif section == "Icons" then
                     state.iconStyle, state.statusStyle, state.classIcons, state.logo = "icons", "words", true, LOGOS[1]
                     ApplyAppearance()
