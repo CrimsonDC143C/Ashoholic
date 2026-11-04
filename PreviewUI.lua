@@ -1242,7 +1242,12 @@ Dialog = function(title, text, options)
         dialog.box:SetAutoFocus(false)
         dialog.box:SetFontObject(ChatFontNormal)
         dialog.box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-        dialog:SetScript("OnHide", function() dialog.box:ClearFocus() end)
+        dialog:SetScript("OnHide", function()
+            dialog.box:ClearFocus()
+            local onCancel = dialog.onCancel
+            dialog.onCancel = nil
+            if onCancel then onCancel() end
+        end)
         dialog.primary = Button(dialog, "", 18, 216, 200, 28)
         dialog.secondary = Button(dialog, "Cancel", 242, 216, 200, 28, function() dialog:Hide() end)
     end
@@ -1251,6 +1256,7 @@ Dialog = function(title, text, options)
     dialog.text:SetText(text)
     SetVisible(dialog.boxBg, options.box ~= nil)
     dialog.box:SetText(options.box or "")
+    dialog.onCancel = options.onCancel
     dialog.primary.text:SetText(options.primary or "OK")
     dialog.primary:SetScript("OnClick", function()
         local value = dialog.box:GetText()
@@ -1263,6 +1269,7 @@ Dialog = function(title, text, options)
                 return
             end
         end
+        dialog.onCancel = nil
         dialog:Hide()
         if options.onAccept then options.onAccept(value) end
     end)
@@ -1426,6 +1433,7 @@ local function BuildSettings()
         end
         return name
     end
+    local closing, closePreview = false, false
     local function SaveCustomTheme(onSaved)
         Dialog("Save custom preset", "Save colors, fonts, icons and row layout in this preview session. /reload clears all preview presets.", {
             box = "My Ashoholic theme", primary = "Save",
@@ -1433,6 +1441,7 @@ local function BuildSettings()
                 local _, message = ThemeName(value)
                 return message
             end,
+            onCancel = function() closePreview = false end,
             onAccept = function(value)
                 local name = ThemeName(value)
                 if not name then return end
@@ -1464,12 +1473,12 @@ local function BuildSettings()
         Say("Updated '" .. theme.name .. "' until /reload.")
         return true
     end
-    local closing, closePreview = false, false
     local function FinishClose()
+        local shouldClosePreview = closePreview
         closing = true
         if closePrompt then closePrompt:Hide() end
         settings:Hide()
-        if closePreview then frame:Hide() end
+        if shouldClosePreview then frame:Hide() end
         closePreview, closing = false, false
     end
     settings.RequestClose = function(withPreview)
@@ -1478,16 +1487,23 @@ local function BuildSettings()
             FinishClose()
             return
         end
+        local shouldClosePreview = closePreview
         if not frame:IsShown() then frame:Show() end
         settings:Show()
         addon:CloseColorPicker(settings)
         if dialog then dialog:Hide() end
+        closePreview = shouldClosePreview
         if not closePrompt then
             closePrompt = Popup("AshoholicPreviewUnsavedTheme", 520, 232)
+            closePrompt:SetScript("OnHide", function()
+                if not closing then closePreview = false end
+            end)
             Label(closePrompt, "Unsaved theme changes", 18, 16, 484, 16, GOLD)
             closePrompt.text = Label(closePrompt, "", 18, 48, 484, 11)
             Button(closePrompt, "Save as new...", 18, 118, 236, 30, function()
+                local withPreview = closePreview
                 closePrompt:Hide()
+                closePreview = withPreview
                 SaveCustomTheme(FinishClose)
             end)
             closePrompt.update = Button(closePrompt, "Update current", 266, 118, 236, 30, function()
