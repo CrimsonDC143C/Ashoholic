@@ -1,7 +1,7 @@
 local objects, methods = {}, {}
 local environment = setmetatable({}, { __index = _G })
 environment._G = environment
-local cursor = 0
+local cursor, shiftDown = 0, false
 local function Noop() end
 local function NewObject(kind, name, parent)
     local object = setmetatable({
@@ -55,6 +55,7 @@ function methods:SetValue(value)
     if changed and self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, value) end
 end
 function methods:GetValue() return self.value end
+function methods:GetMinMaxValues() return self.low, self.high end
 function methods:SetScrollChild(child) self.child = child end
 function methods:GetVerticalScroll() return self.vertical or 0 end
 function methods:SetVerticalScroll(value) self.vertical = value end
@@ -75,7 +76,7 @@ for _, name in ipairs({
 }) do methods[name] = Noop end
 function environment.CreateFrame(kind, name, parent) return NewObject(kind, name, parent) end
 function environment.GetCursorPosition() return cursor, 0 end
-function environment.IsShiftKeyDown() return false end
+function environment.IsShiftKeyDown() return shiftDown end
 environment.tinsert, environment.UISpecialFrames = table.insert, {}
 environment.UIParent = NewObject("Frame")
 environment.UIParent:SetSize(1920, 1080)
@@ -170,6 +171,14 @@ for _, object in ipairs(objects) do
     if object.kind == "Slider" and object.parent == rosterPage then
         object:SetValue(100)
         assert(roster.horizontal == 100 and header.horizontal == 100, "Header and rows must scroll together")
+        shiftDown = true
+        roster.scripts.OnMouseWheel(roster, -1)
+        assert(roster.horizontal == 140 and header.horizontal == 140, "Shift-wheel must scroll headers and rows sideways")
+        header.scripts.OnMouseWheel(header, 10000)
+        assert(roster.horizontal == 0 and header.horizontal == 0, "Shift-wheel must clamp at the left edge")
+        shiftDown = false
+        roster.scripts.OnMouseWheel(roster, -1)
+        assert(roster.horizontal == 0, "Normal wheel scrolling must not move horizontally")
     end
 end
 

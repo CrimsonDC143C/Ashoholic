@@ -353,6 +353,18 @@ local function BuildRoster()
         headerScroll:SetHorizontalScroll(value)
         scroll:SetHorizontalScroll(value)
     end)
+    local function ScrollRoster(_, delta)
+        if IsShiftKeyDown() then
+            local minimum, maximum = hbar:GetMinMaxValues()
+            hbar:SetValue(math.max(minimum, math.min(maximum, hbar:GetValue() - delta * 40)))
+        else
+            ScrollBy(scroll, delta)
+        end
+    end
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", ScrollRoster)
+    headerScroll:EnableMouseWheel(true)
+    headerScroll:SetScript("OnMouseWheel", ScrollRoster)
     page.rows = {}
     for i, character in ipairs(CHARACTERS) do
         local index = i
