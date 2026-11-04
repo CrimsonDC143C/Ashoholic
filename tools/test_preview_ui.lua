@@ -140,6 +140,10 @@ assert(environment.GameTooltip.lines[1] == "SOUL ESSENCE")
 Click("Swap")
 Text("Swap to Aster")
 Click("OK")
+for _, object in ipairs(objects) do
+    assert(not (object.kind == "Button" and object.text and object.text:GetText() == "Columns"),
+        "Character details must not contain a Columns button")
+end
 
 Settings("Roster Columns")
 for _, name in ipairs({ "Offering bonus", "Offerings left", "Echo build", "Soul anchor", "Location" }) do Click("[ ] " .. name) end

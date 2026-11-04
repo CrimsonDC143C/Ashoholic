@@ -408,7 +408,6 @@ local function BuildRoster()
     end
     page.detailNote = Label(detail, "", 16, 278, 300, 11, TEAL)
     Button(detail, "Swap (preview)", 16, 317, 130, 25, function() PreviewSwap(CHARACTERS[state.selected]) end)
-    Button(detail, "Columns", 158, 317, 158, 25, function() ShowSettings("Roster Columns") end)
     Label(page, "No hourly-entry counter: the new realm's cap has not been established.", 0, 391, 716, 10, MUTED)
     page.Refresh = function()
         local width = state.detail and 690 or 1046
