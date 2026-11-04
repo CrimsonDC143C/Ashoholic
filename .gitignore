@@ -10,3 +10,6 @@ sync_config.txt
 # Ignore OS generated files
 .DS_Store
 Thumbs.db
+
+# Ignore IDE settings
+/.vscode/settings.json
