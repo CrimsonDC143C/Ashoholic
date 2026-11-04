@@ -485,19 +485,29 @@ local function LootStatus(character, boss, index, instance)
     return icons and "|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t" or GREEN .. "Available|r"
 end
 
-local MATRIX_COLUMNS, MATRIX_WIDTH, MATRIX_FIRST, MATRIX_HEIGHT = 5, 95, 210, 226
+local MATRIX_FIRST, MATRIX_HEIGHT = 210, 226
 
 local function BuildRaids()
     local page = Page("Raids", "Raid & dungeon watchlist", "Select a category, expansion, instance or individual boss. All statuses are sample data.")
+    local matrixColumns, matrixWidth = 5, 95
+    local showPicker, compact = true, true
+    local pickerToggle = Button(page, "Hide selection", 740, 0, 160, 26, function()
+        showPicker = not showPicker
+        page.Refresh()
+    end)
+    local compactToggle = Button(page, "Compact columns", 908, 0, 164, 26, function()
+        compact = not compact
+        page.Refresh()
+    end)
     Label(page, "WATCHED ENCOUNTERS", 0, 61, 360, 10, GOLD)
     local matrixScroll, matrix = Scroll(page, "AshoholicPreviewRaidMatrix", 0, 135, 716, MATRIX_HEIGHT)
     local header = Surface(page, 0, 84, 690, 47)
     Label(header, "ENCOUNTER", 7, 26, 198, 10, MUTED)
     local headerCells = {}
-    for i = 1, MATRIX_COLUMNS do
+    for i = 1, #CHARACTERS do
         headerCells[i] = {
-            account = Label(header, "", MATRIX_FIRST + (i - 1) * MATRIX_WIDTH, 6, MATRIX_WIDTH - 6, 9, GOLD),
-            name = Label(header, "", MATRIX_FIRST + (i - 1) * MATRIX_WIDTH, 26, MATRIX_WIDTH - 6, 11),
+            account = Label(header, "", MATRIX_FIRST + (i - 1) * matrixWidth, 6, matrixWidth - 6, 9, GOLD),
+            name = Label(header, "", MATRIX_FIRST + (i - 1) * matrixWidth, 26, matrixWidth - 6, 11),
         }
         for _, fs in pairs(headerCells[i]) do
             fs:SetHeight(14)
@@ -505,8 +515,8 @@ local function BuildRaids()
         end
     end
     local separators = {}
-    for i = 1, MATRIX_COLUMNS do
-        local x = MATRIX_FIRST + i * MATRIX_WIDTH - 6
+    for i = 1, #CHARACTERS do
+        local x = MATRIX_FIRST + i * matrixWidth - 6
         local head = header:CreateTexture(nil, "OVERLAY")
         head:SetTexture(WHITE)
         head:SetPoint("TOPLEFT", x, -4)
@@ -516,7 +526,7 @@ local function BuildRaids()
     local hint = Label(page, "Shift + mouse wheel: scroll characters", 0, 370, 205, 9, MUTED)
     local hbar = CreateFrame("Slider", nil, page)
     hbar:SetPoint("TOPLEFT", MATRIX_FIRST, -368)
-    hbar:SetSize(MATRIX_COLUMNS * MATRIX_WIDTH - 6, 12)
+    hbar:SetSize(matrixColumns * matrixWidth - 6, 12)
     hbar:SetOrientation("HORIZONTAL")
     hbar:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
     hbar:SetBackdropColor(0.10, 0.11, 0.14, 1)
@@ -526,9 +536,9 @@ local function BuildRaids()
     hbar:SetValueStep(1)
     hbar:SetMinMaxValues(0, 0)
     hbar:SetValue(0)
-    local position = Label(page, "", MATRIX_FIRST + MATRIX_COLUMNS * MATRIX_WIDTH + 6, 370, 120, 9, MUTED)
+    local position = Label(page, "", 550, 61, 140, 9, MUTED)
     local function ScrollCharacters(delta)
-        local maxOffset = math.max(0, #VisibleCharacters() - MATRIX_COLUMNS)
+        local maxOffset = math.max(0, #VisibleCharacters() - matrixColumns)
         local value = math.max(0, math.min(maxOffset, state.matrixOffset - delta))
         if value ~= state.matrixOffset then
             state.matrixOffset = value
@@ -561,25 +571,25 @@ local function BuildRaids()
             row.name:SetHeight(13)
             if row.name.SetWordWrap then row.name:SetWordWrap(false) end
             row.cells = {}
-            for j = 1, MATRIX_COLUMNS do
-                row.cells[j] = Label(row, "", MATRIX_FIRST + (j - 1) * MATRIX_WIDTH, 7, MATRIX_WIDTH - 8, 10)
+            for j = 1, #CHARACTERS do
+                row.cells[j] = Label(row, "", MATRIX_FIRST + (j - 1) * matrixWidth, 7, matrixWidth - 8, 10)
             end
             page.matrixRows[i] = row
         end
         return row
     end
-    Label(page, "TRACKING SELECTION", 740, 61, 332, 10, GOLD)
-    Button(page, "Watch all", 740, 84, 105, 28, function()
+    local pickerTitle = Label(page, "TRACKING SELECTION", 740, 61, 332, 10, GOLD)
+    local watchAll = Button(page, "Watch all", 740, 84, 105, 28, function()
         for _, raid in ipairs(raids) do
             for _, boss in ipairs(raid.bosses) do state.watched[boss.id] = true end
         end
         page.Refresh()
     end)
-    Button(page, "Clear", 852, 84, 82, 28, function()
+    local clear = Button(page, "Clear", 852, 84, 82, 28, function()
         wipe(state.watched)
         page.Refresh()
     end)
-    Label(page, "+ expands groups", 944, 92, 128, 10, MUTED)
+    local pickerHint = Label(page, "+ expands groups", 944, 92, 128, 10, MUTED)
     page.empty = Label(matrix, "Nothing selected. Choose instances or bosses on the right.", 8, 12, 670, 12, MUTED)
     local function BuildNode(node, depth, ancestors)
         local row = CreateFrame("Frame", nil, picker)
@@ -616,13 +626,30 @@ local function BuildRaids()
     page.Refresh = function()
         local y, rowIndex = 0, 0
         local allCharacters = VisibleCharacters()
-        local maxOffset = math.max(0, #allCharacters - MATRIX_COLUMNS)
+        local width = showPicker and 690 or 1046
+        matrixColumns = math.max(1, math.min(#CHARACTERS, math.floor((width - MATRIX_FIRST) / (compact and 80 or 110))))
+        matrixWidth = (width - MATRIX_FIRST) / matrixColumns
+        matrixScroll:SetWidth(width)
+        matrix:SetWidth(width)
+        header:SetWidth(width)
+        hbar:SetWidth(width - MATRIX_FIRST - 6)
+        pickerToggle.text:SetText(showPicker and "Hide selection" or "Show selection")
+        compactToggle.text:SetText(compact and "[x] Compact columns" or "[ ] Compact columns")
+        for _, widget in ipairs({ pickerScroll, pickerTitle, watchAll, clear, pickerHint }) do SetVisible(widget, showPicker) end
+        local maxOffset = math.max(0, #allCharacters - matrixColumns)
         state.matrixOffset = math.min(state.matrixOffset, maxOffset)
         local characters = {}
-        for i = 1, MATRIX_COLUMNS do characters[i] = allCharacters[state.matrixOffset + i] end
-        for i = 1, MATRIX_COLUMNS do
+        for i = 1, matrixColumns do characters[i] = allCharacters[state.matrixOffset + i] end
+        for i = 1, #CHARACTERS do
             local character = characters[i]
             local cells = headerCells[i]
+            local x = MATRIX_FIRST + (i - 1) * matrixWidth
+            for _, fs in pairs(cells) do SetVisible(fs, i <= matrixColumns) end
+            cells.name:ClearAllPoints()
+            cells.name:SetPoint("TOPLEFT", x, -26)
+            cells.name:SetWidth(matrixWidth - 6)
+            cells.account:ClearAllPoints()
+            cells.account:SetPoint("TOPLEFT", x, -6)
             cells.name:SetText(character and ClassName(character.data) or "")
             cells.account:SetText("")
             local previous = i > 1 and characters[i - 1] or allCharacters[state.matrixOffset]
@@ -631,25 +658,29 @@ local function BuildRaids()
                 while characters[i + span] and characters[i + span].data.account == character.data.account do span = span + 1 end
                 local account = ACCOUNTS[character.data.account]
                 local continued = previous and previous.data.account == character.data.account
-                cells.account:SetWidth(span * MATRIX_WIDTH - 10)
+                cells.account:SetWidth(span * matrixWidth - 10)
                 cells.account:SetText((continued and "< " or "") .. string.upper(account.name))
                 cells.account:SetTextColor(unpack(account.color or GOLD))
             end
             local nextCharacter = allCharacters[state.matrixOffset + i + 1]
             local split = character and nextCharacter and nextCharacter.data.account ~= character.data.account
             for _, texture in ipairs(separators[i]) do
+                texture:ClearAllPoints()
+                texture:SetPoint("TOPLEFT", MATRIX_FIRST + i * matrixWidth - 6, -4)
                 texture:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 0.7)
-                SetVisible(texture, split)
+                SetVisible(texture, i <= matrixColumns and split)
             end
         end
         hbar:SetMinMaxValues(0, maxOffset)
         hbar:SetValue(state.matrixOffset)
         hbar:GetThumbTexture():SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 0.75)
         SetVisible(hbar, maxOffset > 0)
-        position:SetText(#allCharacters == 0 and "" or string.format("%d-%d of %d", state.matrixOffset + 1, math.min(#allCharacters, state.matrixOffset + MATRIX_COLUMNS), #allCharacters))
+        position:SetText(#allCharacters == 0 and "" or string.format("%d-%d of %d", state.matrixOffset + 1, math.min(#allCharacters, state.matrixOffset + matrixColumns), #allCharacters))
+        hint:SetText(maxOffset > 0 and "Shift + wheel: characters" or "All selected characters fit")
         local function AddRow(name, boss, instance)
             rowIndex = rowIndex + 1
             local row = MatrixRow(rowIndex)
+            row:SetWidth(width)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 0, -y)
             row.name:SetText(name)
@@ -658,6 +689,10 @@ local function BuildRaids()
                 or "Sample raid loot eligibility. Looted does not prevent entry. Unknown needs a fresh snapshot.")
             for i, cell in ipairs(row.cells) do
                 local character = characters[i]
+                cell:ClearAllPoints()
+                cell:SetPoint("TOPLEFT", MATRIX_FIRST + (i - 1) * matrixWidth, -7)
+                cell:SetWidth(matrixWidth - 8)
+                SetVisible(cell, i <= matrixColumns)
                 cell:SetText(character and boss and LootStatus(character.data, boss, character.index, instance) or "")
             end
             row:Show()
