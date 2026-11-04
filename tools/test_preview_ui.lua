@@ -173,6 +173,11 @@ for _, name in ipairs({ "Offering bonus", "Offerings left", "Echo build", "Soul 
 Click("Close")
 local roster = environment.AshoholicPreviewRosterScroll
 local rosterPage, header = roster.parent
+local accountOneRows = 0
+for _, row in ipairs(rosterPage.rows) do
+    if row:IsVisible() then accountOneRows = accountOneRows + 1 end
+end
+assert(accountOneRows == 10, "Account One must contain exactly ten sample characters")
 for _, object in ipairs(objects) do
     if object.kind == "ScrollFrame" and object.parent == rosterPage and object ~= roster then header = object end
 end

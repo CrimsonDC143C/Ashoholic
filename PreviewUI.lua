@@ -32,6 +32,8 @@ for i, sample in ipairs({
     { "Briar", "DRUID", 3 }, { "Sol", "PALADIN", 3 }, { "Nyx", "MAGE", 3 },
     { "Ashen", "DEATHKNIGHT", 3 }, { "Gale", "SHAMAN", 4 },
     { "Rune", "WARLOCK", 4 }, { "Vale", "PRIEST", 4 }, { "Steel", "WARRIOR", 4 },
+    { "Fable", "HUNTER", 1 }, { "Wisp", "ROGUE", 1 }, { "Anvil", "WARRIOR", 1 },
+    { "Dusk", "WARLOCK", 1 }, { "Rime", "DEATHKNIGHT", 1 },
 }) do
     CHARACTERS[#CHARACTERS + 1] = {
         name = sample[1], class = sample[2], account = sample[3], level = 80, ilvl = 200 + i,
