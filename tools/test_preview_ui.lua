@@ -129,9 +129,10 @@ local function ClickObject(object)
     assert(object:IsVisible(), "Attempted click on a hidden widget")
     assert(object.scripts.OnClick, "Widget has no click handler")(object, "LeftButton")
 end
-local function Click(value)
+local function Click(value, parent)
     for _, object in ipairs(objects) do
-        if object.kind == "Button" and object.text and object.text:GetText() == value and object:IsVisible() then
+        if object.kind == "Button" and object.text and object.text:GetText() == value and object:IsVisible()
+            and (not parent or object.parent == parent) then
             ClickObject(object)
             return object
         end
@@ -405,7 +406,7 @@ Click("Fonts")
 assert(Text("WINDOW SCALE").font[2] == 13, "Discard must restore the previous font size")
 Click("Small")
 Click("Close")
-Click("Save as new...")
+Click("Save as new...", unsaved)
 local nameBox = environment.AshoholicPreviewDialog.box
 assert(nameBox.focused and nameBox.highlighted, "New preset name must be focused and selected")
 Accept("")
@@ -427,7 +428,7 @@ assert(previewSettings:IsShown() and unsaved:IsVisible(), "Escape/hiding Setting
 Click("Continue editing")
 environment.Ashoholic:TogglePreviewUI()
 assert(main:IsShown() and unsaved:IsVisible(), "Closing the main preview must protect an open theme draft")
-Click("Save as new...")
+Click("Save as new...", unsaved)
 Click("Cancel")
 assert(main:IsShown() and previewSettings:IsShown(), "Cancelling a preset name must return to the editor")
 Click("Close")
