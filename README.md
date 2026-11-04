@@ -86,6 +86,7 @@ fictional character names to FastSwap.
 Drag roster header edges to resize columns. Minimum widths fit each header and
 the widest sample value across all accounts. Overflow scrolls horizontally;
 widths follow their column when reordered and reset on `/reload`.
+Settings > Roster Columns can enable all eleven optional columns, not just six.
 
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.

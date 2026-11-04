@@ -1269,7 +1269,7 @@ local function BuildSettings()
 
     -- Roster Columns
     local columnBody = bodies["Roster Columns"]
-    Label(columnBody, "Choose up to six columns beside the character name. Use < / > to reorder selected columns.", 0, 0, 660, 11, GOLD)
+    Label(columnBody, "Choose any columns beside the character name. Use < / > to reorder; drag header edges to resize.", 0, 0, 660, 11, GOLD)
     local columnButtons = {}
     local function ColumnIndex(key)
         for i, selected in ipairs(columnOrder) do if selected == key then return i end end
@@ -1291,8 +1291,7 @@ local function BuildSettings()
             local index = ColumnIndex(key)
             columnNotice:SetText("")
             if index then table.remove(columnOrder, index)
-            elseif #columnOrder < 6 then columnOrder[#columnOrder + 1] = key
-            else columnNotice:SetText("Six columns are selected. Uncheck one before adding another."); return end
+            else columnOrder[#columnOrder + 1] = key end
             RefreshColumns()
         end)
         for direction = -1, 1, 2 do
