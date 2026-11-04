@@ -70,7 +70,7 @@ local STYLE = {
     tabActiveBg = { 0.075, 0.083, 0.105, 1 }, tabText = { 0.58, 0.61, 0.67 },
     tabActiveText = { 1, 0.79, 0.39 },
 }
-local surfaces, buttons, labels = {}, {}, {}
+local surfaces, buttons, labels, progressFills = {}, {}, {}, {}
 local settings, accountMenu
 local ShowSettings, Dialog
 local columns = {
@@ -233,14 +233,17 @@ local function Progress(parent, x, y, width, value, total)
     fill:SetPoint("TOPLEFT", track, "TOPLEFT")
     fill:SetSize(math.max(1, width * math.min(1, value / total)), 5)
     fill:SetVertexColor(unpack(TEAL))
+    progressFills[#progressFills + 1] = fill
     return track, fill
 end
 
 local function VisibleCharacters()
     local result = {}
-    for i, character in ipairs(CHARACTERS) do
-        if state.accounts[character.account] then
-            result[#result + 1] = { index = i, data = character }
+    for accountId = 1, #ACCOUNTS do
+        if state.accounts[accountId] then
+            for i, character in ipairs(CHARACTERS) do
+                if character.account == accountId then result[#result + 1] = { index = i, data = character } end
+            end
         end
     end
     return result
@@ -532,8 +535,8 @@ local function BuildRaids()
     local headerCells = {}
     for i = 1, #CHARACTERS do
         headerCells[i] = {
-            account = Label(header, "", MATRIX_FIRST + (i - 1) * matrixWidth, 6, matrixWidth - 6, 9, GOLD),
-            name = Label(header, "", MATRIX_FIRST + (i - 1) * matrixWidth, 26, matrixWidth - 6, 11),
+            account = Label(header, "", MATRIX_FIRST + (i - 1) * matrixWidth, 6, matrixWidth - 6, 9, GOLD, "account"),
+            name = Label(header, "", MATRIX_FIRST + (i - 1) * matrixWidth, 26, matrixWidth - 6, 11, STYLE.rowText, "character"),
         }
         for _, fs in pairs(headerCells[i]) do
             fs:SetHeight(14)
@@ -597,8 +600,8 @@ local function BuildRaids()
             row.name:SetHeight(13)
             if row.name.SetWordWrap then row.name:SetWordWrap(false) end
             row.cells = {}
-            for j = 1, #CHARACTERS do
-                row.cells[j] = Label(row, "", MATRIX_FIRST + (j - 1) * matrixWidth, 7, matrixWidth - 8, 10)
+            for j = 1, matrixColumns do
+                row.cells[j] = Label(row, "", MATRIX_FIRST + (j - 1) * matrixWidth, 7, matrixWidth - 8, 10, STYLE.rowText, "character")
             end
             page.matrixRows[i] = row
         end
@@ -706,6 +709,9 @@ local function BuildRaids()
         local function AddRow(name, boss, instance, category)
             rowIndex = rowIndex + 1
             local row = MatrixRow(rowIndex)
+            for j = #row.cells + 1, matrixColumns do
+                row.cells[j] = Label(row, "", 0, 7, matrixWidth - 8, 10, STYLE.rowText, "character")
+            end
             row:SetWidth(width)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 0, -y)
@@ -1045,6 +1051,7 @@ local function ApplyAppearance()
         if entry[4] == "button" or entry[4] == "header" or entry[4] == "character" then entry[1]:SetHeight(size + 3) end
         entry[1]:SetTextColor(unpack(entry[2]))
     end
+    for _, fill in ipairs(progressFills) do fill:SetVertexColor(unpack(TEAL)) end
     for _, window in ipairs({ settings, dialog, palette }) do
         if window then
             window:SetBackdropColor(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3], 0.99)
@@ -1065,6 +1072,7 @@ local function ApplyPreset(preset)
     Copy(TEXT, preset[7] or DEFAULT_TEXT)
     Copy(MUTED, preset[8] or DEFAULT_MUTED)
     Copy(TEAL, preset[9] or DEFAULT_TEAL)
+    for _, color in ipairs({ PANEL, BORDER, BUTTON_BG, BUTTON_BORDER, GOLD, TEXT, MUTED, TEAL }) do color[4] = 1 end
     for i = 1, 3 do
         BUTTON_BG[i] = math.min(1, preset[4][i] * 1.3 + 0.02)
         BUTTON_BORDER[i] = math.min(1, preset[5][i] * 1.25)
@@ -1077,6 +1085,7 @@ local function ApplyPreset(preset)
         elseif key == "rowOdd" or key == "rowEven" or key == "tabBg" then source = BUTTON_BG
         elseif key == "rowHover" or key == "buttonHover" then source = { GOLD[1], GOLD[2], GOLD[3], 0.09 } end
         Copy(STYLE[key], source)
+        STYLE[key][4] = source[4] or 1
         if key == "rowEven" then for i = 1, 3 do STYLE[key][i] = math.min(1, STYLE[key][i] + 0.02) end end
     end
     state.theme = preset[1]
@@ -1166,7 +1175,7 @@ local function PickColor(title, onPick, current)
             swatch:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.2)
             swatch:SetScript("OnClick", function()
                 palette:Hide()
-                if palette.onPick then palette.onPick(swatchColor) end
+                if palette.onPick then palette.onPick({ swatchColor[1], swatchColor[2], swatchColor[3], 1 }) end
             end)
         end
         Button(palette, "Cancel", 216, 212, 102, 28, function() palette:Hide() end)
@@ -1480,9 +1489,9 @@ local function BuildSettings()
     Choices(textBody, {
         { "Fonts\\FRIZQT__.TTF", "Friz Quadrata" }, { "Fonts\\ARIALN.TTF", "Arial Narrow" },
         { "Fonts\\MORPHEUS.TTF", "Morpheus" }, { "Fonts\\skurri.ttf", "Skurri" },
-    }, 0, 22, 154, 4, function() return state.font end, function(value) state.font = value; ApplyAppearance() end)
+    }, 0, 22, 152, 4, function() return state.font end, function(value) state.font = value; ApplyAppearance() end)
     Label(textBody, "TEXT SIZE", 0, 72, 300, 11, GOLD)
-    Choices(textBody, { { -1, "Small" }, { 0, "Normal" }, { 1, "Large" }, { 2, "Larger" } }, 0, 94, 154, 4,
+    Choices(textBody, { { -1, "Small" }, { 0, "Normal" }, { 1, "Large" }, { 2, "Larger" } }, 0, 94, 152, 4,
         function() return state.fontDelta end, function(value) state.fontDelta = value; ApplyAppearance() end)
     Label(textBody, "ROSTER ROW DENSITY", 0, 144, 300, 11, GOLD)
     Choices(textBody, { { "compact", "Compact" }, { "comfortable", "Comfortable" }, { "spacious", "Spacious" } }, 0, 166, 210, 3,

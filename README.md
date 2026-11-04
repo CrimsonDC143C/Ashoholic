@@ -105,6 +105,11 @@ and alpha. Text & Layout scrolls to per-role fonts and size adjustments, row hei
 spacing and border thickness. Save as new or update an applied custom preset.
 Class-name colors and loot-status colors intentionally retain their meaning.
 
+Developer check: `lua tools\test_preview_ui.lua` exercises the preview with mocked
+WoW widgets, including resize minimums, all columns, ten populated raid columns,
+account filtering, encounter collapsing and custom preset save/restore.
+This does not validate game-client rendering or real server behavior.
+
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.
 *   `/ash memory` - Collects Lua garbage and reports addon memory before and after collection. Run between repeated test batches to check whether retained memory keeps growing; this does not measure the game client's native memory or font cache.
