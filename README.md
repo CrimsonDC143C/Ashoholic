@@ -91,6 +91,11 @@ still respecting the current font and content minimum.
 Hold Shift while using the mouse wheel over the roster or its headers to scroll
 sideways. Without Shift, the wheel scrolls vertically.
 Settings > Roster Columns can enable all eleven optional columns, not just six.
+Click roster headers to cycle ascending, descending, then unsorted. The first
+column is primary; a second breaks ties. Selecting a third distinct column clears
+both and starts a new primary sort. Header markers show direction and priority.
+Sorting stays within account groups, keeps unknown values last, and returns to
+sample order when cleared. Hiding a column removes its sort.
 In Raids & Dungeons, hide the tracking-selection sidebar to make room for ten
 compact character columns without widening the main window. Wider columns and
 horizontal scrolling remain available for larger selections.

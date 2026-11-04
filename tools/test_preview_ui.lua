@@ -191,6 +191,35 @@ for _, object in ipairs(objects) do
     end
 end
 
+local function SortHeader(key)
+    for _, button in ipairs(rosterPage.headerButtons) do
+        if button.columnKey == key then ClickObject(button); return end
+    end
+    error("Sort header missing: " .. key)
+end
+local function Above(left, right)
+    return rosterPage.rows[left].points[3] > rosterPage.rows[right].points[3]
+end
+SortHeader("level")
+assert(Above(3, 1), "Ascending Level must put Thorn before level 80 characters")
+SortHeader("runAsh")
+assert(Above(2, 1) and Above(3, 2), "Secondary Run Ash must compare numeric earnings within level ties")
+SortHeader("runAsh")
+assert(Above(1, 2) and Above(3, 1), "Descending secondary sort must preserve the primary")
+SortHeader("gold")
+assert(Above(3, 2) and Above(2, 1), "Third column must replace both sorts with numeric Gold primary")
+SortHeader("gold")
+assert(Above(1, 2), "Second click must sort descending")
+SortHeader("gold")
+assert(Above(1, 2) and Above(2, 3), "Third click must restore original sample order")
+SortHeader("level")
+SortHeader("runAsh")
+SortHeader("level")
+SortHeader("level")
+assert(Above(3, 2) and Above(2, 1), "Clearing primary must promote the secondary")
+SortHeader("runAsh")
+SortHeader("runAsh")
+
 Click("Raids & Dungeons")
 Click("Watch all")
 local matrix = environment.AshoholicPreviewRaidMatrix.child

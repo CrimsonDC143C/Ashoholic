@@ -52,7 +52,7 @@ local state = {
     iconStyle = "icons", classIcons = true, statusStyle = "words", hiddenTabs = {}, defaultTab = "Roster",
     logo = "Interface\\Icons\\inv_soulash", scale = 1, opacity = 1,
     columnWidths = {}, rosterOffset = 0, encounterCollapsed = {}, fontRoles = {},
-    rowGap = 3, borderSize = 1,
+    rowGap = 3, borderSize = 1, rosterSort = {},
 }
 -- Mutated in place by the theme preview so every widget sharing them follows the theme.
 local PANEL = { 0.075, 0.083, 0.105, 1 }
@@ -292,6 +292,63 @@ local function PreviewSwap(character)
     Dialog("Swap to " .. character.name, "Preview only: this fictional character cannot be selected. In the live roster, Swap uses FastSwap for characters on the current account. Other accounts require logging in separately. No logout was requested.")
 end
 
+local function RosterSortValue(character, key)
+    if key == "character" then return string.lower(character.name) end
+    local value = character[key]
+    if type(value) == "number" then return value end
+    if not value or value == "Unknown" or value == "Sample" then return nil end
+    if key == "seen" then
+        if value == "Just now" then return 0 end
+        if value == "Today" then return 12 * 60 end
+        if value == "Yesterday" then return 24 * 60 end
+        local number, unit = value:match("^(%d+)%s+(%a+)")
+        local minutes = { min = 1, hour = 60, hours = 60, day = 1440, days = 1440 }
+        return number and minutes[unit] and tonumber(number) * minutes[unit] or nil
+    end
+    if key == "runAsh" or key == "gold" or key == "bonus" or key == "offerings" then
+        value = value:gsub(",", "")
+        local number, suffix = value:match("([%d%.]+)%s*([kKmM]?)")
+        if not number then return nil end
+        local multiplier = ({ k = 1000, m = 1000000 })[string.lower(suffix)] or 1
+        return tonumber(number) * multiplier
+    end
+    return string.lower(tostring(value))
+end
+
+local function SortedAccountCharacters(accountId)
+    local result = {}
+    for i, character in ipairs(CHARACTERS) do
+        if character.account == accountId then result[#result + 1] = i end
+    end
+    table.sort(result, function(left, right)
+        for _, sort in ipairs(state.rosterSort) do
+            local a = RosterSortValue(CHARACTERS[left], sort.key)
+            local b = RosterSortValue(CHARACTERS[right], sort.key)
+            if a ~= b then
+                -- Unknown snapshots stay last in either direction.
+                if a == nil then return false end
+                if b == nil then return true end
+                if sort.ascending then return a < b end
+                return a > b
+            end
+        end
+        return left < right
+    end)
+    return result
+end
+
+local function CycleRosterSort(key)
+    for i, sort in ipairs(state.rosterSort) do
+        if sort.key == key then
+            if sort.ascending then sort.ascending = false
+            else table.remove(state.rosterSort, i) end
+            return
+        end
+    end
+    if #state.rosterSort == 2 then state.rosterSort = {} end
+    state.rosterSort[#state.rosterSort + 1] = { key = key, ascending = true }
+end
+
 local function BuildRoster()
     local page = Page("Roster", "Your next adventure", "Characters first. Shared currencies stay at account level; run earnings stay with the character.")
     local headerScroll = CreateFrame("ScrollFrame", nil, page)
@@ -307,12 +364,21 @@ local function BuildRoster()
         measure:SetText(text)
         return math.ceil(measure:GetStringWidth()) + 22
     end
-    page.headers, page.grips = {}, {}
+    page.headers, page.grips, page.headerButtons = {}, {}, {}
     for i = 1, #columns + 1 do
+        local header = CreateFrame("Button", nil, headerBody)
+        header:SetHeight(23)
+        header:SetScript("OnClick", function(self)
+            CycleRosterSort(self.columnKey)
+            page.Refresh()
+        end)
+        Tip(header, "Sort column", "Click: ascending, descending, then unsorted. Add a second column to break ties. A third distinct column starts a new sort. Sorting stays within each account; ^ / v show direction and 1 / 2 show priority.")
+        page.headerButtons[i] = header
         page.headers[i] = Label(headerBody, "", 0, 4, 100, 10, STYLE.headerText, "header")
         page.headers[i]:SetHeight(16)
         if page.headers[i].SetWordWrap then page.headers[i]:SetWordWrap(false) end
         local grip = CreateFrame("Button", nil, headerBody)
+        grip:SetFrameLevel(header:GetFrameLevel() + 1)
         grip:SetSize(8, 23)
         local line = grip:CreateTexture(nil, "OVERLAY")
         line:SetTexture(WHITE)
@@ -420,12 +486,16 @@ local function BuildRoster()
             local key = j == 1 and "character" or columnOrder[j - 1]
             local title = "CHARACTER"
             for _, column in ipairs(columns) do if column.key == key then title = column.title end end
-            local minimum = Measure(title, 10, "header")
+            local displayTitle = title
+            for priority, sort in ipairs(state.rosterSort) do
+                if sort.key == key then displayTitle = title .. (sort.ascending and " ^" or " v") .. priority end
+            end
+            local minimum = Measure(title .. " v2", 10, "header")
             for _, character in ipairs(CHARACTERS) do
                 minimum = math.max(minimum, Measure(j == 1 and ClassName(character) or tostring(character[key] or "Unknown"), 11, "character"))
             end
             local cellWidth = math.max(minimum, state.columnWidths[key] or (j == 1 and 150 or 85))
-            layout[j] = { x = contentWidth, width = cellWidth, key = key, minimum = minimum, title = title }
+            layout[j] = { x = contentWidth, width = cellWidth, key = key, minimum = minimum, title = displayTitle }
             contentWidth = contentWidth + cellWidth
         end
         contentWidth = math.max(width, contentWidth + 76)
@@ -448,10 +518,15 @@ local function BuildRoster()
         end
         for j, fs in ipairs(page.headers) do
             PositionCell(fs, j, 4)
-            local cell, grip = layout[j], page.grips[j]
+            local cell, grip, header = layout[j], page.grips[j], page.headerButtons[j]
             SetVisible(grip, cell ~= nil)
+            SetVisible(header, cell ~= nil)
             fs:SetText(cell and cell.title or "")
             if cell then
+                header.columnKey = cell.key
+                header:ClearAllPoints()
+                header:SetPoint("TOPLEFT", cell.x, 0)
+                header:SetWidth(cell.width - 4)
                 grip.key, grip.minimum, grip.width = cell.key, cell.minimum, cell.width
                 grip:ClearAllPoints()
                 grip:SetPoint("TOPLEFT", cell.x + cell.width - 4, 0)
@@ -476,30 +551,29 @@ local function BuildRoster()
             local rowHeight = state.rowHeight or (state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44))
             local _, characterSize = FontFor("character", 11)
             rowHeight = math.max(rowHeight, characterSize + (state.density == "compact" and 16 or 33))
-            for i, character in ipairs(CHARACTERS) do
-                if character.account == accountId then
-                    local row = page.rows[i]
-                    SetVisible(row, show and not state.collapsed[accountId])
-                    if show and not state.collapsed[accountId] then
-                        row:SetWidth(contentWidth)
-                        row.swap:ClearAllPoints()
-                        row.swap:SetPoint("TOPRIGHT", -8, -5)
-                        row.hint:SetWidth(contentWidth - 90)
-                        row:SetHeight(rowHeight)
-                        row:ClearAllPoints()
-                        row:SetPoint("TOPLEFT", 0, -y)
-                        row:SetBackdropColor(unpack(i % 2 == 1 and STYLE.rowOdd or STYLE.rowEven))
-                        row:GetHighlightTexture():SetVertexColor(unpack(STYLE.rowHover))
-                        row:SetBackdropBorderColor(unpack(i == state.selected and STYLE.selectedBorder or BORDER))
-                        for j, fs in ipairs(row.cells) do
-                            PositionCell(fs, j, state.density == "spacious" and 11 or 8)
-                            fs:SetHeight(characterSize + 3)
-                            fs:SetText(j == 1 and ClassName(character) or tostring(character[columnOrder[j - 1]] or "Unknown"))
-                        end
-                        row.hint:SetText(character.action)
-                        SetVisible(row.hint, state.density ~= "compact")
-                        y = y + rowHeight + state.rowGap
+            for position, i in ipairs(SortedAccountCharacters(accountId)) do
+                local character = CHARACTERS[i]
+                local row = page.rows[i]
+                SetVisible(row, show and not state.collapsed[accountId])
+                if show and not state.collapsed[accountId] then
+                    row:SetWidth(contentWidth)
+                    row.swap:ClearAllPoints()
+                    row.swap:SetPoint("TOPRIGHT", -8, -5)
+                    row.hint:SetWidth(contentWidth - 90)
+                    row:SetHeight(rowHeight)
+                    row:ClearAllPoints()
+                    row:SetPoint("TOPLEFT", 0, -y)
+                    row:SetBackdropColor(unpack(position % 2 == 1 and STYLE.rowOdd or STYLE.rowEven))
+                    row:GetHighlightTexture():SetVertexColor(unpack(STYLE.rowHover))
+                    row:SetBackdropBorderColor(unpack(i == state.selected and STYLE.selectedBorder or BORDER))
+                    for j, fs in ipairs(row.cells) do
+                        PositionCell(fs, j, state.density == "spacious" and 11 or 8)
+                        fs:SetHeight(characterSize + 3)
+                        fs:SetText(j == 1 and ClassName(character) or tostring(character[columnOrder[j - 1]] or "Unknown"))
                     end
+                    row.hint:SetText(character.action)
+                    SetVisible(row.hint, state.density ~= "compact")
+                    y = y + rowHeight + state.rowGap
                 end
             end
         end
@@ -1625,7 +1699,11 @@ local function BuildSettings()
         columnButtons[i] = Button(columnBody, "", x, y, 240, 28, function()
             local index = ColumnIndex(key)
             columnNotice:SetText("")
-            if index then table.remove(columnOrder, index)
+            if index then
+                table.remove(columnOrder, index)
+                for priority = #state.rosterSort, 1, -1 do
+                    if state.rosterSort[priority].key == key then table.remove(state.rosterSort, priority) end
+                end
             else columnOrder[#columnOrder + 1] = key end
             RefreshColumns()
         end)
