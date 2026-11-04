@@ -1052,7 +1052,7 @@ local function BuildTrials()
     end
 end
 
-local dialog, palette
+local dialog, palette, closePrompt
 local DEFAULT_TEXT, DEFAULT_MUTED, DEFAULT_TEAL = { unpack(TEXT) }, { unpack(MUTED) }, { unpack(TEAL) }
 local THEMES = {
     { "Ember & Ash", "Warm ember gold on soot.", { 0.035, 0.042, 0.058 }, { 0.075, 0.083, 0.105 }, { 0.19, 0.21, 0.26 }, { 1, 0.79, 0.39 } },
@@ -1107,15 +1107,33 @@ local THEME_COLORS = { BACKGROUND, PANEL, BORDER, BUTTON_BG, BUTTON_BORDER, GOLD
 local STYLE_KEYS = { "titleText", "headerText", "rowText", "accountText", "rowOdd", "rowEven", "rowAccount",
     "rowHover", "selectedBorder", "buttonText", "buttonHover", "tabBg", "tabActiveBg", "tabText", "tabActiveText" }
 for _, key in ipairs(STYLE_KEYS) do THEME_COLORS[#THEME_COLORS + 1] = STYLE[key] end
-local THEME_OPTIONS = { "font", "fontDelta", "density", "opacity", "iconStyle", "classIcons", "statusStyle", "logo",
+local THEME_OPTIONS = { "font", "fontDelta", "density", "opacity", "scale", "iconStyle", "classIcons", "statusStyle", "logo",
     "fontRoles", "rowHeight", "rowGap", "borderSize" }
 local customThemes, nextThemeId = {}, 0
+local themeCheckpoint
 
 local function CaptureTheme()
     local result = { colors = {}, options = {} }
     for i, color in ipairs(THEME_COLORS) do result.colors[i] = Clone(color) end
     for _, key in ipairs(THEME_OPTIONS) do result.options[key] = Clone(state[key]) end
     return result
+end
+
+local function RememberTheme()
+    themeCheckpoint = {
+        appearance = CaptureTheme(), name = state.theme, customTheme = state.customTheme,
+        lastPreset = state.lastPreset,
+    }
+end
+
+local function SameTheme(left, right)
+    if type(left) ~= type(right) then return false end
+    if type(left) ~= "table" then return left == right end
+    for key, value in pairs(left) do
+        if not SameTheme(value, right[key]) then return false end
+    end
+    for key in pairs(right) do if left[key] == nil then return false end end
+    return true
 end
 
 local function Hex(color)
@@ -1143,7 +1161,7 @@ local function ApplyAppearance()
         entry[1]:SetTextColor(unpack(entry[2]))
     end
     for _, fill in ipairs(progressFills) do fill:SetVertexColor(unpack(TEAL)) end
-    for _, window in ipairs({ settings, dialog, palette }) do
+    for _, window in pairs({ settings, dialog, palette, closePrompt }) do
         if window then
             window:SetBackdropColor(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3], 0.99)
             window:SetBackdropBorderColor(GOLD[1] * 0.6, GOLD[2] * 0.6, GOLD[3] * 0.6, 1)
@@ -1182,6 +1200,7 @@ local function ApplyPreset(preset)
     state.theme = preset[1]
     state.lastPreset = preset[1]
     state.customTheme = nil
+    RememberTheme()
     ApplyAppearance()
 end
 
@@ -1189,6 +1208,7 @@ local function ApplyCustomTheme(theme)
     for i, color in ipairs(THEME_COLORS) do Copy(color, theme.appearance.colors[i]) end
     for _, key in ipairs(THEME_OPTIONS) do state[key] = Clone(theme.appearance.options[key]) end
     state.theme, state.customTheme = theme.name, theme.id
+    RememberTheme()
     frame:SetScale((frame.baseScale or 1) * state.scale)
     ApplyAppearance()
 end
@@ -1227,6 +1247,7 @@ Dialog = function(title, text, options)
         dialog.box:SetAutoFocus(false)
         dialog.box:SetFontObject(ChatFontNormal)
         dialog.box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+        dialog:SetScript("OnHide", function() dialog.box:ClearFocus() end)
         dialog.primary = Button(dialog, "", 18, 216, 200, 28)
         dialog.secondary = Button(dialog, "Cancel", 242, 216, 200, 28, function() dialog:Hide() end)
     end
@@ -1238,6 +1259,15 @@ Dialog = function(title, text, options)
     dialog.primary.text:SetText(options.primary or "OK")
     dialog.primary:SetScript("OnClick", function()
         local value = dialog.box:GetText()
+        if options.validate then
+            local errorText = options.validate(value)
+            if errorText then
+                dialog.text:SetText(errorText)
+                dialog.box:SetFocus()
+                dialog.box:HighlightText()
+                return
+            end
+        end
         dialog:Hide()
         if options.onAccept then options.onAccept(value) end
     end)
@@ -1307,7 +1337,7 @@ local function BuildSettings()
     settings.logo:SetTexture(state.logo)
     Label(settings, "ASHOHOLIC SETTINGS", 60, 15, 500, 18, GOLD)
     Label(settings, "Design preview  /  every choice applies to this preview immediately and is forgotten on /reload.", 60, 38, 760, 10, MUTED)
-    Button(settings, "X", 856, 14, 28, 26, function() settings:Hide() end)
+    Button(settings, "X", 856, 14, 28, 26, function() settings.RequestClose() end)
     local nav = Surface(settings, 16, 70, 186, 476)
     local bodies, navButtons = {}, {}
     settings.sectionTitle = Label(settings, "", 222, 74, 660, 16, GOLD)
@@ -1396,20 +1426,33 @@ local function BuildSettings()
     local function ThemeName(name, exceptId)
         name = name:match("^%s*(.-)%s*$")
         if name == "" or #name > 40 or name:find("|", 1, true) or name:find("[%c]") then
-            Say("Use a plain-text name of 1-40 characters, without control codes or |.")
-            return
+            local message = "Use a plain-text name of 1-40 characters, without control codes or |."
+            Say(message)
+            return nil, message
         end
         for _, preset in ipairs(THEMES) do
-            if string.lower(preset[1]) == string.lower(name) then Say("That name belongs to a default preset."); return end
+            if string.lower(preset[1]) == string.lower(name) then
+                local message = "That name belongs to a default preset."
+                Say(message)
+                return nil, message
+            end
         end
         for _, theme in ipairs(customThemes) do
-            if theme.id ~= exceptId and string.lower(theme.name) == string.lower(name) then Say("A custom preset already has that name."); return end
+            if theme.id ~= exceptId and string.lower(theme.name) == string.lower(name) then
+                local message = "A custom preset already has that name."
+                Say(message)
+                return nil, message
+            end
         end
         return name
     end
-    local function SaveCustomTheme()
+    local function SaveCustomTheme(onSaved)
         Dialog("Save custom preset", "Save colors, fonts, icons and row layout in this preview session. /reload clears all preview presets.", {
             box = "My Ashoholic theme", primary = "Save",
+            validate = function(value)
+                local _, message = ThemeName(value)
+                return message
+            end,
             onAccept = function(value)
                 local name = ThemeName(value)
                 if not name then return end
@@ -1417,10 +1460,80 @@ local function BuildSettings()
                 local theme = { id = nextThemeId, name = name, appearance = CaptureTheme() }
                 customThemes[#customThemes + 1] = theme
                 state.theme, state.customTheme = name, theme.id
+                RememberTheme()
                 settings.ShowSection("Themes")
                 Say("Saved '" .. name .. "' until /reload.")
+                if onSaved then onSaved() end
             end,
         })
+    end
+    local function SelectedCustomTheme()
+        for _, theme in ipairs(customThemes) do
+            if theme.id == state.customTheme then return theme end
+        end
+    end
+    local function UpdateCustomTheme()
+        local theme = SelectedCustomTheme()
+        if not theme then
+            Say("Apply or edit a custom preset first, or use Save as new.")
+            return false
+        end
+        theme.appearance = CaptureTheme()
+        state.theme = theme.name
+        RememberTheme()
+        Say("Updated '" .. theme.name .. "' until /reload.")
+        return true
+    end
+    local closing, closePreview = false, false
+    local function FinishClose()
+        closing = true
+        if closePrompt then closePrompt:Hide() end
+        settings:Hide()
+        if closePreview then frame:Hide() end
+        closePreview, closing = false, false
+    end
+    settings.RequestClose = function(withPreview)
+        closePreview = closePreview or withPreview or false
+        if not themeCheckpoint or SameTheme(CaptureTheme(), themeCheckpoint.appearance) then
+            FinishClose()
+            return
+        end
+        if not frame:IsShown() then frame:Show() end
+        settings:Show()
+        if palette then palette:Hide() end
+        if dialog then dialog:Hide() end
+        if not closePrompt then
+            closePrompt = Popup("AshoholicPreviewUnsavedTheme", 520, 232)
+            Label(closePrompt, "Unsaved theme changes", 18, 16, 484, 16, GOLD)
+            closePrompt.text = Label(closePrompt, "", 18, 48, 484, 11)
+            Button(closePrompt, "Save as new...", 18, 118, 236, 30, function()
+                closePrompt:Hide()
+                SaveCustomTheme(FinishClose)
+            end)
+            closePrompt.update = Button(closePrompt, "Update current", 266, 118, 236, 30, function()
+                if UpdateCustomTheme() then FinishClose() end
+            end)
+            Button(closePrompt, "Discard changes and close", 18, 164, 236, 30, function()
+                for i, color in ipairs(THEME_COLORS) do Copy(color, themeCheckpoint.appearance.colors[i]) end
+                for _, key in ipairs(THEME_OPTIONS) do state[key] = Clone(themeCheckpoint.appearance.options[key]) end
+                state.theme, state.customTheme = themeCheckpoint.name, themeCheckpoint.customTheme
+                state.lastPreset = themeCheckpoint.lastPreset
+                frame:SetScale((frame.baseScale or 1) * state.scale)
+                ApplyAppearance()
+                FinishClose()
+            end)
+            Button(closePrompt, "Continue editing", 266, 164, 236, 30, function()
+                closePreview = false
+                closePrompt:Hide()
+            end)
+        end
+        local custom = SelectedCustomTheme()
+        closePrompt.text:SetText(custom and ("Save your edits as a new custom preset, update '" .. custom.name .. "', or discard them. Presets last until /reload.")
+            or "Default presets are read-only. Save your edits as a new custom preset or discard them. Presets last until /reload.")
+        SetVisible(closePrompt.update, custom ~= nil)
+        closePrompt:SetScale(settings:GetScale())
+        closePrompt:Show()
+        closePrompt:Raise()
     end
     local themeGroup = {}
     for i, preset in ipairs(THEMES) do
@@ -1476,6 +1589,7 @@ local function BuildSettings()
                             if not name then return end
                             target.name = name
                             if state.customTheme == target.id then state.theme = name end
+                            if themeCheckpoint and themeCheckpoint.customTheme == target.id then themeCheckpoint.name = name end
                             settings.ShowSection("Themes")
                         end,
                     })
@@ -1487,7 +1601,11 @@ local function BuildSettings()
                             for index, entry in ipairs(customThemes) do
                                 if entry.id == target.id then table.remove(customThemes, index); break end
                             end
-                            if state.customTheme == target.id then state.customTheme = nil; state.theme = "Custom" end
+                            if state.customTheme == target.id then
+                                state.customTheme = nil
+                                state.theme = "Custom"
+                                if themeCheckpoint then themeCheckpoint.customTheme, themeCheckpoint.name = nil, "Custom" end
+                            end
                             settings.ShowSection("Themes")
                         end,
                     })
@@ -1510,7 +1628,7 @@ local function BuildSettings()
         themeScroll:SetVerticalScroll(math.min(themeScroll:GetVerticalScroll(), math.max(0, height - 350)))
     end
     Button(themeBody, "Customize...", 0, 360, 180, 30, function() settings.ShowSection("Colors") end)
-    Button(themeBody, "Save as custom...", 188, 360, 210, 30, SaveCustomTheme)
+    Button(themeBody, "Save as custom...", 188, 360, 210, 30, function() SaveCustomTheme() end)
     Button(themeBody, "Import...", 406, 360, 210, 30, function() settings.ShowSection("Profiles & Sharing") end)
     Label(themeBody, "Default presets are read-only. Custom presets are session-local; account filters are never included.", 0, 400, 660, 10, MUTED)
 
@@ -1554,18 +1672,8 @@ local function BuildSettings()
         for _, entry in ipairs(swatches) do entry[1]:SetVertexColor(entry[2][1], entry[2][2], entry[2][3], entry[2][4] or 1) end
     end }
     colorBody:SetHeight(math.ceil(#slots / 2) * 52)
-    Button(colorPage, "Save as new...", 0, 360, 190, 30, SaveCustomTheme)
-    Button(colorPage, "Update selected", 198, 360, 210, 30, function()
-        for _, theme in ipairs(customThemes) do
-            if theme.id == state.customTheme then
-                theme.appearance = CaptureTheme()
-                state.theme = theme.name
-                Say("Updated '" .. theme.name .. "' until /reload.")
-                return
-            end
-        end
-        Say("Apply or edit a custom preset first, or use Save as new.")
-    end)
+    Button(colorPage, "Save as new...", 0, 360, 190, 30, function() SaveCustomTheme() end)
+    Button(colorPage, "Update selected", 198, 360, 210, 30, UpdateCustomTheme)
     Button(colorPage, "Revert to default", 416, 360, 210, 30, function()
         for _, preset in ipairs(THEMES) do
             if preset[1] == (state.lastPreset or "Ember & Ash") then ApplyPreset(preset) end
@@ -1902,7 +2010,7 @@ local function BuildSettings()
             end,
         })
     end)
-    Button(settings, "Close", 732, 558, 152, 30, function() settings:Hide() end)
+    Button(settings, "Close", 732, 558, 152, 30, function() settings.RequestClose() end)
     settings.ShowSection = function(section)
         if not bodies[section] then section = "Themes" end
         settings.current = section
@@ -1920,6 +2028,11 @@ local function BuildSettings()
         if bodies[section].Refresh then bodies[section].Refresh() end
     end
     settings:SetScript("OnHide", function()
+        if not closing and themeCheckpoint and not SameTheme(CaptureTheme(), themeCheckpoint.appearance) then
+            settings.RequestClose(not frame:IsShown())
+            return
+        end
+        if closePrompt then closePrompt:Hide() end
         if dialog then dialog:Hide() end
         if palette then palette:Hide() end
     end)
@@ -1928,6 +2041,7 @@ end
 
 ShowSettings = function(section)
     if accountMenu then accountMenu:Hide() end
+    if not themeCheckpoint then RememberTheme() end
     if not settings then BuildSettings() end
     settings:SetScale(frame.baseScale or frame:GetScale())
     settings.ShowSection(section or settings.current or "Themes")

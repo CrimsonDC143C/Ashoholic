@@ -108,6 +108,11 @@ Themes separates read-only Default Presets from Custom Presets. Custom presets
 can be saved, applied, starred, renamed, edited and deleted; they capture colors,
 fonts, icons and row layout, but not account filters. They last until `/reload`
 and never replace the live addon's saved themes.
+Closing Settings with edited theme colors, fonts, icons or layout prompts to save
+as a new custom preset, discard changes, or continue editing. Applied custom
+presets also offer Update current. New-preset names are focused and selected
+automatically. Saving closes Settings; cancelling the name popup keeps the draft.
+Discard restores the appearance from the last applied or saved preset.
 The Colors editor offers independent title/header, row/account, button and tab
 colors, including odd/even rows, hover and selection. Use RGBA hex for exact colors
 and alpha. Text & Layout scrolls to per-role fonts and size adjustments, row height,

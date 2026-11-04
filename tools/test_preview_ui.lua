@@ -66,12 +66,15 @@ function methods:SetBackdropColor(...) self.background = { ... } end
 function methods:SetVertexColor(...) self.color = { ... } end
 function methods:AddLine(text) self.lines = self.lines or {}; self.lines[#self.lines + 1] = text end
 function methods:SetOwner() self.lines = {} end
+function methods:SetFocus() self.focused = true end
+function methods:ClearFocus() self.focused = false end
+function methods:HighlightText() self.highlighted = true end
 for _, name in ipairs({
     "SetAllPoints", "SetTexture", "SetTexCoord", "SetBackdrop", "SetBackdropBorderColor",
     "SetTextColor", "SetJustifyH", "SetJustifyV", "SetWordWrap", "SetFontObject",
     "SetFrameStrata", "SetClampedToScreen", "EnableMouse", "EnableMouseWheel", "SetMovable",
     "RegisterForDrag", "SetOrientation", "SetValueStep", "StartMoving", "StopMovingOrSizing",
-    "SetToplevel", "Raise", "SetMultiLine", "SetAutoFocus", "SetFocus", "ClearFocus", "HighlightText",
+    "SetToplevel", "Raise", "SetMultiLine", "SetAutoFocus",
     "SetMaxLetters",
 }) do methods[name] = Noop end
 function environment.CreateFrame(kind, name, parent) return NewObject(kind, name, parent) end
@@ -341,4 +344,44 @@ cursor = 5
 grip.scripts.OnUpdate(grip)
 assert(grip.width == before + 5, "Dragging after a font change must start at the displayed width")
 grip.scripts.OnMouseUp(grip)
+Settings("Themes")
+Click("Ember & Ash")
+Click("Text & Layout")
+Click("Small")
+Click("Close")
+local unsaved = environment.AshoholicPreviewUnsavedTheme
+local previewSettings = environment.AshoholicPreviewSettings
+assert(unsaved:IsVisible() and not unsaved.update:IsShown(), "Default preset edits must offer Save as new, not Update")
+Click("Continue editing")
+assert(previewSettings:IsVisible() and not unsaved:IsShown(), "Continue editing must preserve the open editor")
+Click("Close")
+Click("Discard changes and close")
+assert(not previewSettings:IsShown(), "Discard must close Settings")
+Settings("Text & Layout")
+assert(Text("WINDOW SCALE").font[2] == 13, "Discard must restore the previous font size")
+Click("Small")
+Click("Close")
+Click("Save as new...")
+local nameBox = environment.AshoholicPreviewDialog.box
+assert(nameBox.focused and nameBox.highlighted, "New preset name must be focused and selected")
+Accept("")
+assert(environment.AshoholicPreviewDialog:IsVisible(), "Invalid preset names must leave the naming popup open")
+Accept("Close test theme")
+assert(not previewSettings:IsShown(), "Saving a new preset from the close prompt must close Settings")
+Settings("Text & Layout")
+Click("Normal")
+Click("Close")
+assert(unsaved.update:IsVisible(), "Custom preset edits must offer Update current")
+Click("Update current")
+assert(not previewSettings:IsShown(), "Updating the current preset must close Settings")
+Settings("Text & Layout")
+Click("Larger")
+previewSettings:Hide()
+assert(previewSettings:IsShown() and unsaved:IsVisible(), "Escape/hiding Settings must not bypass unsaved changes")
+Click("Continue editing")
+environment.Ashoholic:TogglePreviewUI()
+assert(main:IsShown() and unsaved:IsVisible(), "Closing the main preview must protect an open theme draft")
+Click("Discard changes and close")
+assert(not main:IsShown() and not previewSettings:IsShown(), "Discard must finish the requested main-window close")
+environment.Ashoholic:TogglePreviewUI()
 print("preview-ui: tooltips, safe Swap, eleven columns, resize minimum, scrolling, encounter groups, ten slots, activities and preset lifecycle passed")
