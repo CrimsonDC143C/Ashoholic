@@ -34,6 +34,7 @@ EXPLICIT = {
     "HourlyWidget.lua": "Ashoholic/HourlyWidget.lua",
     "Minimap.lua": "Ashoholic/Minimap.lua",
     "Themes.lua": "Ashoholic/Themes.lua",
+    "ColorPicker.lua": "Ashoholic/ColorPicker.lua",
     "UI.lua": "Ashoholic/UI.lua",
     "PreviewUI.lua": "Ashoholic/PreviewUI.lua",
     "NexusDock.lua": "Ashoholic/NexusDock.lua",

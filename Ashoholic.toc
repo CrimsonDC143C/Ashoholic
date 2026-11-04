@@ -15,6 +15,7 @@ Characters.lua
 HourlyWidget.lua
 Minimap.lua
 Themes.lua
+ColorPicker.lua
 UI.lua
 PreviewUI.lua
 NexusDock.lua

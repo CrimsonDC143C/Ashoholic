@@ -5,7 +5,7 @@ local cursor, shiftDown = 0, false
 local function Noop() end
 local function NewObject(kind, name, parent)
     local object = setmetatable({
-        kind = kind, parent = parent, shown = true, scripts = {}, points = {},
+        kind = kind, name = name, parent = parent, shown = true, scripts = {}, points = {},
         width = 100, height = 100, value = 0, scale = 1, font = { "font", 12 },
     }, { __index = methods })
     objects[#objects + 1] = object
@@ -14,6 +14,14 @@ local function NewObject(kind, name, parent)
 end
 function methods:SetScript(event, callback) self.scripts[event] = callback end
 function methods:GetScript(event) return self.scripts[event] end
+function methods:HookScript(event, callback)
+    local original = self.scripts[event]
+    self.scripts[event] = function(...)
+        if original then original(...) end
+        callback(...)
+    end
+end
+function methods:GetName() return self.name end
 function methods:SetPoint(...) self.points = { ... } end
 function methods:ClearAllPoints() self.points = {} end
 function methods:SetWidth(value) self.width = value end
@@ -26,7 +34,11 @@ function methods:GetScale() return self.scale end
 function methods:GetEffectiveScale() return self.parent and self.parent:GetEffectiveScale() * self.scale or self.scale end
 function methods:GetFrameLevel() return self.frameLevel or 1 end
 function methods:SetFrameLevel(value) self.frameLevel = value end
-function methods:Show() self.shown = true end
+function methods:Show()
+    local changed = not self.shown
+    self.shown = true
+    if changed and self.scripts.OnShow then self.scripts.OnShow(self) end
+end
 function methods:Hide()
     local changed = self.shown
     self.shown = false
@@ -66,6 +78,8 @@ function methods:SetBackdropColor(...) self.background = { ... } end
 function methods:SetVertexColor(...) self.color = { ... } end
 function methods:AddLine(text) self.lines = self.lines or {}; self.lines[#self.lines + 1] = text end
 function methods:SetOwner() self.lines = {} end
+function methods:SetColorRGB(r, g, b) self.rgb = { r, g, b } end
+function methods:GetColorRGB() return unpack(self.rgb) end
 function methods:SetFocus() self.focused = true end
 function methods:ClearFocus() self.focused = false end
 function methods:HighlightText() self.highlighted = true end
@@ -80,6 +94,7 @@ for _, name in ipairs({
 function environment.CreateFrame(kind, name, parent) return NewObject(kind, name, parent) end
 function environment.GetCursorPosition() return cursor, 0 end
 function environment.IsShiftKeyDown() return shiftDown end
+function environment.GetTime() return 1 end
 environment.tinsert, environment.UISpecialFrames = table.insert, {}
 environment.UIParent = NewObject("Frame")
 environment.UIParent:SetSize(1920, 1080)
@@ -95,6 +110,11 @@ local function Forbidden() error("Preview attempted a live operation") end
 environment.Logout, environment.FastSwap_PerformSwap = Forbidden, Forbidden
 environment.ProjectEbonhold.sendToServer = Forbidden
 environment.Ashoholic = {}
+environment.ColorPickerFrame = NewObject("Frame", nil, environment.UIParent)
+environment.ColorPickerFrame:Hide()
+environment.ColorPickerFrameOpacitySlider = NewObject("Slider", nil, environment.ColorPickerFrame)
+environment.ColorPickerFrameOpacitySlider:SetMinMaxValues(0, 1)
+setfenv(assert(loadfile("ColorPicker.lua")), environment)("Ashoholic")
 setfenv(assert(loadfile("PreviewUI.lua")), environment)("Ashoholic")
 environment.Ashoholic:TogglePreviewUI()
 
@@ -283,9 +303,19 @@ Accept("First theme")
 Click("Star")
 Click("Customize...")
 Click("Change")
-Click("RGBA hex...")
-Accept("11223380")
+local picker, opacity = environment.ColorPickerFrame, environment.ColorPickerFrameOpacitySlider
+assert(picker:IsVisible() and picker.hasOpacity, "Change must open the shared color-and-opacity picker")
+for i = 1, 8 do picker.scripts.OnUpdate(picker) end
+opacity:SetValue(0.25)
+picker:SetColorRGB(0.2, 0.3, 0.4)
+picker.func()
 local main = environment.AshoholicPreviewFrame
+assert(main.background[1] == 0.2 and main.background[4] == 0.25, "Picker must apply RGB and opacity live")
+picker.cancelFunc()
+picker:Hide()
+assert(main.background[1] == 0.035 and main.background[4] == 0.99, "Cancel must restore original RGB and alpha")
+Click("Hex")
+Accept("11223380")
 assert(math.abs(main.background[1] - 17 / 255) < 0.001 and math.abs(main.background[4] - 128 / 255) < 0.001,
     "RGBA editor must apply RGB and alpha exactly")
 Click("Text & Layout")

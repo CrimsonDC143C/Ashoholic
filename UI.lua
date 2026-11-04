@@ -3793,209 +3793,23 @@ function addon:ToggleConfigUI()
             local originalHex = swatch.hex
             local defHex = defaultHexFor(key)
 
-            -- Find the opacity slider. Try the global name first, then walk
-            -- the ColorPickerFrame's descendants (some forks rename it).
-            local function findOpacitySlider()
-                local s = _G["ColorPickerFrameOpacitySlider"]
-                if s and s.GetValue then return s end
-                local function walk(f, depth)
-                    if not f or not f.GetNumChildren or depth > 5 then return nil end
-                    for i = 1, f:GetNumChildren() do
-                        local c = select(i, f:GetChildren())
-                        if c and c.GetObjectType then
-                            if c:GetObjectType() == "Slider" then return c end
-                            local found = walk(c, depth + 1)
-                            if found then return found end
-                        end
-                    end
-                    return nil
-                end
-                return walk(ColorPickerFrame, 0)
-            end
-
-            -- Read the CURRENT alpha from the visible slider value.
-            -- This is the ONLY source of truth on 3.3.5 forks —
-            -- ColorPickerFrame.opacity is never updated when the user
-            -- drags the thumb (the built-in handler never fires).
-            local function readSliderAlpha()
-                local s = ColorPickerFrame._ashOpSlider
-                if s and s.GetValue then
-                    local v = s:GetValue()
-                    local minV, maxV = s:GetMinMaxValues()
-                    if not minV then minV = 0 end
-                    if not maxV or maxV <= minV then maxV = minV + 1 end
-                    local range = maxV - minV
-                    if range > 0 then
-                        local norm = (v - minV) / range
-                        if norm < 0 then norm = 0 elseif norm > 1 then norm = 1 end
-                        return norm
-                    end
-                end
-                return ColorPickerFrame.opacity or 1
-            end
-
-            local function apply()
-                local nr, ng, nb = ColorPickerFrame:GetColorRGB()
-                local na = readSliderAlpha()
-                if na < 0 then na = 0 elseif na > 1 then na = 1 end
+            addon:OpenColorPicker({ r, g, b, a }, function(nr, ng, nb, na)
+                if not addon.customDraft then return end
                 addon.customDraft[key] = toHex(nr, ng, nb, na)
                 addon:ApplyDraft()
                 Refresh()
-            end
-
-            -- Register callbacks (they may or may not fire on this fork —
-            -- the OnUpdate monitor below is the real mechanism).
-            ColorPickerFrame._ashApply   = apply
-            ColorPickerFrame._ashInitial = a
-            ColorPickerFrame.func        = apply
-            ColorPickerFrame.opacityFunc = apply
-            if ColorPickerFrame.swatchFunc then
-                ColorPickerFrame.swatchFunc = apply
-            end
-            ColorPickerFrame.cancelFunc = function()
+            end, function()
                 if not addon.customDraft then return end
                 addon.customDraft[key] = originalHex
                 addon:ApplyDraft()
                 Refresh()
-            end
-
-            ColorPickerFrame.hasOpacity = true
-            ColorPickerFrame.opacity    = a
-
-            if defHex then
-                ColorPickerFrame.hasDefault   = 1
-                ColorPickerFrame.defaultColor = { parseHex(defHex) }
-                ColorPickerFrame.defaultFunc  = function()
-                    if not addon.customDraft then return end
-                    addon.customDraft[key] = nil
-                    addon:ApplyDraft()
-                    Refresh()
-                    ColorPickerFrame:Hide()
-                end
-            else
-                ColorPickerFrame.defaultColor = nil
-                ColorPickerFrame.defaultFunc  = nil
-            end
-            ColorPickerFrame.hasDefault = nil
-
-            -- Cache the slider before Show().
-            ColorPickerFrame._ashOpSlider = findOpacitySlider()
-
-            -- Reset force-frame state BEFORE Show(). This fixes two bugs:
-            --   * The very first open, when the OnShow hook wasn't yet
-            --     installed at the moment Show() fired.
-            --   * Switching swatches while the picker is already open —
-            --     Show() is a no-op then and OnShow never fires.
-            ColorPickerFrame._ashForceFrames     = 8
-            ColorPickerFrame._ashLastSliderValue = nil
-            ColorPickerFrame._ashLastApplyTime   = 0
-
-            ColorPickerFrame:SetColorRGB(r, g, b)
-            ColorPickerFrame:Show()
-            local defaultButton = _G["ColorPickerFrameDefaultButton"]
-            if defaultButton then defaultButton:Hide() end
-
-            -- Install the monitor ONCE. It lives on ColorPickerFrame
-            -- (not on the slider) and fires every frame while the picker
-            -- is shown. It:
-            --   * re-finds the slider if the global was missing,
-            --   * overrides Show()'s opacity=0 reset for the first few
-            --     frames so the picker opens at the saved alpha,
-            --   * watches GetValue() directly and applies live changes
-            --     to the draft immediately.
-            if not ColorPickerFrame._ashMonitorInstalled then
-                ColorPickerFrame._ashMonitorInstalled = true
-
-                ColorPickerFrame:HookScript("OnShow", function(self)
-                    self._ashForceFrames     = 8
-                    self._ashLastSliderValue = nil
-                end)
-
-                ColorPickerFrame:HookScript("OnHide", function(self)
-                    self._ashForceFrames     = 0
-                    self._ashLastSliderValue = nil
-                    self._ashLastApplyTime   = nil
-                    -- Do NOT apply here: some 3.3.5 builds reset the slider
-                    -- value to 0 BEFORE OnHide fires, which would overwrite
-                    -- the user's saved alpha with 0. The guaranteed final
-                    -- apply happens on the slider's OnMouseUp instead.
-                end)
-
-                ColorPickerFrame:HookScript("OnUpdate", function(self)
-                    if not self._ashApply then return end
-
-                    local s = self._ashOpSlider
-                    if not s or not s.GetValue then
-                        s = findOpacitySlider()
-                        self._ashOpSlider = s
-                    end
-                    if not s or not s.GetValue then return end
-
-                    -- Guaranteed final-apply on mouse-up: the throttle skips
-                    -- frames during fast drags, and Show() can reset opacity
-                    -- on close, so we can't rely on OnHide. OnMouseUp fires
-                    -- at the exact moment the user lets go, before anything
-                    -- resets the slider.
-                    if not s._ashMouseUpHooked then
-                        s._ashMouseUpHooked = true
-                        s:HookScript("OnMouseUp", function()
-                            if ColorPickerFrame._ashApply then
-                                ColorPickerFrame._ashApply()
-                            end
-                        end)
-                    end
-
-                    -- (1) Force the initial value for the first ~8 frames.
-                    -- Show() and SetColorRGB reset opacity AFTER our
-                    -- pre-Show assignment, and the reset runs a frame or
-                    -- two late. Keep forcing so the thumb lands at the
-                    -- saved alpha and the "A" textbox shows it too.
-                    if self._ashForceFrames and self._ashForceFrames > 0 then
-                        self._ashForceFrames = self._ashForceFrames - 1
-                        local alpha = self._ashInitial or 1
-                        local minV, maxV = s:GetMinMaxValues()
-                        if not minV then minV = 0 end
-                        if not maxV or maxV <= minV then maxV = minV + 1 end
-                        local range = maxV - minV
-                        if range > 0 then
-                            s:SetValue(minV + alpha * range)
-                        end
-                        self.opacity = alpha
-                        self._ashLastSliderValue = s:GetValue()
-                        return
-                    end
-
-                    -- (2) Watch for user movement. If GetValue() changed
-                    -- since the last frame, the user is dragging the thumb
-                    -- or clicked somewhere on the slider — apply it live.
-                    local v = s:GetValue()
-                    if self._ashLastSliderValue == nil then
-                        self._ashLastSliderValue = v
-                        return
-                    end
-                    if v ~= self._ashLastSliderValue then
-                        self._ashLastSliderValue = v
-                        local minV, maxV = s:GetMinMaxValues()
-                        if not minV then minV = 0 end
-                        if not maxV or maxV <= minV then maxV = minV + 1 end
-                        local range = maxV - minV
-                        if range > 0 then
-                            local norm = (v - minV) / range
-                            if norm < 0 then norm = 0 elseif norm > 1 then norm = 1 end
-                            self.opacity = norm
-
-                            -- Throttle the heavy ApplyTheme to ~12/sec so the
-                            -- drag feels smooth. ApplyTheme rebuilds every
-                            -- themed widget, which is expensive at 60 fps.
-                            local now = GetTime()
-                            if (now - (self._ashLastApplyTime or 0)) >= 0.08 then
-                                self._ashLastApplyTime = now
-                                self._ashApply()
-                            end
-                        end
-                    end
-                end)
-            end
+            end, swatch, defHex and { parseHex(defHex) }, defHex and function()
+                if not addon.customDraft then return end
+                addon.customDraft[key] = nil
+                addon:ApplyDraft()
+                Refresh()
+                ColorPickerFrame:Hide()
+            end)
         end)
 
         widgets[#widgets + 1] = Refresh

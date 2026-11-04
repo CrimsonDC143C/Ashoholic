@@ -1052,7 +1052,7 @@ local function BuildTrials()
     end
 end
 
-local dialog, palette, closePrompt
+local dialog, closePrompt
 local DEFAULT_TEXT, DEFAULT_MUTED, DEFAULT_TEAL = { unpack(TEXT) }, { unpack(MUTED) }, { unpack(TEAL) }
 local THEMES = {
     { "Ember & Ash", "Warm ember gold on soot.", { 0.035, 0.042, 0.058 }, { 0.075, 0.083, 0.105 }, { 0.19, 0.21, 0.26 }, { 1, 0.79, 0.39 } },
@@ -1063,12 +1063,6 @@ local THEMES = {
     { "Holy Light", "Bright, warm and soft.", { 0.08, 0.075, 0.06 }, { 0.13, 0.12, 0.09 }, { 0.5, 0.44, 0.26 }, { 1, 0.92, 0.55 } },
     { "Old Parchment", "Aged leather and ink.", { 0.1, 0.078, 0.05 }, { 0.15, 0.12, 0.08 }, { 0.45, 0.34, 0.2 }, { 0.94, 0.85, 0.63 }, { 0.95, 0.91, 0.82 }, { 0.63, 0.56, 0.45 } },
     { "Terminal", "Green phosphor. Flat.", { 0, 0, 0 }, { 0.02, 0.05, 0.02 }, { 0.12, 0.56, 0.25 }, { 0.2, 1, 0.4 }, { 0.67, 1, 0.73 }, { 0.12, 0.56, 0.25 }, { 0.4, 1, 0.67 } },
-}
-local PALETTE = {
-    { 1, 0.79, 0.39 }, { 1, 0.6, 0.2 }, { 1, 0.35, 0.35 }, { 0.85, 0.2, 0.3 }, { 1, 0.92, 0.55 }, { 0.94, 0.85, 0.63 },
-    { 0.55, 1, 0.3 }, { 0.2, 1, 0.4 }, { 0.4, 0.86, 0.78 }, { 0.45, 0.8, 1 }, { 0.3, 0.5, 1 }, { 0.8, 0.55, 1 },
-    { 0.88, 0.88, 0.9 }, { 0.58, 0.61, 0.67 }, { 0.35, 0.37, 0.42 }, { 0.19, 0.21, 0.26 }, { 0.12, 0.13, 0.17 }, { 0.075, 0.083, 0.105 },
-    { 0.035, 0.042, 0.058 }, { 0, 0, 0 }, { 0.1, 0.078, 0.05 }, { 0.025, 0.05, 0.085 }, { 0.05, 0.02, 0.08 }, { 0.06, 0.015, 0.02 },
 }
 local LOGOS = {
     "Interface\\Icons\\inv_soulash", "Interface\\Icons\\inv_misc_supersoulash",
@@ -1161,7 +1155,7 @@ local function ApplyAppearance()
         entry[1]:SetTextColor(unpack(entry[2]))
     end
     for _, fill in ipairs(progressFills) do fill:SetVertexColor(unpack(TEAL)) end
-    for _, window in pairs({ settings, dialog, palette, closePrompt }) do
+    for _, window in pairs({ settings, dialog, closePrompt }) do
         if window then
             window:SetBackdropColor(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3], 0.99)
             window:SetBackdropBorderColor(GOLD[1] * 0.6, GOLD[2] * 0.6, GOLD[3] * 0.6, 1)
@@ -1280,51 +1274,36 @@ Dialog = function(title, text, options)
     end
 end
 
-local function PickColor(title, onPick, current)
-    if not palette then
-        palette = Popup("AshoholicPreviewPalette", 336, 256)
-        palette.title = Label(palette, "", 18, 16, 300, 14, GOLD)
-        for i, color in ipairs(PALETTE) do
-            local swatchColor = color
-            local swatch = CreateFrame("Button", nil, palette)
-            swatch:SetPoint("TOPLEFT", 18 + ((i - 1) % 6) * 50, -(48 + math.floor((i - 1) / 6) * 38))
-            swatch:SetSize(44, 32)
-            swatch:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
-            swatch:SetBackdropColor(color[1], color[2], color[3], 1)
-            swatch:SetBackdropBorderColor(0.5, 0.5, 0.55, 1)
-            swatch:SetHighlightTexture(WHITE)
-            swatch:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.2)
-            swatch:SetScript("OnClick", function()
-                palette:Hide()
-                if palette.onPick then palette.onPick({ swatchColor[1], swatchColor[2], swatchColor[3], 1 }) end
-            end)
-        end
-        Button(palette, "Cancel", 216, 212, 102, 28, function() palette:Hide() end)
-        Button(palette, "RGBA hex...", 18, 212, 150, 28, function()
-            local callback, initial = palette.onPick, palette.current
-            palette:Hide()
-            Dialog("Custom RGBA color", "Enter RRGGBB or RRGGBBAA (00 transparent, FF opaque). Example: FFCC6680.", {
-                box = Hex(initial) .. string.format("%02x", math.floor((initial[4] or 1) * 255 + 0.5)),
-                primary = "Apply", onAccept = function(value)
-                    value = value:match("^%s*#?(%x+)%s*$")
-                    if not value or (#value ~= 6 and #value ~= 8) then
-                        print("|cffff6060Ashoholic preview:|r Invalid color. Enter six or eight hexadecimal digits.")
-                        return
-                    end
-                    local color = {}
-                    for i = 1, #value / 2 do color[i] = tonumber(value:sub(i * 2 - 1, i * 2), 16) / 255 end
-                    color[4] = color[4] or 1
-                    callback(color)
-                end,
-            })
-        end)
-    end
-    palette:SetScale(settings and settings:GetScale() or 1)
-    palette.title:SetText(title)
-    palette.onPick = onPick
-    palette.current = current or TEXT
-    palette:Show()
-    palette:Raise()
+local function PickColor(onPick, current)
+    local original, originalTheme = Clone(current or TEXT), state.theme
+    addon:OpenColorPicker(original, function(r, g, b, a)
+        onPick({ r, g, b, a })
+    end, function()
+        onPick(original)
+        state.theme = originalTheme
+        ApplyAppearance()
+    end, settings)
+end
+
+local function EditColorHex(title, onPick, current)
+    addon:CloseColorPicker(settings)
+    Dialog(title .. " / RGBA hex", "Enter RRGGBB or RRGGBBAA (00 transparent, FF opaque). Example: FFCC6680.", {
+        box = Hex(current) .. string.format("%02x", math.floor((current[4] or 1) * 255 + 0.5)),
+        primary = "Apply",
+        validate = function(value)
+            value = value:match("^%s*#?(%x+)%s*$")
+            if not value or (#value ~= 6 and #value ~= 8) then
+                return "Invalid color. Enter six or eight hexadecimal digits."
+            end
+        end,
+        onAccept = function(value)
+            value = value:match("^%s*#?(%x+)%s*$")
+            local color = {}
+            for i = 1, #value / 2 do color[i] = tonumber(value:sub(i * 2 - 1, i * 2), 16) / 255 end
+            color[4] = color[4] or 1
+            onPick(color)
+        end,
+    })
 end
 
 local function BuildSettings()
@@ -1500,7 +1479,7 @@ local function BuildSettings()
         end
         if not frame:IsShown() then frame:Show() end
         settings:Show()
-        if palette then palette:Hide() end
+        addon:CloseColorPicker(settings)
         if dialog then dialog:Hide() end
         if not closePrompt then
             closePrompt = Popup("AshoholicPreviewUnsavedTheme", 520, 232)
@@ -1653,20 +1632,21 @@ local function BuildSettings()
         local target, title = slot[2], slot[1]
         local x, y = ((i - 1) % 2) * 320, math.floor((i - 1) / 2) * 52
         local row = Surface(colorBody, x, y, 310, 44)
-        Label(row, title, 9, 15, 165, 11)
+        Label(row, title, 9, 15, 143, 11)
         local swatch = row:CreateTexture(nil, "OVERLAY")
         swatch:SetTexture(WHITE)
-        swatch:SetPoint("TOPLEFT", 176, -9)
-        swatch:SetSize(32, 26)
+        swatch:SetPoint("TOPLEFT", 158, -9)
+        swatch:SetSize(24, 26)
         swatches[i] = { swatch, target }
-        Button(row, "Change", 216, 8, 86, 28, function()
-            PickColor(title, function(color)
-                Copy(target, color)
-                state.theme = "Custom"
-                ApplyAppearance()
-                Say(title .. " changed. Save or update your custom preset to keep this draft.")
-            end, target)
-        end)
+        local function SetColor(color)
+            Copy(target, color)
+            state.theme = "Custom"
+            ApplyAppearance()
+            Say(title .. " changed. Save or update your custom preset to keep this draft.")
+        end
+        Button(row, "Change", 190, 8, 70, 28, function() PickColor(SetColor, target) end)
+        local hexButton = Button(row, "Hex", 264, 8, 42, 28, function() EditColorHex(title, SetColor, target) end)
+        Tip(hexButton, title .. " RGBA hex", "Enter an exact RGB color and optional alpha value.")
     end
     settings.groups[#settings.groups + 1] = { Update = function()
         for _, entry in ipairs(swatches) do entry[1]:SetVertexColor(entry[2][1], entry[2][2], entry[2][3], entry[2][4] or 1) end
@@ -1889,12 +1869,12 @@ local function BuildSettings()
         row.swatch:SetPoint("TOPLEFT", 260, -10)
         row.swatch:SetSize(30, 20)
         Button(row, "Color...", 298, 6, 92, 28, function()
-            PickColor(data.name .. " color", function(color)
-                data.color = { color[1], color[2], color[3] }
+            PickColor(function(color)
+                data.color = Clone(color)
                 Say(data.name .. " recolored in the roster and encounter headers.")
                 settings.ShowSection("Accounts")
                 refresh()
-            end)
+            end, data.color or STYLE.accountText)
         end)
         Toggle(row, "Start collapsed", 398, 6, 234, function() return state.collapsed[id] end,
             function(value) state.collapsed[id] = value; refresh() end)
@@ -1907,7 +1887,7 @@ local function BuildSettings()
             local account = ACCOUNTS[i]
             row.name:SetText(account.name .. (i == 1 and "  (current)" or ""))
             local color = account.color or GOLD
-            row.swatch:SetVertexColor(color[1], color[2], color[3], 1)
+            row.swatch:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
         end
     end
 
@@ -2034,7 +2014,7 @@ local function BuildSettings()
         end
         if closePrompt then closePrompt:Hide() end
         if dialog then dialog:Hide() end
-        if palette then palette:Hide() end
+        addon:CloseColorPicker(settings)
     end)
     settings:Hide()
 end

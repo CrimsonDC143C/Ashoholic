@@ -114,8 +114,10 @@ presets also offer Update current. New-preset names are focused and selected
 automatically. Saving closes Settings; cancelling the name popup keeps the draft.
 Discard restores the appearance from the last applied or saved preset.
 The Colors editor offers independent title/header, row/account, button and tab
-colors, including odd/even rows, hover and selection. Use RGBA hex for exact colors
-and alpha. Text & Layout scrolls to per-role fonts and size adjustments, row height,
+colors, including odd/even rows, hover and selection. Change opens the same live
+color-and-opacity picker used by the old Settings; Cancel restores the original
+color and alpha. Hex accepts exact RGB or RGBA values.
+Text & Layout scrolls to per-role fonts and size adjustments, row height,
 spacing and border thickness. Save as new or update an applied custom preset.
 Class-name colors and loot-status colors intentionally retain their meaning.
 
