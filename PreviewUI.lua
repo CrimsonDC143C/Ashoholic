@@ -51,7 +51,8 @@ local state = {
     matrixOffset = 0, detail = true, font = FONT, fontDelta = 0, density = "comfortable",
     iconStyle = "icons", classIcons = true, statusStyle = "words", hiddenTabs = {}, defaultTab = "Roster",
     logo = "Interface\\Icons\\inv_soulash", scale = 1, opacity = 1,
-    columnWidths = {}, rosterOffset = 0, encounterCollapsed = {},
+    columnWidths = {}, rosterOffset = 0, encounterCollapsed = {}, fontRoles = {},
+    rowGap = 3, borderSize = 1,
 }
 -- Mutated in place by the theme preview so every widget sharing them follows the theme.
 local PANEL = { 0.075, 0.083, 0.105, 1 }
@@ -59,6 +60,16 @@ local BORDER = { 0.19, 0.21, 0.26, 1 }
 local BUTTON_BG = { 0.10, 0.115, 0.145, 1 }
 local BUTTON_BORDER = { 0.24, 0.26, 0.31, 1 }
 local BACKGROUND = { 0.035, 0.042, 0.058, 0.99 }
+local STYLE = {
+    titleText = { 1, 0.79, 0.39 }, headerText = { 0.58, 0.61, 0.67 },
+    rowText = { 0.88, 0.88, 0.90 }, accountText = { 0.88, 0.88, 0.90 },
+    rowOdd = { 0.10, 0.115, 0.145, 1 }, rowEven = { 0.12, 0.135, 0.165, 1 },
+    rowAccount = { 0.075, 0.083, 0.105, 1 }, rowHover = { 1, 0.8, 0.4, 0.09 },
+    selectedBorder = { 1, 0.79, 0.39, 1 }, buttonText = { 0.88, 0.88, 0.90 },
+    buttonHover = { 1, 0.8, 0.4, 0.09 }, tabBg = { 0.10, 0.115, 0.145, 1 },
+    tabActiveBg = { 0.075, 0.083, 0.105, 1 }, tabText = { 0.58, 0.61, 0.67 },
+    tabActiveText = { 1, 0.79, 0.39 },
+}
 local surfaces, buttons, labels = {}, {}, {}
 local settings, accountMenu
 local ShowSettings, Dialog
@@ -142,10 +153,17 @@ local function SetVisible(widget, visible)
     if visible then widget:Show() else widget:Hide() end
 end
 
-local function Label(parent, text, x, y, width, size, color)
+local function FontFor(role, size)
+    local override = state.fontRoles[role] or {}
+    return override.font or state.font, math.max(8, size + state.fontDelta + (override.delta or 0))
+end
+
+local function Label(parent, text, x, y, width, size, color, role)
     local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(state.font, math.max(8, (size or 12) + state.fontDelta))
-    labels[#labels + 1] = { fs, color or TEXT, size or 12 }
+    role = role or ((size or 12) >= 17 and "title" or (color == MUTED and "hint" or "body"))
+    if role == "title" and color == GOLD then color = STYLE.titleText end
+    fs:SetFont(FontFor(role, size or 12))
+    labels[#labels + 1] = { fs, color or TEXT, size or 12, role }
     fs:SetPoint("TOPLEFT", x, -y)
     fs:SetWidth(width)
     fs:SetJustifyH("LEFT")
@@ -162,7 +180,7 @@ local function Surface(parent, x, y, width, height, color)
     panel:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
     panel:SetBackdropColor(unpack(color or PANEL))
     panel:SetBackdropBorderColor(unpack(BORDER))
-    surfaces[#surfaces + 1] = { panel, color == nil }
+    surfaces[#surfaces + 1] = { panel, color or PANEL }
     return panel
 end
 
@@ -175,8 +193,8 @@ local function Button(parent, text, x, y, width, height, onClick)
     button:SetBackdropBorderColor(unpack(BUTTON_BORDER))
     buttons[#buttons + 1] = button
     button:SetHighlightTexture(WHITE)
-    button:GetHighlightTexture():SetVertexColor(1, 0.8, 0.4, 0.09)
-    button.text = Label(button, text, 9, 7, width - 18, 11)
+    button:GetHighlightTexture():SetVertexColor(unpack(STYLE.buttonHover))
+    button.text = Label(button, text, 9, 7, width - 18, 11, STYLE.buttonText, "button")
     button.text:SetHeight(14)
     if button.text.SetWordWrap then button.text:SetWordWrap(false) end
     button:SetScript("OnClick", onClick)
@@ -281,14 +299,14 @@ local function BuildRoster()
     headerScroll:SetScrollChild(headerBody)
     local measure = Label(page, "", 0, 0, 0, 11)
     measure:Hide()
-    local function Measure(text, size)
-        measure:SetFont(state.font, math.max(8, size + state.fontDelta))
+    local function Measure(text, size, role)
+        measure:SetFont(FontFor(role, size))
         measure:SetText(text)
         return math.ceil(measure:GetStringWidth()) + 22
     end
     page.headers, page.grips = {}, {}
     for i = 1, #columns + 1 do
-        page.headers[i] = Label(headerBody, "", 0, 4, 100, 10, MUTED)
+        page.headers[i] = Label(headerBody, "", 0, 4, 100, 10, STYLE.headerText, "header")
         page.headers[i]:SetHeight(16)
         if page.headers[i].SetWordWrap then page.headers[i]:SetWordWrap(false) end
         local grip = CreateFrame("Button", nil, headerBody)
@@ -341,7 +359,7 @@ local function BuildRoster()
         end)
         row.cells = {}
         for j = 1, #columns + 1 do
-            row.cells[j] = Label(row, "", 0, 8, 85, 11)
+            row.cells[j] = Label(row, "", 0, 8, 85, 11, STYLE.rowText, "character")
             row.cells[j]:SetHeight(14)
             if row.cells[j].SetWordWrap then row.cells[j]:SetWordWrap(false) end
         end
@@ -382,9 +400,9 @@ local function BuildRoster()
             local key = j == 1 and "character" or columnOrder[j - 1]
             local title = "CHARACTER"
             for _, column in ipairs(columns) do if column.key == key then title = column.title end end
-            local minimum = Measure(title, 10)
+            local minimum = Measure(title, 10, "header")
             for _, character in ipairs(CHARACTERS) do
-                minimum = math.max(minimum, Measure(j == 1 and ClassName(character) or tostring(character[key] or "Unknown"), 11))
+                minimum = math.max(minimum, Measure(j == 1 and ClassName(character) or tostring(character[key] or "Unknown"), 11, "character"))
             end
             local cellWidth = math.max(minimum, state.columnWidths[key] or (j == 1 and 150 or 85))
             layout[j] = { x = contentWidth, width = cellWidth, key = key, minimum = minimum, title = title }
@@ -430,10 +448,14 @@ local function BuildRoster()
                 accountLabel:SetWidth(contentWidth)
                 accountLabel.text:SetWidth(contentWidth - 18)
                 accountLabel.text:SetText((state.collapsed[accountId] and "+ " or "- ") .. account.name .. (accountId == 1 and "  /  Current account" or ""))
-                accountLabel.text:SetTextColor(unpack(account.color or TEXT))
+                accountLabel:SetBackdropColor(unpack(STYLE.rowAccount))
+                accountLabel.text:SetFont(FontFor("account", 11))
+                accountLabel.text:SetTextColor(unpack(account.color or STYLE.accountText))
                 y = y + 28
             end
-            local rowHeight = state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44)
+            local rowHeight = state.rowHeight or (state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44))
+            local _, characterSize = FontFor("character", 11)
+            rowHeight = math.max(rowHeight, characterSize + (state.density == "compact" and 16 or 33))
             for i, character in ipairs(CHARACTERS) do
                 if character.account == accountId then
                     local row = page.rows[i]
@@ -446,14 +468,17 @@ local function BuildRoster()
                         row:SetHeight(rowHeight)
                         row:ClearAllPoints()
                         row:SetPoint("TOPLEFT", 0, -y)
-                        row:SetBackdropBorderColor(unpack(i == state.selected and GOLD or BORDER))
+                        row:SetBackdropColor(unpack(i % 2 == 1 and STYLE.rowOdd or STYLE.rowEven))
+                        row:GetHighlightTexture():SetVertexColor(unpack(STYLE.rowHover))
+                        row:SetBackdropBorderColor(unpack(i == state.selected and STYLE.selectedBorder or BORDER))
                         for j, fs in ipairs(row.cells) do
                             PositionCell(fs, j, state.density == "spacious" and 11 or 8)
+                            fs:SetHeight(characterSize + 3)
                             fs:SetText(j == 1 and ClassName(character) or tostring(character[columnOrder[j - 1]] or "Unknown"))
                         end
                         row.hint:SetText(character.action)
                         SetVisible(row.hint, state.density ~= "compact")
-                        y = y + rowHeight + 3
+                        y = y + rowHeight + state.rowGap
                     end
                 end
             end
@@ -708,16 +733,16 @@ local function BuildRaids()
             if WatchedCount(category) > 0 then
                 AddRow((state.encounterCollapsed[category.key] and "+ " or "- ") .. category.name, nil, nil, category)
                 if not state.encounterCollapsed[category.key] then
-                for _, expansion in ipairs(category.children) do
-                    if WatchedCount(expansion) > 0 then
-                        for _, instance in ipairs(expansion.children) do
-                            if WatchedCount(instance) > 0 then
-                                AddRow(AMBER .. instance.name .. "|r", nil, instance)
-                                for _, boss in ipairs(instance.bosses) do
-                                    if state.watched[boss.id] then AddRow(boss.name, boss, instance) end
+                    for _, expansion in ipairs(category.children) do
+                        if WatchedCount(expansion) > 0 then
+                            for _, instance in ipairs(expansion.children) do
+                                if WatchedCount(instance) > 0 then
+                                    AddRow(AMBER .. instance.name .. "|r", nil, instance)
+                                    for _, boss in ipairs(instance.bosses) do
+                                        if state.watched[boss.id] then AddRow(boss.name, boss, instance) end
+                                    end
+                                    y = y + 8
                                 end
-                                y = y + 8
-                            end
                             end
                         end
                     end
@@ -982,6 +1007,9 @@ local function Clone(source)
 end
 
 local THEME_COLORS = { BACKGROUND, PANEL, BORDER, BUTTON_BG, BUTTON_BORDER, GOLD, TEXT, MUTED, TEAL }
+local STYLE_KEYS = { "titleText", "headerText", "rowText", "accountText", "rowOdd", "rowEven", "rowAccount",
+    "rowHover", "selectedBorder", "buttonText", "buttonHover", "tabBg", "tabActiveBg", "tabText", "tabActiveText" }
+for _, key in ipairs(STYLE_KEYS) do THEME_COLORS[#THEME_COLORS + 1] = STYLE[key] end
 local THEME_OPTIONS = { "font", "fontDelta", "density", "opacity", "iconStyle", "classIcons", "statusStyle", "logo",
     "fontRoles", "rowHeight", "rowGap", "borderSize" }
 local customThemes, nextThemeId = {}, 0
@@ -1001,15 +1029,20 @@ local function ApplyAppearance()
     frame:SetBackdropColor(unpack(BACKGROUND))
     frame:SetBackdropBorderColor(GOLD[1] * 0.45, GOLD[2] * 0.45, GOLD[3] * 0.45, 1)
     for _, entry in ipairs(surfaces) do
-        if entry[2] then entry[1]:SetBackdropColor(unpack(PANEL)) end
+        entry[1]:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = state.borderSize })
+        entry[1]:SetBackdropColor(unpack(entry[2]))
         entry[1]:SetBackdropBorderColor(unpack(BORDER))
     end
     for _, button in ipairs(buttons) do
+        button:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = state.borderSize })
         button:SetBackdropColor(unpack(BUTTON_BG))
         button:SetBackdropBorderColor(unpack(BUTTON_BORDER))
+        button:GetHighlightTexture():SetVertexColor(unpack(STYLE.buttonHover))
     end
     for _, entry in ipairs(labels) do
-        entry[1]:SetFont(state.font, math.max(8, entry[3] + state.fontDelta))
+        local font, size = FontFor(entry[4], entry[3])
+        entry[1]:SetFont(font, size)
+        if entry[4] == "button" or entry[4] == "header" or entry[4] == "character" then entry[1]:SetHeight(size + 3) end
         entry[1]:SetTextColor(unpack(entry[2]))
     end
     for _, window in ipairs({ settings, dialog, palette }) do
@@ -1035,6 +1068,16 @@ local function ApplyPreset(preset)
     for i = 1, 3 do
         BUTTON_BG[i] = math.min(1, preset[4][i] * 1.3 + 0.02)
         BUTTON_BORDER[i] = math.min(1, preset[5][i] * 1.25)
+    end
+    for _, key in ipairs(STYLE_KEYS) do
+        local source = TEXT
+        if key == "titleText" or key == "selectedBorder" or key == "tabActiveText" then source = GOLD
+        elseif key == "headerText" or key == "tabText" then source = MUTED
+        elseif key == "rowAccount" or key == "tabActiveBg" then source = PANEL
+        elseif key == "rowOdd" or key == "rowEven" or key == "tabBg" then source = BUTTON_BG
+        elseif key == "rowHover" or key == "buttonHover" then source = { GOLD[1], GOLD[2], GOLD[3], 0.09 } end
+        Copy(STYLE[key], source)
+        if key == "rowEven" then for i = 1, 3 do STYLE[key][i] = math.min(1, STYLE[key][i] + 0.02) end end
     end
     state.theme = preset[1]
     state.lastPreset = preset[1]
@@ -1107,7 +1150,7 @@ Dialog = function(title, text, options)
     end
 end
 
-local function PickColor(title, onPick)
+local function PickColor(title, onPick, current)
     if not palette then
         palette = Popup("AshoholicPreviewPalette", 336, 256)
         palette.title = Label(palette, "", 18, 16, 300, 14, GOLD)
@@ -1127,11 +1170,29 @@ local function PickColor(title, onPick)
             end)
         end
         Button(palette, "Cancel", 216, 212, 102, 28, function() palette:Hide() end)
-        Label(palette, "Preview palette", 18, 220, 190, 10, MUTED)
+        Button(palette, "RGBA hex...", 18, 212, 150, 28, function()
+            local callback, initial = palette.onPick, palette.current
+            palette:Hide()
+            Dialog("Custom RGBA color", "Enter RRGGBB or RRGGBBAA (00 transparent, FF opaque). Example: FFCC6680.", {
+                box = Hex(initial) .. string.format("%02x", math.floor((initial[4] or 1) * 255 + 0.5)),
+                primary = "Apply", onAccept = function(value)
+                    value = value:match("^%s*#?(%x+)%s*$")
+                    if not value or (#value ~= 6 and #value ~= 8) then
+                        print("|cffff6060Ashoholic preview:|r Invalid color. Enter six or eight hexadecimal digits.")
+                        return
+                    end
+                    local color = {}
+                    for i = 1, #value / 2 do color[i] = tonumber(value:sub(i * 2 - 1, i * 2), 16) / 255 end
+                    color[4] = color[4] or 1
+                    callback(color)
+                end,
+            })
+        end)
     end
     palette:SetScale(settings and settings:GetScale() or 1)
     palette.title:SetText(title)
     palette.onPick = onPick
+    palette.current = current or TEXT
     palette:Show()
     palette:Raise()
 end
@@ -1209,14 +1270,22 @@ local function BuildSettings()
         slider:SetValueStep(step)
         slider:SetValue(get())
         local text = Label(parent, format(get()), x + 416, y + 24, 120, 11)
+        local updating = false
         slider:SetScript("OnValueChanged", function(_, value)
+            if updating then return end
             value = math.floor(value / step + 0.5) * step
             text:SetText(format(value))
             set(value)
         end)
         slider:EnableMouseWheel(true)
         slider:SetScript("OnMouseWheel", function(self, delta) self:SetValue(self:GetValue() + delta * step) end)
-        settings.groups[#settings.groups + 1] = { Update = function() slider:GetThumbTexture():SetVertexColor(unpack(GOLD)) end }
+        settings.groups[#settings.groups + 1] = { Update = function()
+            updating = true
+            slider:SetValue(get())
+            text:SetText(format(get()))
+            slider:GetThumbTexture():SetVertexColor(unpack(GOLD))
+            updating = false
+        end }
         return slider
     end
 
@@ -1282,7 +1351,7 @@ local function BuildSettings()
         local sorted = {}
         for i, theme in ipairs(customThemes) do sorted[i] = theme end
         table.sort(sorted, function(a, b)
-            if not not a.starred ~= not not b.starred then return not not a.starred end
+            if (a.starred or false) ~= (b.starred or false) then return a.starred or false end
             return a.id < b.id
         end)
         for i, theme in ipairs(sorted) do
@@ -1346,47 +1415,67 @@ local function BuildSettings()
     Label(themeBody, "Default presets are read-only. Custom presets are session-local; account filters are never included.", 0, 400, 660, 10, MUTED)
 
     -- Colors (custom theme editor)
-    local colorBody = bodies.Colors
+    local colorPage = bodies.Colors
+    local _, colorBody = Scroll(colorPage, "AshoholicPreviewColorEditor", 0, 0, 660, 350)
     local slots = {
         { "Window background", BACKGROUND }, { "Panels & rows", PANEL }, { "Borders", BORDER },
         { "Buttons", BUTTON_BG }, { "Accent / headings", GOLD }, { "Body text", TEXT },
         { "Secondary text", MUTED }, { "Highlighted values", TEAL },
+        { "Button borders", BUTTON_BORDER }, { "Button text", STYLE.buttonText },
+        { "Button hover", STYLE.buttonHover }, { "Title text", STYLE.titleText },
+        { "Column header text", STYLE.headerText }, { "Character row text", STYLE.rowText },
+        { "Account name text", STYLE.accountText }, { "Account row background", STYLE.rowAccount },
+        { "Odd character rows", STYLE.rowOdd }, { "Even character rows", STYLE.rowEven },
+        { "Character row hover", STYLE.rowHover }, { "Selected row border", STYLE.selectedBorder },
+        { "Tab background", STYLE.tabBg }, { "Active tab background", STYLE.tabActiveBg },
+        { "Tab text", STYLE.tabText }, { "Active tab text", STYLE.tabActiveText },
     }
     local swatches = {}
     for i, slot in ipairs(slots) do
         local target, title = slot[2], slot[1]
-        local x, y = ((i - 1) % 2) * 330, math.floor((i - 1) / 2) * 52
-        local row = Surface(colorBody, x, y, 320, 44)
-        Label(row, title, 12, 15, 160, 11)
+        local x, y = ((i - 1) % 2) * 320, math.floor((i - 1) / 2) * 52
+        local row = Surface(colorBody, x, y, 310, 44)
+        Label(row, title, 9, 15, 165, 11)
         local swatch = row:CreateTexture(nil, "OVERLAY")
         swatch:SetTexture(WHITE)
         swatch:SetPoint("TOPLEFT", 176, -9)
-        swatch:SetSize(42, 26)
+        swatch:SetSize(32, 26)
         swatches[i] = { swatch, target }
-        Button(row, "Change", 228, 8, 82, 28, function()
+        Button(row, "Change", 216, 8, 86, 28, function()
             PickColor(title, function(color)
                 Copy(target, color)
                 state.theme = "Custom"
                 ApplyAppearance()
-                Say(title .. " changed. Theme is now 'Custom'.")
-            end)
+                Say(title .. " changed. Save or update your custom preset to keep this draft.")
+            end, target)
         end)
     end
     settings.groups[#settings.groups + 1] = { Update = function()
-        for _, entry in ipairs(swatches) do entry[1]:SetVertexColor(entry[2][1], entry[2][2], entry[2][3], 1) end
+        for _, entry in ipairs(swatches) do entry[1]:SetVertexColor(entry[2][1], entry[2][2], entry[2][3], entry[2][4] or 1) end
     end }
-    Button(colorBody, "Save as custom theme...", 0, 222, 240, 30, SaveCustomTheme)
-    Button(colorBody, "Revert to preset", 250, 222, 200, 30, function()
+    colorBody:SetHeight(math.ceil(#slots / 2) * 52)
+    Button(colorPage, "Save as new...", 0, 360, 190, 30, SaveCustomTheme)
+    Button(colorPage, "Update selected", 198, 360, 210, 30, function()
+        for _, theme in ipairs(customThemes) do
+            if theme.id == state.customTheme then
+                theme.appearance = CaptureTheme()
+                state.theme = theme.name
+                Say("Updated '" .. theme.name .. "' until /reload.")
+                return
+            end
+        end
+        Say("Apply or edit a custom preset first, or use Save as new.")
+    end)
+    Button(colorPage, "Revert to default", 416, 360, 210, 30, function()
         for _, preset in ipairs(THEMES) do
             if preset[1] == (state.lastPreset or "Ember & Ash") then ApplyPreset(preset) end
         end
         Say("Reverted to " .. (state.lastPreset or "Ember & Ash") .. ".")
     end)
-    Label(colorBody, "IDEAS TO EXPAND", 0, 282, 660, 11, GOLD)
-    Label(colorBody, "Per-tab accent colors, gradient headers, background art (Icecrown, Karazhan, Torment), class-colored row tints, and a 'Torment glow' that intensifies with your highest unlocked tier.", 0, 304, 660, 11, MUTED)
+    Label(colorPage, "Each slot supports RGBA hex. Class colors and status colors remain semantic, not theme overrides.", 0, 400, 660, 10, MUTED)
 
     -- Text & Layout
-    local textBody = bodies["Text & Layout"]
+    local _, textBody = Scroll(bodies["Text & Layout"], "AshoholicPreviewTextEditor", 0, 0, 660, 414)
     Label(textBody, "FONT", 0, 0, 300, 11, GOLD)
     Choices(textBody, {
         { "Fonts\\FRIZQT__.TTF", "Friz Quadrata" }, { "Fonts\\ARIALN.TTF", "Arial Narrow" },
@@ -1397,7 +1486,7 @@ local function BuildSettings()
         function() return state.fontDelta end, function(value) state.fontDelta = value; ApplyAppearance() end)
     Label(textBody, "ROSTER ROW DENSITY", 0, 144, 300, 11, GOLD)
     Choices(textBody, { { "compact", "Compact" }, { "comfortable", "Comfortable" }, { "spacious", "Spacious" } }, 0, 166, 210, 3,
-        function() return state.density end, function(value) state.density = value; refresh() end)
+        function() return state.density end, function(value) state.density = value; state.rowHeight = nil; refresh() end)
     SliderRow(textBody, "WINDOW SCALE", 0, 218, 0.7, 1.2, 0.05, function() return state.scale end, function(value)
         state.scale = value
         frame:SetScale((frame.baseScale or 1) * value)
@@ -1407,6 +1496,40 @@ local function BuildSettings()
         frame:SetBackdropColor(unpack(BACKGROUND))
     end, function(value) return string.format("%.0f%%", value * 100) end)
     Label(textBody, "Compact hides the hint line under each character. Scale and opacity affect only the main window.", 0, 346, 660, 10, MUTED)
+    local function Pixels(value) return string.format("%d px", value) end
+    SliderRow(textBody, "ROSTER ROW HEIGHT (content minimum applies)", 0, 388, 30, 70, 1,
+        function() return state.rowHeight or (state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44)) end,
+        function(value) state.rowHeight = value; refresh() end, Pixels)
+    SliderRow(textBody, "ROSTER ROW SPACING", 0, 450, 0, 12, 1,
+        function() return state.rowGap end, function(value) state.rowGap = value; refresh() end, Pixels)
+    SliderRow(textBody, "PANEL & BUTTON BORDER THICKNESS", 0, 512, 1, 4, 1,
+        function() return state.borderSize end, function(value) state.borderSize = value; ApplyAppearance() end, Pixels)
+    local fontChoices = {
+        { "inherit", "Global font" }, { "Fonts\\FRIZQT__.TTF", "Friz Quadrata" },
+        { "Fonts\\ARIALN.TTF", "Arial Narrow" }, { "Fonts\\MORPHEUS.TTF", "Morpheus" },
+        { "Fonts\\skurri.ttf", "Skurri" },
+    }
+    for i, role in ipairs({ { "title", "Titles" }, { "header", "Column headers" }, { "character", "Character values" },
+        { "account", "Account names" }, { "button", "Buttons" }, { "hint", "Hints" } }) do
+        local key, title = role[1], role[2]
+        local y = 584 + (i - 1) * 156
+        Label(textBody, string.upper(title) .. " FONT", 0, y, 630, 11, GOLD)
+        Choices(textBody, fontChoices, 0, y + 22, 200, 3,
+            function() return (state.fontRoles[key] or {}).font or "inherit" end,
+            function(value)
+                state.fontRoles[key] = state.fontRoles[key] or {}
+                state.fontRoles[key].font = value ~= "inherit" and value or nil
+                ApplyAppearance()
+            end)
+        SliderRow(textBody, title .. " size adjustment", 0, y + 88, -2, 4, 1,
+            function() return (state.fontRoles[key] or {}).delta or 0 end,
+            function(value)
+                state.fontRoles[key] = state.fontRoles[key] or {}
+                state.fontRoles[key].delta = value
+                ApplyAppearance()
+            end, Pixels)
+    end
+    textBody:SetHeight(584 + 6 * 156)
 
     -- Icons
     local iconBody = bodies.Icons
@@ -1664,6 +1787,7 @@ local function BuildSettings()
                 if section == "Themes" or section == "Colors" then ApplyPreset(THEMES[1])
                 elseif section == "Text & Layout" then
                     state.font, state.fontDelta, state.density, state.scale, BACKGROUND[4] = FONT, 0, "comfortable", 1, 0.99
+                    state.fontRoles, state.rowHeight, state.rowGap, state.borderSize = {}, nil, 3, 1
                     frame:SetScale(frame.baseScale or 1)
                     ApplyAppearance()
                 elseif section == "Icons" then
@@ -1917,8 +2041,9 @@ local function BuildPreview()
         for name, page in pairs(pages) do
             local active = state.tab == name
             SetVisible(page, active)
+            tabs[name]:SetBackdropColor(unpack(active and STYLE.tabActiveBg or STYLE.tabBg))
             tabs[name]:SetBackdropBorderColor(unpack(active and GOLD or BUTTON_BORDER))
-            tabs[name].text:SetTextColor(unpack(active and GOLD or MUTED))
+            tabs[name].text:SetTextColor(unpack(active and STYLE.tabActiveText or STYLE.tabText))
             if active then page.Refresh() end
         end
     end
