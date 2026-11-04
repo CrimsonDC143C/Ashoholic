@@ -95,6 +95,10 @@ instances and bosses without changing the watchlist.
 Activities uses the full width for one account, separating Daily and Weekly
 examples; multiple accounts retain a two-column overview. Reset times and
 objectives are explicitly illustrative, not live server data.
+Themes separates read-only Default Presets from Custom Presets. Custom presets
+can be saved, applied, starred, renamed, edited and deleted; they capture colors,
+fonts, icons and row layout, but not account filters. They last until `/reload`
+and never replace the live addon's saved themes.
 
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.

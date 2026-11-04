@@ -974,6 +974,25 @@ local function Copy(target, source)
     for i = 1, #source do target[i] = source[i] end
 end
 
+local function Clone(source)
+    if type(source) ~= "table" then return source end
+    local result = {}
+    for key, value in pairs(source) do result[key] = Clone(value) end
+    return result
+end
+
+local THEME_COLORS = { BACKGROUND, PANEL, BORDER, BUTTON_BG, BUTTON_BORDER, GOLD, TEXT, MUTED, TEAL }
+local THEME_OPTIONS = { "font", "fontDelta", "density", "opacity", "iconStyle", "classIcons", "statusStyle", "logo",
+    "fontRoles", "rowHeight", "rowGap", "borderSize" }
+local customThemes, nextThemeId = {}, 0
+
+local function CaptureTheme()
+    local result = { colors = {}, options = {} }
+    for i, color in ipairs(THEME_COLORS) do result.colors[i] = Clone(color) end
+    for _, key in ipairs(THEME_OPTIONS) do result.options[key] = Clone(state[key]) end
+    return result
+end
+
 local function Hex(color)
     return string.format("%02x%02x%02x", color[1] * 255, color[2] * 255, color[3] * 255)
 end
@@ -1019,6 +1038,15 @@ local function ApplyPreset(preset)
     end
     state.theme = preset[1]
     state.lastPreset = preset[1]
+    state.customTheme = nil
+    ApplyAppearance()
+end
+
+local function ApplyCustomTheme(theme)
+    for i, color in ipairs(THEME_COLORS) do Copy(color, theme.appearance.colors[i]) end
+    for _, key in ipairs(THEME_OPTIONS) do state[key] = Clone(theme.appearance.options[key]) end
+    state.theme, state.customTheme = theme.name, theme.id
+    frame:SetScale((frame.baseScale or 1) * state.scale)
     ApplyAppearance()
 end
 
@@ -1194,10 +1222,41 @@ local function BuildSettings()
 
     -- Themes
     local themeBody = bodies.Themes
+    local themeScroll, themeGallery = Scroll(themeBody, "AshoholicPreviewThemeGallery", 0, 0, 660, 350)
+    Label(themeGallery, "DEFAULT PRESETS", 0, 0, 630, 11, GOLD)
+    local function ThemeName(name, exceptId)
+        name = name:match("^%s*(.-)%s*$")
+        if name == "" or #name > 40 or name:find("|", 1, true) or name:find("[%c]") then
+            Say("Use a plain-text name of 1-40 characters, without control codes or |.")
+            return
+        end
+        for _, preset in ipairs(THEMES) do
+            if string.lower(preset[1]) == string.lower(name) then Say("That name belongs to a default preset."); return end
+        end
+        for _, theme in ipairs(customThemes) do
+            if theme.id ~= exceptId and string.lower(theme.name) == string.lower(name) then Say("A custom preset already has that name."); return end
+        end
+        return name
+    end
+    local function SaveCustomTheme()
+        Dialog("Save custom preset", "Save colors, fonts, icons and row layout in this preview session. /reload clears all preview presets.", {
+            box = "My Ashoholic theme", primary = "Save",
+            onAccept = function(value)
+                local name = ThemeName(value)
+                if not name then return end
+                nextThemeId = nextThemeId + 1
+                local theme = { id = nextThemeId, name = name, appearance = CaptureTheme() }
+                customThemes[#customThemes + 1] = theme
+                state.theme, state.customTheme = name, theme.id
+                settings.ShowSection("Themes")
+                Say("Saved '" .. name .. "' until /reload.")
+            end,
+        })
+    end
     local themeGroup = {}
     for i, preset in ipairs(THEMES) do
         local theme = preset
-        local card = Button(themeBody, preset[1], ((i - 1) % 2) * 330, math.floor((i - 1) / 2) * 82, 320, 72, function() ApplyPreset(theme) end)
+        local card = Button(themeGallery, preset[1], ((i - 1) % 2) * 320, 24 + math.floor((i - 1) / 2) * 82, 310, 72, function() ApplyPreset(theme) end)
         Label(card, preset[2], 9, 27, 200, 10, MUTED)
         for j, color in ipairs({ preset[3], preset[4], preset[5], preset[6] }) do
             local swatch = card:CreateTexture(nil, "OVERLAY")
@@ -1215,9 +1274,76 @@ local function BuildSettings()
         end
     end
     settings.groups[#settings.groups + 1] = themeGroup
-    Button(themeBody, "Customize this theme...", 0, 340, 240, 30, function() settings.ShowSection("Colors") end)
-    Button(themeBody, "Import a theme...", 250, 340, 200, 30, function() settings.ShowSection("Profiles & Sharing") end)
-    Label(themeBody, "Themes affect colors only. Fonts, icons and layout live in their own sections, so you can mix them freely.", 0, 386, 660, 10, MUTED)
+    local customY = 24 + math.ceil(#THEMES / 2) * 82
+    Label(themeGallery, "CUSTOM PRESETS  /  Starred first", 0, customY, 630, 11, GOLD)
+    local emptyThemes = Label(themeGallery, "No custom presets yet. Customize a default preset, then save your own.", 0, customY + 28, 630, 11, MUTED)
+    local customRows = {}
+    themeBody.Refresh = function()
+        local sorted = {}
+        for i, theme in ipairs(customThemes) do sorted[i] = theme end
+        table.sort(sorted, function(a, b)
+            if not not a.starred ~= not not b.starred then return not not a.starred end
+            return a.id < b.id
+        end)
+        for i, theme in ipairs(sorted) do
+            local row = customRows[i]
+            if not row then
+                row = CreateFrame("Frame", nil, themeGallery)
+                row:SetSize(630, 64)
+                row.apply = Button(row, "", 0, 0, 272, 28, function() ApplyCustomTheme(row.theme) end)
+                row.star = Button(row, "", 280, 0, 92, 28, function()
+                    row.theme.starred = not row.theme.starred
+                    settings.ShowSection("Themes")
+                end)
+                Button(row, "Edit", 380, 0, 70, 28, function()
+                    ApplyCustomTheme(row.theme)
+                    settings.ShowSection("Colors")
+                end)
+                Button(row, "Rename", 458, 0, 82, 28, function()
+                    local target = row.theme
+                    Dialog("Rename preset", "Default presets cannot be renamed. This custom preset lasts until /reload.", {
+                        box = target.name, primary = "Rename", onAccept = function(value)
+                            local name = ThemeName(value, target.id)
+                            if not name then return end
+                            target.name = name
+                            if state.customTheme == target.id then state.theme = name end
+                            settings.ShowSection("Themes")
+                        end,
+                    })
+                end)
+                Button(row, "Delete", 548, 0, 82, 28, function()
+                    local target = row.theme
+                    Dialog("Delete custom preset", "Delete '" .. target.name .. "'? Your current appearance remains applied.", {
+                        primary = "Delete", onAccept = function()
+                            for index, entry in ipairs(customThemes) do
+                                if entry.id == target.id then table.remove(customThemes, index); break end
+                            end
+                            if state.customTheme == target.id then state.customTheme = nil; state.theme = "Custom" end
+                            settings.ShowSection("Themes")
+                        end,
+                    })
+                end)
+                Label(row, "Saved colors, fonts, icons and row layout", 9, 36, 600, 10, MUTED)
+                customRows[i] = row
+            end
+            row.theme = theme
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", 0, -(customY + 28 + (i - 1) * 64))
+            row.apply.text:SetText(theme.name)
+            row.apply:SetBackdropBorderColor(unpack(state.customTheme == theme.id and GOLD or BUTTON_BORDER))
+            row.star.text:SetText(theme.starred and "* Starred" or "Star")
+            row:Show()
+        end
+        for i = #sorted + 1, #customRows do customRows[i]:Hide() end
+        SetVisible(emptyThemes, #sorted == 0)
+        local height = customY + 28 + math.max(1, #sorted) * 64
+        themeGallery:SetHeight(height)
+        themeScroll:SetVerticalScroll(math.min(themeScroll:GetVerticalScroll(), math.max(0, height - 350)))
+    end
+    Button(themeBody, "Customize...", 0, 360, 180, 30, function() settings.ShowSection("Colors") end)
+    Button(themeBody, "Save as custom...", 188, 360, 210, 30, SaveCustomTheme)
+    Button(themeBody, "Import...", 406, 360, 210, 30, function() settings.ShowSection("Profiles & Sharing") end)
+    Label(themeBody, "Default presets are read-only. Custom presets are session-local; account filters are never included.", 0, 400, 660, 10, MUTED)
 
     -- Colors (custom theme editor)
     local colorBody = bodies.Colors
@@ -1249,12 +1375,7 @@ local function BuildSettings()
     settings.groups[#settings.groups + 1] = { Update = function()
         for _, entry in ipairs(swatches) do entry[1]:SetVertexColor(entry[2][1], entry[2][2], entry[2][3], 1) end
     end }
-    Button(colorBody, "Save as custom theme...", 0, 222, 240, 30, function()
-        Dialog("Save custom theme", "Name your theme. In the live addon it would join the theme gallery and could be exported.", {
-            box = "My Ashoholic theme", primary = "Save",
-            onAccept = function(name) Say("Saved '" .. name .. "' (preview only).") end,
-        })
-    end)
+    Button(colorBody, "Save as custom theme...", 0, 222, 240, 30, SaveCustomTheme)
     Button(colorBody, "Revert to preset", 250, 222, 200, 30, function()
         for _, preset in ipairs(THEMES) do
             if preset[1] == (state.lastPreset or "Ember & Ash") then ApplyPreset(preset) end
