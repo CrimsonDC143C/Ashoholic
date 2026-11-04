@@ -2,7 +2,7 @@ local addonName = ...
 local addon = _G[addonName]
 
 -- The preview owns only session-local sample data; it never reads or writes the roster.
--- /ash preview: Settings previews appearance, columns and account aliases.
+-- /ash preview: Settings previews themes, colors, fonts, icons, columns, tabs, accounts, alerts and profiles.
 -- Account filters, collapsed groups and layout choices survive closing, but not /reload.
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local FONT = "Fonts\\FRIZQT__.TTF"
@@ -46,7 +46,19 @@ for i, account in ipairs(ACCOUNTS) do
 end
 
 local frame
-local state = { accounts = { [1] = true }, selected = 1, tab = "Roster", watched = {}, expanded = {}, collapsed = {}, matrixPage = 1, detail = true }
+local state = {
+    accounts = { [1] = true }, selected = 1, tab = "Roster", watched = {}, expanded = {}, collapsed = {},
+    matrixOffset = 0, detail = true, font = FONT, fontDelta = 0, density = "comfortable",
+    iconStyle = "icons", classIcons = true, statusStyle = "words", hiddenTabs = {}, defaultTab = "Roster",
+    logo = "Interface\\Icons\\inv_soulash", scale = 1, opacity = 1,
+}
+-- Mutated in place by the theme preview so every widget sharing them follows the theme.
+local PANEL = { 0.075, 0.083, 0.105, 1 }
+local BORDER = { 0.19, 0.21, 0.26, 1 }
+local BUTTON_BG = { 0.10, 0.115, 0.145, 1 }
+local BUTTON_BORDER = { 0.24, 0.26, 0.31, 1 }
+local BACKGROUND = { 0.035, 0.042, 0.058, 0.99 }
+local surfaces, buttons, labels = {}, {}, {}
 local settings, accountMenu
 local ShowSettings
 local columns = {
@@ -131,7 +143,8 @@ end
 
 local function Label(parent, text, x, y, width, size, color)
     local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(FONT, size or 12)
+    fs:SetFont(state.font, math.max(8, (size or 12) + state.fontDelta))
+    labels[#labels + 1] = { fs, color or TEXT, size or 12 }
     fs:SetPoint("TOPLEFT", x, -y)
     fs:SetWidth(width)
     fs:SetJustifyH("LEFT")
@@ -146,8 +159,9 @@ local function Surface(parent, x, y, width, height, color)
     panel:SetPoint("TOPLEFT", x, -y)
     panel:SetSize(width, height)
     panel:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
-    panel:SetBackdropColor(unpack(color or { 0.075, 0.083, 0.105, 1 }))
-    panel:SetBackdropBorderColor(0.19, 0.21, 0.26, 1)
+    panel:SetBackdropColor(unpack(color or PANEL))
+    panel:SetBackdropBorderColor(unpack(BORDER))
+    surfaces[#surfaces + 1] = { panel, color == nil }
     return panel
 end
 
@@ -156,8 +170,9 @@ local function Button(parent, text, x, y, width, height, onClick)
     button:SetPoint("TOPLEFT", x, -y)
     button:SetSize(width, height or 28)
     button:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
-    button:SetBackdropColor(0.10, 0.115, 0.145, 1)
-    button:SetBackdropBorderColor(0.24, 0.26, 0.31, 1)
+    button:SetBackdropColor(unpack(BUTTON_BG))
+    button:SetBackdropBorderColor(unpack(BUTTON_BORDER))
+    buttons[#buttons + 1] = button
     button:SetHighlightTexture(WHITE)
     button:GetHighlightTexture():SetVertexColor(1, 0.8, 0.4, 0.09)
     button.text = Label(button, text, 9, 7, width - 18, 11)
@@ -213,7 +228,18 @@ end
 
 local function ClassName(character)
     local color = RAID_CLASS_COLORS[character.class]
-    return string.format("|cff%02x%02x%02x%s|r", color.r * 255, color.g * 255, color.b * 255, character.name)
+    local icon = ""
+    local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[character.class]
+    if state.classIcons and coords then
+        icon = string.format("|TInterface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes:14:14:0:0:256:256:%d:%d:%d:%d|t ",
+            coords[1] * 256, coords[2] * 256, coords[3] * 256, coords[4] * 256)
+    end
+    return string.format("%s|cff%02x%02x%02x%s|r", icon, color.r * 255, color.g * 255, color.b * 255, character.name)
+end
+
+local function ScrollBy(scroll, delta)
+    local bar = _G[scroll:GetName() .. "ScrollBar"]
+    if bar then bar:SetValue(bar:GetValue() - delta * 30) end
 end
 
 local function Short(n)
@@ -241,7 +267,7 @@ end
 
 local function BuildRoster()
     local page = Page("Roster", "Your next adventure", "Characters first. Shared currencies stay at account level; run earnings stay with the character.")
-    Button(page, "Columns / layout", 548, 0, 168, 26, function() ShowSettings("Columns") end)
+    Button(page, "Columns / layout", 548, 0, 168, 26, function() ShowSettings("Roster Columns") end)
     page.headers = {}
     for i = 1, 7 do page.headers[i] = Label(page, "", 0, 61, 100, 10, MUTED) end
     local scroll, body = Scroll(page, "AshoholicPreviewRosterScroll", 0, 84, 716, 290)
@@ -279,7 +305,7 @@ local function BuildRoster()
         page.detailValues[i] = DetailLine(detail, title, "", 101 + (i - 1) * 28)
     end
     page.detailNote = Label(detail, "", 16, 278, 300, 11, TEAL)
-    Button(detail, "Customize columns / detail panel", 16, 317, 300, 25, function() ShowSettings("Columns") end)
+    Button(detail, "Customize columns / detail panel", 16, 317, 300, 25, function() ShowSettings("Roster Columns") end)
     Label(page, "No hourly-entry counter: the new realm's cap has not been established.", 0, 391, 716, 10, MUTED)
     page.Refresh = function()
         local width = state.detail and 690 or 1046
@@ -311,23 +337,27 @@ local function BuildRoster()
                 accountLabel:SetWidth(width)
                 accountLabel.text:SetWidth(width - 18)
                 accountLabel.text:SetText((state.collapsed[accountId] and "+ " or "- ") .. account.name .. (accountId == 1 and "  /  Current account" or ""))
+                accountLabel.text:SetTextColor(unpack(account.color or TEXT))
                 y = y + 28
             end
+            local rowHeight = state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44)
             for i, character in ipairs(CHARACTERS) do
                 if character.account == accountId then
                     local row = page.rows[i]
                     SetVisible(row, show and not state.collapsed[accountId])
                     if show and not state.collapsed[accountId] then
                         row:SetWidth(width)
+                        row:SetHeight(rowHeight)
                         row:ClearAllPoints()
                         row:SetPoint("TOPLEFT", 0, -y)
-                        row:SetBackdropBorderColor(unpack(i == state.selected and GOLD or { 0.19, 0.21, 0.26 }))
+                        row:SetBackdropBorderColor(unpack(i == state.selected and GOLD or BORDER))
                         for j, fs in ipairs(row.cells) do
-                            PositionCell(fs, j, 8)
+                            PositionCell(fs, j, state.density == "spacious" and 11 or 8)
                             fs:SetText(j == 1 and ClassName(character) or tostring(character[columnOrder[j - 1]] or "Unknown"))
                         end
                         row.hint:SetText(character.action)
-                        y = y + 47
+                        SetVisible(row.hint, state.density ~= "compact")
+                        y = y + rowHeight + 3
                     end
                 end
             end
@@ -352,39 +382,89 @@ local function WatchedCount(raid)
 end
 
 local function LootStatus(character, boss, index, instance)
-    if character.stale then return DIM .. "Unknown|r" end
+    local icons = state.statusStyle == "icons"
+    if character.stale then return icons and "|TInterface\\RaidFrame\\ReadyCheck-Waiting:14|t" or DIM .. "Unknown|r" end
     if instance.kind == "Dungeons" then return "|cff6edbc7Tracked|r" end
-    if character.level < 80 then return DIM .. "Not ready|r" end
-    if (boss.id + index) % 3 == 0 then return DIM .. "Looted|r" end
-    return GREEN .. "Available|r"
+    if character.level < 80 then return DIM .. (icons and "-" or "Not ready") .. "|r" end
+    if (boss.id + index) % 3 == 0 then return icons and "|TInterface\\RaidFrame\\ReadyCheck-NotReady:14|t" or DIM .. "Looted|r" end
+    return icons and "|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t" or GREEN .. "Available|r"
 end
+
+local MATRIX_COLUMNS, MATRIX_WIDTH, MATRIX_FIRST, MATRIX_HEIGHT = 5, 95, 210, 226
 
 local function BuildRaids()
     local page = Page("Raids", "Raid & dungeon watchlist", "Select a category, expansion, instance or individual boss. All statuses are sample data.")
     Label(page, "WATCHED ENCOUNTERS", 0, 61, 360, 10, GOLD)
-    local matrixScroll, matrix = Scroll(page, "AshoholicPreviewRaidMatrix", 0, 135, 716, 240)
+    local matrixScroll, matrix = Scroll(page, "AshoholicPreviewRaidMatrix", 0, 135, 716, MATRIX_HEIGHT)
     local header = Surface(page, 0, 84, 690, 47)
     Label(header, "ENCOUNTER", 7, 26, 198, 10, MUTED)
     local headerCells = {}
-    for i = 1, 5 do
+    for i = 1, MATRIX_COLUMNS do
         headerCells[i] = {
-            account = Label(header, "", 210 + (i - 1) * 95, 6, 92, 9, GOLD),
-            name = Label(header, "", 210 + (i - 1) * 95, 26, 92, 11),
+            account = Label(header, "", MATRIX_FIRST + (i - 1) * MATRIX_WIDTH, 6, MATRIX_WIDTH - 6, 9, GOLD),
+            name = Label(header, "", MATRIX_FIRST + (i - 1) * MATRIX_WIDTH, 26, MATRIX_WIDTH - 6, 11),
         }
         for _, fs in pairs(headerCells[i]) do
             fs:SetHeight(14)
             if fs.SetWordWrap then fs:SetWordWrap(false) end
         end
     end
-    Button(page, "<", 442, 52, 28, 26, function()
-        state.matrixPage = math.max(1, state.matrixPage - 1)
-        page.Refresh()
+    -- Separators sit on an overlay so row backgrounds cannot cover them.
+    local overlay = CreateFrame("Frame", nil, matrix)
+    overlay:SetAllPoints(matrix)
+    overlay:SetFrameLevel(matrix:GetFrameLevel() + 10)
+    local separators = {}
+    for i = 1, MATRIX_COLUMNS do
+        local x = MATRIX_FIRST + i * MATRIX_WIDTH - 6
+        local head = header:CreateTexture(nil, "OVERLAY")
+        head:SetTexture(WHITE)
+        head:SetPoint("TOPLEFT", x, -4)
+        head:SetSize(2, 39)
+        local body = overlay:CreateTexture(nil, "OVERLAY")
+        body:SetTexture(WHITE)
+        body:SetPoint("TOPLEFT", x, 0)
+        body:SetPoint("BOTTOMLEFT", x, 0)
+        body:SetWidth(2)
+        separators[i] = { head, body }
+    end
+    local hint = Label(page, "Shift + mouse wheel: scroll characters", 0, 370, 205, 9, MUTED)
+    local hbar = CreateFrame("Slider", nil, page)
+    hbar:SetPoint("TOPLEFT", MATRIX_FIRST, -368)
+    hbar:SetSize(MATRIX_COLUMNS * MATRIX_WIDTH - 6, 12)
+    hbar:SetOrientation("HORIZONTAL")
+    hbar:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+    hbar:SetBackdropColor(0.10, 0.11, 0.14, 1)
+    hbar:SetBackdropBorderColor(unpack(BORDER))
+    hbar:SetThumbTexture(WHITE)
+    hbar:GetThumbTexture():SetSize(70, 10)
+    hbar:SetValueStep(1)
+    hbar:SetMinMaxValues(0, 0)
+    hbar:SetValue(0)
+    local position = Label(page, "", MATRIX_FIRST + MATRIX_COLUMNS * MATRIX_WIDTH + 6, 370, 120, 9, MUTED)
+    local function ScrollCharacters(delta)
+        local maxOffset = math.max(0, #VisibleCharacters() - MATRIX_COLUMNS)
+        local value = math.max(0, math.min(maxOffset, state.matrixOffset - delta))
+        if value ~= state.matrixOffset then
+            state.matrixOffset = value
+            page.Refresh()
+        end
+    end
+    hbar:SetScript("OnValueChanged", function(_, value)
+        value = math.floor(value + 0.5)
+        if value ~= state.matrixOffset then
+            state.matrixOffset = value
+            page.Refresh()
+        end
     end)
-    local pageNumber = Label(page, "", 478, 61, 190, 10, MUTED)
-    Button(page, ">", 682, 52, 28, 26, function()
-        state.matrixPage = math.min(math.max(1, math.ceil(#VisibleCharacters() / 5)), state.matrixPage + 1)
-        page.Refresh()
+    matrixScroll:EnableMouseWheel(true)
+    matrixScroll:SetScript("OnMouseWheel", function(self, delta)
+        if IsShiftKeyDown() then ScrollCharacters(delta) else ScrollBy(self, delta) end
     end)
+    for _, widget in ipairs({ header, hbar }) do
+        widget:EnableMouseWheel(true)
+        widget:SetScript("OnMouseWheel", function(_, delta) ScrollCharacters(delta) end)
+    end
+    Tip(header, "Watched characters", "Shift + mouse wheel scrolls sideways. Gold lines separate accounts; the account name appears once above its first visible character.")
     local pickerScroll, picker = Scroll(page, "AshoholicPreviewRaidPicker", 740, 127, 332, 251)
     page.matrixRows, page.pickerRows = {}, {}
     local function MatrixRow(i)
@@ -395,8 +475,8 @@ local function BuildRaids()
             row.name:SetHeight(13)
             if row.name.SetWordWrap then row.name:SetWordWrap(false) end
             row.cells = {}
-            for j = 1, 5 do
-                row.cells[j] = Label(row, "", 210 + (j - 1) * 95, 7, 92, 10)
+            for j = 1, MATRIX_COLUMNS do
+                row.cells[j] = Label(row, "", MATRIX_FIRST + (j - 1) * MATRIX_WIDTH, 7, MATRIX_WIDTH - 8, 10)
             end
             page.matrixRows[i] = row
         end
@@ -450,16 +530,37 @@ local function BuildRaids()
     page.Refresh = function()
         local y, rowIndex = 0, 0
         local allCharacters = VisibleCharacters()
-        local maxPage = math.max(1, math.ceil(#allCharacters / 5))
-        state.matrixPage = math.min(state.matrixPage, maxPage)
+        local maxOffset = math.max(0, #allCharacters - MATRIX_COLUMNS)
+        state.matrixOffset = math.min(state.matrixOffset, maxOffset)
         local characters = {}
-        for i = 1, 5 do
-            local character = allCharacters[(state.matrixPage - 1) * 5 + i]
-            characters[i] = character
-            headerCells[i].account:SetText(character and ACCOUNTS[character.data.account].name or "")
-            headerCells[i].name:SetText(character and ClassName(character.data) or "")
+        for i = 1, MATRIX_COLUMNS do characters[i] = allCharacters[state.matrixOffset + i] end
+        for i = 1, MATRIX_COLUMNS do
+            local character = characters[i]
+            local cells = headerCells[i]
+            cells.name:SetText(character and ClassName(character.data) or "")
+            cells.account:SetText("")
+            local previous = i > 1 and characters[i - 1] or allCharacters[state.matrixOffset]
+            if character and (i == 1 or character.data.account ~= characters[i - 1].data.account) then
+                local span = 1
+                while characters[i + span] and characters[i + span].data.account == character.data.account do span = span + 1 end
+                local account = ACCOUNTS[character.data.account]
+                local continued = previous and previous.data.account == character.data.account
+                cells.account:SetWidth(span * MATRIX_WIDTH - 10)
+                cells.account:SetText((continued and "< " or "") .. string.upper(account.name))
+                cells.account:SetTextColor(unpack(account.color or GOLD))
+            end
+            local nextCharacter = allCharacters[state.matrixOffset + i + 1]
+            local split = character and nextCharacter and nextCharacter.data.account ~= character.data.account
+            for _, texture in ipairs(separators[i]) do
+                texture:SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 0.7)
+                SetVisible(texture, split)
+            end
         end
-        pageNumber:SetText("Characters: page " .. state.matrixPage .. " / " .. maxPage)
+        hbar:SetMinMaxValues(0, maxOffset)
+        hbar:SetValue(state.matrixOffset)
+        hbar:GetThumbTexture():SetVertexColor(GOLD[1], GOLD[2], GOLD[3], 0.75)
+        SetVisible(hbar, maxOffset > 0)
+        position:SetText(#allCharacters == 0 and "" or string.format("%d-%d of %d", state.matrixOffset + 1, math.min(#allCharacters, state.matrixOffset + MATRIX_COLUMNS), #allCharacters))
         local function AddRow(name, boss, instance)
             rowIndex = rowIndex + 1
             local row = MatrixRow(rowIndex)
@@ -495,8 +596,8 @@ local function BuildRaids()
         end
         for i = rowIndex + 1, #page.matrixRows do page.matrixRows[i]:Hide() end
         SetVisible(page.empty, rowIndex == 0)
-        matrix:SetHeight(math.max(240, y))
-        matrixScroll:SetVerticalScroll(math.min(matrixScroll:GetVerticalScroll(), math.max(0, y - 240)))
+        matrix:SetHeight(math.max(MATRIX_HEIGHT, y))
+        matrixScroll:SetVerticalScroll(math.min(matrixScroll:GetVerticalScroll(), math.max(0, y - MATRIX_HEIGHT)))
         y = 0
         for _, entry in ipairs(page.pickerRows) do
             local row, node = entry.widget, entry.data
@@ -574,9 +675,11 @@ end
 
 local function BuildProgression()
     local page = Page("Progression", "Torment & Prestige", "Account-wide Torment access (the new Hardcore ladder), alongside account Prestige readiness.")
-    local scroll, body = Scroll(page, "AshoholicPreviewProgressionScroll", 0, 57, 1072, 345)
-    local ladder = Surface(body, 0, 0, 510, 345)
+    local ladder = Surface(page, 0, 57, 510, 345)
     Label(ladder, "ACCOUNT TORMENT UNLOCKS", 16, 17, 478, 11, GOLD)
+    local scroll, body = Scroll(page, "AshoholicPreviewProgressionScroll", 530, 57, 542, 345)
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", ScrollBy)
     page.ladderRows = {}
     for i = 1, #ACCOUNTS do
         local row = CreateFrame("Frame", nil, ladder)
@@ -593,7 +696,7 @@ local function BuildProgression()
     end
     page.prestigePanels = {}
     for accountId, account in ipairs(ACCOUNTS) do
-        local panel = Surface(body, 530, 0, 510, 160)
+        local panel = Surface(body, 0, 0, 510, 160)
         panel.title = Label(panel, account.name .. "  /  Prestige " .. account.prestige, 16, 15, 478, 14, GOLD)
         Label(panel, account.ash >= 10771440 and GREEN .. "Ready to Prestige|r" or AMBER .. "Ash requirement not met|r", 16, 44, 478, 13)
         DetailLine(panel, "Committed Ash / gate", Short(account.ash) .. " / 10.77m", 74)
@@ -626,10 +729,11 @@ local function BuildProgression()
             if visible then
                 panel:ClearAllPoints()
                 panel.title:SetText(ACCOUNTS[accountId].name .. "  /  Prestige " .. ACCOUNTS[accountId].prestige)
-                panel:SetPoint("TOPLEFT", 530, -y)
+                panel:SetPoint("TOPLEFT", 0, -y)
                 y = y + 177
             end
         end
+        y = y - 17
         body:SetHeight(math.max(345, y))
         scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - 345)))
     end
@@ -640,7 +744,7 @@ local function BuildTrials()
     local headings = { { "CHARACTER", 16 }, { "CHAMPION BEST", 205 }, { "CLASS RANK", 409 }, { "CRUSADER BEST", 575 }, { "TEAM", 797 }, { "UPDATED", 912 } }
     for _, column in ipairs(headings) do Label(page, column[1], column[2], 68, 190, 10, MUTED) end
     Button(page, "What are these Trials?", 845, 0, 227, 26, function()
-        ShowSettings("Trials")
+        ShowSettings("Help")
     end)
     local scroll, body = Scroll(page, "AshoholicPreviewTrialScroll", 0, 98, 1072, 264)
     local records = {
@@ -675,80 +779,429 @@ local function BuildTrials()
     end
 end
 
+local dialog, palette
+local DEFAULT_TEXT, DEFAULT_MUTED, DEFAULT_TEAL = { unpack(TEXT) }, { unpack(MUTED) }, { unpack(TEAL) }
+local THEMES = {
+    { "Ember & Ash", "Warm ember gold on soot.", { 0.035, 0.042, 0.058 }, { 0.075, 0.083, 0.105 }, { 0.19, 0.21, 0.26 }, { 1, 0.79, 0.39 } },
+    { "Frostbound", "Northrend ice and steel.", { 0.025, 0.05, 0.085 }, { 0.05, 0.09, 0.14 }, { 0.16, 0.27, 0.38 }, { 0.45, 0.8, 1 } },
+    { "Void Walker", "Deep violet shadow.", { 0.05, 0.02, 0.08 }, { 0.09, 0.05, 0.13 }, { 0.27, 0.17, 0.36 }, { 0.8, 0.55, 1 } },
+    { "Fel Ember", "Sickly green flame.", { 0.03, 0.05, 0.025 }, { 0.06, 0.09, 0.05 }, { 0.2, 0.32, 0.14 }, { 0.55, 1, 0.3 } },
+    { "Blood Moon", "Crimson Torment.", { 0.06, 0.015, 0.02 }, { 0.11, 0.03, 0.04 }, { 0.36, 0.1, 0.12 }, { 1, 0.35, 0.35 } },
+    { "Holy Light", "Bright, warm and soft.", { 0.08, 0.075, 0.06 }, { 0.13, 0.12, 0.09 }, { 0.5, 0.44, 0.26 }, { 1, 0.92, 0.55 } },
+    { "Old Parchment", "Aged leather and ink.", { 0.1, 0.078, 0.05 }, { 0.15, 0.12, 0.08 }, { 0.45, 0.34, 0.2 }, { 0.94, 0.85, 0.63 }, { 0.95, 0.91, 0.82 }, { 0.63, 0.56, 0.45 } },
+    { "Terminal", "Green phosphor. Flat.", { 0, 0, 0 }, { 0.02, 0.05, 0.02 }, { 0.12, 0.56, 0.25 }, { 0.2, 1, 0.4 }, { 0.67, 1, 0.73 }, { 0.12, 0.56, 0.25 }, { 0.4, 1, 0.67 } },
+}
+local PALETTE = {
+    { 1, 0.79, 0.39 }, { 1, 0.6, 0.2 }, { 1, 0.35, 0.35 }, { 0.85, 0.2, 0.3 }, { 1, 0.92, 0.55 }, { 0.94, 0.85, 0.63 },
+    { 0.55, 1, 0.3 }, { 0.2, 1, 0.4 }, { 0.4, 0.86, 0.78 }, { 0.45, 0.8, 1 }, { 0.3, 0.5, 1 }, { 0.8, 0.55, 1 },
+    { 0.88, 0.88, 0.9 }, { 0.58, 0.61, 0.67 }, { 0.35, 0.37, 0.42 }, { 0.19, 0.21, 0.26 }, { 0.12, 0.13, 0.17 }, { 0.075, 0.083, 0.105 },
+    { 0.035, 0.042, 0.058 }, { 0, 0, 0 }, { 0.1, 0.078, 0.05 }, { 0.025, 0.05, 0.085 }, { 0.05, 0.02, 0.08 }, { 0.06, 0.015, 0.02 },
+}
+local LOGOS = {
+    "Interface\\Icons\\inv_soulash", "Interface\\Icons\\inv_misc_supersoulash",
+    "Interface\\Icons\\inv_10_jewelcrafting3_soulcage_frost", "Interface\\Icons\\ability_argus_soulbombdebufflarge",
+    "Interface\\Icons\\Spell_Shadow_SoulGem", "Interface\\Icons\\Spell_Fire_Fire",
+    "Interface\\Icons\\Achievement_Boss_LichKing", "Interface\\Icons\\INV_Misc_Coin_02",
+    "Interface\\Icons\\INV_Misc_Bag_10", "Interface\\Icons\\Spell_Shadow_DeathCoil",
+    "Interface\\Icons\\Spell_Frost_FrostShock", "Interface\\Icons\\INV_Misc_Book_09",
+}
+local SECTIONS = {
+    { "Themes", "Pick a complete look. Every preset recolors the whole preview instantly." },
+    { "Colors", "Build your own theme, slot by slot. Save it, export it, share it." },
+    { "Text & Layout", "Fonts, text size, row density, window scale and transparency." },
+    { "Icons", "Currency icons, class icons, raid status symbols and the Ashoholic logo." },
+    { "Roster Columns", "Choose which character details become columns, and in which order." },
+    { "Tabs & Views", "Hide tabs you never use and choose what opens first." },
+    { "Accounts", "Optional aliases, account colors and default grouping." },
+    { "Alerts", "Reminders for resets, caches, Prestige and watched bosses." },
+    { "Profiles & Sharing", "Keep different setups and share themes with friends." },
+    { "Sync", "Combine several WoW accounts into one roster." },
+    { "Help", "What the Trials, Torment and loot terms mean." },
+}
+
+local function Copy(target, source)
+    for i = 1, #source do target[i] = source[i] end
+end
+
+local function Hex(color)
+    return string.format("%02x%02x%02x", color[1] * 255, color[2] * 255, color[3] * 255)
+end
+
+local function ApplyAppearance()
+    frame:SetBackdropColor(unpack(BACKGROUND))
+    frame:SetBackdropBorderColor(GOLD[1] * 0.45, GOLD[2] * 0.45, GOLD[3] * 0.45, 1)
+    for _, entry in ipairs(surfaces) do
+        if entry[2] then entry[1]:SetBackdropColor(unpack(PANEL)) end
+        entry[1]:SetBackdropBorderColor(unpack(BORDER))
+    end
+    for _, button in ipairs(buttons) do
+        button:SetBackdropColor(unpack(BUTTON_BG))
+        button:SetBackdropBorderColor(unpack(BUTTON_BORDER))
+    end
+    for _, entry in ipairs(labels) do
+        entry[1]:SetFont(state.font, math.max(8, entry[3] + state.fontDelta))
+        entry[1]:SetTextColor(unpack(entry[2]))
+    end
+    for _, window in ipairs({ settings, dialog, palette }) do
+        if window then
+            window:SetBackdropColor(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3], 0.99)
+            window:SetBackdropBorderColor(GOLD[1] * 0.6, GOLD[2] * 0.6, GOLD[3] * 0.6, 1)
+        end
+    end
+    if frame.logo then frame.logo:SetTexture(state.logo) end
+    if settings and settings.logo then settings.logo:SetTexture(state.logo) end
+    refresh()
+    if settings and settings.current then settings.ShowSection(settings.current) end
+end
+
+local function ApplyPreset(preset)
+    Copy(BACKGROUND, preset[3])
+    Copy(PANEL, preset[4])
+    Copy(BORDER, preset[5])
+    Copy(GOLD, preset[6])
+    Copy(TEXT, preset[7] or DEFAULT_TEXT)
+    Copy(MUTED, preset[8] or DEFAULT_MUTED)
+    Copy(TEAL, preset[9] or DEFAULT_TEAL)
+    for i = 1, 3 do
+        BUTTON_BG[i] = math.min(1, preset[4][i] * 1.3 + 0.02)
+        BUTTON_BORDER[i] = math.min(1, preset[5][i] * 1.25)
+    end
+    state.theme = preset[1]
+    state.lastPreset = preset[1]
+    ApplyAppearance()
+end
+
+local function Popup(name, width, height)
+    local popup = CreateFrame("Frame", name, UIParent)
+    popup:SetSize(width, height)
+    popup:SetPoint("CENTER")
+    popup:SetFrameStrata("FULLSCREEN_DIALOG")
+    popup:SetFrameLevel(120)
+    popup:SetToplevel(true)
+    popup:SetClampedToScreen(true)
+    popup:EnableMouse(true)
+    popup:SetMovable(true)
+    popup:RegisterForDrag("LeftButton")
+    popup:SetScript("OnDragStart", popup.StartMoving)
+    popup:SetScript("OnDragStop", popup.StopMovingOrSizing)
+    popup:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+    popup:SetBackdropColor(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3], 0.99)
+    popup:SetBackdropBorderColor(GOLD[1] * 0.6, GOLD[2] * 0.6, GOLD[3] * 0.6, 1)
+    tinsert(UISpecialFrames, name)
+    return popup
+end
+
+local function Dialog(title, text, options)
+    options = options or {}
+    if not dialog then
+        dialog = Popup("AshoholicPreviewDialog", 460, 262)
+        dialog.title = Label(dialog, "", 18, 16, 424, 15, GOLD)
+        dialog.text = Label(dialog, "", 18, 46, 424, 11)
+        dialog.boxBg = Surface(dialog, 14, 118, 432, 78, { 0.02, 0.025, 0.035, 1 })
+        dialog.box = CreateFrame("EditBox", nil, dialog.boxBg)
+        dialog.box:SetPoint("TOPLEFT", 8, -8)
+        dialog.box:SetSize(416, 62)
+        dialog.box:SetMultiLine(true)
+        dialog.box:SetAutoFocus(false)
+        dialog.box:SetFontObject(ChatFontNormal)
+        dialog.box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+        dialog.primary = Button(dialog, "", 18, 216, 200, 28)
+        dialog.secondary = Button(dialog, "Cancel", 242, 216, 200, 28, function() dialog:Hide() end)
+    end
+    dialog:SetScale(settings and settings:GetScale() or 1)
+    dialog.title:SetText(title)
+    dialog.text:SetText(text)
+    SetVisible(dialog.boxBg, options.box ~= nil)
+    dialog.box:SetText(options.box or "")
+    dialog.primary.text:SetText(options.primary or "OK")
+    dialog.primary:SetScript("OnClick", function()
+        local value = dialog.box:GetText()
+        dialog:Hide()
+        if options.onAccept then options.onAccept(value) end
+    end)
+    SetVisible(dialog.secondary, options.primary ~= nil)
+    dialog:Show()
+    dialog:Raise()
+    if options.box then
+        dialog.box:SetFocus()
+        dialog.box:HighlightText()
+    end
+end
+
+local function PickColor(title, onPick)
+    if not palette then
+        palette = Popup("AshoholicPreviewPalette", 336, 256)
+        palette.title = Label(palette, "", 18, 16, 300, 14, GOLD)
+        for i, color in ipairs(PALETTE) do
+            local swatchColor = color
+            local swatch = CreateFrame("Button", nil, palette)
+            swatch:SetPoint("TOPLEFT", 18 + ((i - 1) % 6) * 50, -(48 + math.floor((i - 1) / 6) * 38))
+            swatch:SetSize(44, 32)
+            swatch:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+            swatch:SetBackdropColor(color[1], color[2], color[3], 1)
+            swatch:SetBackdropBorderColor(0.5, 0.5, 0.55, 1)
+            swatch:SetHighlightTexture(WHITE)
+            swatch:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.2)
+            swatch:SetScript("OnClick", function()
+                palette:Hide()
+                if palette.onPick then palette.onPick(swatchColor) end
+            end)
+        end
+        Button(palette, "Cancel", 216, 212, 102, 28, function() palette:Hide() end)
+        Label(palette, "Preview palette", 18, 220, 190, 10, MUTED)
+    end
+    palette:SetScale(settings and settings:GetScale() or 1)
+    palette.title:SetText(title)
+    palette.onPick = onPick
+    palette:Show()
+    palette:Raise()
+end
+
 local function BuildSettings()
-    settings = Surface(frame, 180, 95, 760, 550)
-    settings:SetFrameStrata("FULLSCREEN_DIALOG")
-    settings:EnableMouse(true)
-    Label(settings, "Ashoholic / Settings", 20, 18, 660, 21, GOLD)
-    Label(settings, "Interactive concept. Changes last until reload; no real settings are modified.", 20, 51, 720, 11, MUTED)
-    Button(settings, "X", 714, 14, 28, 26, function() settings:Hide() end)
-    local bodies, sectionButtons = {}, {}
-    local sections = { "Appearance", "Columns", "Accounts", "Sync", "Trials" }
-    for i, name in ipairs(sections) do
-        local section = name
-        sectionButtons[name] = Button(settings, name, 20 + (i - 1) * 144, 82, 136, 28, function() ShowSettings(section) end)
+    settings = Popup("AshoholicPreviewSettings", 900, 600)
+    settings:SetFrameLevel(40)
+    settings.groups = {}
+    settings.logo = settings:CreateTexture(nil, "ARTWORK")
+    settings.logo:SetPoint("TOPLEFT", 18, -14)
+    settings.logo:SetSize(32, 32)
+    settings.logo:SetTexture(state.logo)
+    Label(settings, "ASHOHOLIC SETTINGS", 60, 15, 500, 18, GOLD)
+    Label(settings, "Design preview  /  every choice applies to this preview immediately and is forgotten on /reload.", 60, 38, 760, 10, MUTED)
+    Button(settings, "X", 856, 14, 28, 26, function() settings:Hide() end)
+    local nav = Surface(settings, 16, 70, 186, 476)
+    local bodies, navButtons = {}, {}
+    settings.sectionTitle = Label(settings, "", 222, 74, 660, 16, GOLD)
+    settings.sectionText = Label(settings, "", 222, 98, 660, 10, MUTED)
+    for i, section in ipairs(SECTIONS) do
+        local name = section[1]
+        navButtons[name] = Button(nav, name, 8, 8 + (i - 1) * 42, 170, 34, function() settings.ShowSection(name) end)
         local body = CreateFrame("Frame", nil, settings)
-        body:SetPoint("TOPLEFT", 20, -127)
-        body:SetSize(720, 360)
+        body:SetPoint("TOPLEFT", 222, -126)
+        body:SetSize(664, 420)
         bodies[name] = body
     end
-    local appearance = bodies.Appearance
-    Label(appearance, "THEME", 0, 0, 700, 12, GOLD)
-    local presets = {
-        { "Ember & Ash", { 0.035, 0.042, 0.058, 0.99 }, { 1, 0.79, 0.39 } },
-        { "Frostbound", { 0.025, 0.07, 0.12, 0.99 }, { 0.45, 0.8, 1 } },
-        { "Void Walker", { 0.075, 0.025, 0.12, 0.99 }, { 0.8, 0.55, 1 } },
-    }
-    for i, preset in ipairs(presets) do
-        local theme = preset
-        Button(appearance, preset[1], (i - 1) * 240, 32, 225, 32, function()
-            frame:SetBackdropColor(unpack(theme[2]))
-            frame:SetBackdropBorderColor(unpack(theme[3]))
-            for _, card in ipairs(cards) do
-                card:SetBackdropBorderColor(unpack(theme[3]))
-                card.value:SetTextColor(unpack(theme[3]))
+    local status = Label(settings, "", 222, 567, 340, 10, TEAL)
+    local function Say(text) status:SetText(text) end
+    local function Toggle(parent, text, x, y, width, get, set)
+        local button
+        button = Button(parent, "", x, y, width, 28, function()
+            set(not get())
+            button.Update()
+        end)
+        button.Update = function() button.text:SetText((get() and "[x] " or "[ ] ") .. text) end
+        button.Update()
+        settings.groups[#settings.groups + 1] = button
+        return button
+    end
+    local function Choices(parent, options, x, y, width, perRow, get, set)
+        local group = {}
+        for i, option in ipairs(options) do
+            local value = option[1]
+            local button = Button(parent, option[2], x + ((i - 1) % perRow) * (width + 8), y + math.floor((i - 1) / perRow) * 34, width, 28, function()
+                set(value)
+                group.Update()
+            end)
+            button.value = value
+            group[i] = button
+        end
+        group.Update = function()
+            for _, button in ipairs(group) do
+                button:SetBackdropBorderColor(unpack(get() == button.value and GOLD or BUTTON_BORDER))
+                button.text:SetTextColor(unpack(get() == button.value and GOLD or TEXT))
             end
-            settings.themeName:SetText("Selected: " .. theme[1] .. " (preview frame and currency accents)")
+        end
+        group.Update()
+        settings.groups[#settings.groups + 1] = group
+        return group
+    end
+    local function SliderRow(parent, title, x, y, low, high, step, get, set, format)
+        Label(parent, title, x, y, 300, 11, GOLD)
+        local slider = CreateFrame("Slider", nil, parent)
+        slider:SetPoint("TOPLEFT", x, -(y + 24))
+        slider:SetSize(400, 14)
+        slider:SetOrientation("HORIZONTAL")
+        slider:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+        slider:SetBackdropColor(0.10, 0.11, 0.14, 1)
+        slider:SetBackdropBorderColor(unpack(BORDER))
+        slider:SetThumbTexture(WHITE)
+        slider:GetThumbTexture():SetSize(14, 14)
+        slider:GetThumbTexture():SetVertexColor(unpack(GOLD))
+        slider:SetMinMaxValues(low, high)
+        slider:SetValueStep(step)
+        slider:SetValue(get())
+        local text = Label(parent, format(get()), x + 416, y + 24, 120, 11)
+        slider:SetScript("OnValueChanged", function(_, value)
+            value = math.floor(value / step + 0.5) * step
+            text:SetText(format(value))
+            set(value)
+        end)
+        slider:EnableMouseWheel(true)
+        slider:SetScript("OnMouseWheel", function(self, delta) self:SetValue(self:GetValue() + delta * step) end)
+        settings.groups[#settings.groups + 1] = { Update = function() slider:GetThumbTexture():SetVertexColor(unpack(GOLD)) end }
+        return slider
+    end
+
+    -- Themes
+    local themeBody = bodies.Themes
+    local themeGroup = {}
+    for i, preset in ipairs(THEMES) do
+        local theme = preset
+        local card = Button(themeBody, preset[1], ((i - 1) % 2) * 330, math.floor((i - 1) / 2) * 82, 320, 72, function() ApplyPreset(theme) end)
+        Label(card, preset[2], 9, 27, 200, 10, MUTED)
+        for j, color in ipairs({ preset[3], preset[4], preset[5], preset[6] }) do
+            local swatch = card:CreateTexture(nil, "OVERLAY")
+            swatch:SetTexture(WHITE)
+            swatch:SetVertexColor(color[1], color[2], color[3], 1)
+            swatch:SetPoint("TOPLEFT", 214 + (j - 1) * 24, -22)
+            swatch:SetSize(20, 28)
+        end
+        card.value = preset[1]
+        themeGroup[i] = card
+    end
+    themeGroup.Update = function()
+        for _, card in ipairs(themeGroup) do
+            card:SetBackdropBorderColor(unpack((state.theme or "Ember & Ash") == card.value and GOLD or BUTTON_BORDER))
+        end
+    end
+    settings.groups[#settings.groups + 1] = themeGroup
+    Button(themeBody, "Customize this theme...", 0, 340, 240, 30, function() settings.ShowSection("Colors") end)
+    Button(themeBody, "Import a theme...", 250, 340, 200, 30, function() settings.ShowSection("Profiles & Sharing") end)
+    Label(themeBody, "Themes affect colors only. Fonts, icons and layout live in their own sections, so you can mix them freely.", 0, 386, 660, 10, MUTED)
+
+    -- Colors (custom theme editor)
+    local colorBody = bodies.Colors
+    local slots = {
+        { "Window background", BACKGROUND }, { "Panels & rows", PANEL }, { "Borders", BORDER },
+        { "Buttons", BUTTON_BG }, { "Accent / headings", GOLD }, { "Body text", TEXT },
+        { "Secondary text", MUTED }, { "Highlighted values", TEAL },
+    }
+    local swatches = {}
+    for i, slot in ipairs(slots) do
+        local target, title = slot[2], slot[1]
+        local x, y = ((i - 1) % 2) * 330, math.floor((i - 1) / 2) * 52
+        local row = Surface(colorBody, x, y, 320, 44)
+        Label(row, title, 12, 15, 160, 11)
+        local swatch = row:CreateTexture(nil, "OVERLAY")
+        swatch:SetTexture(WHITE)
+        swatch:SetPoint("TOPLEFT", 176, -9)
+        swatch:SetSize(42, 26)
+        swatches[i] = { swatch, target }
+        Button(row, "Change", 228, 8, 82, 28, function()
+            PickColor(title, function(color)
+                Copy(target, color)
+                state.theme = "Custom"
+                ApplyAppearance()
+                Say(title .. " changed. Theme is now 'Custom'.")
+            end)
         end)
     end
-    settings.themeName = Label(appearance, "Selected: Ember & Ash", 0, 85, 700, 12)
-    Label(appearance, "WINDOW OPACITY", 0, 135, 700, 12, GOLD)
-    local opacity = CreateFrame("Slider", nil, appearance)
-    opacity:SetPoint("TOPLEFT", 0, -170)
-    opacity:SetSize(470, 18)
-    opacity:SetOrientation("HORIZONTAL")
-    opacity:SetMinMaxValues(0.55, 1)
-    opacity:SetValueStep(0.05)
-    opacity:SetBackdrop({ bgFile = WHITE })
-    opacity:SetBackdropColor(0.15, 0.17, 0.21, 1)
-    opacity:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
-    opacity:SetValue(1)
-    local opacityText = Label(appearance, "100%", 490, 170, 150, 12)
-    opacity:SetScript("OnValueChanged", function(_, value)
-        frame:SetAlpha(value)
-        opacityText:SetText(string.format("%.0f%%", value * 100))
+    settings.groups[#settings.groups + 1] = { Update = function()
+        for _, entry in ipairs(swatches) do entry[1]:SetVertexColor(entry[2][1], entry[2][2], entry[2][3], 1) end
+    end }
+    Button(colorBody, "Save as custom theme...", 0, 222, 240, 30, function()
+        Dialog("Save custom theme", "Name your theme. In the live addon it would join the theme gallery and could be exported.", {
+            box = "My Ashoholic theme", primary = "Save",
+            onAccept = function(name) Say("Saved '" .. name .. "' (preview only).") end,
+        })
     end)
-    Label(appearance, "This concept previews presets and opacity. Full theme colors/fonts can reuse the existing theme editor when the design is settled.", 0, 225, 700, 12, MUTED)
+    Button(colorBody, "Revert to preset", 250, 222, 200, 30, function()
+        for _, preset in ipairs(THEMES) do
+            if preset[1] == (state.lastPreset or "Ember & Ash") then ApplyPreset(preset) end
+        end
+        Say("Reverted to " .. (state.lastPreset or "Ember & Ash") .. ".")
+    end)
+    Label(colorBody, "IDEAS TO EXPAND", 0, 282, 660, 11, GOLD)
+    Label(colorBody, "Per-tab accent colors, gradient headers, background art (Icecrown, Karazhan, Torment), class-colored row tints, and a 'Torment glow' that intensifies with your highest unlocked tier.", 0, 304, 660, 11, MUTED)
 
-    local columnBody = bodies.Columns
-    Label(columnBody, "Choose up to six columns beside Name. Use < / > to reorder selected columns.", 0, 0, 700, 12, GOLD)
+    -- Text & Layout
+    local textBody = bodies["Text & Layout"]
+    Label(textBody, "FONT", 0, 0, 300, 11, GOLD)
+    Choices(textBody, {
+        { "Fonts\\FRIZQT__.TTF", "Friz Quadrata" }, { "Fonts\\ARIALN.TTF", "Arial Narrow" },
+        { "Fonts\\MORPHEUS.TTF", "Morpheus" }, { "Fonts\\skurri.ttf", "Skurri" },
+    }, 0, 22, 154, 4, function() return state.font end, function(value) state.font = value; ApplyAppearance() end)
+    Label(textBody, "TEXT SIZE", 0, 72, 300, 11, GOLD)
+    Choices(textBody, { { -1, "Small" }, { 0, "Normal" }, { 1, "Large" }, { 2, "Larger" } }, 0, 94, 154, 4,
+        function() return state.fontDelta end, function(value) state.fontDelta = value; ApplyAppearance() end)
+    Label(textBody, "ROSTER ROW DENSITY", 0, 144, 300, 11, GOLD)
+    Choices(textBody, { { "compact", "Compact" }, { "comfortable", "Comfortable" }, { "spacious", "Spacious" } }, 0, 166, 210, 3,
+        function() return state.density end, function(value) state.density = value; refresh() end)
+    SliderRow(textBody, "WINDOW SCALE", 0, 218, 0.7, 1.2, 0.05, function() return state.scale end, function(value)
+        state.scale = value
+        frame:SetScale((frame.baseScale or 1) * value)
+    end, function(value) return string.format("%.0f%%", value * 100) end)
+    SliderRow(textBody, "BACKGROUND OPACITY", 0, 278, 0.4, 1, 0.05, function() return BACKGROUND[4] end, function(value)
+        BACKGROUND[4] = value
+        frame:SetBackdropColor(unpack(BACKGROUND))
+    end, function(value) return string.format("%.0f%%", value * 100) end)
+    Label(textBody, "Compact hides the hint line under each character. Scale and opacity affect only the main window.", 0, 346, 660, 10, MUTED)
+
+    -- Icons
+    local iconBody = bodies.Icons
+    Label(iconBody, "CURRENCY ICONS", 0, 0, 300, 11, GOLD)
+    Choices(iconBody, { { "icons", "Ebonhold icons" }, { "large", "Large icons" }, { "text", "Text only" } }, 0, 22, 210, 3,
+        function() return state.iconStyle end, function(value) state.iconStyle = value; refresh() end)
+    Label(iconBody, "RAID LOOT STATUS", 0, 72, 300, 11, GOLD)
+    Choices(iconBody, { { "words", "Words (Available / Looted)" }, { "icons", "Ready-check symbols" } }, 0, 94, 320, 2,
+        function() return state.statusStyle end, function(value) state.statusStyle = value; refresh() end)
+    Toggle(iconBody, "Show class icons beside names", 0, 140, 320, function() return state.classIcons end,
+        function(value) state.classIcons = value; refresh() end)
+    Label(iconBody, "ASHOHOLIC LOGO & MINIMAP ICON", 0, 190, 400, 11, GOLD)
+    local logoButtons = {}
+    for i, path in ipairs(LOGOS) do
+        local logo = path
+        local button = Button(iconBody, "", (i - 1) * 54, 214, 46, 46, function()
+            state.logo = logo
+            ApplyAppearance()
+            Say("Logo changed. The live addon would update the minimap button too.")
+        end)
+        local texture = button:CreateTexture(nil, "ARTWORK")
+        texture:SetPoint("TOPLEFT", 4, -4)
+        texture:SetPoint("BOTTOMRIGHT", -4, 4)
+        texture:SetTexture(path)
+        texture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+        button.value = path
+        logoButtons[i] = button
+    end
+    logoButtons.Update = function()
+        for _, button in ipairs(logoButtons) do
+            button:SetBackdropBorderColor(unpack(state.logo == button.value and GOLD or BUTTON_BORDER))
+        end
+    end
+    settings.groups[#settings.groups + 1] = logoButtons
+    Button(iconBody, "Use custom icon path...", 0, 276, 240, 30, function()
+        Dialog("Custom icon", "Enter any game icon path. The live addon would validate it before use.", {
+            box = "Interface\\Icons\\INV_Misc_QuestionMark", primary = "Use icon",
+            onAccept = function(path)
+                state.logo = path
+                ApplyAppearance()
+                Say("Custom icon applied to the preview.")
+            end,
+        })
+    end)
+    Label(iconBody, "Later ideas: role icons, Torment tier badges, Prestige emblems and per-account icons.", 0, 326, 660, 10, MUTED)
+
+    -- Roster Columns
+    local columnBody = bodies["Roster Columns"]
+    Label(columnBody, "Choose up to six columns beside the character name. Use < / > to reorder selected columns.", 0, 0, 660, 11, GOLD)
     local columnButtons = {}
     local function ColumnIndex(key)
         for i, selected in ipairs(columnOrder) do if selected == key then return i end end
     end
+    local columnNotice = Label(columnBody, "", 0, 315, 660, 11, GOLD)
+    local detailButton
     local function RefreshColumns()
         for i, column in ipairs(columns) do
             local index = ColumnIndex(column.key)
             columnButtons[i].text:SetText((index and "[x] " .. index .. ". " or "[ ] ") .. column.title)
         end
-        settings.detailButton.text:SetText((state.detail and "[x] " or "[ ] ") .. "Show parked-run detail panel")
+        detailButton.text:SetText((state.detail and "[x] " or "[ ] ") .. "Show parked-run detail panel")
         refresh()
     end
-    local columnNotice = Label(columnBody, "", 0, 315, 700, 11, GOLD)
     for i, column in ipairs(columns) do
         local key = column.key
-        local x, y = ((i - 1) % 2) * 360, 35 + math.floor((i - 1) / 2) * 38
-        columnButtons[i] = Button(columnBody, "", x, y, 254, 28, function()
+        local x, y = ((i - 1) % 2) * 330, 32 + math.floor((i - 1) / 2) * 38
+        columnButtons[i] = Button(columnBody, "", x, y, 240, 28, function()
             local index = ColumnIndex(key)
             columnNotice:SetText("")
             if index then table.remove(columnOrder, index)
@@ -758,71 +1211,229 @@ local function BuildSettings()
         end)
         for direction = -1, 1, 2 do
             local step = direction
-            Button(columnBody, direction == -1 and "<" or ">", x + (direction == -1 and 262 or 304), y, 34, 28, function()
+            Button(columnBody, direction == -1 and "<" or ">", x + (direction == -1 and 248 or 286), y, 34, 28, function()
                 local index = ColumnIndex(key)
                 if index and index + step >= 1 and index + step <= #columnOrder then
                     columnOrder[index], columnOrder[index + step] = columnOrder[index + step], columnOrder[index]
                     RefreshColumns()
-                else columnNotice:SetText("Select this column first; only selected columns can move within the list.") end
+                else columnNotice:SetText("Select this column first; only selected columns can move.") end
             end)
         end
     end
-    settings.detailButton = Button(columnBody, "", 0, 273, 420, 28, function()
+    detailButton = Button(columnBody, "", 0, 273, 420, 28, function()
         state.detail = not state.detail
         RefreshColumns()
     end)
-    Label(columnBody, "Offering bonus, offerings, build and anchor can be columns too; hiding the panel gives the roster more width.", 0, 342, 700, 11, MUTED)
+    Label(columnBody, "Any parked-run detail can become a column. Hiding the detail panel gives the roster the full width.", 0, 342, 660, 10, MUTED)
+    bodies["Roster Columns"].Refresh = RefreshColumns
 
-    local accounts = bodies.Accounts
-    Label(accounts, "CURRENT ACCOUNT (sample account 1)", 0, 0, 700, 12, GOLD)
-    Label(accounts, "Default: Account One. An alias is optional and does not change account identity.", 0, 30, 700, 12, MUTED)
-    local input = CreateFrame("EditBox", nil, accounts, "InputBoxTemplate")
-    input:SetPoint("TOPLEFT", 8, -70)
-    input:SetSize(440, 28)
+    -- Tabs & Views
+    local tabBody = bodies["Tabs & Views"]
+    Label(tabBody, "SHOW TABS  (Roster is always shown)", 0, 0, 400, 11, GOLD)
+    for i, tab in ipairs({ { "Raids", "Raids & Dungeons" }, { "Activities", "Activities" }, { "Progression", "Progression" }, { "Trials", "Trials" } }) do
+        local key = tab[1]
+        Toggle(tabBody, tab[2], ((i - 1) % 2) * 330, 22 + math.floor((i - 1) / 2) * 34, 320,
+            function() return not state.hiddenTabs[key] end,
+            function(value) state.hiddenTabs[key] = not value; refresh() end)
+    end
+    Label(tabBody, "WHEN THE WINDOW OPENS", 0, 112, 400, 11, GOLD)
+    Choices(tabBody, { { "last", "Last used tab" }, { "Roster", "Roster" }, { "Raids", "Raids & Dungeons" }, { "Activities", "Activities" }, { "Progression", "Progression" }, { "Trials", "Trials" } },
+        0, 134, 210, 3, function() return state.openTab or "last" end, function(value) state.openTab = value end)
+    Label(tabBody, "EXTRAS", 0, 218, 400, 11, GOLD)
+    state.mock = state.mock or {}
+    for i, option in ipairs({ { "openLogin", "Open Ashoholic on login" }, { "combatHide", "Hide automatically in combat" }, { "lockWindow", "Lock window position" }, { "escClose", "Escape closes the window", true } }) do
+        local key = option[1]
+        if state.mock[key] == nil then state.mock[key] = option[3] or false end
+        Toggle(tabBody, option[2], ((i - 1) % 2) * 330, 240 + math.floor((i - 1) / 2) * 34, 320,
+            function() return state.mock[key] end, function(value) state.mock[key] = value end)
+    end
+    Label(tabBody, "Hidden tabs disappear immediately. 'Extras' are mock switches only.", 0, 330, 660, 10, MUTED)
+
+    -- Accounts
+    local accountBody = bodies.Accounts
+    Label(accountBody, "CURRENT ACCOUNT ALIAS  (optional; default is the real account name)", 0, 0, 660, 11, GOLD)
+    local input = CreateFrame("EditBox", nil, accountBody, "InputBoxTemplate")
+    input:SetPoint("TOPLEFT", 8, -26)
+    input:SetSize(300, 28)
     input:SetAutoFocus(false)
     input:SetMaxLetters(32)
-    local notice = Label(accounts, "", 0, 152, 700, 12, TEAL)
     local function Rename(name)
         name = name:match("^%s*(.-)%s*$")
-        if name == "" then notice:SetText("Enter a name, or use Restore default."); return end
-        if name:find("|", 1, true) or name:find("[%c]") then notice:SetText("Use a plain-text name without control codes or |."); return end
+        if name == "" then Say("Enter a name, or use Restore default."); return end
+        if name:find("|", 1, true) or name:find("[%c]") then Say("Use a plain-text name without control codes or |."); return end
         ACCOUNTS[1].name = name
         input:SetText(name)
         input:ClearFocus()
-        notice:SetText("Preview alias updated everywhere. No real account data was changed.")
+        Say("Alias updated everywhere in the preview.")
+        settings.ShowSection("Accounts")
         refresh()
     end
-    Button(accounts, "Rename current account", 0, 112, 225, 28, function() Rename(input:GetText()) end)
-    Button(accounts, "Restore default", 240, 112, 200, 28, function() Rename(ACCOUNTS[1].originalName) end)
+    Button(accountBody, "Rename", 322, 26, 120, 28, function() Rename(input:GetText()) end)
+    Button(accountBody, "Restore default", 452, 26, 160, 28, function() Rename(ACCOUNTS[1].originalName) end)
     input:SetScript("OnEnterPressed", function() Rename(input:GetText()) end)
     input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    Label(accounts, "The live version should use the actual account name by default and store an optional alias, independently of filter selections.\n\nPreview accounts are fictional. Account 1 represents the account you are playing on. Filter choices survive switching tabs and closing this preview, but not /reload.", 0, 205, 700, 12, MUTED)
-    bodies.Accounts.Refresh = function() input:SetText(ACCOUNTS[1].name) end
-    bodies.Columns.Refresh = RefreshColumns
-    Label(bodies.Sync, "MULTI-ACCOUNT SYNC", 0, 0, 700, 14, GOLD)
-    Label(bodies.Sync, "The real addon already supports local SavedVariables merging through its launcher/scripts.\n\nThis preview demonstrates four accounts; it does not read other accounts, run scripts or modify sync configuration. Account filtering, grouping and scrollable views are not limited to two accounts.", 0, 39, 700, 13)
-    local syncNotice = Label(bodies.Sync, "", 0, 205, 700, 12, TEAL)
-    Button(bodies.Sync, "Simulate sync status", 0, 153, 230, 28, function()
-        syncNotice:SetText("Sample sync complete: 4 accounts / " .. #CHARACTERS .. " characters. No files were accessed.")
-    end)
-    Label(bodies.Trials, "TWO DIFFERENT TRIALS", 0, 0, 700, 14, GOLD)
-    Label(bodies.Trials, "Champion best: your best solo damage-Trial score.\nClass rank: last-observed rank among your class, not the entire roster.\n\nCrusader best: highest survival-wave result, with elapsed time.\nTeam: how many players were in that recorded attempt (1-5).\n\nPractice/checkpoint attempts should not count as ranked records. Rankings need a timestamp and season; they can become stale.\n\nThese are the special Trials, not ordinary dungeon or raid completion records.", 0, 40, 700, 13)
-    Button(settings, "Done", 594, 505, 146, 28, function() settings:Hide() end)
-    settings.ShowSection = function(section)
-        for name, body in pairs(bodies) do
-            SetVisible(body, name == section)
-            sectionButtons[name]:SetBackdropBorderColor(unpack(name == section and GOLD or { 0.24, 0.26, 0.31 }))
+    Label(accountBody, "ALL ACCOUNTS", 0, 82, 660, 11, GOLD)
+    local accountRows = {}
+    for i, account in ipairs(ACCOUNTS) do
+        local id, data = i, account
+        local row = Surface(accountBody, 0, 104 + (i - 1) * 46, 640, 40)
+        row.name = Label(row, "", 12, 14, 240, 12)
+        row.swatch = row:CreateTexture(nil, "OVERLAY")
+        row.swatch:SetTexture(WHITE)
+        row.swatch:SetPoint("TOPLEFT", 260, -10)
+        row.swatch:SetSize(30, 20)
+        Button(row, "Color...", 298, 6, 92, 28, function()
+            PickColor(data.name .. " color", function(color)
+                data.color = { color[1], color[2], color[3] }
+                Say(data.name .. " recolored in the roster and encounter headers.")
+                settings.ShowSection("Accounts")
+                refresh()
+            end)
+        end)
+        Toggle(row, "Start collapsed", 398, 6, 234, function() return state.collapsed[id] end,
+            function(value) state.collapsed[id] = value; refresh() end)
+        accountRows[i] = row
+    end
+    Label(accountBody, "Account 1 is the account you are playing on. Aliases never change account identity; filters are separate.", 0, 300, 660, 10, MUTED)
+    bodies.Accounts.Refresh = function()
+        input:SetText(ACCOUNTS[1].name)
+        for i, row in ipairs(accountRows) do
+            local account = ACCOUNTS[i]
+            row.name:SetText(account.name .. (i == 1 and "  (current)" or ""))
+            local color = account.color or GOLD
+            row.swatch:SetVertexColor(color[1], color[2], color[3], 1)
         end
+    end
+
+    -- Alerts
+    local alertBody = bodies.Alerts
+    Label(alertBody, "REMIND ME ABOUT", 0, 0, 400, 11, GOLD)
+    state.alerts = state.alerts or { reset = true, cache = true, boss = true, prestige = false, stale = true }
+    for i, option in ipairs({ { "reset", "Weekly raid reset (Tuesday 03:00 UTC)" }, { "cache", "Call Board cache ready" }, { "boss", "Watched boss available on login" }, { "prestige", "Account ready to Prestige" }, { "stale", "Character snapshot is stale" } }) do
+        local key = option[1]
+        Toggle(alertBody, option[2], 0, 22 + (i - 1) * 34, 420, function() return state.alerts[key] end,
+            function(value) state.alerts[key] = value end)
+    end
+    Label(alertBody, "SHOW ALERTS AS", 0, 202, 400, 11, GOLD)
+    Choices(alertBody, { { "chat", "Chat message" }, { "center", "Center of screen" }, { "silent", "Silent (badge only)" } }, 0, 224, 210, 3,
+        function() return state.alertStyle or "chat" end, function(value) state.alertStyle = value end)
+    Button(alertBody, "Send test alert", 0, 274, 210, 30, function()
+        local text = "Ashoholic preview: Nightbane loot is available on Cinder."
+        local style = state.alertStyle or "chat"
+        if style == "chat" then print("|cffffca63" .. text .. "|r")
+        elseif style == "center" and RaidNotice_AddMessage then RaidNotice_AddMessage(RaidWarningFrame, text, ChatTypeInfo["RAID_WARNING"]) end
+        Say(style == "silent" and "Silent: the live addon would show a badge on the tab instead." or "Test alert sent.")
+    end)
+
+    -- Profiles & Sharing
+    local profileBody = bodies["Profiles & Sharing"]
+    Label(profileBody, "ACTIVE PROFILE", 0, 0, 400, 11, GOLD)
+    Choices(profileBody, { { "Default", "Default" }, { "Raid Night", "Raid Night" }, { "Transmog Hunter", "Transmog Hunter" } }, 0, 22, 210, 3,
+        function() return state.profile or "Default" end, function(value) state.profile = value; Say("Switched to profile '" .. value .. "'.") end)
+    Label(profileBody, "PROFILE APPLIES TO", 0, 72, 400, 11, GOLD)
+    Choices(profileBody, { { "character", "This character" }, { "account", "This account" }, { "all", "All synced accounts" } }, 0, 94, 210, 3,
+        function() return state.profileScope or "account" end, function(value) state.profileScope = value end)
+    Button(profileBody, "New profile...", 0, 146, 210, 30, function()
+        Dialog("New profile", "Name the new profile. It starts as a copy of the current settings.", {
+            box = "My profile", primary = "Create", onAccept = function(name) Say("Created '" .. name .. "' (preview only).") end,
+        })
+    end)
+    Button(profileBody, "Copy from...", 218, 146, 210, 30, function()
+        Dialog("Copy profile", "Copy every setting from 'Raid Night' into '" .. (state.profile or "Default") .. "'?", {
+            primary = "Copy", onAccept = function() Say("Copied (preview only).") end,
+        })
+    end)
+    Button(profileBody, "Delete profile", 436, 146, 210, 30, function()
+        Dialog("Delete profile", "Delete '" .. (state.profile or "Default") .. "'? This cannot be undone.", {
+            primary = "Delete", onAccept = function() Say("Nothing was deleted; this is a preview.") end,
+        })
+    end)
+    Label(profileBody, "SHARE THEMES", 0, 202, 400, 11, GOLD)
+    Button(profileBody, "Export current theme...", 0, 224, 260, 30, function()
+        local code = "ASH2:" .. (state.theme or "Ember & Ash") .. ":" .. Hex(BACKGROUND) .. ":" .. Hex(PANEL) .. ":" .. Hex(BORDER) .. ":" .. Hex(GOLD) .. ":" .. Hex(TEXT)
+        Dialog("Export theme", "Copy this string (Ctrl+C) and share it with friends.", { box = code })
+    end)
+    Button(profileBody, "Import theme...", 268, 224, 260, 30, function()
+        Dialog("Import theme", "Paste a theme string (Ctrl+V).", {
+            box = "", primary = "Import", onAccept = function(code)
+                Say(code == "" and "Nothing pasted." or "String received; import is not applied in the preview.")
+            end,
+        })
+    end)
+    Label(profileBody, "Idea: a community theme gallery in-game, filled from strings shared on Discord.", 0, 274, 660, 10, MUTED)
+
+    -- Sync
+    local syncBody = bodies.Sync
+    Label(syncBody, "MULTI-ACCOUNT SYNC", 0, 0, 660, 11, GOLD)
+    Label(syncBody, "The real addon merges SavedVariables from several WoW accounts with its sync scripts. This preview shows four sample accounts; nothing is read or written.", 0, 24, 660, 11)
+    local rows = { { "Account One", "This account", "Live" }, { "Account Two", "Synced 2 hours ago", "OK" }, { "Account Three", "Synced yesterday", "OK" }, { "Account Four", "Synced 8 days ago", "Stale" } }
+    for i, row in ipairs(rows) do
+        local panel = Surface(syncBody, 0, 76 + (i - 1) * 40, 640, 34)
+        Label(panel, row[1], 12, 11, 220, 11)
+        Label(panel, row[2], 240, 11, 260, 11, MUTED)
+        Label(panel, row[3], 540, 11, 90, 11, row[3] == "Stale" and GOLD or TEAL)
+    end
+    Button(syncBody, "Simulate sync", 0, 246, 210, 30, function()
+        Say("Sample sync complete: 4 accounts / " .. #CHARACTERS .. " characters.")
+    end)
+    Button(syncBody, "How does sync work?", 218, 246, 210, 30, function()
+        Dialog("How sync works", "1. Log out of WoW.\n2. Run the Ashoholic sync launcher.\n3. It merges each account's roster into the others.\n4. Log in; every account sees every character.\n\nShared balances are counted once per account.")
+    end)
+
+    -- Help
+    Label(bodies.Help, "TRIALS", 0, 0, 660, 11, GOLD)
+    Label(bodies.Help, "Champion best: your best solo damage-Trial score.\nClass rank: last-observed rank among your class, not the entire roster.\nCrusader best: highest survival wave reached, with elapsed time.\nTeam: how many players were in that recorded attempt (1-5).", 0, 22, 660, 11)
+    Label(bodies.Help, "TORMENT & LOOT", 0, 130, 660, 11, GOLD)
+    Label(bodies.Help, "Torment is the new Hardcore ladder. Unlocks are account-wide.\nAvailable: this character can still loot the boss this week.\nLooted: loot already received; entering and killing are still allowed.\nUnknown: the snapshot is stale; log in on that character to refresh.\nTracked (dungeons): on your watchlist; no weekly lockout is assumed.", 0, 152, 660, 11)
+
+    Button(settings, "Reset section", 582, 558, 140, 30, function()
+        local section = settings.current
+        Dialog("Reset " .. section, "Restore the default settings for '" .. section .. "'?", {
+            primary = "Reset", onAccept = function()
+                if section == "Themes" or section == "Colors" then ApplyPreset(THEMES[1])
+                elseif section == "Text & Layout" then
+                    state.font, state.fontDelta, state.density, state.scale, BACKGROUND[4] = FONT, 0, "comfortable", 1, 0.99
+                    frame:SetScale(frame.baseScale or 1)
+                    ApplyAppearance()
+                elseif section == "Icons" then
+                    state.iconStyle, state.statusStyle, state.classIcons, state.logo = "icons", "words", true, LOGOS[1]
+                    ApplyAppearance()
+                end
+                Say(section .. " reset.")
+            end,
+        })
+    end)
+    Button(settings, "Close", 732, 558, 152, 30, function() settings:Hide() end)
+    settings.ShowSection = function(section)
+        if not bodies[section] then section = "Themes" end
+        settings.current = section
+        for _, entry in ipairs(SECTIONS) do
+            local name = entry[1]
+            SetVisible(bodies[name], name == section)
+            navButtons[name]:SetBackdropBorderColor(unpack(name == section and GOLD or BUTTON_BORDER))
+            navButtons[name].text:SetTextColor(unpack(name == section and GOLD or TEXT))
+            if name == section then
+                settings.sectionTitle:SetText(string.upper(name))
+                settings.sectionText:SetText(entry[2])
+            end
+        end
+        for _, group in ipairs(settings.groups) do group.Update() end
         if bodies[section].Refresh then bodies[section].Refresh() end
     end
+    settings:SetScript("OnHide", function()
+        if dialog then dialog:Hide() end
+        if palette then palette:Hide() end
+    end)
     settings:Hide()
 end
 
 ShowSettings = function(section)
     if accountMenu then accountMenu:Hide() end
     if not settings then BuildSettings() end
-    settings.ShowSection(section or "Appearance")
+    settings:SetScale(frame.baseScale or frame:GetScale())
+    settings.ShowSection(section or settings.current or "Themes")
     settings:Show()
+    settings:Raise()
 end
 
 local function BuildPreview()
@@ -900,18 +1511,23 @@ local function BuildPreview()
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
-    frame:SetBackdropColor(0.035, 0.042, 0.058, 0.99)
+    frame:SetBackdropColor(unpack(BACKGROUND))
     frame:SetBackdropBorderColor(0.40, 0.31, 0.17, 1)
     local titleBar = CreateFrame("Frame", nil, frame)
     titleBar:SetPoint("TOPLEFT")
-    titleBar:SetSize(1075, 58)
+    titleBar:SetSize(900, 58)
     titleBar:EnableMouse(true)
     titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() frame:StartMoving() end)
+    titleBar:SetScript("OnDragStart", function() if not (state.mock and state.mock.lockWindow) then frame:StartMoving() end end)
     titleBar:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
-    Label(titleBar, "ASHOHOLIC", 24, 15, 230, 24, GOLD)
-    Label(titleBar, "A new chapter for your roster", 244, 24, 400, 12, MUTED)
-    Button(frame, "Settings", 948, 14, 115, 28, function() ShowSettings("Appearance") end)
+    frame.logo = titleBar:CreateTexture(nil, "ARTWORK")
+    frame.logo:SetPoint("TOPLEFT", 24, -12)
+    frame.logo:SetSize(30, 30)
+    frame.logo:SetTexture(state.logo)
+    Label(titleBar, "ASHOHOLIC", 62, 15, 230, 24, GOLD)
+    Label(titleBar, "A new chapter for your roster", 282, 24, 400, 12, MUTED)
+    local settingsButton = Button(frame, "Settings", 948, 14, 115, 28, function() ShowSettings() end)
+    settingsButton:SetFrameLevel(titleBar:GetFrameLevel() + 5)
     Button(frame, "X", 1076, 14, 28, 28, function() frame:Hide() end)
     tinsert(UISpecialFrames, "AshoholicPreviewFrame")
     local banner = Surface(frame, 24, 60, 1072, 33, { 0.18, 0.13, 0.065, 1 })
@@ -934,7 +1550,7 @@ local function BuildPreview()
     local function FilterChanged()
         local characters = VisibleCharacters()
         if not state.accounts[CHARACTERS[state.selected].account] and characters[1] then state.selected = characters[1].index end
-        state.matrixPage = 1
+        state.matrixOffset = 0
         refresh()
     end
     for i = 0, #ACCOUNTS do
@@ -963,15 +1579,15 @@ local function BuildPreview()
         end)
     end
     local definitions = {
-        { "|TInterface\\Icons\\inv_soulash:16|t SOUL ASH", "ash", "Banked, once per account" },
-        { "|TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_frost:16|t SOUL SHARDS", "shards", "Banked; run shards excluded" },
-        { "|TInterface\\Icons\\inv_misc_supersoulash:16|t SOUL ESSENCE", "essence", "Persistent Prestige currency" },
-        { "|TInterface\\Icons\\ability_argus_soulbombdebufflarge:16|t ARTISAN SOUL", "artisan", "Persistent profession currency" },
-        { "TOTAL GOLD", "gold", "Character pockets + Warband" },
+        { "SOUL ASH", "ash", "Banked, once per account", "inv_soulash" },
+        { "SOUL SHARDS", "shards", "Banked; run shards excluded", "inv_10_jewelcrafting3_soulcage_frost" },
+        { "SOUL ESSENCE", "essence", "Persistent Prestige currency", "inv_misc_supersoulash" },
+        { "ARTISAN SOUL", "artisan", "Persistent profession currency", "ability_argus_soulbombdebufflarge" },
+        { "TOTAL GOLD", "gold", "Character pockets + Warband", "INV_Misc_Coin_02" },
     }
     for i, definition in ipairs(definitions) do
         local card = Surface(frame, 24 + (i - 1) * 218, 153, 200, 78)
-        Label(card, definition[1], 12, 11, 176, 10, MUTED)
+        card.title = Label(card, "", 12, 9, 176, 10, MUTED)
         card.value = Label(card, "", 12, 30, 176, 22, i == 5 and GOLD or TEAL)
         Label(card, definition[3], 12, 60, 178, 9, MUTED)
         cards[i] = card
@@ -1008,14 +1624,28 @@ local function BuildPreview()
         for i, definition in ipairs(definitions) do
             local amount = totals[definition[2]]
             cards[i].value:SetText(i == 5 and string.format("%dg", amount) or Short(amount))
+            local size = state.iconStyle == "large" and 22 or 16
+            cards[i].title:SetText(state.iconStyle == "text" and definition[1]
+                or string.format("|TInterface\\Icons\\%s:%d|t %s", definition[4], size, definition[1]))
         end
         Tip(cards[1], "Account Soul Ash", "Sample banked balance. Run earnings are shown only on characters. Banked and spendable are distinct; a future live view would show both.")
         Tip(cards[2], "Account Soul Shards", "Sample banked Shards. Do not count this shared balance again for every character.")
         Tip(cards[5], "Gold breakdown", string.format("Character pockets: %dg\nWarband bank: %dg\nTotal: %dg\nWarband gold is counted once per account.", totals.pockets, totals.warband, totals.gold))
+        if state.hiddenTabs[state.tab] then state.tab = "Roster" end
+        local tabX = 24
+        for _, name in ipairs(tabOrder) do
+            local shown = not state.hiddenTabs[name]
+            SetVisible(tabs[name], shown)
+            if shown then
+                tabs[name]:ClearAllPoints()
+                tabs[name]:SetPoint("TOPLEFT", tabX, -105)
+                tabX = tabX + 158
+            end
+        end
         for name, page in pairs(pages) do
             local active = state.tab == name
             SetVisible(page, active)
-            tabs[name]:SetBackdropBorderColor(unpack(active and GOLD or { 0.24, 0.26, 0.31 }))
+            tabs[name]:SetBackdropBorderColor(unpack(active and GOLD or BUTTON_BORDER))
             tabs[name].text:SetTextColor(unpack(active and GOLD or MUTED))
             if active then page.Refresh() end
         end
@@ -1038,7 +1668,9 @@ function addon:TogglePreviewUI()
         frame:Hide()
     else
         local scale = math.min(1, (UIParent:GetWidth() - 32) / 1120, (UIParent:GetHeight() - 32) / 720)
-        frame:SetScale(math.max(0.1, scale))
+        frame.baseScale = math.max(0.1, scale)
+        frame:SetScale(frame.baseScale * state.scale)
+        if state.openTab and state.openTab ~= "last" then state.tab = state.openTab end
         refresh()
         frame:Show()
     end
