@@ -92,6 +92,9 @@ compact character columns without widening the main window. Wider columns and
 horizontal scrolling remain available for larger selections.
 Click the watched matrix's Raids or Dungeons section header to collapse its
 instances and bosses without changing the watchlist.
+Activities uses the full width for one account, separating Daily and Weekly
+examples; multiple accounts retain a two-column overview. Reset times and
+objectives are explicitly illustrative, not live server data.
 
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.

@@ -215,6 +215,7 @@ local function Progress(parent, x, y, width, value, total)
     fill:SetPoint("TOPLEFT", track, "TOPLEFT")
     fill:SetSize(math.max(1, width * math.min(1, value / total)), 5)
     fill:SetVertexColor(unpack(TEAL))
+    return track, fill
 end
 
 local function VisibleCharacters()
@@ -761,30 +762,37 @@ local function BuildActivities()
     for accountId, account in ipairs(ACCOUNTS) do
         local panel = Surface(body, 0, 0, 510, 345)
         panel.title = Label(panel, account.name, 16, 17, 478, 16, GOLD)
-        Label(panel, "CALL BOARD CACHE", 16, 51, 490, 10, MUTED)
+        Label(panel, "CALL BOARD CACHE (SAMPLE)", 16, 51, 490, 10, MUTED)
         Label(panel, accountId == 1 and "7 / 10 progress" or "9 / 10 progress", 16, 73, 490, 21, TEAL)
-        Progress(panel, 16, 106, 490, accountId == 1 and 7 or 9, 10)
-        Label(panel, "UNCLAIMED & IN PROGRESS", 16, 132, 490, 10, GOLD)
+        panel.track, panel.fill = Progress(panel, 16, 106, 478, accountId == 1 and 7 or 9, 10)
+        panel.heading = Label(panel, "UNCLAIMED & IN PROGRESS", 16, 132, 490, 10, GOLD)
+        panel.daily = Label(panel, "DAILY  /  Sample reset: 08h 42m", 16, 132, 490, 11, GOLD)
+        panel.weekly = Label(panel, "WEEKLY  /  Sample reset: 3d 08h", 540, 132, 490, 11, GOLD)
         local rows = accountId == 1 and {
             { "Aster / Daily dungeon", GREEN .. "Ready to claim|r", "Character activity  /  Ash + Shards + gold" },
             { "Account / Crafting contract", GREEN .. "Ready to claim|r", "Shared activity  /  1 Artisan Soul" },
-            { "Cinder / Weekly raid", "8 / 11 bosses", "Character activity  /  Shards" },
+            { "Cinder / Example weekly", "8 / 11 sample objectives", "Illustrative progress, not a verified raid objective" },
         } or {
             { "Character / Open World daily", GREEN .. "Ready to claim|r", "Character activity  /  Ash + gold" },
             { "Account / Crafting contract", "2 / 3 objectives", "Shared activity  /  1 Artisan Soul" },
             { "Character / Weekly activities", DIM .. "Unknown|r", "Snapshot predates this reset; refresh needed" },
         }
+        panel.rows = {}
         for i, row in ipairs(rows) do
             local y = 159 + (i - 1) * 56
-            Label(panel, row[1], 16, y, 320, 12)
-            local status = Label(panel, row[2], 330, y, 176, 11, TEAL)
+            local title = Label(panel, row[1], 16, y, 280, 12)
+            local status = Label(panel, row[2], 280, y, 214, 11, TEAL)
             status:SetJustifyH("RIGHT")
-            Label(panel, row[3], 16, y + 23, 490, 10, MUTED)
+            local note = Label(panel, row[3], 16, y + 23, 478, 10, MUTED)
+            panel.rows[i] = { title, status, note }
         end
         panels[accountId] = panel
     end
     Label(page, "Sample reset timers: Daily 08h 42m  /  Weekly 3d 08h. Shared activities count once per account.", 0, 411, 1072, 10, MUTED)
     page.Refresh = function()
+        local selected = 0
+        for _, visible in pairs(state.accounts) do if visible then selected = selected + 1 end end
+        local single = selected == 1
         local count = 0
         for accountId, panel in ipairs(panels) do
             local visible = state.accounts[accountId]
@@ -792,7 +800,21 @@ local function BuildActivities()
             if visible then
                 panel:ClearAllPoints()
                 panel.title:SetText(ACCOUNTS[accountId].name)
-                panel:SetPoint("TOPLEFT", (count % 2) * 530, -math.floor(count / 2) * 360)
+                panel:SetWidth(single and 1046 or 510)
+                panel.track:SetWidth(single and 1014 or 478)
+                panel.fill:SetWidth((single and 1014 or 478) * (accountId == 1 and 0.7 or 0.9))
+                SetVisible(panel.heading, not single)
+                SetVisible(panel.daily, single)
+                SetVisible(panel.weekly, single)
+                for i, row in ipairs(panel.rows) do
+                    local x = single and i == 3 and 540 or 16
+                    local y = single and (i == 2 and 251 or 170) or 159 + (i - 1) * 56
+                    for j, fs in ipairs(row) do
+                        fs:ClearAllPoints()
+                        fs:SetPoint("TOPLEFT", x + (j == 2 and 264 or 0), -(y + (j == 3 and 23 or 0)))
+                    end
+                end
+                panel:SetPoint("TOPLEFT", single and 0 or (count % 2) * 530, -math.floor(count / 2) * 360)
                 count = count + 1
             end
         end
