@@ -75,6 +75,13 @@ If you play on multiple WoW accounts and want to see all your characters in one 
 
 ## Commands
 
+### UI design preview (PTR)
+
+Use `/ash preview` for the separate, session-local design preview. All characters,
+balances, activity objectives, timers and records are samples, not live tracking.
+Closing preserves preview choices until `/reload`; it does not change your saved roster.
+Hover the currency cards for explanations of their account-level totals.
+
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.
 *   `/ash memory` - Collects Lua garbage and reports addon memory before and after collection. Run between repeated test batches to check whether retained memory keeps growing; this does not measure the game client's native memory or font cache.

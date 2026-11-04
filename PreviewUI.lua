@@ -1590,6 +1590,7 @@ local function BuildPreview()
         card.title = Label(card, "", 12, 9, 176, 10, MUTED)
         card.value = Label(card, "", 12, 30, 176, 22, i == 5 and GOLD or TEAL)
         Label(card, definition[3], 12, 60, 178, 9, MUTED)
+        Tip(card, definition[1], definition[3] .. ". Totals combine the selected sample accounts, counting each account once. Preview balances are invented; this does not query your currencies.")
         cards[i] = card
     end
     BuildRoster()
