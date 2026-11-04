@@ -86,6 +86,8 @@ fictional character names to FastSwap.
 Drag roster header edges to resize columns. Minimum widths fit each header and
 the widest sample value across all accounts. Overflow scrolls horizontally;
 widths follow their column when reordered and reset on `/reload`.
+Right-click a header's resize handle to restore that column's default width,
+still respecting the current font and content minimum.
 Hold Shift while using the mouse wheel over the roster or its headers to scroll
 sideways. Without Shift, the wheel scrolls vertically.
 Settings > Roster Columns can enable all eleven optional columns, not just six.

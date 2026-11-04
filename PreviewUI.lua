@@ -319,8 +319,14 @@ local function BuildRoster()
         line:SetSize(1, 16)
         line:SetPoint("CENTER")
         line:SetVertexColor(unpack(MUTED))
-        Tip(grip, "Resize column", "Drag this header edge. The minimum fits the widest sample value or header, including hidden accounts.")
+        Tip(grip, "Resize column", "Drag this header edge. Right-click to reset its default width. The minimum fits the widest sample value or header, including hidden accounts.")
         grip:SetScript("OnMouseDown", function(self, button)
+            if button == "RightButton" then
+                self:SetScript("OnUpdate", nil)
+                state.columnWidths[self.key] = nil
+                page.Refresh()
+                return
+            end
             if button ~= "LeftButton" then return end
             self.startX = GetCursorPosition() / self:GetEffectiveScale()
             self.startWidth = self.width

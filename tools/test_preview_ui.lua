@@ -158,11 +158,16 @@ assert(roster.child.width > roster.width, "Column overflow should preserve conte
 local grip
 for _, object in ipairs(objects) do if object.parent == header.child and object.key == "location" then grip = object end end
 assert(grip, "Location resize handle missing")
+local defaultWidth = grip.width
 cursor = 0
 grip.scripts.OnMouseDown(grip, "LeftButton")
 cursor = 150
 grip.scripts.OnUpdate(grip)
 local enlarged = grip.width
+grip.scripts.OnMouseDown(grip, "RightButton")
+assert(grip.width == defaultWidth and not grip.scripts.OnUpdate, "Right-click must reset the column and stop dragging")
+cursor = 0
+grip.scripts.OnMouseDown(grip, "LeftButton")
 cursor = -10000
 grip.scripts.OnUpdate(grip)
 assert(grip.width == grip.minimum and enlarged > grip.minimum, "Drag must clamp to the content minimum")
