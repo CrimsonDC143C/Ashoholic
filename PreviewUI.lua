@@ -714,7 +714,7 @@ local function BuildProgression()
                 row:ClearAllPoints()
                 row:SetPoint("TOPLEFT", 16, -y)
                 row.name:SetText(account.name)
-                row.note:SetText("Torment " .. account.tier .. " unlocked for all characters")
+                row.note:SetText("Torment " .. account.tier .. " unlocked")
                 for tier, pip in ipairs(row.pips) do
                     pip:SetBackdropColor(unpack(tier <= account.tier and { 0.16, 0.36, 0.31, 1 } or { 0.11, 0.12, 0.15, 1 }))
                 end
