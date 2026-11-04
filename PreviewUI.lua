@@ -408,10 +408,6 @@ local function BuildRaids()
             if fs.SetWordWrap then fs:SetWordWrap(false) end
         end
     end
-    -- Separators sit on an overlay so row backgrounds cannot cover them.
-    local overlay = CreateFrame("Frame", nil, matrix)
-    overlay:SetAllPoints(matrix)
-    overlay:SetFrameLevel(matrix:GetFrameLevel() + 10)
     local separators = {}
     for i = 1, MATRIX_COLUMNS do
         local x = MATRIX_FIRST + i * MATRIX_WIDTH - 6
@@ -419,12 +415,7 @@ local function BuildRaids()
         head:SetTexture(WHITE)
         head:SetPoint("TOPLEFT", x, -4)
         head:SetSize(2, 39)
-        local body = overlay:CreateTexture(nil, "OVERLAY")
-        body:SetTexture(WHITE)
-        body:SetPoint("TOPLEFT", x, 0)
-        body:SetPoint("BOTTOMLEFT", x, 0)
-        body:SetWidth(2)
-        separators[i] = { head, body }
+        separators[i] = { head }
     end
     local hint = Label(page, "Shift + mouse wheel: scroll characters", 0, 370, 205, 9, MUTED)
     local hbar = CreateFrame("Slider", nil, page)
