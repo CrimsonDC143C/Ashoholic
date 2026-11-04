@@ -81,6 +81,8 @@ Use `/ash preview` for the separate, session-local design preview. All character
 balances, activity objectives, timers and records are samples, not live tracking.
 Closing preserves preview choices until `/reload`; it does not change your saved roster.
 Hover the currency cards for explanations of their account-level totals.
+Preview roster Swap buttons explain switching without logging out or passing
+fictional character names to FastSwap.
 
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.

@@ -60,7 +60,7 @@ local BUTTON_BORDER = { 0.24, 0.26, 0.31, 1 }
 local BACKGROUND = { 0.035, 0.042, 0.058, 0.99 }
 local surfaces, buttons, labels = {}, {}, {}
 local settings, accountMenu
-local ShowSettings
+local ShowSettings, Dialog
 local columns = {
     { key = "level", title = "Level" }, { key = "ilvl", title = "Item level" },
     { key = "runAsh", title = "Run Ash" }, { key = "runShards", title = "Run Shards" },
@@ -265,6 +265,10 @@ local function DetailLine(parent, title, value, y)
     return fs
 end
 
+local function PreviewSwap(character)
+    Dialog("Swap to " .. character.name, "Preview only: this fictional character cannot be selected. In the live roster, Swap uses FastSwap for characters on the current account. Other accounts require logging in separately. No logout was requested.")
+end
+
 local function BuildRoster()
     local page = Page("Roster", "Your next adventure", "Characters first. Shared currencies stay at account level; run earnings stay with the character.")
     page.headers = {}
@@ -284,6 +288,8 @@ local function BuildRoster()
             if row.cells[j].SetWordWrap then row.cells[j]:SetWordWrap(false) end
         end
         row.hint = Label(row, "", 12, 27, 680, 10, MUTED)
+        row.swap = Button(row, "Swap", 620, 5, 60, 24, function() PreviewSwap(character) end)
+        Tip(row.swap, "Swap (preview)", "Simulate switching to this character. Never logs out or calls FastSwap with sample names.")
         page.rows[i] = row
     end
     page.accountLabels = {}
@@ -304,14 +310,15 @@ local function BuildRoster()
         page.detailValues[i] = DetailLine(detail, title, "", 101 + (i - 1) * 28)
     end
     page.detailNote = Label(detail, "", 16, 278, 300, 11, TEAL)
-    Button(detail, "Customize columns / detail panel", 16, 317, 300, 25, function() ShowSettings("Roster Columns") end)
+    Button(detail, "Swap (preview)", 16, 317, 130, 25, function() PreviewSwap(CHARACTERS[state.selected]) end)
+    Button(detail, "Columns", 158, 317, 158, 25, function() ShowSettings("Roster Columns") end)
     Label(page, "No hourly-entry counter: the new realm's cap has not been established.", 0, 391, 716, 10, MUTED)
     page.Refresh = function()
         local width = state.detail and 690 or 1046
         scroll:SetWidth(width)
         body:SetWidth(width)
         SetVisible(detail, state.detail and state.accounts[CHARACTERS[state.selected].account])
-        local cellWidth = (width - 160) / math.max(1, #columnOrder)
+        local cellWidth = (width - 230) / math.max(1, #columnOrder)
         local function PositionCell(fs, j, y)
             fs:ClearAllPoints()
             fs:SetPoint("TOPLEFT", j == 1 and 10 or 160 + (j - 2) * cellWidth, -y)
@@ -346,6 +353,9 @@ local function BuildRoster()
                     SetVisible(row, show and not state.collapsed[accountId])
                     if show and not state.collapsed[accountId] then
                         row:SetWidth(width)
+                        row.swap:ClearAllPoints()
+                        row.swap:SetPoint("TOPRIGHT", -8, -5)
+                        row.hint:SetWidth(width - 90)
                         row:SetHeight(rowHeight)
                         row:ClearAllPoints()
                         row:SetPoint("TOPLEFT", 0, -y)
@@ -881,7 +891,7 @@ local function Popup(name, width, height)
     return popup
 end
 
-local function Dialog(title, text, options)
+Dialog = function(title, text, options)
     options = options or {}
     if not dialog then
         dialog = Popup("AshoholicPreviewDialog", 460, 262)
