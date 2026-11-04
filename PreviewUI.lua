@@ -51,7 +51,7 @@ local state = {
     matrixOffset = 0, detail = true, font = FONT, fontDelta = 0, density = "comfortable",
     iconStyle = "icons", classIcons = true, statusStyle = "words", hiddenTabs = {}, defaultTab = "Roster",
     logo = "Interface\\Icons\\inv_soulash", scale = 1, opacity = 1,
-    columnWidths = {}, rosterOffset = 0,
+    columnWidths = {}, rosterOffset = 0, encounterCollapsed = {},
 }
 -- Mutated in place by the theme preview so every widget sharing them follows the theme.
 local PANEL = { 0.075, 0.083, 0.105, 1 }
@@ -566,7 +566,7 @@ local function BuildRaids()
     local function MatrixRow(i)
         local row = page.matrixRows[i]
         if not row then
-            row = Surface(matrix, 0, 0, 690, 25)
+            row = Button(matrix, "", 0, 0, 690, 25)
             row.name = Label(row, "", 7, 7, 198, 10)
             row.name:SetHeight(13)
             if row.name.SetWordWrap then row.name:SetWordWrap(false) end
@@ -677,14 +677,19 @@ local function BuildRaids()
         SetVisible(hbar, maxOffset > 0)
         position:SetText(#allCharacters == 0 and "" or string.format("%d-%d of %d", state.matrixOffset + 1, math.min(#allCharacters, state.matrixOffset + matrixColumns), #allCharacters))
         hint:SetText(maxOffset > 0 and "Shift + wheel: characters" or "All selected characters fit")
-        local function AddRow(name, boss, instance)
+        local function AddRow(name, boss, instance, category)
             rowIndex = rowIndex + 1
             local row = MatrixRow(rowIndex)
             row:SetWidth(width)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 0, -y)
             row.name:SetText(name)
-            Tip(row, boss and boss.name or name, instance and instance.kind == "Dungeons"
+            row:SetScript("OnClick", category and function()
+                state.encounterCollapsed[category.key] = not state.encounterCollapsed[category.key]
+                page.Refresh()
+            end or nil)
+            Tip(row, boss and boss.name or name, category and "Click to collapse or expand all watched " .. category.name .. ". Tracking selections are kept."
+                or instance and instance.kind == "Dungeons"
                 and "Dungeon watchlist only. Tracked does not imply a weekly lockout or a recorded kill."
                 or "Sample raid loot eligibility. Looted does not prevent entry. Unknown needs a fresh snapshot.")
             for i, cell in ipairs(row.cells) do
@@ -700,6 +705,8 @@ local function BuildRaids()
         end
         for _, category in ipairs(trackingTree) do
             if WatchedCount(category) > 0 then
+                AddRow((state.encounterCollapsed[category.key] and "+ " or "- ") .. category.name, nil, nil, category)
+                if not state.encounterCollapsed[category.key] then
                 for _, expansion in ipairs(category.children) do
                     if WatchedCount(expansion) > 0 then
                         for _, instance in ipairs(expansion.children) do
@@ -709,6 +716,7 @@ local function BuildRaids()
                                     if state.watched[boss.id] then AddRow(boss.name, boss, instance) end
                                 end
                                 y = y + 8
+                            end
                             end
                         end
                     end

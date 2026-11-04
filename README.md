@@ -90,6 +90,8 @@ Settings > Roster Columns can enable all eleven optional columns, not just six.
 In Raids & Dungeons, hide the tracking-selection sidebar to make room for ten
 compact character columns without widening the main window. Wider columns and
 horizontal scrolling remain available for larger selections.
+Click the watched matrix's Raids or Dungeons section header to collapse its
+instances and bosses without changing the watchlist.
 
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.
