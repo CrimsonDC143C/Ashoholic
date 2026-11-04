@@ -285,4 +285,13 @@ environment.Ashoholic:TogglePreviewUI()
 environment.Ashoholic:TogglePreviewUI()
 Settings("Themes")
 Text("Renamed theme")
+Click("Close")
+Click("Roster")
+local before = grip.width
+cursor = 0
+grip.scripts.OnMouseDown(grip, "LeftButton")
+cursor = 5
+grip.scripts.OnUpdate(grip)
+assert(grip.width == before + 5, "Dragging after a font change must start at the displayed width")
+grip.scripts.OnMouseUp(grip)
 print("preview-ui: tooltips, safe Swap, eleven columns, resize minimum, scrolling, encounter groups, ten slots, activities and preset lifecycle passed")

@@ -323,7 +323,7 @@ local function BuildRoster()
         grip:SetScript("OnMouseDown", function(self, button)
             if button ~= "LeftButton" then return end
             self.startX = GetCursorPosition() / self:GetEffectiveScale()
-            self.startWidth = state.columnWidths[self.key] or self.width
+            self.startWidth = self.width
             self:SetScript("OnUpdate", function(handle)
                 state.columnWidths[handle.key] = math.max(handle.minimum,
                     handle.startWidth + GetCursorPosition() / handle:GetEffectiveScale() - handle.startX)
