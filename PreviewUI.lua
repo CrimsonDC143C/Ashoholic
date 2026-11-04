@@ -51,6 +51,7 @@ local state = {
     matrixOffset = 0, detail = true, font = FONT, fontDelta = 0, density = "comfortable",
     iconStyle = "icons", classIcons = true, statusStyle = "words", hiddenTabs = {}, defaultTab = "Roster",
     logo = "Interface\\Icons\\inv_soulash", scale = 1, opacity = 1,
+    columnWidths = {}, rosterOffset = 0,
 }
 -- Mutated in place by the theme preview so every widget sharing them follows the theme.
 local PANEL = { 0.075, 0.083, 0.105, 1 }
@@ -271,9 +272,65 @@ end
 
 local function BuildRoster()
     local page = Page("Roster", "Your next adventure", "Characters first. Shared currencies stay at account level; run earnings stay with the character.")
-    page.headers = {}
-    for i = 1, 7 do page.headers[i] = Label(page, "", 0, 61, 100, 10, MUTED) end
+    local headerScroll = CreateFrame("ScrollFrame", nil, page)
+    headerScroll:SetPoint("TOPLEFT", 0, -57)
+    headerScroll:SetSize(690, 23)
+    local headerBody = CreateFrame("Frame", nil, headerScroll)
+    headerBody:SetSize(690, 23)
+    headerScroll:SetScrollChild(headerBody)
+    local measure = Label(page, "", 0, 0, 0, 11)
+    measure:Hide()
+    local function Measure(text, size)
+        measure:SetFont(state.font, math.max(8, size + state.fontDelta))
+        measure:SetText(text)
+        return math.ceil(measure:GetStringWidth()) + 22
+    end
+    page.headers, page.grips = {}, {}
+    for i = 1, #columns + 1 do
+        page.headers[i] = Label(headerBody, "", 0, 4, 100, 10, MUTED)
+        page.headers[i]:SetHeight(16)
+        if page.headers[i].SetWordWrap then page.headers[i]:SetWordWrap(false) end
+        local grip = CreateFrame("Button", nil, headerBody)
+        grip:SetSize(8, 23)
+        local line = grip:CreateTexture(nil, "OVERLAY")
+        line:SetTexture(WHITE)
+        line:SetSize(1, 16)
+        line:SetPoint("CENTER")
+        line:SetVertexColor(unpack(MUTED))
+        Tip(grip, "Resize column", "Drag this header edge. The minimum fits the widest sample value or header, including hidden accounts.")
+        grip:SetScript("OnMouseDown", function(self, button)
+            if button ~= "LeftButton" then return end
+            self.startX = GetCursorPosition() / self:GetEffectiveScale()
+            self.startWidth = state.columnWidths[self.key] or self.width
+            self:SetScript("OnUpdate", function(handle)
+                state.columnWidths[handle.key] = math.max(handle.minimum,
+                    handle.startWidth + GetCursorPosition() / handle:GetEffectiveScale() - handle.startX)
+                page.Refresh()
+            end)
+        end)
+        local function StopResize(self) self:SetScript("OnUpdate", nil) end
+        grip:SetScript("OnMouseUp", StopResize)
+        grip:SetScript("OnHide", StopResize)
+        page.grips[i] = grip
+    end
     local scroll, body = Scroll(page, "AshoholicPreviewRosterScroll", 0, 84, 716, 290)
+    local hbar = CreateFrame("Slider", nil, page)
+    hbar:SetPoint("TOPLEFT", 0, -378)
+    hbar:SetSize(690, 10)
+    hbar:SetOrientation("HORIZONTAL")
+    hbar:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+    hbar:SetBackdropColor(unpack(BUTTON_BG))
+    hbar:SetThumbTexture(WHITE)
+    hbar:GetThumbTexture():SetSize(70, 10)
+    hbar:GetThumbTexture():SetVertexColor(unpack(GOLD))
+    hbar:SetValueStep(1)
+    hbar:SetMinMaxValues(0, 0)
+    hbar:SetValue(0)
+    hbar:SetScript("OnValueChanged", function(_, value)
+        state.rosterOffset = value
+        headerScroll:SetHorizontalScroll(value)
+        scroll:SetHorizontalScroll(value)
+    end)
     page.rows = {}
     for i, character in ipairs(CHARACTERS) do
         local index = i
@@ -282,7 +339,7 @@ local function BuildRoster()
             refresh()
         end)
         row.cells = {}
-        for j = 1, 7 do
+        for j = 1, #columns + 1 do
             row.cells[j] = Label(row, "", 0, 8, 85, 11)
             row.cells[j]:SetHeight(14)
             if row.cells[j].SetWordWrap then row.cells[j]:SetWordWrap(false) end
@@ -316,21 +373,50 @@ local function BuildRoster()
     page.Refresh = function()
         local width = state.detail and 690 or 1046
         scroll:SetWidth(width)
-        body:SetWidth(width)
+        headerScroll:SetWidth(width)
+        hbar:SetWidth(width)
         SetVisible(detail, state.detail and state.accounts[CHARACTERS[state.selected].account])
-        local cellWidth = (width - 230) / math.max(1, #columnOrder)
-        local function PositionCell(fs, j, y)
-            fs:ClearAllPoints()
-            fs:SetPoint("TOPLEFT", j == 1 and 10 or 160 + (j - 2) * cellWidth, -y)
-            fs:SetWidth(j == 1 and 145 or cellWidth - 6)
-            SetVisible(fs, j <= #columnOrder + 1)
-        end
-        for j, fs in ipairs(page.headers) do
-            PositionCell(fs, j, 61)
-            local key = columnOrder[j - 1]
+        local layout, contentWidth = {}, 0
+        for j = 1, #columnOrder + 1 do
+            local key = j == 1 and "character" or columnOrder[j - 1]
             local title = "CHARACTER"
             for _, column in ipairs(columns) do if column.key == key then title = column.title end end
-            fs:SetText(title)
+            local minimum = Measure(title, 10)
+            for _, character in ipairs(CHARACTERS) do
+                minimum = math.max(minimum, Measure(j == 1 and ClassName(character) or tostring(character[key] or "Unknown"), 11))
+            end
+            local cellWidth = math.max(minimum, state.columnWidths[key] or (j == 1 and 150 or 85))
+            layout[j] = { x = contentWidth, width = cellWidth, key = key, minimum = minimum, title = title }
+            contentWidth = contentWidth + cellWidth
+        end
+        contentWidth = math.max(width, contentWidth + 76)
+        body:SetWidth(contentWidth)
+        headerBody:SetWidth(contentWidth)
+        local maximum = math.max(0, contentWidth - width)
+        state.rosterOffset = math.min(state.rosterOffset, maximum)
+        hbar:SetMinMaxValues(0, maximum)
+        hbar:SetValue(state.rosterOffset)
+        headerScroll:SetHorizontalScroll(state.rosterOffset)
+        scroll:SetHorizontalScroll(state.rosterOffset)
+        SetVisible(hbar, maximum > 0)
+        local function PositionCell(fs, j, y)
+            local cell = layout[j]
+            SetVisible(fs, cell ~= nil)
+            if not cell then return end
+            fs:ClearAllPoints()
+            fs:SetPoint("TOPLEFT", cell.x + 10, -y)
+            fs:SetWidth(cell.width - 16)
+        end
+        for j, fs in ipairs(page.headers) do
+            PositionCell(fs, j, 4)
+            local cell, grip = layout[j], page.grips[j]
+            SetVisible(grip, cell ~= nil)
+            fs:SetText(cell and cell.title or "")
+            if cell then
+                grip.key, grip.minimum, grip.width = cell.key, cell.minimum, cell.width
+                grip:ClearAllPoints()
+                grip:SetPoint("TOPLEFT", cell.x + cell.width - 4, 0)
+            end
         end
         local y = 0
         for accountId, account in ipairs(ACCOUNTS) do
@@ -340,8 +426,8 @@ local function BuildRoster()
             if show then
                 accountLabel:ClearAllPoints()
                 accountLabel:SetPoint("TOPLEFT", 0, -y)
-                accountLabel:SetWidth(width)
-                accountLabel.text:SetWidth(width - 18)
+                accountLabel:SetWidth(contentWidth)
+                accountLabel.text:SetWidth(contentWidth - 18)
                 accountLabel.text:SetText((state.collapsed[accountId] and "+ " or "- ") .. account.name .. (accountId == 1 and "  /  Current account" or ""))
                 accountLabel.text:SetTextColor(unpack(account.color or TEXT))
                 y = y + 28
@@ -352,10 +438,10 @@ local function BuildRoster()
                     local row = page.rows[i]
                     SetVisible(row, show and not state.collapsed[accountId])
                     if show and not state.collapsed[accountId] then
-                        row:SetWidth(width)
+                        row:SetWidth(contentWidth)
                         row.swap:ClearAllPoints()
                         row.swap:SetPoint("TOPRIGHT", -8, -5)
-                        row.hint:SetWidth(width - 90)
+                        row.hint:SetWidth(contentWidth - 90)
                         row:SetHeight(rowHeight)
                         row:ClearAllPoints()
                         row:SetPoint("TOPLEFT", 0, -y)

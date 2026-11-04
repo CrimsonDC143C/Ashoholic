@@ -83,6 +83,9 @@ Closing preserves preview choices until `/reload`; it does not change your saved
 Hover the currency cards for explanations of their account-level totals.
 Preview roster Swap buttons explain switching without logging out or passing
 fictional character names to FastSwap.
+Drag roster header edges to resize columns. Minimum widths fit each header and
+the widest sample value across all accounts. Overflow scrolls horizontally;
+widths follow their column when reordered and reset on `/reload`.
 
 *   `/ash` or `/ashoholic` - Toggles the main roster window.
 *   `/ash config` or `/ashoholic config` - Opens the settings menu directly.
