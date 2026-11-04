@@ -35,6 +35,7 @@ EXPLICIT = {
     "Minimap.lua": "Ashoholic/Minimap.lua",
     "Themes.lua": "Ashoholic/Themes.lua",
     "UI.lua": "Ashoholic/UI.lua",
+    "PreviewUI.lua": "Ashoholic/PreviewUI.lua",
     "NexusDock.lua": "Ashoholic/NexusDock.lua",
     "FastSwap/FastSwap.toc": "FastSwap/FastSwap.toc",
     "FastSwap/FastSwap.lua": "FastSwap/FastSwap.lua",
