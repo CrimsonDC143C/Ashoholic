@@ -267,7 +267,6 @@ end
 
 local function BuildRoster()
     local page = Page("Roster", "Your next adventure", "Characters first. Shared currencies stay at account level; run earnings stay with the character.")
-    Button(page, "Columns / layout", 548, 0, 168, 26, function() ShowSettings("Roster Columns") end)
     page.headers = {}
     for i = 1, 7 do page.headers[i] = Label(page, "", 0, 61, 100, 10, MUTED) end
     local scroll, body = Scroll(page, "AshoholicPreviewRosterScroll", 0, 84, 716, 290)
