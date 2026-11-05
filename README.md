@@ -53,13 +53,13 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 
 ## PTR testing download
 
-For the Ebonhold PTR, download [Ashoholic-PTR.zip](https://github.com/CrimsonDC143C/Ashoholic/releases/download/ptr-latest/Ashoholic-PTR.zip). This link becomes available after the first successful PTR publication. The [PTR prerelease page](https://github.com/CrimsonDC143C/Ashoholic/releases/tag/ptr-latest) identifies the packaged commit.
+For the Ebonhold PTR UI mock preview, download [Ashoholic-PTR.zip](https://github.com/CrimsonDC143C/Ashoholic/releases/download/ptr-latest/Ashoholic-PTR.zip). This link becomes available after the first successful PTR publication. The [PTR prerelease page](https://github.com/CrimsonDC143C/Ashoholic/releases/tag/ptr-latest) identifies the packaged commit.
 
-Close WoW, back up your PTR SavedVariables, and extract the ZIP into your **PTR client's** `Interface\AddOns\` folder. It contains the same three addon folders as the live package; follow the remaining installation steps above using the PTR client. ProjectEbonhold must already be installed. PTR builds are experimental and should not replace your live-client addon installation.
+Close WoW, back up your PTR SavedVariables, remove any previous `Ashoholic` folder from your **PTR client's** `Interface\AddOns\` folder, and extract the ZIP there. The archive contains only the preview manifest, loader, color picker, and mock UI in an `Ashoholic` folder; it does not include the live roster, FastSwap, or SharedMedia. ProjectEbonhold must already be installed. Type `/ash preview` to open the mock UI. PTR builds are experimental and should not replace your live-client addon installation.
 
 ### Publishing PTR builds
 
-- Commit and push PTR changes to `PTR-main`. The **Package PTR addon** workflow builds the install-ready ZIP, including the preview UI, and publishes it as a prerelease.
+- Commit and push PTR changes to `PTR-main`. The **Package PTR addon** workflow builds the preview-only ZIP and publishes it as a prerelease.
 - Each successful publication moves the dedicated `ptr-latest` tag to the packaged commit and replaces `Ashoholic-PTR.zip`, keeping the download URL unchanged. It does not retain previous PTR builds.
 - Live release tags, the live ZIP, and the latest stable release are not changed. The live packaging job only runs on `main`.
 - If the workflow is available in GitHub's manual-run menu, select `PTR-main` when running it. GitHub normally requires a workflow to exist on the default branch before exposing manual dispatch; automatic PTR pushes do not have that requirement.

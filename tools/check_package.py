@@ -56,6 +56,15 @@ REQUIRED_ZIP_ENTRIES = (
     "SharedMedia/SharedMedia.toc",
 )
 
+PTR_PREVIEW_EXPLICIT = {
+    "AshoholicPreview.toc": "Ashoholic/Ashoholic.toc",
+    "PreviewBootstrap.lua": "Ashoholic/PreviewBootstrap.lua",
+    "ColorPicker.lua": "Ashoholic/ColorPicker.lua",
+    "PreviewUI.lua": "Ashoholic/PreviewUI.lua",
+}
+
+PTR_PREVIEW_REQUIRED_ZIP_ENTRIES = ("Ashoholic/Ashoholic.toc",)
+
 
 def git_files() -> list[str]:
     result = subprocess.run(
@@ -190,18 +199,22 @@ def require_tracked(path: str, origin: str, tracked: set[str], errors: list[str]
         errors.append(f"missing file: {origin} resolves to {path}")
 
 
-def package_map(tracked: set[str], errors: list[str]) -> dict[str, str]:
+def package_map(
+    tracked: set[str], errors: list[str], ptr_preview: bool = False
+) -> dict[str, str]:
     mapping: dict[str, str] = {}
-    for source, archive in EXPLICIT.items():
+    explicit = PTR_PREVIEW_EXPLICIT if ptr_preview else EXPLICIT
+    for source, archive in explicit.items():
         require_tracked(source, "package list", tracked, errors)
         mapping[source] = archive
-    for source_prefix, archive_prefix in PREFIXES:
-        matched = [path for path in tracked if path.startswith(source_prefix)]
-        if not matched:
-            errors.append(f"package tree is empty: {source_prefix}")
-            continue
-        for source in matched:
-            mapping[source] = archive_prefix + source
+    if not ptr_preview:
+        for source_prefix, archive_prefix in PREFIXES:
+            matched = [path for path in tracked if path.startswith(source_prefix)]
+            if not matched:
+                errors.append(f"package tree is empty: {source_prefix}")
+                continue
+            for source in matched:
+                mapping[source] = archive_prefix + source
     return mapping
 
 
@@ -233,13 +246,21 @@ def main() -> int:
         metavar="PATH",
         help="write the archive to this path and keep it (the release workflow)",
     )
+    parser.add_argument(
+        "--ptr-preview",
+        action="store_true",
+        help="build the preview-only PTR archive instead of the full addon package",
+    )
     args = parser.parse_args()
 
     errors: list[str] = []
     tracked = set(git_files())
     version_of_ashoholic(errors)
-    mapping = package_map(tracked, errors)
+    mapping = package_map(tracked, errors, ptr_preview=args.ptr_preview)
     loaded = manifest_files(tracked, set(mapping), errors)
+    required_entries = (
+        PTR_PREVIEW_REQUIRED_ZIP_ENTRIES if args.ptr_preview else REQUIRED_ZIP_ENTRIES
+    )
 
     missing_from_package = sorted({path for path in loaded if path not in mapping})
     for path in missing_from_package:
@@ -262,7 +283,7 @@ def main() -> int:
             names = build_zip(mapping, destination)
             kept = None
             zip_names = set(names)
-            for required in REQUIRED_ZIP_ENTRIES:
+            for required in required_entries:
                 if required not in zip_names:
                     errors.append(f"archive is missing {required}")
             packaged_sources = set(mapping)
@@ -281,7 +302,7 @@ def main() -> int:
             return 0
 
     zip_names = set(names)
-    for required in REQUIRED_ZIP_ENTRIES:
+    for required in required_entries:
         if required not in zip_names:
             errors.append(f"archive is missing {required}")
     for path in loaded:

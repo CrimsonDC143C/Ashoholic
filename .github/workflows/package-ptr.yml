@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Ashoholic-PTR.zip
-        run: python3 tools/check_package.py --zip Ashoholic-PTR.zip
+        run: python3 tools/check_package.py --ptr-preview --zip Ashoholic-PTR.zip
 
       - name: Publish PTR prerelease
         env:
@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="ptr-latest"
-          notes="Experimental PTR build from PTR-main, commit ${GITHUB_SHA}. For the Ebonhold PTR client only. Close WoW and extract Ashoholic-PTR.zip into your PTR client's Interface/AddOns folder. The archive contains Ashoholic, FastSwap, and SharedMedia. ProjectEbonhold must already be installed. Back up your PTR SavedVariables before testing. This is a rolling build; the download is replaced after each successful PTR publication."
+          notes="Experimental UI preview from PTR-main, commit ${GITHUB_SHA}. For the Ebonhold PTR client only. Close WoW, remove any previous Ashoholic folder, and extract Ashoholic-PTR.zip into your PTR client's Interface/AddOns folder. The archive contains only the Ashoholic preview manifest, loader, color picker, and mock UI; it does not include the live roster, FastSwap, or SharedMedia. ProjectEbonhold must already be installed. Back up your PTR SavedVariables before testing. Use /ash preview to open the mock UI. This is a rolling build; the download is replaced after each successful PTR publication."
 
           # Only the dedicated rolling PTR tag moves; live release tags are untouched.
           git tag --force "$tag" "$GITHUB_SHA"

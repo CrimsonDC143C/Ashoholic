@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: Ashoholic UI Preview
+## Notes: Session-local mock UI preview for Ashoholic.
+## Author: Crimson, MarkusLastu
+## Dependencies: ProjectEbonhold
+
+PreviewBootstrap.lua
+ColorPicker.lua
+PreviewUI.lua
