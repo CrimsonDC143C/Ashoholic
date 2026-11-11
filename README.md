@@ -1,5 +1,9 @@
 # 🍷 Ashoholic - Ebonhold Roster
 
+[![Download latest PTR build](https://img.shields.io/badge/Download-latest%20PTR%20build-blue?style=for-the-badge)](https://github.com/CrimsonDC143C/Ashoholic/releases/download/ptr-latest/Ashoholic-PTR.zip)
+
+The rolling PTR prerelease is refreshed automatically after successful pushes to `PTR-main`.
+
 <!-- [![Download Latest Release](https://img.shields.io/github/v/release/CrimsonDC143C/Ashoholic?label=Download&style=for-the-badge&color=blue)](https://github.com/CrimsonDC143C/Ashoholic/releases/latest/download/Ashoholic.zip)
 
 **A highly customizable character, gold, and Soul Ash tracker for Project Ebonhold (WotLK 3.3.5).**

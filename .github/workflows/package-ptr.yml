@@ -1,0 +1,56 @@
+name: Package PTR addon
+
+on:
+  push:
+    branches:
+      - PTR-main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ashoholic-ptr-release
+  cancel-in-progress: false
+
+jobs:
+  package:
+    if: github.ref == 'refs/heads/PTR-main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Ashoholic-PTR.zip
+        run: python3 tools/check_package.py --zip Ashoholic-PTR.zip
+
+      - name: Publish latest PTR prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="ptr-latest"
+          notes="Latest PTR build from PTR-main, commit ${GITHUB_SHA}. Extract Ashoholic-PTR.zip into Interface/AddOns. The archive contains Ashoholic, FastSwap, and SharedMedia addon folders. This rolling prerelease is replaced after each successful PTR publication."
+
+          git tag --force "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag" --force
+
+          release_id="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+            --jq '.[] | select(.tag_name == "ptr-latest") | .id')"
+          if [ -n "$release_id" ]; then
+            gh release edit "$tag" \
+              --title "Ashoholic PTR - latest build" \
+              --notes "$notes" \
+              --prerelease \
+              --latest=false
+            gh release upload "$tag" Ashoholic-PTR.zip --clobber
+          else
+            gh release create "$tag" Ashoholic-PTR.zip \
+              --verify-tag \
+              --title "Ashoholic PTR - latest build" \
+              --notes "$notes" \
+              --prerelease \
+              --latest=false
+          fi
