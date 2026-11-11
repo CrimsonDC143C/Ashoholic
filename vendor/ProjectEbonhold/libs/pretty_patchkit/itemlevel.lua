@@ -365,6 +365,17 @@ local iconOffsetx = { iconOffset, iconOffset, iconOffset, iconOffset, iconOffset
 local iconOffsety = { -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, iconOffset, iconOffset, iconOffset };
 
 -- create font strings;
+-- the item level sits on the slot icon (beside it, the right column hid behind the
+-- resistance icons); gem / enchant icons hang off this invisible anchor, left where the
+-- text used to be, so they keep their spot;
+local function createIconAnchor(slot, i)
+	local anchor = slot:CreateFontString(nil, "OVERLAY", fontStyle);
+	anchor:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE");
+	anchor:SetText(" ");
+	anchor:SetPoint(slotAlign1[i], slot, slotAlign2[i], slotOffsetx[i], slotOffsety[i]);
+	return anchor;
+end
+
 local charkids = { CharacterHeadSlot, CharacterNeckSlot, CharacterShoulderSlot, CharacterShirtSlot, CharacterChestSlot, CharacterWaistSlot, CharacterLegsSlot, CharacterFeetSlot, CharacterWristSlot, CharacterHandsSlot,
  CharacterFinger0Slot, CharacterFinger1Slot, CharacterTrinket0Slot, CharacterTrinket1Slot, CharacterBackSlot, CharacterMainHandSlot, CharacterSecondaryHandSlot, CharacterRangedSlot };
 local function createCharKits()
@@ -383,14 +394,15 @@ local function createCharKits()
 			charFS[i] = charkids[i]:CreateFontString("iLvl_"..slotID[i], "OVERLAY", fontStyle);
 			charFS[i]:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE");
 			charFS[i]:SetText("");
-			charFS[i]:SetPoint(slotAlign1[i], charkids[i], slotAlign2[i], slotOffsetx[i], slotOffsety[i]);
-			
+			charFS[i]:SetPoint("BOTTOM", charkids[i], "BOTTOM", 0, 2);
+			local anchor = createIconAnchor(charkids[i], i);
+
 			if (enchantableItems[i]) then
 				enchantIcons[i] = CreateFrame("Frame", "EnchantIcon"..i, charkids[i]);
 				if (i ~= 16) and (i ~= 17) and (i ~= 18) then
-					enchantIcons[i]:SetPoint(iconAlign1[i], charFS[i], iconAlign2[i], 0, iconOffsety[i]);
+					enchantIcons[i]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], 0, iconOffsety[i]);
 				else
-					enchantIcons[i]:SetPoint(iconAlign1[i], charFS[i], iconAlign2[i], -5, offsety);
+					enchantIcons[i]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], -5, offsety);
 				end
 				enchantIcons[i]:SetSize(iconSize,iconSize);
 
@@ -407,9 +419,9 @@ local function createCharKits()
 			for j = iconSlotID, iconSlotID + 2 do
 				charIcons[j] = CreateFrame("Frame", "GemIcon"..j, charkids[i]);
 				if (i ~= 16) and (i ~= 17) and (i ~= 18) then
-					charIcons[j]:SetPoint(iconAlign1[i], charFS[i], iconAlign2[i], offset, iconOffsety[i]);
+					charIcons[j]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], offset, iconOffsety[i]);
 				else
-					charIcons[j]:SetPoint(iconAlign1[i], charFS[i], iconAlign2[i], -5, offsety);
+					charIcons[j]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], -5, offsety);
 				end
 				charIcons[j]:SetSize(iconSize,iconSize);
 				
@@ -442,17 +454,18 @@ local function createInspectKits()
 				offsety = iconOffset;
 			end
 			
-			inspectFS[i] = inspkids[i]:CreateFontString("iLvl_"..slotID[i], "ARTWORK", fontStyle);
+			inspectFS[i] = inspkids[i]:CreateFontString("iLvl_"..slotID[i], "OVERLAY", fontStyle);
 			inspectFS[i]:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE");
 			inspectFS[i]:SetText("");
-			inspectFS[i]:SetPoint(slotAlign1[i], inspkids[i], slotAlign2[i] , slotOffsetx[i], slotOffsety[i]);
-			
+			inspectFS[i]:SetPoint("BOTTOM", inspkids[i], "BOTTOM", 0, 2);
+			local anchor = createIconAnchor(inspkids[i], i);
+
 			if (enchantableItems[i]) then
 				inspectEnchantIcons[i] = CreateFrame("Frame", "EnchantIcon"..i, inspkids[i]);
 				if (i ~= 16) and (i ~= 17) and (i ~= 18) then
-					inspectEnchantIcons[i]:SetPoint(iconAlign1[i], inspectFS[i], iconAlign2[i], 0, iconOffsety[i]);
+					inspectEnchantIcons[i]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], 0, iconOffsety[i]);
 				else
-					inspectEnchantIcons[i]:SetPoint(iconAlign1[i], inspectFS[i], iconAlign2[i], -5, offsety + 2);
+					inspectEnchantIcons[i]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], -5, offsety + 2);
 				end
 				inspectEnchantIcons[i]:SetSize(iconSize,iconSize);
 
@@ -469,9 +482,9 @@ local function createInspectKits()
 			for j = iconSlotID, iconSlotID + 2 do
 				inspectIcons[j] = CreateFrame("Frame", "GemIcon"..j, inspkids[i]);
 				if (i ~= 16) and (i ~= 17) and (i ~= 18) then
-					inspectIcons[j]:SetPoint(iconAlign1[i], inspectFS[i], iconAlign2[i], offset, iconOffsety[i]);
+					inspectIcons[j]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], offset, iconOffsety[i]);
 				else
-					inspectIcons[j]:SetPoint(iconAlign1[i], inspectFS[i], iconAlign2[i], -5, offsety);
+					inspectIcons[j]:SetPoint(iconAlign1[i], anchor, iconAlign2[i], -5, offsety);
 				end
 				inspectIcons[j]:SetSize(iconSize,iconSize);
 				

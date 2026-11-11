@@ -4,8 +4,7 @@ local addonName, addon = ...
 -- Same GlowBox bubble as the Skill Tree's (skillTreeMicroButton.lua), pointing at
 -- the Talents micro button while the active spec has points left to spend. Closing
 -- it, or opening the talent window, silences it until a new point is earned.
--- Loads after skillTreeMicroButton.lua: when both bubbles show, this one sits
--- above the Skill Tree one (the two buttons are too close for side by side).
+-- The bubbles of the bar take turns (GuidedTour.BarAlerts).
 
 if not TalentMicroButton then return end
 
@@ -15,6 +14,7 @@ Alert:SetFrameStrata("DIALOG")
 Alert:SetFrameLevel(10)
 Alert:EnableMouse(true)
 Alert:Hide()
+ProjectEbonhold.GuidedTour.BarAlerts.Add(Alert, 2)
 
 Alert.Text = Alert:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
 Alert.Text:SetJustifyV("TOP")
@@ -26,6 +26,7 @@ Alert.CloseButton:SetPoint("TOPRIGHT", 6, 6)
 
 Alert.Arrow = CreateFrame("Frame", nil, Alert, "GlowBoxArrowTemplate")
 Alert.Arrow:SetPoint("TOP", Alert, "BOTTOM", 0, 4)
+Alert:SetPoint("BOTTOM", TalentMicroButton, "TOP", 0, 10)
 
 -- Clicking the bubble opens the talents, like the button it points at.
 Alert:SetScript("OnMouseUp", function()
@@ -45,18 +46,6 @@ local function TalentWindowShown()
     return ProjectEbonhold.TalentFrame and ProjectEbonhold.TalentFrame.IsShown()
 end
 
-local function Anchor()
-    local skillAlert = SkillTreeMicroButtonAlert
-    Alert:ClearAllPoints()
-    if skillAlert and skillAlert:IsShown() then
-        Alert:SetPoint("BOTTOM", TalentMicroButton, "TOP", 0, 10 + skillAlert:GetHeight() + 8)
-        Alert.Arrow:Hide()
-    else
-        Alert:SetPoint("BOTTOM", TalentMicroButton, "TOP", 0, 10)
-        Alert.Arrow:Show()
-    end
-end
-
 local function Refresh()
     local points = UnspentPoints()
     if points < silencedAt then silencedAt = points end
@@ -69,7 +58,6 @@ local function Refresh()
     Alert.Text:SetText(string.format("You have %d unspent talent point%s! Open your Talents to spend %s.",
         points, points == 1 and "" or "s", points == 1 and "it" or "them"))
     Alert:SetHeight(math.max(85, Alert.Text:GetStringHeight() + 40))
-    Anchor()
     Alert:Show()
 end
 
@@ -82,11 +70,6 @@ Alert.CloseButton:SetScript("OnClick", Silence)
 
 if EbonholdTalentFrame then
     EbonholdTalentFrame:HookScript("OnShow", Silence)
-end
-
-if SkillTreeMicroButtonAlert then
-    SkillTreeMicroButtonAlert:HookScript("OnShow", function() if Alert:IsShown() then Anchor() end end)
-    SkillTreeMicroButtonAlert:HookScript("OnHide", function() if Alert:IsShown() then Anchor() end end)
 end
 
 local events = CreateFrame("Frame")

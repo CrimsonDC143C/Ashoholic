@@ -50,46 +50,46 @@ local ICON_EXTRA_ITEM      = "Interface\\Icons\\INV_Misc_Bag_10"
 --        open-world hp, open-world melee, open-world spell, dungeon trash hp }  (own curves)
 --        -- item affixes V2, tools/affixes/catalog.py
 local TORMENT_ROWS = {
-  { "Normal", 1.0, 1.0, 0, 0, 1.0, 1.0, 1.0, 1.0, 5.0, { 40, 25, 18, 11, 6 }, 0.0, 0, 1.0, 1.0, 1.0, 1.0, 1.0 },
-  { "Torment I", 1.6917, 1.3622, 1, 20, 1.3, 1.3, 1.25, 1.35, 10.0, { 40, 25, 18, 11, 6 }, 30.0, 0, 4.2557, 4.8, 2.5455, 2.1, 6.912 },
-  { "Torment II", 2.3848, 1.8556, 2, 26, 1.6, 1.6, 1.5, 1.7, 15.0, { 40, 25, 18, 11, 6 }, 60.0, 0, 6.037, 8.4, 2.2424, 1.85, 12.096 },
-  { "Torment III", 3.3619, 2.5277, 2, 32, 1.9, 1.9, 1.75, 2.05, 20.0, { 40, 25, 18, 11, 6 }, 90.0, 0, 8.564, 12.0, 3.2121, 2.65, 17.28 },
-  { "Torment IV", 4.7394, 3.4433, 3, 38, 2.2, 2.2, 2.0, 2.4, 25.0, { 40, 25, 18, 11, 6 }, 20.0, 1, 12.1486, 15.6, 4.4805, 3.7994, 22.464 },
-  { "Torment V", 6.6813, 4.6904, 3, 44, 2.5, 2.5, 2.25, 2.75, 30.0, { 40, 25, 18, 11, 6 }, 50.0, 1, 17.2337, 19.2, 6.2496, 5.4473, 27.648 },
-  { "Torment VI", 9.4189, 6.3893, 4, 50, 2.8, 2.8, 2.5, 3.1, 35.0, { 40, 25, 18, 11, 6 }, 80.0, 1, 24.4472, 22.8, 8.7174, 7.8099, 32.832 },
-  { "Torment VII", 16.483, 11.1813, 4, 56, 3.1, 3.1, 2.75, 3.45, 40.0, { 40, 25, 18, 11, 6 }, 10.0, 2, 42.7826, 26.4, 12.1596, 11.1973, 38.016 },
-  { "Torment VIII", 28.8453, 19.5672, 5, 62, 3.4, 3.4, 3.0, 3.8, 45.0, { 40, 25, 18, 11, 6 }, 40.0, 2, 74.8696, 30.0, 16.961, 16.0539, 43.2 },
-  { "Torment IX", 50.4792, 34.2427, 5, 68, 3.7, 3.7, 3.25, 4.15, 50.0, { 40, 25, 18, 11, 6 }, 70.0, 2, 131.0219, 33.6, 23.6582, 23.0169, 48.384 },
-  { "Torment X", 88.3386, 59.9247, 6, 74, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 229.2883, 37.2, 33.0, 33.0, 53.568 },
-  { "Torment XI", 101.5894, 68.9134, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 263.6815, 42.78, 37.95, 37.95, 61.6032 },
-  { "Torment XII", 116.8278, 79.2504, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 303.2337, 49.197, 43.6425, 43.6425, 70.8437 },
-  { "Torment XIII", 134.352, 91.138, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 348.7188, 56.5765, 50.1889, 50.1889, 81.4702 },
-  { "Torment XIV", 154.5047, 104.8087, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 401.0266, 65.063, 57.7172, 57.7172, 93.6908 },
-  { "Torment XV", 177.6805, 120.53, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 461.1806, 74.8225, 66.3748, 66.3748, 107.7444 },
-  { "Torment XVI", 204.3325, 138.6095, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 530.3577, 86.0459, 76.331, 76.331, 123.906 },
-  { "Torment XVII", 234.9824, 159.4009, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 609.9113, 98.9527, 87.7807, 87.7807, 142.4919 },
-  { "Torment XVIII", 270.2298, 183.311, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 701.398, 113.7957, 100.9478, 100.9478, 163.8657 },
-  { "Torment XIX", 310.7642, 210.8076, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 806.6077, 130.865, 116.0899, 116.0899, 188.4456 },
-  { "Torment XX", 357.3789, 242.4288, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 927.5989, 150.4947, 133.5034, 133.5034, 216.7124 },
-  { "Torment XXI", 410.9857, 278.7931, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 1066.7387, 173.069, 153.5289, 153.5289, 249.2193 },
-  { "Torment XXII", 472.6335, 320.6121, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 1226.7495, 199.0293, 176.5583, 176.5583, 286.6022 },
-  { "Torment XXIII", 543.5286, 368.7039, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 1410.762, 228.8837, 203.042, 203.042, 329.5925 },
-  { "Torment XXIV", 625.0579, 424.0095, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 1622.3762, 263.2163, 233.4983, 233.4983, 379.0314 },
-  { "Torment XXV", 718.8165, 487.6109, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 1865.7327, 302.6987, 268.523, 268.523, 435.8861 },
-  { "Torment XXVI", 826.639, 560.7525, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 2145.5926, 348.1035, 308.8015, 308.8015, 501.269 },
-  { "Torment XXVII", 950.6349, 644.8654, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 2467.4315, 400.319, 355.1217, 355.1217, 576.4594 },
-  { "Torment XXVIII", 1093.2301, 741.5952, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 2837.5462, 460.3669, 408.39, 408.39, 662.9283 },
-  { "Torment XXIX", 1257.2146, 852.8345, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 3263.1781, 529.4219, 469.6485, 469.6485, 762.3675 },
-  { "Torment XXX", 1445.7968, 980.7597, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 3752.6548, 608.8352, 540.0957, 540.0957, 876.7227 },
+  { "Normal", 1.0, 1.0, 0, 0, 1.0, 1.0, 1.0, 1.0, 5.0, { 40, 25, 18, 11, 6 }, 0.0, 0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 },
+  { "Torment I", 3.6227, 1.2058, 1, 20, 1.3, 1.3, 1.25, 1.35, 10.0, { 40, 25, 18, 11, 6 }, 30.0, 0, 1.2058, 4.8, 2.5455, 2.1, 5.6788, 43.472 },
+  { "Torment II", 3.6227, 1.4541, 2, 26, 1.6, 1.6, 1.5, 1.7, 15.0, { 40, 25, 18, 11, 6 }, 60.0, 0, 1.4541, 8.4, 2.8594, 2.359, 7.3392, 43.472 },
+  { "Torment III", 3.6227, 1.7534, 2, 32, 1.9, 1.9, 1.75, 2.05, 20.0, { 40, 25, 18, 11, 6 }, 90.0, 0, 1.7534, 12.0, 3.2121, 2.65, 9.4851, 43.472 },
+  { "Torment IV", 4.2939, 2.1143, 3, 38, 2.2, 2.2, 2.0, 2.4, 25.0, { 40, 25, 18, 11, 6 }, 20.0, 1, 2.1143, 15.6, 4.4805, 3.7994, 12.2585, 51.5272 },
+  { "Torment V", 4.2939, 2.5495, 3, 44, 2.5, 2.5, 2.25, 2.75, 30.0, { 40, 25, 18, 11, 6 }, 50.0, 1, 2.5495, 19.2, 6.2496, 5.4473, 15.8428, 51.5272 },
+  { "Torment VI", 4.2939, 3.0743, 4, 50, 2.8, 2.8, 2.5, 3.1, 35.0, { 40, 25, 18, 11, 6 }, 80.0, 1, 3.0743, 22.8, 8.7174, 7.8099, 20.4751, 51.5272 },
+  { "Torment VII", 4.2939, 3.7071, 4, 56, 3.1, 3.1, 2.75, 3.45, 40.0, { 40, 25, 18, 11, 6 }, 10.0, 2, 3.7071, 26.4, 12.1596, 11.1973, 26.4619, 51.5272 },
+  { "Torment VIII", 5.0896, 4.4702, 5, 62, 3.4, 3.4, 3.0, 3.8, 45.0, { 40, 25, 18, 11, 6 }, 40.0, 2, 4.4702, 30.0, 16.961, 16.0539, 34.1991, 61.0751 },
+  { "Torment IX", 5.0896, 5.3904, 5, 68, 3.7, 3.7, 3.25, 4.15, 50.0, { 40, 25, 18, 11, 6 }, 70.0, 2, 5.3904, 33.6, 23.6582, 23.0169, 44.1987, 61.0751 },
+  { "Torment X", 6.0327, 6.5, 6, 74, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 6.5, 37.2, 33.0, 33.0, 57.122, 72.3921 },
+  { "Torment XI", 6.9376, 7.475, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 7.475, 42.78, 37.95, 37.95, 65.6903, 83.2509 },
+  { "Torment XII", 7.9782, 8.5962, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 8.5962, 49.197, 43.6425, 43.6425, 75.5438, 95.7385 },
+  { "Torment XIII", 9.1749, 9.8857, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 9.8857, 56.5765, 50.1889, 50.1889, 86.8754, 110.0993 },
+  { "Torment XIV", 10.5512, 11.3685, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 11.3685, 65.063, 57.7172, 57.7172, 99.9067, 126.6142 },
+  { "Torment XV", 12.1339, 13.0738, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 13.0738, 74.8225, 66.3748, 66.3748, 114.8927, 145.6063 },
+  { "Torment XVI", 13.9539, 15.0349, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 15.0349, 86.0459, 76.331, 76.331, 132.1267, 167.4472 },
+  { "Torment XVII", 16.047, 17.2901, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 17.2901, 98.9527, 87.7807, 87.7807, 151.9457, 192.5643 },
+  { "Torment XVIII", 18.4541, 19.8836, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 19.8836, 113.7957, 100.9478, 100.9478, 174.7375, 221.449 },
+  { "Torment XIX", 21.2222, 22.8662, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 22.8662, 130.865, 116.0899, 116.0899, 200.9481, 254.6663 },
+  { "Torment XX", 24.4055, 26.2961, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 26.2961, 150.4947, 133.5034, 133.5034, 231.0903, 292.8663 },
+  { "Torment XXI", 28.0664, 30.2405, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 30.2405, 173.069, 153.5289, 153.5289, 265.7539, 336.7962 },
+  { "Torment XXII", 32.2763, 34.7766, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 34.7766, 199.0293, 176.5583, 176.5583, 305.617, 387.3157 },
+  { "Torment XXIII", 37.1178, 39.9931, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 39.9931, 228.8837, 203.042, 203.042, 351.4595, 445.413 },
+  { "Torment XXIV", 42.6854, 45.9921, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 45.9921, 263.2163, 233.4983, 233.4983, 404.1785, 512.225 },
+  { "Torment XXV", 49.0882, 52.8909, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 52.8909, 302.6987, 268.523, 268.523, 464.8052, 589.0587 },
+  { "Torment XXVI", 56.4515, 60.8245, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 60.8245, 348.1035, 308.8015, 308.8015, 534.526, 677.4175 },
+  { "Torment XXVII", 64.9192, 69.9482, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 69.9482, 400.319, 355.1217, 355.1217, 614.7049, 779.0301 },
+  { "Torment XXVIII", 74.6571, 80.4404, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 80.4404, 460.3669, 408.39, 408.39, 706.9107, 895.8846 },
+  { "Torment XXIX", 85.8556, 92.5065, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 92.5065, 529.4219, 469.6485, 469.6485, 812.9473, 1030.2673 },
+  { "Torment XXX", 98.734, 106.3825, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 106.3825, 608.8352, 540.0957, 540.0957, 934.8893, 1184.8074 },
 }
 
 -- Per-context ratios: health to the flat line; damage to the trash curve (adds) or to the
 -- boss curve (row field 14, bosses), every damage ratio 1 since 2026-10-13.
 local CTX_RATIO = {
-  dungeon_boss   = { hp = 1.0, melee = 1.0, spell = 1.0 },
-  raid_boss      = { hp = 1.15, melee = 1.0, spell = 1.0 },
-  dungeon_add    = { hp = 1.15, melee = 1.0, spell = 1.0 },
-  raid_add       = { hp = 1.15, melee = 1.0, spell = 1.0 },
+  dungeon_boss   = { hp = 4.394, melee = 4.394, spell = 2.197 },
+  raid_boss      = { hp = 1.0, melee = 2.0, spell = 1.0 },
+  dungeon_add    = { hp = 4.394, melee = 4.394, spell = 2.197 },
+  raid_add       = { hp = 2.0, melee = 2.0, spell = 1.0 },
 }
 
 local OPEN_WORLD_HP_FACTOR = 4.0
@@ -132,8 +132,10 @@ do
       scaling.aura_chance = auraChance
       for key, ratio in pairs(CTX_RATIO) do
         local keyDmg = key:find("_boss$") and bossDmg or dmg
-        -- dungeon trash health: its own column (row field 18, the open-world curve x1.44), not the instance ladder
-        scaling[key .. "_hp_mul"]    = (key == "dungeon_add" and row[18]) or hp * ratio.hp
+        -- dungeon health: its own curve (row field 18, bosses and trash alike); raid health: the row's hp x its ratio
+        scaling[key .. "_hp_mul"]    = (key:find("^dungeon") and row[18]) or hp * ratio.hp
+        -- a level-78+ dungeon boss reads its own column (row field 19), as the server does
+        if key == "dungeon_boss" and (UnitLevel("player") or 0) >= 78 then scaling.dungeon_boss_hp_mul = row[19] end
         scaling[key .. "_melee_mul"] = keyDmg * ratio.melee
         scaling[key .. "_spell_mul"] = keyDmg * ratio.spell
       end
@@ -426,6 +428,15 @@ local function RefreshApplyState(selTier, curTier)
     applyBtn:SetText("Apply")
     applyBtn:Disable()
     if applyHint then applyHint:Show() end
+    -- A disabled button takes no click, so the reason has to be on the panel, not in chat.
+    if applyLockText then
+      local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
+      applyLockText:SetText(inCombat
+        and "You cannot change your Torment while in combat."
+        or "Go to an inn or a capital city to change your Torment.")
+      applyLockText:Show()
+    end
+    if applyLockHover then applyLockHover:Hide() end
     return
   end
 
@@ -1133,7 +1144,19 @@ local function CreateHardmodeFrame()
   -- appears on entering a dungeon and disappears on leaving it.
   hardmodeFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
   hardmodeFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-  hardmodeFrame:SetScript("OnEvent", function()
+  -- Entering a rest area or leaving combat changes what the Apply button can do.
+  hardmodeFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
+  hardmodeFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+  hardmodeFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+  hardmodeFrame:SetScript("OnEvent", function(self, event)
+    if event ~= "PLAYER_ENTERING_WORLD" and event ~= "ZONE_CHANGED_NEW_AREA" then
+      -- Only the button: a full Refresh would throw the tier being browsed back to the current one.
+      if self:IsShown() then
+        local svc = ProjectEbonhold.HardmodeService
+        RefreshApplyState(selectedTier, svc and svc.GetCurrentDifficulty() or 1)
+      end
+      return
+    end
     if ProjectEbonhold.HardmodeUI and ProjectEbonhold.HardmodeUI.Refresh then
       ProjectEbonhold.HardmodeUI.Refresh()
     end
@@ -1219,14 +1242,23 @@ local function CreateUnlockAlert()
     -- alert the queue is about to show.
     if alert.dismissTimer then alert.dismissTimer:SetScript("OnUpdate", nil) end
     if ShowNextUnlockAlert then ShowNextUnlockAlert() end
+    if ProjectEbonhold.EvaluateHudTips then
+      C_Timer.After(1.0, ProjectEbonhold.EvaluateHudTips)
+    end
   end)
 
   unlockAlert = alert
   return alert
 end
 
+-- It sits right by the HUD tips: it waits while a tour is on screen.
+ProjectEbonhold.GuidedTour.OnAnyEnd(function()
+  C_Timer.After(0.5, function() if ShowNextUnlockAlert then ShowNextUnlockAlert() end end)
+end)
+
 ShowNextUnlockAlert = function()
   if unlockAlert and unlockAlert:IsShown() then return end
+  if ProjectEbonhold.GuidedTour.AnyActive() then return end
 
   local rank = table.remove(pendingUnlockRanks, 1)
   if not rank then return end

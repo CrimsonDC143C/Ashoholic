@@ -1092,14 +1092,13 @@ nodes = {
     },
     {
         id = 217,
-        x = -270,
+        x = -300,
         y = -240,
         spells = {110640},
         soulPointsCosts = {1},
         currency = "essence",
         sector = "pr",
-        permanent = true,
-        isStart = true
+        permanent = true
     },
     {
         id = 233,
@@ -1739,7 +1738,7 @@ nodes = {
         x = 1050,
         y = -270,
         spells = {111030},
-        soulPointsCosts = {17},
+        soulPointsCosts = {330000},
         currency = "ash",
         sector = "mi"
     },
@@ -2066,8 +2065,7 @@ nodes = {
         soulPointsCosts = {1},
         currency = "essence",
         sector = "pr",
-        permanent = true,
-        isStart = true
+        permanent = true
     },
     {
         id = 406,
@@ -2082,7 +2080,7 @@ nodes = {
     },
     {
         id = 407,
-        x = -840,
+        x = -810,
         y = -150,
         spells = {101250},
         soulPointsCosts = {2},
@@ -2092,7 +2090,7 @@ nodes = {
     },
     {
         id = 408,
-        x = -1140,
+        x = -1170,
         y = -390,
         spells = {101251},
         soulPointsCosts = {3},
@@ -2113,7 +2111,7 @@ nodes = {
     {
         id = 410,
         x = -1110,
-        y = 210,
+        y = 270,
         spells = {101253},
         soulPointsCosts = {7},
         currency = "essence",
@@ -2122,8 +2120,8 @@ nodes = {
     },
     {
         id = 411,
-        x = -1170,
-        y = -90,
+        x = -1260,
+        y = -270,
         spells = {101254},
         soulPointsCosts = {4},
         currency = "essence",
@@ -3215,7 +3213,7 @@ nodes = {
     {
         id = 631,
         x = -1290,
-        y = 210,
+        y = 270,
         spells = {600154},
         soulPointsCosts = {9},
         currency = "essence",
@@ -3224,7 +3222,7 @@ nodes = {
     },
     {
         id = 632,
-        x = -960,
+        x = -930,
         y = -210,
         spells = {600155},
         soulPointsCosts = {3},
@@ -3234,8 +3232,8 @@ nodes = {
     },
     {
         id = 633,
-        x = -1260,
-        y = -150,
+        x = -1350,
+        y = -330,
         spells = {600156},
         soulPointsCosts = {7},
         currency = "essence",
@@ -3294,7 +3292,7 @@ nodes = {
     },
     {
         id = 639,
-        x = -1350,
+        x = -1380,
         y = -390,
         spells = {600162},
         soulPointsCosts = {4},
@@ -3959,7 +3957,7 @@ nodes = {
     {
         id = 734,
         x = -960,
-        y = 150,
+        y = 210,
         spells = {103446},
         soulPointsCosts = {7},
         currency = "essence",
@@ -3969,7 +3967,7 @@ nodes = {
     },
     {
         id = 735,
-        x = -1140,
+        x = -1110,
         y = -150,
         spells = {103447},
         soulPointsCosts = {13},
@@ -3979,7 +3977,7 @@ nodes = {
     },
     {
         id = 736,
-        x = -1230,
+        x = -1260,
         y = -510,
         spells = {103448},
         soulPointsCosts = {13},
@@ -3989,7 +3987,7 @@ nodes = {
     },
     {
         id = 737,
-        x = -1170,
+        x = -1140,
         y = -210,
         spells = {103449},
         soulPointsCosts = {13},
@@ -4347,7 +4345,7 @@ nodes = {
     },
     {
         id = 816,
-        x = -1470,
+        x = -1500,
         y = -390,
         spells = {103543},
         soulPointsCosts = {7},
@@ -4357,7 +4355,7 @@ nodes = {
     },
     {
         id = 817,
-        x = -1470,
+        x = -1440,
         y = -210,
         spells = {103544},
         soulPointsCosts = {7},
@@ -4387,7 +4385,7 @@ nodes = {
     },
     {
         id = 820,
-        x = -1470,
+        x = -1500,
         y = -270,
         spells = {101274},
         soulPointsCosts = {4},
@@ -16523,6 +16521,13 @@ nodes = {
     }
 },
 links = {
+    { 355, 217 },
+    { 396, 405 },
+    { 413, 407 },
+    { 644, 408 },
+    { 820, 411 },
+    { 639, 820 },
+    { 595, 410 },
     { 356, 554 },
     { 554, 555 },
     { 555, 556 },

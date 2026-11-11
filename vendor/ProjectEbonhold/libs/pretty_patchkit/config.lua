@@ -89,7 +89,8 @@ local function config_loaded()
 	if (_data.enchantChar == nil) then _data.enchantChar = false; end
 	if (_data.enchantCharMiss == nil) then _data.enchantCharMiss = false; end
 	if (_data.gemsChar == nil) then _data.gemsChar = false; end
-	if (_data.ilvlChar == nil) then _data.ilvlChar = false; end
+	-- on by default; characters that saved the old default (off) get it turned on once;
+	if (_data.ilvlChar == nil or not _data.ilvlCharDefaulted) then _data.ilvlChar = true; _data.ilvlCharDefaulted = true; end
 	if (_data.enableInspect == nil) then _data.enableInspect = true; end
 	if (_data.iLvlScore == nil) then _data.iLvlScore = false; end
 	if (_data.GearScore == nil) then _data.GearScore = true; end

@@ -5636,9 +5636,11 @@ microButton.Alert = CreateFrame("Frame", "EchoJournalMicroButtonAlert", UIParent
 microButton.Alert:SetSize(220, 70)
 microButton.Alert:SetPoint("BOTTOM", microButton, "TOP", 0, 10)
 microButton.Alert:SetFrameStrata("DIALOG")
-microButton.Alert:SetFrameLevel(10)
+microButton.Alert:SetFrameLevel(20) -- above the talent and skill tree bubbles
+microButton.Alert:SetClampedToScreen(true) -- Edit Mode can place the button near an edge
 microButton.Alert:EnableMouse(true)
 microButton.Alert:Hide()
+ProjectEbonhold.GuidedTour.BarAlerts.Add(microButton.Alert, 1)
 
 microButton.Alert.Text = microButton.Alert:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
 microButton.Alert.Text:SetJustifyV("TOP")
@@ -5668,6 +5670,16 @@ microButton.Alert.Arrow:SetPoint("TOP", microButton.Alert, "BOTTOM", 0, 4)
 local function ShowJournalAlert(text, dismissKey)
     microButton.Alert.dismissKey = dismissKey or "hideNewEchoAlert"
     microButton.Alert.Text:SetText(text)
+    -- A UI addon can hide the micro bar (ElvUI does): no button to point at, so
+    -- the bubble goes to the top of the screen, without its arrow.
+    microButton.Alert:ClearAllPoints()
+    if microButton:IsVisible() then
+        microButton.Alert:SetPoint("BOTTOM", microButton, "TOP", 0, 10)
+        microButton.Alert.Arrow:Show()
+    else
+        microButton.Alert:SetPoint("TOP", UIParent, "TOP", 0, -140)
+        microButton.Alert.Arrow:Hide()
+    end
     microButton.Alert:SetHeight(microButton.Alert.Text:GetStringHeight() + 36)
     microButton.Alert:Show()
 end
@@ -5675,8 +5687,20 @@ end
 -- Called by the perk service when an echo selection succeeds
 function Journal.NotifyNewEcho()
     ProjectEbonholdDB = ProjectEbonholdDB or {}
-    if ProjectEbonholdDB.hideNewEchoAlert then return end
     if journalFrame and journalFrame:IsShown() then return end
+    -- The very first pick says where the echo went, whatever the X of the usual
+    -- bubble was set to. Once per account. It has its own key: closing this one
+    -- must not silence the usual bubble.
+    if not ProjectEbonholdDB.seenFirstEchoAlert then
+        ProjectEbonholdDB.seenFirstEchoAlert = true
+        ShowJournalAlert(microButton:IsVisible()
+            and ("Your echo is here! Click this button to open |cffffd700Character Progression|r, " ..
+                "your echoes are in the |cffffd700Echoes|r tab.")
+            or ("Your echo is in |cffffd700Character Progression|r, |cffffd700Echoes|r tab. " ..
+                "Type |cffffd700/collections|r to open it."), "seenFirstEchoAlert")
+        return
+    end
+    if ProjectEbonholdDB.hideNewEchoAlert then return end
     ShowJournalAlert("You gained a new echo! Open your Echo Journal to see it.")
 end
 

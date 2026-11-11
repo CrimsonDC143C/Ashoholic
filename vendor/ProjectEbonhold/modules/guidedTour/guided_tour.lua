@@ -164,6 +164,7 @@ function Tour:Start()
 end
 
 function Tour:Stop(markSeen)
+    self.waiting = nil
     local wasActive = self.step ~= nil
     self.step = nil
     if self.box then self.box:Hide() end
@@ -174,6 +175,13 @@ function Tour:Stop(markSeen)
     end
     if wasActive and self.cfg.onEnd then self.cfg.onEnd(markSeen) end
     if wasActive then
+        for _, tour in ipairs(GuidedTour.all) do
+            if tour.waiting then
+                tour.waiting = nil
+                tour:Start()
+                if tour.step then break end
+            end
+        end
         for _, fn in ipairs(GuidedTour.endListeners) do fn(self) end
     end
 end
@@ -186,10 +194,16 @@ function Tour:HasSeen()
     return (ProjectEbonholdDB and ProjectEbonholdDB[self.cfg.dbKey]) and true or false
 end
 
--- Start once per dbKey: no-op if already seen. Returns true while a step is
--- actually on screen, so callers can suppress competing hints for the showing.
+-- Start once per dbKey: no-op if already seen. One tour on screen at a time: with another
+-- one up, this one waits and starts when that one closes (a tour whose zone is gone by then
+-- simply does not show, and is not burnt). Returns true while a step is on screen or waiting,
+-- so callers can suppress competing hints for the showing.
 function Tour:MaybeStart()
     if not self.step and not self:HasSeen() then
+        if GuidedTour.AnyActive() then
+            self.waiting = true
+            return true
+        end
         self:Start()
     end
     return self.step ~= nil
@@ -211,6 +225,56 @@ function GuidedTour.AnyActive()
         if tour:IsActive() then return true end
     end
     return false
+end
+
+-- -- Bubbles of the bottom bar ---------------------------------------------------
+-- 220 wide on buttons 24 apart: any two of them overlap. Only the first one wanted (lowest
+-- rank) is on screen, and none while an echo choice is up (the talent bubble covered its
+-- button). Their owners keep calling Show and Hide as if alone: a bubble that waits is
+-- parked under a hidden frame, so it still says IsShown and comes back by itself.
+local barAlerts = {}
+local barAlertBlocker
+local barAlertHold = CreateFrame("Frame")
+barAlertHold:Hide()
+
+local function ArbitrateBarAlerts()
+    local active
+    if not (barAlertBlocker and barAlertBlocker:IsShown()) then
+        for _, a in ipairs(barAlerts) do
+            if a.frame:IsShown() then
+                active = a.frame
+                break
+            end
+        end
+    end
+    for _, a in ipairs(barAlerts) do
+        local parent = (a.frame == active) and UIParent or barAlertHold
+        if a.frame:GetParent() ~= parent then
+            a.frame:SetParent(parent)
+            a.frame:SetFrameStrata(a.strata)
+            a.frame:SetFrameLevel(a.level)
+        end
+    end
+end
+
+GuidedTour.BarAlerts = {}
+
+-- rank: 1 goes first. Echo 1, Talents 2, Skill Tree 3, Dungeons 4.
+function GuidedTour.BarAlerts.Add(frame, rank)
+    table.insert(barAlerts, { frame = frame, rank = rank,
+        strata = frame:GetFrameStrata(), level = frame:GetFrameLevel() })
+    table.sort(barAlerts, function(a, b) return a.rank < b.rank end)
+    hooksecurefunc(frame, "Show", ArbitrateBarAlerts)
+    hooksecurefunc(frame, "Hide", ArbitrateBarAlerts)
+    ArbitrateBarAlerts()
+end
+
+-- The echo choice. Its frame is created at PLAYER_ENTERING_WORLD.
+function GuidedTour.BarAlerts.SetBlocker(frame)
+    barAlertBlocker = frame
+    hooksecurefunc(frame, "Show", ArbitrateBarAlerts)
+    hooksecurefunc(frame, "Hide", ArbitrateBarAlerts)
+    ArbitrateBarAlerts()
 end
 
 -- fn(tour) runs each time a tour that was on screen closes (finished, X, or paused)

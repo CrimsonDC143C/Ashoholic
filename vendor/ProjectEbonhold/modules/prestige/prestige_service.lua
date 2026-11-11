@@ -124,14 +124,27 @@ function PrestigeService.IsGateProgressKnown()
   return gateProgress ~= nil
 end
 
---- Eclats a banquer avant qu'un prestige ait le moindre interet : de quoi frapper une essence.
---- Doit rester en accord avec SHARDS_PER_ESSENCE (PrestigeHandler.h).
-PrestigeService.SHARDS_PER_ESSENCE = 750
+--- Eclats pour une essence au PROCHAIN prestige : 50 au premier, 50 de plus a chaque fois,
+--- 750 a partir du 15e. C'est aussi ce qu'il faut banquer pour qu'un prestige paie quelque chose.
+--- Doit rester en accord avec ShardsPerEssence (PrestigeHandler.h).
+function PrestigeService.GetShardsPerEssence()
+  return math.min(50 + 50 * (totalPrestiges or 0), 750)
+end
+
+--- Eclats que le prochain prestige convertit : les 15 premiers frappent au plus autant d'essences
+--- que leur taux, le surplus reste en banque. Doit rester en accord avec
+--- ShardsConsumedByPrestige (PrestigeHandler.h).
+function PrestigeService.GetShardsConsumed()
+  local shards = select(1, PrestigeService.GetPendingEssence())
+  if (totalPrestiges or 0) >= 15 then return shards end
+  local rate = PrestigeService.GetShardsPerEssence()
+  return math.min(shards, rate * rate)
+end
 
 --- Les eclats manquants pour ouvrir la seconde porte (0 quand elle est ouverte).
 function PrestigeService.GetMissingShards()
   local have = select(1, PrestigeService.GetPendingEssence())
-  local need = PrestigeService.SHARDS_PER_ESSENCE
+  local need = PrestigeService.GetShardsPerEssence()
   return (have < need) and (need - have) or 0
 end
 

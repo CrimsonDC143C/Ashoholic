@@ -227,7 +227,6 @@ local SS = {
     SEND_PLAYER_PERK_SELECTION_RESULT         = 1000,
     SEND_PLAYER_PERK_GRANTED                  = 18,
     SEND_PLAYER_ITEMS_SAVED                   = 21,
-    SEND_PLAYER_LEARNED_SPELL_ON_LEVEL_UP     = 31,
     SEND_PLAYER_SPEC_INDEX                    = 32,
     SEND_WRONG_PATCH                          = 33,
     SEND_CONTENT_VOID_STORAGE                 = 100,
@@ -466,6 +465,14 @@ f:SetScript("OnEvent", function(_, e, ...)
         if name == ADDON_NAME then
             if RegisterAddonMessagePrefix then
                 RegisterAddonMessagePrefix(PREFIX)
+            end
+            -- Interface > Display "Show Item Level" (the item level in item
+            -- tooltips) is off in the stock client: turn it on once per account,
+            -- so a player who turns it off afterwards keeps it off.
+            ProjectEbonholdDB = ProjectEbonholdDB or {}
+            if not ProjectEbonholdDB.showItemLevelDefaulted then
+                SetCVar("showItemLevel", 1)
+                ProjectEbonholdDB.showItemLevelDefaulted = true
             end
         end
     elseif e == "CHAT_MSG_ADDON" then

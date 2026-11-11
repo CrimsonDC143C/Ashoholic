@@ -233,8 +233,16 @@ end
 
 local itemRetry, itemTries = 0, 0
 local events -- created below; drives the item-cache redraw
+local deferred = false -- a redraw asked in combat, done at PLAYER_REGEN_ENABLED
 
 function IT.Refresh()
+    -- The objectives tracker (secure item buttons) anchors under this frame, which makes it
+    -- protected: SetHeight/Show/Hide from here are blocked in combat (taint.log 2026-11-03).
+    if frame and InCombatLockdown() then
+        deferred = true
+        return
+    end
+    deferred = false
     if not state then
         if frame and frame:IsShown() then
             frame:Hide()
@@ -398,7 +406,12 @@ events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PARTY_MEMBERS_CHANGED")
 events:RegisterEvent("RAID_ROSTER_UPDATE")
-events:SetScript("OnEvent", function(self)
+events:RegisterEvent("PLAYER_REGEN_ENABLED")
+events:SetScript("OnEvent", function(self, event)
+    if event == "PLAYER_REGEN_ENABLED" then
+        if deferred then IT.Refresh() end
+        return
+    end
     pending = 0.5
     self:Show()
 end)

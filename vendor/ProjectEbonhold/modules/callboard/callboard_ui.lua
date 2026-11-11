@@ -47,8 +47,6 @@ local STRIP_H            = 134
 local MAX_OBJECTIVES     = 4
 local MAX_REWARDS        = 7
 local REWARD_STEP        = 42
--- today's suggested Open World zone (server field 28): its header and its cards carry this star
-local SUGGESTED_STAR     = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
 local TAB_TEXT_MAX_W     = 120
 
 local FONT               = "Fonts\\FRIZQT__.TTF"
@@ -465,7 +463,7 @@ local function CreateGroupHeader(parent)
     toggle:SetHeight(14)
     toggle:SetPoint("BOTTOMLEFT", g, "BOTTOMLEFT", 2, 2)
     g.toggle = toggle
-    local text = g:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local text = g:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     text:SetPoint("LEFT", toggle, "RIGHT", 3, 0)
     g.text = text
     g:SetScript("OnClick", function(self)
@@ -519,14 +517,6 @@ local function CreateRow(parent)
     local badge = row:CreateTexture(nil, "OVERLAY")
     badge:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", -6, -1)
     row.badge = badge
-    -- a contract of today's suggested zone: a star on the icon's top corner
-    local star = row:CreateTexture(nil, "OVERLAY")
-    star:SetWidth(14)
-    star:SetHeight(14)
-    star:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 6, 3)
-    star:SetTexture(SUGGESTED_STAR)
-    star:Hide()
-    row.star = star
 
     local title = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     title:SetPoint("TOPLEFT", row, "TOPLEFT", 49, -10)
@@ -635,7 +625,6 @@ local function RefreshRow(row, q)
             badge:SetTexture(daily and "Interface\\GossipFrame\\DailyQuestIcon" or "Interface\\GossipFrame\\AvailableQuestIcon")
         end
     end
-    if q.suggested then row.star:Show() else row.star:Hide() end
     row.title:SetText(LevelTag(q) .. q.title)
     row.sub:SetText(RowSubText(q))
 end
@@ -1147,9 +1136,7 @@ local function RefreshList()
 
     -- One header per group; the open-world dailies get one per zone instead (no zone of the
     -- day since 08/10: every zone of the player's level is on the board), lowest level first,
-    -- each with its level range. A zone is folded unless the player stands in it or holds one of
-    -- its contracts (2026-10-11). The zone the server suggests today (field 28) comes first, under
-    -- its own starred header, always open (2026-10-21): the board points the player somewhere.
+    -- each with its level range. Only the zone the player stands in is open (2026-11-05).
     local sections = {}
     local here = GetRealZoneText()
     for _, g in ipairs(GROUPS) do
@@ -1158,43 +1145,19 @@ local function RefreshList()
             if q.cadence == g.cadence then table.insert(mine, q) end
         end
         if selectedCategory == Callboard.CATEGORY.OPEN_WORLD and g.cadence == 0 and #mine > 0 then
-            local suggested, lo, hi, suggestedZone = {}
-            for _, q in ipairs(mine) do
-                if q.suggested then
-                    table.insert(suggested, q)
-                    suggestedZone = suggestedZone or ZoneOf(q)
-                    local level = LevelOf(q)
-                    if level then
-                        lo = math.min(lo or level, level)
-                        hi = math.max(hi or level, level)
-                    end
-                end
-            end
-            if #suggested > 0 then
-                local label = "|T" .. SUGGESTED_STAR .. ":14:14:0:0|t Suggested Today"
-                    .. (suggestedZone and ("  -  " .. suggestedZone) or "")
-                if lo then
-                    label = label .. (lo == hi and string.format(" (%d)", lo) or string.format(" (%d-%d)", lo, hi))
-                end
-                table.insert(sections, { key = "suggested", label = label, quests = suggested, open = true })
-            end
             local byZone, zones = {}, {}
             for _, q in ipairs(mine) do
-                -- the suggested zone's cards are listed under their header above
-                if not q.suggested then
-                    local zone = ZoneOf(q) or ""
-                    if not byZone[zone] then
-                        byZone[zone] = { quests = {}, open = zone == here }
-                        table.insert(zones, zone)
-                    end
-                    local z = byZone[zone]
-                    table.insert(z.quests, q)
-                    local level = LevelOf(q)
-                    if level then
-                        z.lo = math.min(z.lo or level, level)
-                        z.hi = math.max(z.hi or level, level)
-                    end
-                    if q.state == Callboard.STATE.ACCEPTED or q.state == Callboard.STATE.COMPLETE then z.open = true end
+                local zone = ZoneOf(q) or ""
+                if not byZone[zone] then
+                    byZone[zone] = { quests = {}, open = zone == here }
+                    table.insert(zones, zone)
+                end
+                local z = byZone[zone]
+                table.insert(z.quests, q)
+                local level = LevelOf(q)
+                if level then
+                    z.lo = math.min(z.lo or level, level)
+                    z.hi = math.max(z.hi or level, level)
                 end
             end
             table.sort(zones, function(a, b)
@@ -1204,7 +1167,7 @@ local function RefreshList()
             end)
             for _, zone in ipairs(zones) do
                 local z = byZone[zone]
-                local label = zone ~= "" and (g.label .. "  -  " .. zone) or g.label
+                local label = zone ~= "" and zone or g.label
                 if z.lo then
                     label = label .. (z.lo == z.hi and string.format(" (%d)", z.lo) or string.format(" (%d-%d)", z.lo, z.hi))
                 end
@@ -1228,8 +1191,7 @@ local function RefreshList()
             local header = groups[nGroups]
             header.key, header.open = key, open
             header.toggle:SetTexture(open and "Interface\\Buttons\\UI-MinusButton-Up" or "Interface\\Buttons\\UI-PlusButton-Up")
-            -- folded: how many cards it hides
-            header.text:SetText(open and section.label or (section.label .. "  |cffffffff+" .. #mine .. "|r"))
+            header.text:SetText(section.label)
             header:ClearAllPoints()
             header:SetPoint("TOPLEFT", content, "TOPLEFT", 3, -y)
             header:Show()
@@ -1595,9 +1557,11 @@ Callboard.OnChanged(function(event, payload)
     end
 end)
 
--- The objectives of the panel follow the quest log while the window is open.
+-- The objectives of the panel follow the quest log while the window is open, the Open World tab
+-- the player's zone.
 local logWatcher = CreateFrame("Frame")
 logWatcher:RegisterEvent("QUEST_LOG_UPDATE")
+logWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 logWatcher:SetScript("OnEvent", function()
     if mainFrame and mainFrame:IsShown() then UI.Refresh() end
 end)

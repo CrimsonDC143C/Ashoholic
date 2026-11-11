@@ -49,7 +49,7 @@
 --
 -- RETIRE le 2026-09-08 : un prestige n'accorde plus de bonus permanent de gain de
 -- cendres. Les cendres engagees sont detruites sans contrepartie, et la recompense
--- est l'Essence que frappent les eclats banques (750 pour 1 depuis le 14/09). ComputeBonusPct, en
+-- est l'Essence que frappent les eclats banques (50 pour 1 au premier prestige, jusqu'a 750, depuis le 04/11). ComputeBonusPct, en
 -- bas de ce fichier, ne sert plus qu'a lire les bonus gagnes sous l'ancienne regle.
 -- ============================================================================
 

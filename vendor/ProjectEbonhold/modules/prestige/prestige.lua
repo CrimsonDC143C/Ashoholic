@@ -117,7 +117,7 @@ local function BuildUI()
     -- PrestigeHandler::HandleDoPrestige.
     descText:SetText(
         "Resets your Skill Tree and consumes every Soul Ash on the account," .. "\n" ..
-        "banked or spent, on every character. Banked Shards return as Soul Essence.")
+        "banked or spent, on every character. Banked Shards return as Soul Essence, up to a limit.")
     descText:SetTextColor(0.9, 0.9, 0.9)
     descText:SetSpacing(3)
 
@@ -162,7 +162,7 @@ local function BuildUI()
     dealGain:SetWidth(196)
     dealGain:SetJustifyH("RIGHT")
 
-    -- Second row: the Soul Shards the prestige consumes become Soul Essence, SHARDS_PER_ESSENCE (750) to 1.
+    -- Second row: the Soul Shards the prestige consumes become Soul Essence, at the rate of GetShardsPerEssence.
     -- Shown only when there are shards to convert; the card grows to fit.
     local dealEssence = dealFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     dealEssence:SetPoint("TOP", dealFrame, "TOP", 0, -30)
@@ -175,7 +175,8 @@ local function BuildUI()
     -- cendres detruites n'y figurent plus, elles n'achetent rien et le chiffre vit deja dans
     -- le paragraphe du dessus et dans l'infobulle de la carte.
     local function ShowEssenceDeal()
-        local shards, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+        local _, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+        local shards = ProjectEbonhold.PrestigeService.GetShardsConsumed()
         dealCost:Hide()
         dealGain:Hide()
         dealSep:Hide()
@@ -204,10 +205,15 @@ local function BuildUI()
         GameTooltip:AddDoubleLine("Soul Ashes destroyed",
             FormatThousands(self.destroyed or 0), 0.9, 0.9, 0.9, 1, 0.4, 0.4)
         do
-            local shards, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+            local banked, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+            local shards = ProjectEbonhold.PrestigeService.GetShardsConsumed()
             GameTooltip:AddDoubleLine("Soul Shards consumed",
                 FormatThousands(shards), 0.9, 0.9, 0.9, 1, 0.4, 0.4)
-            GameTooltip:AddDoubleLine("Soul Essence (" .. FormatThousands(ProjectEbonhold.PrestigeService.SHARDS_PER_ESSENCE or 750) .. " shards each)",
+            if banked > shards then
+                GameTooltip:AddDoubleLine("Soul Shards staying banked",
+                    FormatThousands(banked - shards), 0.9, 0.9, 0.9, 0.2, 1, 0.2)
+            end
+            GameTooltip:AddDoubleLine("Soul Essence (" .. FormatThousands(ProjectEbonhold.PrestigeService.GetShardsPerEssence()) .. " shards each)",
                 "+" .. FormatThousands(essence), 0.9, 0.9, 0.9, 0.2, 1, 0.2)
         end
         GameTooltip:Show()
@@ -264,7 +270,7 @@ local function BuildUI()
     eraseList:SetSpacing(4)
     eraseList:SetText(
         "\226\128\162 ALL Soul Ashes, banked or spent,\n   on EVERY character\n" ..
-        "\226\128\162 ALL banked Soul Shards\n   (turned into Soul Essence, 750 to 1)\n" ..
+        "\226\128\162 Your banked Soul Shards\n   (turned into Soul Essence)\n" ..
         "\226\128\162 Skill Tree nodes without\n   Carry over Prestige")
 
     local keepHeader = confirm:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -325,7 +331,8 @@ local function BuildUI()
 
         local destroyed = ProjectEbonhold.PrestigeService.GetPendingPrestigeGain()
         if destroyed > 0 then
-            local shards, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+            local _, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
+            local shards = ProjectEbonhold.PrestigeService.GetShardsConsumed()
             cDeal:SetText("|cffFF4444" .. FormatThousands(destroyed) .. "|r Soul Ashes destroyed" ..
                 (shards > 0 and ("\n|cffFF4444" .. FormatThousands(shards) ..
                     "|r Soul Shards consumed, |cff33FF33+" .. FormatThousands(essence) ..
@@ -401,7 +408,7 @@ local function BuildUI()
         GameTooltip:AddLine(
             "Banked Soul Shards: " ..
             FormatThousands(select(1, svc.GetPendingEssence())) ..
-            " / " .. FormatThousands(svc.SHARDS_PER_ESSENCE or 750),
+            " / " .. FormatThousands(svc.GetShardsPerEssence()),
             0.8, 0.8, 0.8)
         GameTooltip:Show()
         GameTooltip:SetBackdropColor(0.04, 0.04, 0.06, 0.97)
@@ -1220,7 +1227,10 @@ local function BuildUI()
                 {
                     title = "What it pays",
                     text = "Your banked Soul Shards are consumed with the Ashes and come back " ..
-                        "as |cffFFCC00Soul Essence|r, one for every 750 Shards. This card " ..
+                        "as |cffFFCC00Soul Essence|r: one for every 50 Shards on your first Prestige, " ..
+                        "50 Shards more each time, up to 750. Your first Prestige mints at most 50 " ..
+                        "Soul Essence, the next 100, up to 750 on the 15th, then there is no limit. " ..
+                        "Shards above the limit stay banked. This card " ..
                         "shows the exchange you would make right now." .. "\n\n" ..
                         "Soul Essence buys the Prestige branch of the Skill Tree, and it is the " ..
                         "only currency a prestige never takes back: it only ever grows.",
@@ -1238,7 +1248,7 @@ local function BuildUI()
                 {
                     title = "Two locks",
                     text = "The button opens when both are met: enough Soul Ashes committed to " ..
-                        "your Skill Tree, and at least 750 banked Soul Shards, so the " ..
+                        "your Skill Tree, and enough banked Soul Shards for one Soul Essence, so the " ..
                         "reset always pays at least one Soul Essence." .. "\n\n" ..
                         "Hover the locked button to see which one is still missing.",
                     zone = function() return prestigeButton end,
@@ -1247,8 +1257,8 @@ local function BuildUI()
                 {
                     title = "When to do it",
                     text = "Nothing forces you the moment the locks open. Shards keep piling up " ..
-                        "from the dungeons, raids and Call Board contracts you clear, and every 750 of them is " ..
-                        "one more Soul Essence when you finally reset. Waiting is worth it.",
+                        "from the dungeons, raids and Call Board contracts you clear, and what one " ..
+                        "Prestige cannot convert waits in your bank for the next.",
                     zone = function() return prestigeButton end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },

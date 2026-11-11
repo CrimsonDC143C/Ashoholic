@@ -84,7 +84,7 @@ local CURRENCY_HELP = {
     shard   = { buys = "The Milestones of the tree: the percentage bonuses on the stats of your gear.",
                 earn = "Paid when every boss of a dungeon or raid in your bracket is dead, by dungeon champions in Torment, and by some Hero's Call Board contracts. Like Soul Ashes, they accumulate during the run and are banked at an offering or when it ends. Consumed by a Prestige." },
     essence = { buys = "The Prestige sector of the tree: talents, echoes, resurrections, experience.",
-                earn = "Minted when you Prestige: every 750 Soul Shards consumed become 1 Soul Essence. Never reset." },
+                earn = "Minted when you Prestige: 50 Soul Shards consumed become 1 Soul Essence on your first Prestige, 50 Shards more each time, up to 750. Your first Prestige mints at most 50, the next 100, up to 750 on the 15th, then no limit; Shards above the limit stay banked. Never reset." },
     artisan = { buys = "The Professions sector of the tree: gathering, crafting and the Torment recipes.",
                 earn = "Earned at the Hero's Call Board: every crafting contract you claim pays one. Never reset." },
 }
@@ -464,6 +464,28 @@ local function getNodeCost(btn, rank)
     return costs[rank] or costs[#costs] or 0
 end
 
+
+-- What the ranks selected since the last Apply cost, per currency. The server's spendable
+-- figures only know the applied build, so every pool packet has to take these off again:
+-- a death or a loot banks ashes and sends one while unapplied ranks are on screen.
+local function pendingTreeCost()
+    local cost = {}
+    for nodeId, rank in pairs(nodeRanks) do
+        local btn = nodesById[nodeId]
+        local validated = getValidatedRank(nodeId)
+        if btn and rank > validated then
+            local currency = getNodeCurrency(btn)
+            local sum = cost[currency] or 0
+            if btn.isMultipleChoice then
+                sum = sum + getNodeCost(btn, 1)
+            else
+                for r = validated + 1, rank do sum = sum + getNodeCost(btn, r) end
+            end
+            cost[currency] = sum
+        end
+    end
+    return cost
+end
 
 -- 12345678 -> "12,345,678": large Soul Ash numbers (infinite-node costs,
 -- late-game balances) are unreadable without separators.
@@ -876,6 +898,8 @@ local function RevertToValidatedState()
             "|cffFFFF00Warning: Validated state is for a different class!|r")
     end
 
+
+    for currency, cost in pairs(pendingTreeCost()) do poolAdd(currency, cost) end
 
     nodeRanks = {}
     resetAllNodeRanks()
@@ -4669,6 +4693,7 @@ ProjectEbonhold.SkillTree.UpdateTotalSoulPoints =
                 end
             end
         end
+        for currency, cost in pairs(pendingTreeCost()) do poolAdd(currency, -cost) end
 
         if skillTreeFrame and skillTreeFrame.poolTexts then
             refreshPoolsBar()

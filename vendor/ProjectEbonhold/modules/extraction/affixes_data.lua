@@ -1,7 +1,7 @@
 -- Affix Database
 -- Genere par tools/affixes/emit_addon_affixes.py depuis tools/affixes/catalog.py.
 -- NE PAS EDITER A LA MAIN : regenerer apres tout changement du catalogue.
--- Genere le 2026-11-01 -- 268 familles x 5 rangs.
+-- Genere le 2026-11-04 -- 268 familles x 5 rangs.
 
 ProjectEbonhold = ProjectEbonhold or {}
 
@@ -551,11 +551,11 @@ local families = {
         [5] = { spellId = 150764, passiveId = 151764, enchantId = 10764, applyCost = 2000000, extractCost = 10000000, text = "Increases healing received by @value@20%@value@ @range@[4%-20%]@range@ (Does not stack)" },
     } },
     [77] = { key = "juggernaut", name = "Juggernaut", category = 2, icon = "Interface\\Icons\\INV_Armor_Helm_Plate_Naxxramas_RaidWarrior_C_01", classMask = 0, spec = "", ranks = {
-        [1] = { spellId = 150770, passiveId = 151770, enchantId = 10770, applyCost = 125000, extractCost = 625000, text = "Increases your total Stamina by @value@5%@value@ @range@[5%-50%]@range@ but reduces your movement speed by @value@5%@value@ @range@[5%-50%]@range@ (Does not stack)" },
-        [2] = { spellId = 150771, passiveId = 151771, enchantId = 10771, applyCost = 250000, extractCost = 1250000, text = "Increases your total Stamina by @value@10%@value@ @range@[5%-50%]@range@ but reduces your movement speed by @value@10%@value@ @range@[5%-50%]@range@ (Does not stack)" },
-        [3] = { spellId = 150772, passiveId = 151772, enchantId = 10772, applyCost = 500000, extractCost = 2500000, text = "Increases your total Stamina by @value@20%@value@ @range@[5%-50%]@range@ but reduces your movement speed by @value@20%@value@ @range@[5%-50%]@range@ (Does not stack)" },
-        [4] = { spellId = 150773, passiveId = 151773, enchantId = 10773, applyCost = 1000000, extractCost = 5000000, text = "Increases your total Stamina by @value@35%@value@ @range@[5%-50%]@range@ but reduces your movement speed by @value@35%@value@ @range@[5%-50%]@range@ (Does not stack)" },
-        [5] = { spellId = 150774, passiveId = 151774, enchantId = 10774, applyCost = 2000000, extractCost = 10000000, text = "Increases your total Stamina by @value@50%@value@ @range@[5%-50%]@range@ but reduces your movement speed by @value@50%@value@ @range@[5%-50%]@range@ (Does not stack)" },
+        [1] = { spellId = 150770, passiveId = 151770, enchantId = 10770, applyCost = 125000, extractCost = 625000, text = "Increases your total Stamina by @value@5%@value@ @range@[5%-50%]@range@ but reduces your movement speed, including while mounted, by @value@5%@value@ @range@[5%-50%]@range@ (Does not stack)" },
+        [2] = { spellId = 150771, passiveId = 151771, enchantId = 10771, applyCost = 250000, extractCost = 1250000, text = "Increases your total Stamina by @value@10%@value@ @range@[5%-50%]@range@ but reduces your movement speed, including while mounted, by @value@10%@value@ @range@[5%-50%]@range@ (Does not stack)" },
+        [3] = { spellId = 150772, passiveId = 151772, enchantId = 10772, applyCost = 500000, extractCost = 2500000, text = "Increases your total Stamina by @value@20%@value@ @range@[5%-50%]@range@ but reduces your movement speed, including while mounted, by @value@20%@value@ @range@[5%-50%]@range@ (Does not stack)" },
+        [4] = { spellId = 150773, passiveId = 151773, enchantId = 10773, applyCost = 1000000, extractCost = 5000000, text = "Increases your total Stamina by @value@35%@value@ @range@[5%-50%]@range@ but reduces your movement speed, including while mounted, by @value@35%@value@ @range@[5%-50%]@range@ (Does not stack)" },
+        [5] = { spellId = 150774, passiveId = 151774, enchantId = 10774, applyCost = 2000000, extractCost = 10000000, text = "Increases your total Stamina by @value@50%@value@ @range@[5%-50%]@range@ but reduces your movement speed, including while mounted, by @value@50%@value@ @range@[5%-50%]@range@ (Does not stack)" },
     } },
     [78] = { key = "cornered", name = "Cornered", category = 2, icon = "Interface\\Icons\\Ability_GolemThunderClap", classMask = 0, spec = "", ranks = {
         [1] = { spellId = 150780, passiveId = 151780, enchantId = 10780, applyCost = 125000, extractCost = 625000, text = "When you fall below 35% health, you unleash a shockwave dealing @value@40%@value@ @range@[40%-200%]@range@ of your Attack Power or Spell Power as Physical damage to enemies within 8 yards and stunning them for 2 sec (once every 45 sec) (Does not stack)" },

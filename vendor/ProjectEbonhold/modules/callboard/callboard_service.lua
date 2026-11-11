@@ -17,8 +17,6 @@
 --   20 fields and paid nothing past the top; an older one sends 18.)
 --   Then (2026-10-11) "~level~minLevel~maxLevel~poiArea~poiX~poiY": the card's level and level window,
 --   and the camp on the zone map (WorldMapAreaId + world x / y, 0 = no POI). Absent = older server.
---   Then (2026-10-21) "~suggested": 1 on the Open World dailies of the zone the board suggests today
---   (CallboardMgr::SuggestedZone), listed first under their own header. Absent = older server.
 --   cadence 0 daily, 1 weekly, 2 once (a one-shot challenge)
 --   Empty body = board disabled server-side.
 
@@ -205,8 +203,6 @@ local function ParseQuest(section)
         poiArea    = tonumber(f[25]) or 0,
         poiX       = tonumber(f[26]) or 0,
         poiY       = tonumber(f[27]) or 0,
-        -- field 28 (2026-10-21): an Open World daily of today's suggested zone
-        suggested  = (tonumber(f[28]) or 0) == 1,
     }
     -- a server without field 21 paid nothing past the window top (a current one can send 0 too:
     -- 0.8 ^ 73 rounds to 0 % for an 80 holding a level-7 contract - that is not this case)

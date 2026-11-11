@@ -1,8 +1,8 @@
 ﻿## Interface: 30300
 ## Title: Project Ebonhold
 ## Notes: UI core system
-## SavedVariables: SpecCustomNames, ProjectEbonholdDB
-## SavedVariablesPerCharacter: ActionBarSaverDB, _data
+## SavedVariables: SpecCustomNames, ProjectEbonholdDB, EbonholdEditModeDB, _detalhes_global, CompactRaidFrameDB
+## SavedVariablesPerCharacter: ActionBarSaverDB, _data, _detalhes_database
 
 projectebonhold.lua
 constants.lua
@@ -67,6 +67,8 @@ modules\options\xp_bonus.lua
 modules\options\echo_visuals.lua
 
 modules\lootBind\loot_bind.lua
+# All the bags in one window, or not (option in Project Ebonhold > General).
+modules\combinedBags\combined_bags.lua
 
 # Feuille de personnage : onglet Reputation retire (la reputation n'a plus
 # d'effet, 2026-09-15). Ne depend que du FrameXML, deja charge.
@@ -87,9 +89,6 @@ modules\knowledgeBase\knowledgeBase.lua
 
 modules\checkpoint\checkpoint_service.lua
 modules\checkpoint\checkpoint.lua
-
-modules\levelup\levelup_service.lua
-modules\levelup\levelup.lua
 
 modules\callboard\callboard_service.lua
 modules\callboard\MapAreaData.lua
@@ -137,6 +136,9 @@ modules\torment\raid_difficulty_lock.lua
 modules\torment\torment_item_tooltip.lua
 # Icon above a Torment champion's nameplate (server: TormentChampionMgr, entries 985000-989999).
 modules\torment\champion_marker.lua
+# The player's own class debuffs above enemy nameplates.
+modules\nameplates\nameplate_dots_data.lua
+modules\nameplates\nameplate_dots.lua
 
 modules\dungeonFinder\dungeon_finder.lua
 # The "Raids" tab of the Dungeon Finder window (server: Ashendor/RaidFinder).
@@ -257,8 +259,11 @@ modules\graveyards\graveyard_pins.lua
 
 modules\skillTree\skillTreeMicroButton.lua
 # Yellow bubble over the Talents button while talent points are unspent; after
-# skillTreeMicroButton.lua so it can stack above the Skill Tree bubble.
+# skillTreeMicroButton.lua, whose module it follows on the bar.
 modules\talents\talent_alert.lua
+# Yellow bubble over the Dungeon Finder button at level 15; after talent_alert.lua so it
+# takes its turn with the other bubbles of the bar (GuidedTour.BarAlerts).
+modules\dungeonFinder\dungeon_alert.lua
 
 # Prestige: skill tree reset meta-progression (Prestige tab of /progression).
 # Data and service are frame-free; the UI creates EbonholdPrestigeFrame as a
@@ -283,3 +288,19 @@ modules\prestige\prestige.lua
 # ProjectEbonhold.EchoJournal, skillTreeFrame, EbonholdPrestigeFrame) already
 # exist.
 modules\progression\character_progression.lua
+
+# Edit Mode (retail-style): move and scale the HUD frames, layouts saved per account,
+# chosen per character. Game Menu > Edit Mode, or /editmode. After the modules whose
+# frames it places (run tracker, echoes, quest tracker).
+modules\editMode\edit_mode.lua
+
+# Details! (damage meter) and its plugins, embedded: one addon only. MUST STAY LAST: AceAddon
+# initializes what is queued at ANY ADDON_LOADED, and the modules above call LoadAddOn while they
+# load (Blizzard_TalentUI, Blizzard_MacroUI). Earlier in this list, Details! would start before
+# the saved variables of this addon exist and lose its settings.
+libs\Details\details_embed.xml
+
+# Compact Raid Frames (raid frames, raid manager, raid profiles), embedded. Also after the modules, for
+# the same reason as Details! just above. It reuses the C_Timer of modules\utils.lua instead of adding
+# its own. before_load / after_load keep the helpers the modules share (crf_embed.xml).
+libs\CompactRaidFrame\crf_embed.xml

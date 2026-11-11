@@ -301,7 +301,13 @@ if AchievementMicroButton then
             pcall(LoadAddOn, "Blizzard_AchievementUI")
         end
         guardAchievementShield()
-        if AchievementFrame then
+        -- Open through Blizzard's own toggle: it also selects tab 1, which shows the Summary
+        -- subframe. A bare ShowUIPanel left the empty achievement list on screen (rows still
+        -- reading the template's "For the Alliance!"), since "summary" is already the selected
+        -- category and selecting it again does nothing (2026-11-03).
+        if AchievementFrame and AchievementFrame_ToggleAchievementFrame then
+            AchievementFrame_ToggleAchievementFrame()
+        elseif AchievementFrame then
             if AchievementFrame:IsShown() then
                 HideUIPanel(AchievementFrame)
             else
@@ -397,6 +403,7 @@ SkillTreeMicroButton.Alert:SetFrameStrata("DIALOG")
 SkillTreeMicroButton.Alert:SetFrameLevel(10)
 SkillTreeMicroButton.Alert:EnableMouse(true)
 SkillTreeMicroButton.Alert:Hide()
+ProjectEbonhold.GuidedTour.BarAlerts.Add(SkillTreeMicroButton.Alert, 3)
 
 SkillTreeMicroButton.Alert.Text = SkillTreeMicroButton.Alert:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
 SkillTreeMicroButton.Alert.Text:SetJustifyV("TOP")

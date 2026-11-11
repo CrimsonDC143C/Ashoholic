@@ -9,7 +9,6 @@ local defaultSettings = {
     autoLearnTalents = true,
     autoPlaceSpells = true,
     showFloatingText = true,
-    hideLevelUpFrame = false,
     -- Perk Selection UI options
     noPerkFadeAnimations = false,
     noRerollConfirm = false,
@@ -44,8 +43,12 @@ local defaultSettings = {
     nameplatesBarWidth = 130,
     nameplatesBarHeight = 14,
     nameplatesFontSize = 12,
+    -- The player's own debuffs above enemy nameplates (modules/nameplates/nameplate_dots.lua)
+    nameplateDotsEnabled = true,
     -- Skip the "Looting X will bind it to you" confirmation (modules/lootBind)
     autoConfirmLootBind = false,
+    -- All the bags in one window (modules/combinedBags)
+    combinedBags = false,
     -- Merchant / junk selling options
     autoSellJunk = false,
     -- Toolbelt / Vendor: run the sale / the repair when combat ends

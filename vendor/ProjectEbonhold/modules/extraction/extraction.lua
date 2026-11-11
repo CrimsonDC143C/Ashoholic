@@ -149,7 +149,7 @@ end
 ------------------------------------------------------------
 
 StaticPopupDialogs["EBONHOLD_CONFIRM_LEGENDARY_UPGRADE"] = {
-    text = "Raise this item to %s?\n\nIt will consume %d Marks of Torment. Enchantments and gems are kept.",
+    text = "Upgrade this item to %s?\n\nIt will consume %s. Enchantments, gems and its affix are kept.",
     button1 = "Upgrade",
     button2 = "Cancel",
     OnAccept = function()
@@ -306,6 +306,14 @@ local function ItemIdOf(link)
     return link and tonumber(link:match("item:(%d+)")) or nil
 end
 
+-- What the anvil accepts: gear that takes or carries an affix, and any legendary. A legendary
+-- bow takes no affix (no ranged weapon does) but is still raised here: the server decides which
+-- items have an upgrade.
+local function GoesOnAnvil(link)
+    if GetItemAffixRules(link) or FindItemAffix(link) then return true end
+    return select(3, GetItemInfo(link)) == 5
+end
+
 local function MakeEntry(link, texture, serverBag, serverSlot, setTooltip)
     local name, _, quality, itemLevel, _, _, _, _, equipLoc = GetItemInfo(link)
     if not name then return nil end
@@ -325,7 +333,7 @@ local function ScanItems()
         if link then
             local e = MakeEntry(link, GetInventoryItemTexture("player", inv), 255, inv - 1,
                 function(tip) tip:SetInventoryItem("player", inv) end)
-            if e and (e.allowedCats or e.affix) then
+            if e and GoesOnAnvil(link) then
                 e.equipped = true
                 out[#out + 1] = e
             end
@@ -338,7 +346,7 @@ local function ScanItems()
                 local serverBag, serverSlot = ServerPos(b, s)
                 local e = MakeEntry(link, (GetContainerItemInfo(b, s)), serverBag, serverSlot,
                     function(tip) tip:SetBagItem(b, s) end)
-                if e and (e.allowedCats or e.affix) then out[#out + 1] = e end
+                if e and GoesOnAnvil(link) then out[#out + 1] = e end
             end
         end
     end
@@ -489,6 +497,7 @@ local function SelectEntry(e)
     if not e then return end
     S.key, S.itemId = e.key, ItemIdOf(e.link)
     ExtractionUI.pendingBag, ExtractionUI.pendingSlot, ExtractionUI.pendingLink = e.bag, e.slot, e.link
+    S.quoted = false   -- no upgrade line until the server has answered
     ExtractionService.RequestLegendaryUpgradeInfo(e.bag, e.slot)
     if e.affix and not e.equipped then
         ExtractionService.RequestExtractionInfo(e.bag, e.slot)
@@ -501,8 +510,8 @@ local function PlaceFromCursor()
     local infoType, _, link = GetCursorInfo()
     ClearCursor()
     if infoType ~= "item" or not link then return end
-    if not (GetItemAffixRules(link) or FindItemAffix(link)) then
-        SetStatus("|cffff8040Only rare or better gear can carry an affix.|r")
+    if not GoesOnAnvil(link) then
+        SetStatus("|cffff8040Only rare or better gear can go on the anvil.|r")
         ExtractionUI.Refresh()
         return
     end
@@ -551,7 +560,7 @@ local function InitItemMenu(self, level)
     end
     if level == 1 then
         if #equipped + #bags == 0 then
-            MenuTitle("None of your items can carry an affix", 1)
+            MenuTitle("None of your items can go on the anvil", 1)
             return
         end
         if #equipped + #bags + 2 <= MENU_MAX then
@@ -1038,6 +1047,8 @@ local function BuildAnvilPage(base)
     W.itemName = Text(c, "GameFontNormal", 180, 136, 330, "CENTER")
     W.itemSub = Text(c, "GameFontHighlightSmall", 180, 154, 330, "CENTER")
     W.itemSub:SetTextColor(0.73, 0.68, 0.56)
+    -- what the upgrade costs, or why this item has none (RefreshUpgrade)
+    W.upgradeHint = Text(c, "GameFontHighlightSmall", 180, 168, 330, "CENTER")
 
     -- Legendary Torment upgrade: shown only when the server quotes a recipe for the item
     W.upgrade = CreateFrame("Button", nil, c, "UIPanelButtonTemplate")
@@ -1050,8 +1061,14 @@ local function BuildAnvilPage(base)
         local up = ExtractionService.upgradeInfo
         if not up then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Upgrade to " .. up.label)
+        -- the item as it will be, then what it costs
+        GameTooltip:SetHyperlink("item:" .. up.nextEntry)
+        GameTooltip:AddLine(" ")
         GameTooltip:AddLine(string.format("%d/%d %s", up.held, up.needed, TokenLabel(up.tokenId)), 0.8, 0.8, 0.8)
+        if up.held < up.needed then
+            GameTooltip:AddLine("Earned in " .. up.label .. ".", 1, 0.5, 0.25)
+        end
+        GameTooltip:AddLine("Enchantments, gems and its affix are kept.", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     W.upgrade:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1060,7 +1077,7 @@ local function BuildAnvilPage(base)
         if not up or not ExtractionUI.pendingBag or not ExtractionUI.pendingSlot then return end
         local e = SelectedEntry()
         S.pending = { link = e and e.link, label = up.label }
-        StaticPopup_Show("EBONHOLD_CONFIRM_LEGENDARY_UPGRADE", up.label, up.needed)
+        StaticPopup_Show("EBONHOLD_CONFIRM_LEGENDARY_UPGRADE", up.label, up.needed .. " " .. TokenLabel(up.tokenId))
     end)
 
     local label = Text(c, "GameFontNormalSmall", 20, 220)
@@ -1208,10 +1225,13 @@ local function RefreshUpgrade(entry)
     local up = entry and ExtractionService.upgradeInfo
     if not up then
         W.upgrade:Hide()
+        W.upgradeHint:SetText((entry and S.quoted)
+            and "|cff9d9d9dOnly legendaries and tier set pieces can be upgraded, up to Torment X.|r" or "")
         return
     end
     local color = (up.held >= up.needed) and "|cff00ff00" or "|cffff4040"
-    W.upgrade:SetText(string.format("Upgrade  %s%d/%d|r %s", color, up.held, up.needed, TokenLabel(up.tokenId)))
+    W.upgradeHint:SetText(string.format("Needs %s%d/%d|r %s", color, up.held, up.needed, TokenLabel(up.tokenId)))
+    W.upgrade:SetText("Upgrade to " .. up.label)
     W.upgrade:Show()
     if up.held >= up.needed then W.upgrade:Enable() else W.upgrade:Disable() end
 end
@@ -1230,7 +1250,8 @@ local function RefreshAnvil()
         W.slot.icon:Hide()
         W.slot.glow:Hide()
         W.itemName:SetText("Place an item on the anvil")
-        W.itemSub:SetText("Click the slot to choose an item,\nor drag one here.")
+        W.itemSub:SetText("Click the slot to choose an item, or drag one here.")
+        W.upgradeHint:SetText("Upgrade legendaries and tier set pieces,\nor engrave and extract affixes.")
         W.upgrade:Hide()
         UIDropDownMenu_SetText(W.affixDD, "|cff808080Choose an affix|r")
         UIDropDownMenu_DisableDropDown(W.affixDD)
@@ -1259,7 +1280,7 @@ local function RefreshAnvil()
         if e.allowedCats and e.allowedCats[cat] then cats[#cats + 1] = CategoryText(cat) end
     end
     W.itemName:SetText(QualityHex(e.quality) .. e.name .. "|r")
-    W.itemSub:SetText(#cats > 0 and table.concat(cats, ", ") or "None")
+    W.itemSub:SetText(#cats > 0 and ("Takes affixes: " .. table.concat(cats, ", ")) or "Takes no affix")
     RefreshUpgrade(e)
 
     -- the dropdown: learned affixes this item takes
@@ -1277,7 +1298,7 @@ local function RefreshAnvil()
     if e.foreign or #EngravableAffixes(e) == 0 then
         HideAffixList()
         UIDropDownMenu_SetText(W.affixDD, "|cff808080" .. (e.foreign and "Random enchantment: cannot be engraved"
-            or "You know no affix for this slot yet") .. "|r")
+            or (not e.allowedCats and "This item takes no affix") or "You know no affix for this slot yet") .. "|r")
         UIDropDownMenu_DisableDropDown(W.affixDD)
     else
         UIDropDownMenu_EnableDropDown(W.affixDD)
@@ -1443,6 +1464,7 @@ frame:SetScript("OnMouseUp", function() if CursorHasItem() then OnWindowDrop() e
 ------------------------------------------------------------
 
 function ExtractionUI.OnUpgradeInfoReceived(info)
+    S.quoted = true
     if frame:IsShown() then ExtractionUI.Refresh() end
 end
 

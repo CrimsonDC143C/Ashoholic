@@ -20,7 +20,11 @@ local ShowPerkFamilyHint
 local isFading = false
 local isSelecting = false
 local isShowingPerkUI = false
-local PERK_CARDS_GRACE_SEC = 0.1
+-- The whole card is clickable and the next draw lands under the cursor: without this wait, the second
+-- click of a double-click would pick an echo of the next draw. About the time the cards take to turn over.
+local PERK_CARDS_GRACE_SEC = 0.45
+-- The echo card: size, room between two cards, height of the row, how much lower the outer cards sit
+local CARD_W, CARD_H, CARD_PITCH, CARD_ROW_Y, CARD_ARC = 216, 340, 232, 70, 14
 local perkCardsGraceUntil = 0
 
 local function IsTransparentDesign()
@@ -323,7 +327,7 @@ local function EnsureSpecDrawWidgets()
 
     -- Two four-point stars turning against each other read as eight shifting rays.
     -- On the main frame's background, so every card sits above them; centred on the
-    -- card row (PlaceCard puts it at +100).
+    -- card row (see CARD_ROW_Y).
     specRays = {}
     for i, spec in ipairs({ { 70, 360 }, { 95, -360 } }) do
         local t = perkMainFrame:CreateTexture(nil, "BACKGROUND")
@@ -331,7 +335,7 @@ local function EnsureSpecDrawWidgets()
         t:SetBlendMode("ADD")
         t:SetVertexColor(1, 0.78, 0.15, i == 1 and 0.55 or 0.4)
         t:SetSize(980, 980)
-        t:SetPoint("CENTER", perkMainFrame, "CENTER", 0, 100)
+        t:SetPoint("CENTER", perkMainFrame, "CENTER", 0, CARD_ROW_Y)
         t.spin = MakeSpin(t, spec[1], spec[2])
         t:Hide()
         specRays[i] = t
@@ -387,7 +391,7 @@ local function ShowSpecDrawWidgets(shown)
 
     if draw.chosen == 0 then
         specBanner.title:SetText("Choose your Echo Specialization")
-        specBanner.sub:SetText("Each card is one specialization (icon above its name). Every 10 levels of this run, you will get three echoes of the one you take")
+        specBanner.sub:SetText("Each card is one specialization (small icon on the echo's corner). Every 10 levels of this run, you will get three echoes of the one you take")
     else
         local specName
         for _, f in ipairs(perkFramePool) do
@@ -454,11 +458,12 @@ local function ApplyPerkUIScale(scale)
 end
 
 local qualityInfo = {
-    [0] = { name = "Common", color = { 1, 1, 1 }, border = 0 },
-    [1] = { name = "Uncommon", color = { 0.1, 1.0, 0.1 }, border = 1 },
-    [2] = { name = "Rare", color = { 0.0, 0.4, 1.0 }, border = 2 },
-    [3] = { name = "Epic", color = { 0.6, 0.2, 1.0 }, border = 3 },
-    [4] = { name = "Legendary", color = { 1.0, 0.5, 0.0 }, border = 4 }
+    -- rim = the card's frame and glow; text = the name on the card (the plain blue and purple are too dark on it)
+    [0] = { name = "Common", color = { 1, 1, 1 }, border = 0, rim = { 0.72, 0.70, 0.66 } },
+    [1] = { name = "Uncommon", color = { 0.1, 1.0, 0.1 }, border = 1, rim = { 0.1, 1.0, 0.1 } },
+    [2] = { name = "Rare", color = { 0.0, 0.4, 1.0 }, border = 2, rim = { 0.15, 0.5, 1.0 }, text = { 0.3, 0.59, 1.0 } },
+    [3] = { name = "Epic", color = { 0.6, 0.2, 1.0 }, border = 3, rim = { 0.6, 0.2, 1.0 }, text = { 0.74, 0.49, 1.0 } },
+    [4] = { name = "Legendary", color = { 1.0, 0.5, 0.0 }, border = 4, rim = { 1.0, 0.5, 0.0 } }
 }
 
 
@@ -516,6 +521,80 @@ local function GetFreezeInfo()
     return availableFreezes, totalFreezes
 end
 
+-- Reroll and Hide/Show are plates of the same stone and rim as the cards (classic design only, the
+-- transparent one keeps its flat backdrop). The art is grey and painted here, so one file serves every
+-- colour. Stock textures of the button are cleared: stone, rim and label lift together on hover.
+local PLATE_ART = "Interface\\AddOns\\ProjectEbonhold\\assets\\echo_plate_"
+local PLATE_LIFT = 2
+local HIDE_PLATE, HIDE_PLATE_HOT = { 0.50, 0.47, 0.43 }, { 0.95, 0.76, 0.32 }
+
+local function PlateLift(btn, y)
+    btn._plateStock:ClearAllPoints()
+    btn._plateStock:SetPoint("CENTER", btn, "CENTER", 0, y)
+end
+
+local function PaintPlate(btn, color, state)
+    local stock, rim, glow = btn._plateStock, btn._plateRim, btn._plateGlow
+    if state == "off" then
+        stock:SetVertexColor(0.30, 0.30, 0.30)
+        rim:SetVertexColor(0.42, 0.42, 0.42, 0.8)
+        glow:Hide()
+        PlateLift(btn, 0)
+        return
+    end
+    local hot = state == "hover"
+    local k = hot and 1 or 0.72
+    stock:SetVertexColor(color[1] * k, color[2] * k, color[3] * k)
+    -- The rim is the same colour pulled towards white, or it melts into the stone
+    local w = hot and 0.45 or 0.25
+    rim:SetVertexColor(color[1] + (1 - color[1]) * w, color[2] + (1 - color[2]) * w, color[3] + (1 - color[3]) * w,
+        hot and 1 or 0.85)
+    glow:SetVertexColor(color[1], color[2], color[3], 0.75)
+    if hot then glow:Show() else glow:Hide() end
+    PlateLift(btn, hot and PLATE_LIFT or 0)
+end
+
+local function MakePlate(btn, width, height, fontSize)
+    for _, t in ipairs({ btn:GetNormalTexture(), btn:GetPushedTexture(),
+                         btn:GetHighlightTexture(), btn:GetDisabledTexture() }) do
+        t:Hide()
+        t:SetTexture(nil)
+    end
+    btn:SetSize(width, height)
+
+    local glow = btn:CreateTexture(nil, "BACKGROUND")
+    glow:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
+    glow:SetBlendMode("ADD")
+    glow:SetPoint("CENTER", btn, "CENTER", 0, 0)
+    glow:SetSize(width + 70, height + 56)
+    glow:Hide()
+    btn._plateGlow = glow
+
+    local stock = btn:CreateTexture(nil, "BORDER")
+    stock:SetTexture(PLATE_ART .. "stock")
+    stock:SetSize(width, height)
+    btn._plateStock = stock
+
+    local rim = btn:CreateTexture(nil, "ARTWORK")
+    rim:SetTexture(PLATE_ART .. "rim")
+    rim:SetAllPoints(stock)
+    btn._plateRim = rim
+
+    btn.text:SetFont("Fonts\\FRIZQT__.TTF", fontSize)
+    btn.text:SetShadowColor(0, 0, 0, 1)
+    btn.text:SetShadowOffset(1, -1)
+    btn.text:ClearAllPoints()
+    btn.text:SetPoint("CENTER", stock, "CENTER", 0, 0)
+    PlateLift(btn, 0)
+
+    btn:SetScript("OnMouseDown", function(self)
+        if self:IsEnabled() then PlateLift(self, -1) end
+    end)
+    btn:SetScript("OnMouseUp", function(self)
+        PlateLift(self, (self:IsEnabled() and GetMouseFocus() == self) and PLATE_LIFT or 0)
+    end)
+end
+
 -- The Reroll button has TWO modes, told apart by who pays. On an ordinary draw it spends the
 -- run's reroll budget. On an Orb of Lost Memories offer that budget is refused server-side and
 -- one more orb buys the redraw instead (PerksHandler::OnOrbRerollRequested), so a player who
@@ -533,6 +612,7 @@ local REROLL_SKIN = {
         glow   = { 0.50, 0.14, 0.14, 0.40 },
         -- nil = the button art in its own colours, which are already red.
         tex    = nil,
+        plate  = { 0.80, 0.20, 0.14 },
     },
     -- Matches the orb bubble's mauve glow in orb_of_lost_memories.lua, so the button reads as
     -- part of the same currency.
@@ -546,6 +626,7 @@ local REROLL_SKIN = {
         -- Tinting the red art mauve directly would only darken it (a vertex colour multiplies,
         -- it cannot add the blue the source has none of), hence desaturate first.
         tex    = { 0.72, 0.42, 1.00 },
+        plate  = { 0.58, 0.28, 0.92 },
     },
 }
 
@@ -553,6 +634,15 @@ local function ApplyRerollSkin(hovered)
     if not rerollButton then return end
 
     local skin = rerollButton._orbMode and REROLL_SKIN.orb or REROLL_SKIN.run
+
+    if rerollButton._plateStock then
+        if rerollButton:IsEnabled() then
+            PaintPlate(rerollButton, skin.plate, hovered and "hover" or "rest")
+        else
+            PaintPlate(rerollButton, skin.plate, "off")
+        end
+        return
+    end
 
     -- Backdrop: the transparent design only. Classic has none, and the texture tint below is
     -- what carries the mode there.
@@ -612,7 +702,8 @@ local function RefreshRerollButton()
         rerollButton:Disable()
     end
 
-    ApplyRerollSkin(false)
+    -- The count changes under a cursor that is still on the button
+    ApplyRerollSkin(GetMouseFocus() == rerollButton)
 end
 
 local function GetCardFrameByIndex(cardIndex)
@@ -674,7 +765,7 @@ local perkTour = ProjectEbonhold.GuidedTour.Create({
                 title = "Echo Choices",
                 text = "Every level up during a run offers a draw of echoes: " ..
                     "temporary powers that last until the run ends. Click " ..
-                    "|cffffd700Select|r to claim one; the card's color shows its " ..
+                    "a |cffffd700card|r to claim it; the card's color shows its " ..
                     "quality.\n\n|cffffd700Freeze|r holds a card for your next " ..
                     "draw, |cffffd700Banish|r removes it from this run's pool.",
                 zone = GetCardsZone,
@@ -774,11 +865,605 @@ do
     end
 end
 
--- ── Card entrance: a short fade in place ───────────────────────────────────
--- Every reveal (first show, Show after Hide, the reveal after a "Draw") plays
--- this: each card sits on its place and fades in. No movement: the old drop from
--- above was removed (owner's call).
-local CARD_FADE_DURATION = 0.2
+-- ── Tarot cards: hover, deal, turn over, pick ──────────────────────────────
+-- The choice cards, design picked by the owner on a mock-up (2026-11-04). All of it runs from one
+-- OnUpdate (CardFx.Update, on the main frame), only while the choice is on screen.
+-- The 3.3.5 client can't tilt a frame or turn text, so nothing here does: a card rises, grows, glows and
+-- fades, and "turning over" is the back narrowing, the face widening, then the text fading in.
+local CARD_FADE_DURATION = 0.2 -- the face-down cards of the souvenir stage still just fade in
+
+local CardFx = {
+    ICON_SIZE = 72,
+    ICON_Y = -64, -- centre of the icon, from the top of the card
+}
+do
+    local ASSETS = "Interface\\AddOns\\ProjectEbonhold\\assets\\"
+    local GLOW_TEX = "Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64"
+
+    local HOVER_SEC, LIFT_Y, LIFT_SCALE, DIM_ALPHA, ICON_GROW = 0.13, 28, 0.08, 0.55, 6
+    local GLOW_REST, GLOW_HOT = 0.12, 0.9
+    -- The light on the card's edge, in front of it: at rest a card above Common breathes between these
+    -- two strengths, by rarity. Under the mouse it is on full for all of them.
+    local EDGE_BREATH = {
+        [1] = { 0.30, 0.65 },
+        [2] = { 0.40, 0.80 },
+        [3] = { 0.55, 1.00 },
+        [4] = { 0.55, 1.00 },
+    }
+    local EDGE_BREATH_RATE = 2 * math.pi / 2.4 -- one breath every 2.4 s
+    local TIP_DELAY = 0.45
+    local DEAL_SEC, DEAL_DROP, DEAL_STAGGER = 0.32, 330, 0.11
+    local FLIP_START, FLIP_MID, FLIP_END, TEXT_END = 0.2, 0.33, 0.46, 0.64
+    local SHINE_SEC = 0.5
+    local EMBER_COUNT, EMBER_REST_COUNT, EMBER_RISE = 10, 5, 230
+    local EMBER_LIFE_REST, EMBER_LIFE_HOT = 2.4, 1.5
+    local PICK_SEC, PICK_RISE, PICK_SCALE, BURN_SEC, BURN_DROP = 0.5, 60, 1.16, 0.36, 46
+    local PICK_SAFETY_SEC = 1.5
+
+    -- The art window: the part of the rarity smoke and ring textures kept on the card. Textures are not
+    -- clipped by their frame in 3.3.5, so the window is cut with texture coordinates. At this scale
+    -- (360 px for the whole texture) the ring goes around a 72 px icon.
+    local ART_W, ART_H = 210, 130
+    local ART_L, ART_R, ART_T, ART_B = 0.2083, 0.7917, 0.3528, 0.7139
+
+    function CardFx.PlaceArt(tex, card)
+        tex:SetSize(ART_W, ART_H)
+        tex:SetPoint("TOP", card, "TOP", 0, -3)
+        tex:SetTexCoord(ART_L, ART_R, ART_T, ART_B)
+    end
+
+    -- The colour around the icon turns: two layers of their own, over the rarity smoke and under the icon.
+    -- The smoke itself can't turn, it is cut by the art window and would swing out of the card. These stay
+    -- inside the window at any angle (122 px wide, icon centre 64 px from the top of the card).
+    local SWIRL_SIZE, SWIRL_REST, SWIRL_HOT = 122, 0.6, 1
+    local function SwirlLayer(iconFrame, art, level, seconds, degrees)
+        local t = iconFrame:CreateTexture(nil, "BACKGROUND", nil, level)
+        t:SetTexture(ASSETS .. art)
+        t:SetBlendMode("ADD")
+        t:SetSize(SWIRL_SIZE, SWIRL_SIZE)
+        t:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
+        t:SetAlpha(SWIRL_REST)
+        t.spin = MakeSpin(t, seconds, degrees)
+        return t
+    end
+
+    function CardFx.BuildSwirl(frame, iconFrame)
+        frame.swirl = SwirlLayer(iconFrame, "echo_card_swirl", 1, 16, -360)
+        frame.sparks = SwirlLayer(iconFrame, "echo_card_sparks", 2, 26, 360)
+    end
+
+    function CardFx.BuildBody(frame, visual)
+        local glow = visual:CreateTexture(nil, "BACKGROUND", nil, -2)
+        glow:SetTexture(GLOW_TEX)
+        glow:SetBlendMode("ADD")
+        glow:SetSize(CARD_W + 104, CARD_H + 104)
+        glow:SetPoint("CENTER", visual, "CENTER", 0, 0)
+        glow:SetAlpha(GLOW_REST)
+        frame.cardGlow = glow
+        frame._fxBreathPhase = math.random() * 2.4 -- or the whole row would breathe as one
+
+        local bg = visual:CreateTexture(nil, "BACKGROUND")
+        bg:SetTexture(ASSETS .. "echo_card_stock")
+        bg:SetSize(CARD_W, CARD_H)
+        bg:SetPoint("CENTER", visual, "CENTER", 0, 0)
+        frame.bg = bg
+
+        local rim = visual:CreateTexture(nil, "BORDER")
+        rim:SetTexture(ASSETS .. "echo_card_rim")
+        rim:SetSize(CARD_W, CARD_H)
+        rim:SetPoint("CENTER", visual, "CENTER", 0, 0)
+        frame.cardRim = rim
+
+        local back = visual:CreateTexture(nil, "BORDER", nil, 2)
+        back:SetTexture(ASSETS .. "echo_card_back")
+        back:SetSize(CARD_W, CARD_H)
+        back:SetPoint("CENTER", visual, "CENTER", 0, 0)
+        back:Hide()
+        frame.cardBack = back
+
+        -- The back lets the rarity show through, a small promise before the card turns over
+        local backSmoke = visual:CreateTexture(nil, "BORDER", nil, 3)
+        backSmoke:SetSize(CARD_W, CARD_W)
+        backSmoke:SetPoint("CENTER", visual, "CENTER", 0, 0)
+        backSmoke:SetTexCoord(0.14, 0.86, 0.14, 0.86)
+        backSmoke:SetBlendMode("ADD")
+        backSmoke:Hide()
+        frame.cardBackSmoke = backSmoke
+    end
+
+    function CardFx.BuildOverlay(frame, visual, content)
+        -- On the content, so it stays off until the card has turned over; on the rim, so it grows with the face
+        local edge = content:CreateTexture(nil, "OVERLAY")
+        edge:SetTexture(ASSETS .. "echo_card_edge")
+        edge:SetBlendMode("ADD")
+        edge:SetAllPoints(frame.cardRim)
+        edge:SetAlpha(0)
+        frame.cardEdge = edge
+
+        local flag = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        flag:SetFont("Fonts\\FRIZQT__.TTF", 11)
+        flag:SetPoint("TOPLEFT", visual, "TOPLEFT", 12, -10)
+        flag:SetTextColor(0.56, 0.82, 1)
+        flag:SetText("Frozen")
+        flag:Hide()
+        frame.frozenFlag = flag
+
+        local shine = content:CreateTexture(nil, "OVERLAY")
+        shine:SetTexture(ASSETS .. "echo_card_shine")
+        shine:SetBlendMode("ADD")
+        shine:SetAllPoints(frame.cardRim) -- the face, which grows on hover; `visual` does not
+        shine:Hide()
+        frame.cardShine = shine
+
+        frame.embers = {}
+        for i = 1, EMBER_COUNT do
+            local e = content:CreateTexture(nil, "OVERLAY")
+            e:SetTexture(GLOW_TEX)
+            e:SetBlendMode("ADD")
+            e:SetSize(9, 9)
+            e:Hide()
+            e.x = 12 + ((i * 37) % 84) / 100 * (CARD_W - 24)
+            e.t = (i * 0.37) % 1
+            frame.embers[i] = e
+        end
+    end
+
+    -- Paints the frame, glow and embers with the rarity, or everything in ice for a frozen card
+    function CardFx.Paint(f, frozen)
+        local qd = f._qualityData or qualityInfo[0]
+        local rim = qd.rim or qd.color
+        local r, g, b = rim[1], rim[2], rim[3]
+        if frozen then r, g, b = 0.44, 0.77, 1 end
+        if f.cardRim then f.cardRim:SetVertexColor(r, g, b) end
+        if f.cardGlow then f.cardGlow:SetVertexColor(r, g, b) end
+        if f.cardEdge then f.cardEdge:SetVertexColor(r, g, b) end
+        if f.swirl then
+            f.swirl:SetVertexColor(r, g, b)
+            f.sparks:SetVertexColor(r, g, b)
+        end
+        if f.bg then
+            if frozen then f.bg:SetVertexColor(0.55, 0.78, 1) else f.bg:SetVertexColor(1, 1, 1) end
+        end
+        if f.frozenFlag then
+            if frozen then f.frozenFlag:Show() else f.frozenFlag:Hide() end
+        end
+        for _, e in ipairs(f.embers or _emptyTable) do e:SetVertexColor(r, g, b) end
+        if f.cardBackSmoke then
+            f.cardBackSmoke:SetTexture(ASSETS .. "perk_quality_" .. qd.border)
+        end
+    end
+
+    function CardFx.SetSelectHint(f, label)
+        if not f.selectHint then return end
+        if label then
+            f.selectHint:SetText(label)
+            f.selectHint:Show()
+        else
+            f.selectHint:Hide()
+        end
+    end
+
+    local function SetFrontWidth(f, w)
+        f._fxFace = nil -- the flip owns the width, Step gives the face its size back afterwards
+        f.bg:SetWidth(w)
+        f.cardRim:SetWidth(w)
+    end
+
+    local function SetBack(f, w)
+        if w then
+            f.cardBack:SetWidth(w)
+            f.cardBackSmoke:SetWidth(w)
+            f.cardBack:Show()
+            f.cardBackSmoke:Show()
+        else
+            f.cardBack:Hide()
+            f.cardBackSmoke:Hide()
+        end
+    end
+
+    local function FinishEntrance(f)
+        f._fxT, f._fxFlipOnly = nil, nil
+        SetBack(f, nil)
+        SetFrontWidth(f, CARD_W)
+        f.content:SetAlpha(1)
+    end
+
+    -- Deals the card from the bottom of the row, face down, and turns it over
+    function CardFx.Start(f, delay)
+        if not f.visual then return end
+        f._fxT = -(delay or 0)
+        f._fxFlipOnly = nil
+        f._fxDX = -(f._cardX or 0)
+        f._fxHiddenUntil = nil
+        f.visual:SetAlpha(0)
+    end
+
+    -- Only turns over, in place: the card that replaces a banished one
+    function CardFx.StartFlip(f)
+        if not f.visual or f._fxNoFlip then return end
+        f._fxT = FLIP_START
+        f._fxFlipOnly = true
+        f._fxDX = 0
+    end
+
+    function CardFx.Stagger(k)
+        return k * DEAL_STAGGER
+    end
+
+    -- The tooltip opens after a short wait and on the outer side of the card, so that it doesn't cover
+    -- the card the player is reading; the card in the middle opens to the right.
+    function CardFx.ShowTooltip(self)
+        local qd = self._qualityData or qualityInfo[0]
+        GameTooltip:SetOwner(self, "ANCHOR_NONE")
+        GameTooltip:ClearAllPoints()
+        if (self._cardX or 0) < 0 then
+            GameTooltip:SetPoint("RIGHT", self, "LEFT", -16, 0)
+        else
+            GameTooltip:SetPoint("LEFT", self, "RIGHT", 16, 0)
+        end
+        GameTooltip:ClearLines()
+        local sName = GetSpellInfo(self._spellId or 0)
+        GameTooltip:AddLine(sName or ("Spell " .. tostring(self._spellId)), qd.color[1], qd.color[2], qd.color[3])
+        GameTooltip:AddLine(qd.name, 0.5, 0.5, 0.5)
+        if self._perkData and self._perkData.isGuaranteed then
+            -- The choice itself is spelled out under the cards (memoryHint)
+            GameTooltip:AddLine("Souvenir from your previous build", 1, 0.82, 0.1)
+        end
+        local svcRule = ProjectEbonhold.PerkService
+            and ProjectEbonhold.PerkService.GetActiveEchoLoadoutRule
+        local rule = svcRule and svcRule(self._spellId)
+        if rule == "avoid" then
+            GameTooltip:AddLine("Your build refuses this echo", 1, 0.25, 0.25)
+            GameTooltip:AddLine("It is never taken for you. Take it yourself if you changed your mind.", 0.8, 0.6, 0.6, true)
+        elseif rule == "want" then
+            GameTooltip:AddLine("Wanted by your build", 0.1, 1, 0.1)
+        end
+        local st = self._stacks or 1
+        local ms = self._maxStacks or 1
+        if st > 1 then
+            GameTooltip:AddLine("Stacks: " .. st .. "/" .. ms, 1, 1, 1)
+        end
+        GameTooltip:AddLine(" ")
+        local description = utils.GetSpellDescription(self._spellId, 500, st)
+        GameTooltip:AddLine(description, 1, 0.82, 0, true)
+        -- stat echoes have their stat line instead (owner 2026-10-23)
+        local okStats, stats = pcall(GetEchoStats, self._spellId, description)
+        if (self._ownedCount or 0) >= 1 and not (okStats and stats and next(stats)) then
+            pcall(AddEchoStackLine, GameTooltip, self._spellId, self._ownedCount)
+        end
+        AddEchoStatLines(GameTooltip, self._spellId, description)
+        GameTooltip:Show()
+    end
+
+    local function StepEmbers(f, dt, isHot, shown)
+        local active = 0
+        if shown then
+            if isHot then active = EMBER_COUNT
+            elseif f._fxQuality == 3 then active = EMBER_REST_COUNT end
+        end
+        if active == 0 and not f._fxEmbersOn then return end
+        f._fxEmbersOn = active > 0
+        local life = isHot and EMBER_LIFE_HOT or EMBER_LIFE_REST
+        for i, e in ipairs(f.embers) do
+            if i <= active then
+                e.t = (e.t + dt / life) % 1
+                local a = e.t < 0.15 and (e.t / 0.15) or ((1 - e.t) / 0.85)
+                e:SetPoint("CENTER", f.visual, "BOTTOMLEFT", e.x, 40 + e.t * EMBER_RISE)
+                e:SetAlpha(a * 0.9)
+                e:Show()
+            else
+                e:Hide()
+            end
+        end
+    end
+
+    local function Step(f, dt, hot, now)
+        local isHot = f == hot
+
+        -- Hover: rises and grows, the others step back
+        local lift = f._fxLift or 0
+        local target = isHot and 1 or 0
+        if lift ~= target then
+            if target == 1 and lift == 0 and not f._fxT then
+                f._fxShineT = 0
+                f.cardShine:Show()
+            end
+            if lift < target then lift = math.min(target, lift + dt / HOVER_SEC)
+            else lift = math.max(target, lift - dt / HOVER_SEC) end
+            f._fxLift = lift
+        end
+        local ease = lift * (2 - lift)
+
+        local dim = f._fxDim or 1
+        local dimTarget = (hot and not isHot) and DIM_ALPHA or 1
+        if dim ~= dimTarget then
+            local step = (1 - DIM_ALPHA) * dt / HOVER_SEC
+            if dim < dimTarget then dim = math.min(dimTarget, dim + step)
+            else dim = math.max(dimTarget, dim - step) end
+            f._fxDim = dim
+        end
+
+        -- Entrance
+        local ox, oy, alpha = 0, 0, 1
+        local t = f._fxT
+        if t then
+            t = t + dt
+            f._fxT = t
+            if t < 0 then
+                alpha = 0
+                if not f._fxNoFlip then
+                    SetFrontWidth(f, 1)
+                    SetBack(f, CARD_W)
+                    f.content:SetAlpha(0)
+                end
+            else
+                if not f._fxFlipOnly then
+                    local p = math.min(t / DEAL_SEC, 1)
+                    local inv = 1 - p
+                    local e = inv * inv * inv
+                    ox, oy = (f._fxDX or 0) * e, -DEAL_DROP * e
+                    alpha = math.min(t / 0.1, 1)
+                end
+                if f._fxNoFlip then
+                    if t >= DEAL_SEC then FinishEntrance(f) end
+                elseif t >= TEXT_END then
+                    FinishEntrance(f)
+                else
+                    if t < FLIP_START then
+                        SetBack(f, CARD_W)
+                        SetFrontWidth(f, 1)
+                    elseif t < FLIP_MID then
+                        SetBack(f, math.max(1, CARD_W * (1 - (t - FLIP_START) / (FLIP_MID - FLIP_START))))
+                        SetFrontWidth(f, 1)
+                    else
+                        SetBack(f, nil)
+                        SetFrontWidth(f, math.max(1, CARD_W * math.min(1, (t - FLIP_MID) / (FLIP_END - FLIP_MID))))
+                    end
+                    f.content:SetAlpha(t < FLIP_END and 0 or ((t - FLIP_END) / (TEXT_END - FLIP_END)))
+                end
+            end
+        end
+
+        -- A picked card has been handed over to its ghost (CardFx.PlayPick)
+        if f._fxHiddenUntil then
+            if now < f._fxHiddenUntil then alpha = 0 else f._fxHiddenUntil = nil end
+        end
+
+        -- Only the card's face grows, never a frame holding text: under SetScale the client lays a font
+        -- string out again at each step, so the description changes size and breaks its lines elsewhere.
+        -- Whole pixels for the same reason, text on a fractional position shimmers as it moves.
+        local x, y = math.floor(ox + 0.5), math.floor(oy + LIFT_Y * ease + 0.5)
+        if x ~= f._fxX or y ~= f._fxY then
+            f._fxX, f._fxY = x, y
+            f.visual:SetPoint("CENTER", f, "CENTER", x, y)
+        end
+        if not f._fxT and ease ~= f._fxFace then
+            f._fxFace = ease
+            local scale = 1 + LIFT_SCALE * ease
+            f.bg:SetSize(CARD_W * scale, CARD_H * scale)
+            f.cardRim:SetSize(CARD_W * scale, CARD_H * scale)
+            if f._fxNoFlip then f.backdropFrame:SetSize(CARD_W * scale, CARD_H * scale) end
+        end
+        f.visual:SetAlpha(alpha * dim)
+        -- An animation stops when its frame is hidden, and a card is hidden between two draws
+        if not f.swirl.spin:IsPlaying() then
+            f.swirl.spin:Play()
+            f.sparks.spin:Play()
+        end
+
+        if ease ~= f._fxEase then
+            f._fxEase = ease
+            f.cardGlow:SetAlpha(GLOW_REST + (GLOW_HOT - GLOW_REST) * ease)
+            f.swirl:SetAlpha(SWIRL_REST + (SWIRL_HOT - SWIRL_REST) * ease)
+            f.sparks:SetAlpha(SWIRL_REST + (SWIRL_HOT - SWIRL_REST) * ease)
+            local size = CardFx.ICON_SIZE + ICON_GROW * ease
+            f.icon:SetSize(size, size)
+            -- Alpha, not Show: the Update*Buttons polls own Show and Hide
+            f.freezeCardButton:SetAlpha(ease)
+            f.banishCardButton:SetAlpha(ease)
+            if f.selectHint then f.selectHint:SetAlpha(1 - ease) end
+        end
+
+        local edgeRest = 0
+        local breath = EDGE_BREATH[f._fxQuality]
+        if breath then
+            local wave = 0.5 + 0.5 * math.sin((now + f._fxBreathPhase) * EDGE_BREATH_RATE)
+            edgeRest = breath[1] + (breath[2] - breath[1]) * wave
+        end
+        local edgeAlpha = edgeRest + (1 - edgeRest) * ease
+        if edgeAlpha ~= f._fxEdgeAlpha then
+            f._fxEdgeAlpha = edgeAlpha
+            f.cardEdge:SetAlpha(edgeAlpha)
+        end
+
+        -- The reflection crosses the card once per hover
+        local s = f._fxShineT
+        if s then
+            s = s + dt / SHINE_SEC
+            if s >= 1 then
+                f._fxShineT = nil
+                f.cardShine:Hide()
+            else
+                f._fxShineT = s
+                local l = s * 0.6
+                f.cardShine:SetTexCoord(l, l + 0.4, 0, 1)
+            end
+        end
+
+        StepEmbers(f, dt, isHot, not f._fxT and alpha > 0)
+    end
+
+    local tipFocus, tipCard, tipWait = nil, nil, 0
+
+    function CardFx.Update(elapsed)
+        local dt = math.min(elapsed, 0.1)
+
+        -- Hover comes from the mouse focus and not from OnEnter / OnLeave: moving onto Freeze or Banish
+        -- fires the card's OnLeave though the cursor is still on the card. `_card` is set on the card's
+        -- frame, its Select cover, its two buttons and its spec badge.
+        local focus = GetMouseFocus()
+        local hot = focus and focus._card or nil
+        if hot and (isSelecting or not hot.inUse or not hot:IsShown()) then hot = nil end
+
+        if focus ~= tipFocus then
+            if tipCard and GameTooltip:IsOwned(tipCard) then GameTooltip:Hide() end
+            tipFocus, tipCard, tipWait = focus, nil, 0
+        end
+        if hot and not tipCard and (focus == hot or focus == hot.selectButton) then
+            tipWait = tipWait + dt
+            if tipWait >= TIP_DELAY then
+                tipCard = hot
+                CardFx.ShowTooltip(hot)
+            end
+        end
+
+        local now = GetTime()
+        for _, f in ipairs(perkFramePool) do
+            if f.inUse and f.visual and f:IsShown() then
+                Step(f, dt, hot, now)
+            end
+        end
+    end
+
+    -- ── The pick ────────────────────────────────────────────────────────────
+    -- The server's answer hides the row (or brings the next draw) at once, so the animation can't live on
+    -- the cards: they hand over to ghosts, plain copies parented to UIParent. The chosen one rises, the
+    -- others burn away. Nothing waits for it: the next draw can land while it plays.
+    local ghosts = {}
+    local ghostTime = 0
+    local ghostDriver = CreateFrame("Frame")
+    ghostDriver:Hide()
+
+    local function GetGhost(i)
+        if ghosts[i] then return ghosts[i] end
+        local g = CreateFrame("Frame", nil, UIParent)
+        g:SetFrameStrata("DIALOG")
+        g:SetFrameLevel(90)
+        g:SetSize(CARD_W, CARD_H)
+        g:Hide()
+
+        g.glow = g:CreateTexture(nil, "BACKGROUND", nil, -2)
+        g.glow:SetTexture(GLOW_TEX)
+        g.glow:SetBlendMode("ADD")
+        g.glow:SetSize(CARD_W + 104, CARD_H + 104)
+        g.glow:SetPoint("CENTER", g, "CENTER", 0, 0)
+
+        g.bg = g:CreateTexture(nil, "BACKGROUND")
+        g.bg:SetTexture(ASSETS .. "echo_card_stock")
+        g.bg:SetAllPoints(g)
+
+        g.rim = g:CreateTexture(nil, "BORDER")
+        g.rim:SetTexture(ASSETS .. "echo_card_rim")
+        g.rim:SetAllPoints(g)
+
+        g.smoke = g:CreateTexture(nil, "ARTWORK")
+        CardFx.PlaceArt(g.smoke, g)
+
+        g.icon = g:CreateTexture(nil, "ARTWORK", nil, 1)
+        g.icon:SetSize(CardFx.ICON_SIZE, CardFx.ICON_SIZE)
+        g.icon:SetPoint("CENTER", g, "TOP", 0, CardFx.ICON_Y)
+
+        g.ring = g:CreateTexture(nil, "ARTWORK", nil, 2)
+        CardFx.PlaceArt(g.ring, g)
+
+        g.name = g:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        g.name:SetFont("Fonts\\MORPHEUS.ttf", 20)
+        g.name:SetPoint("TOP", g, "TOP", 0, -147)
+        g.name:SetWidth(192)
+        g.name:SetShadowColor(0, 0, 0, 1)
+        g.name:SetShadowOffset(1, -1)
+
+        g.desc = g:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        g.desc:SetFont("Fonts\\ARIALN.TTF", 13)
+        g.desc:SetPoint("TOP", g.name, "BOTTOM", 0, -24)
+        g.desc:SetWidth(188)
+        g.desc:SetHeight(96)
+        g.desc:SetJustifyV("TOP")
+        g.desc:SetTextColor(0.87, 0.83, 0.76)
+
+        ghosts[i] = g
+        return g
+    end
+
+    local function PlaceGhost(g, rise, scale)
+        g:SetScale(g.baseScale * scale)
+        g:SetPoint("CENTER", UIParent, "BOTTOMLEFT", g.x / scale, (g.y + rise) / scale)
+    end
+
+    ghostDriver:SetScript("OnUpdate", function(self, elapsed)
+        ghostTime = ghostTime + math.min(elapsed, 0.1)
+        local running = false
+        for _, g in ipairs(ghosts) do
+            if g:IsShown() then
+                if g.chosen then
+                    local p = math.min(ghostTime / PICK_SEC, 1)
+                    local up = 1 - (1 - math.min(p * 2.5, 1)) ^ 3
+                    PlaceGhost(g, g.startRise + (PICK_RISE - g.startRise) * up,
+                        g.startScale + (PICK_SCALE - g.startScale) * up)
+                    g:SetAlpha(p < 0.45 and 1 or (1 - (p - 0.45) / 0.55))
+                    g.glow:SetAlpha(1)
+                    if p >= 1 then g:Hide() else running = true end
+                else
+                    local p = math.min(ghostTime / BURN_SEC, 1)
+                    PlaceGhost(g, g.startRise * (1 - p) - BURN_DROP * p, g.startScale + (0.95 - g.startScale) * p)
+                    g:SetAlpha(g.startAlpha * (1 - p))
+                    -- Burns: everything goes from its own colour to embers
+                    g.bg:SetVertexColor(1, 1 - 0.55 * p, 1 - 0.85 * p)
+                    g.rim:SetVertexColor(g.r + (1 - g.r) * p, g.g + (0.42 - g.g) * p, g.b + (0.08 - g.b) * p)
+                    g.glow:SetVertexColor(1, 0.42, 0.08)
+                    g.glow:SetAlpha(p)
+                    if p >= 1 then g:Hide() else running = true end
+                end
+            end
+        end
+        if not running then self:Hide() end
+    end)
+
+    function CardFx.PlayPick(chosen)
+        local n = 0
+        local now = GetTime()
+        local baseScale = perkMainFrame:GetScale()
+        for _, f in ipairs(perkFramePool) do
+            if f.inUse and f.visual and f:IsShown() and f._qualityData then
+                n = n + 1
+                local g = GetGhost(n)
+                local qd = f._qualityData
+                local rim = qd.rim or qd.color
+                g.chosen = f == chosen
+                g.r, g.g, g.b = rim[1], rim[2], rim[3]
+                g.bg:SetVertexColor(1, 1, 1)
+                g.rim:SetVertexColor(g.r, g.g, g.b)
+                g.glow:SetVertexColor(g.r, g.g, g.b)
+                g.glow:SetAlpha(0)
+                g.smoke:SetTexture(ASSETS .. "perk_quality_" .. qd.border)
+                g.ring:SetTexture(ASSETS .. "perk_border_quality_" .. qd.border)
+                local _, _, spellIcon = GetSpellInfo(f._spellId or 0)
+                SetPortraitToTexture(g.icon, spellIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
+                g.name:SetText(f.nameText:GetText())
+                g.name:SetTextColor(unpack(qd.text or qd.color))
+                g.desc:SetText(f.descText:GetText())
+
+                local ease = f._fxEase or 0
+                g.baseScale = baseScale
+                g.startRise, g.startScale = LIFT_Y * ease, 1
+                g.startAlpha = f._fxDim or 1
+                g.x, g.y = f:GetCenter()
+                g:ClearAllPoints()
+                PlaceGhost(g, g.startRise, g.startScale)
+                g:SetAlpha(g.startAlpha)
+                g:Show()
+
+                -- If the answer never comes the card comes back by itself, it is not lost
+                f._fxHiddenUntil = now + PICK_SAFETY_SEC
+            end
+        end
+        if n > 0 then
+            for i = n + 1, #ghosts do ghosts[i]:Hide() end
+            ghostTime = 0
+            ghostDriver:Show()
+        end
+    end
+end
 
 -- Remembers where a card belongs so a reveal can put it back there
 function PlaceCard(f, x, y)
@@ -787,17 +1472,24 @@ function PlaceCard(f, x, y)
     f:SetPoint("CENTER", perkMainFrame, "CENTER", x, y)
 end
 
-function PlayCardEntrance(f, onDone)
+function PlayCardEntrance(f, onDone, delay)
     if not f._cardX then return end
     CancelFade(f)
     f:ClearAllPoints()
     f:SetPoint("CENTER", perkMainFrame, "CENTER", f._cardX, f._cardY)
-    FadeFrame(f, CARD_FADE_DURATION, 0, 1, 0, onDone)
+    if f.visual then
+        f:SetAlpha(1)
+        f:Show()
+        CardFx.Start(f, delay)
+        if onDone then onDone(f) end
+    else
+        FadeFrame(f, CARD_FADE_DURATION, 0, 1, 0, onDone)
+    end
 end
 
 function PlayCardsEntrance(frames)
-    for _, f in ipairs(frames) do
-        PlayCardEntrance(f)
+    for k, f in ipairs(frames) do
+        PlayCardEntrance(f, nil, CardFx.Stagger(k - 1))
     end
 end
 
@@ -810,30 +1502,14 @@ function CollectVisibleCards()
     return list
 end
 
-local FREEZE_FADE_DURATION = 0.45
-
-local function ApplyFreezeVisual(frame, smooth)
+local function ApplyFreezeVisual(frame)
     if not frame then return end
 
     if frame.backdropFrame and frame.backdropFrame.SetBackdropColor then
         frame.backdropFrame:SetBackdropColor(0.06, 0.12, 0.28, 0.95)
         frame.backdropFrame:SetBackdropBorderColor(0.3, 0.55, 0.85, 1)
     end
-
-    if frame.bg then
-        if smooth and frame.freezeOverlay then
-            frame.freezeOverlay:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk_freeze")
-            frame.freezeOverlay:SetAlpha(0)
-            frame.freezeOverlay:Show()
-            FadeFrame(frame.freezeOverlay, FREEZE_FADE_DURATION, 0, 1, nil, function()
-                frame.bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk_freeze")
-                frame.freezeOverlay:Hide()
-            end)
-        else
-            frame.bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk_freeze")
-            if frame.freezeOverlay then frame.freezeOverlay:Hide() end
-        end
-    end
+    CardFx.Paint(frame, true)
 end
 
 local function ClearFreezeVisual(frame)
@@ -842,13 +1518,7 @@ local function ClearFreezeVisual(frame)
         frame.backdropFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
         frame.backdropFrame:SetBackdropBorderColor(0, 0, 0, 1)
     end
-    if frame.bg then
-        frame.bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk")
-    end
-    if frame.freezeOverlay then
-        CancelFade(frame.freezeOverlay)
-        frame.freezeOverlay:Hide()
-    end
+    CardFx.Paint(frame, false)
 end
 
 local function IsCardFrozen(frame)
@@ -884,7 +1554,7 @@ local function UpdateBanishButtons()
             elseif IsCardFrozen(frame) then
                 btn:Show()
                 btn:Disable()
-                btn:EnableMouse(false)
+                btn:EnableMouse(true) -- swallows the click: the card under it is a button too
                 if btn.text then
                     btn.text:SetText("Banish")
                     btn.text:SetTextColor(0.5, 0.5, 0.5)
@@ -899,6 +1569,7 @@ local function UpdateBanishButtons()
                 end
             else
                 btn:Show()
+                btn:EnableMouse(true)
                 btn:Disable()
                 if btn.text then
                     if banishLabel then btn.text:SetText("Banish (0)") end
@@ -923,7 +1594,7 @@ local function UpdateFreezeButtons()
             elseif false then
                 btn:Show()
                 btn:Disable()
-                btn:EnableMouse(false)
+                btn:EnableMouse(true) -- swallows the click: the card under it is a button too
                 if btn.text then
                     btn.text:SetText("Freeze")
                     btn.text:SetTextColor(0.5, 0.5, 0.5)
@@ -935,7 +1606,7 @@ local function UpdateFreezeButtons()
             elseif IsCardFrozen(frame) then
                 btn:Show()
                 btn:Disable()
-                btn:EnableMouse(false)
+                btn:EnableMouse(true) -- swallows the click: the card under it is a button too
                 ApplyFreezeVisual(frame)
                 if btn.text then
                     btn.text:SetText("Freeze")
@@ -959,6 +1630,7 @@ local function UpdateFreezeButtons()
                 end
             else
                 btn:Show()
+                btn:EnableMouse(true)
                 btn:Disable()
                 if btn.text then
                     btn.text:SetText("Freeze (0)")
@@ -992,36 +1664,26 @@ local function AcquirePerkFrame(parent)
 
     local index = #perkFramePool + 1
     local frame = CreateFrame("Frame", "PerkChoice" .. index, parent)
-    frame:SetSize(200, 400)
+    frame:SetSize(CARD_W, CARD_H)
+    frame._card = frame
 
-    -- Original texture (hidden when transparent); visual backdrop is on a separate frame
-    local bg = frame:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(frame)
-    bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk")
-    bg:SetTexCoord(0.226562, 0.746094, 0.009766, 0.958984)
-    frame.bg = bg
+    -- The frame never moves and keeps the hit area; everything that shows sits on `visual`, which lifts
+    -- and grows on hover. A card that moved its own hit area would run away from a cursor coming from below.
+    local visual = CreateFrame("Frame", nil, frame)
+    visual:SetSize(CARD_W, CARD_H)
+    visual:SetPoint("CENTER", frame, "CENTER", 0, 0)
+    frame.visual = visual
+    CardFx.BuildBody(frame, visual)
 
-    -- Overlay for smooth freeze crossfade (sits just above bg)
-    local freezeOverlay = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
-    freezeOverlay:SetAllPoints(frame)
-    freezeOverlay:SetTexCoord(0.226562, 0.746094, 0.009766, 0.958984)
-    freezeOverlay:SetAlpha(0)
-    freezeOverlay:Hide()
-    frame.freezeOverlay = freezeOverlay
-
-    -- Backdrop frame: only this controls how tall the dark rectangle looks. Frame was 400 so content doesn't overlap.
-    local backdropHeight = 320 -- change this to crop the visible backdrop (e.g. 320 = shorter, 360 = taller)
-    local backdropFrame = CreateFrame("Frame", nil, frame)
-    backdropFrame:SetPoint("BOTTOM", frame, "BOTTOM", 0, 0)
-    backdropFrame:SetPoint("LEFT", frame, "LEFT", 0, 0)
-    backdropFrame:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
-    backdropFrame:SetHeight(backdropHeight)
-    backdropFrame:SetFrameLevel(frame:GetFrameLevel() - 1)
+    -- Flat dark face of the transparent design, in place of the stone
+    local backdropFrame = CreateFrame("Frame", nil, visual)
+    backdropFrame:SetSize(CARD_W, CARD_H) -- sized, not stuck to `visual`: it grows on hover with the rim
+    backdropFrame:SetPoint("CENTER", visual, "CENTER", 0, 0)
     frame.backdropFrame = backdropFrame
 
     if IsTransparentDesign() then
-        bg:Hide()
-        freezeOverlay:Hide()
+        frame.bg:Hide()
+        frame._fxNoFlip = true
         if backdropFrame.SetBackdrop then
             backdropFrame:SetBackdrop({
                 bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -1034,37 +1696,35 @@ local function AcquirePerkFrame(parent)
             backdropFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.95)
             backdropFrame:SetBackdropBorderColor(0, 0, 0, 1)
         end
-        -- Shrink hit area to match visible backdrop so the invisible top doesn't block Reroll/Hide/checkbox
-        local frameHeight = 400
-        frame:SetHitRectInsets(0, 0, frameHeight - backdropHeight, 0)
     else
         backdropFrame:Hide()
     end
 
-
-    local topPerkFrame = CreateFrame("Frame", nil, frame)
-    topPerkFrame:SetSize(200, 200)
-    topPerkFrame:SetPoint("TOP", frame, "TOP", -5, -140)
+    -- All the card's content; fades in once the card has turned over
+    local topPerkFrame = CreateFrame("Frame", nil, visual)
+    topPerkFrame:SetAllPoints(visual)
+    topPerkFrame:SetFrameLevel(visual:GetFrameLevel() + 3)
+    frame.content = topPerkFrame
 
     local iconFrame = CreateFrame("Frame", nil, topPerkFrame)
-    iconFrame:SetSize(26, 26)
-    iconFrame:SetPoint("TOP", topPerkFrame, "TOP", 0, -20)
+    iconFrame:SetSize(CardFx.ICON_SIZE, CardFx.ICON_SIZE)
+    iconFrame:SetPoint("CENTER", visual, "TOP", 0, CardFx.ICON_Y)
     frame.iconFrame = iconFrame
 
     local iconBase = iconFrame:CreateTexture(nil, "BACKGROUND")
-    iconBase:SetSize(124, 124)
-    iconBase:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
+    CardFx.PlaceArt(iconBase, visual)
     frame.iconBase = iconBase
 
     local icon = iconFrame:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("CENTER", iconFrame, "CENTER", 0, -3)
-    icon:SetSize(26, 26)
+    icon:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
+    icon:SetSize(CardFx.ICON_SIZE, CardFx.ICON_SIZE)
     frame.icon = icon
 
     local border = iconFrame:CreateTexture(nil, "OVERLAY")
-    border:SetSize(124, 124)
-    border:SetPoint("CENTER", iconFrame, "CENTER", 0, 0)
+    CardFx.PlaceArt(border, visual)
     frame.border = border
+
+    CardFx.BuildSwirl(frame, iconFrame)
 
     -- Freeze indicator (ice overlay texture)
     local freezeIndicator = iconFrame:CreateTexture(nil, "OVERLAY")
@@ -1075,25 +1735,32 @@ local function AcquirePerkFrame(parent)
     freezeIndicator:Hide()
     frame.freezeIndicator = freezeIndicator
 
-    -- Freeze status text (shown below name for frozen/carried cards)
+    -- Status line at the top of the card (the souvenir says what it is)
     local freezeStatusText = topPerkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    freezeStatusText:SetFont("Fonts\\ARIALN.TTF", 11)
-    freezeStatusText:SetPoint("TOP", frame, "TOP", -5, -116)
+    freezeStatusText:SetFont("Fonts\\ARIALN.TTF", 12)
+    freezeStatusText:SetPoint("TOP", visual, "TOP", 0, -9)
     freezeStatusText:SetWidth(170)
     freezeStatusText:SetJustifyH("CENTER")
     freezeStatusText:SetTextColor(0.4, 0.7, 1.0)
     freezeStatusText:Hide()
     frame.freezeStatusText = freezeStatusText
 
-    -- ElvUI-style fonts: Friz for titles, Arial Narrow for body
     local nameText = topPerkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    nameText:SetFont("Fonts\\FRIZQT__.TTF", 14)
-    nameText:SetPoint("TOP", frame, "TOP", -5, -100)
-    nameText:SetWidth(170)
+    nameText:SetFont("Fonts\\MORPHEUS.ttf", 20)
+    nameText:SetPoint("TOP", visual, "TOP", 0, -147)
+    nameText:SetWidth(192)
     nameText:SetJustifyH("CENTER")
+    nameText:SetShadowColor(0, 0, 0, 1)
+    nameText:SetShadowOffset(1, -1)
     frame.nameText = nameText
 
-    -- Owned counter: "xN" centered in the gap between title and icon
+    local rarityText = topPerkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    rarityText:SetFont("Fonts\\FRIZQT__.TTF", 10)
+    rarityText:SetPoint("TOP", nameText, "BOTTOM", 0, -3)
+    rarityText:SetTextColor(0.65, 0.61, 0.56)
+    frame.rarityText = rarityText
+
+    -- Owned counter, hidden since the owner removed it (2026-10-23): the tooltip's stack line says it
     local ownedFrame = CreateFrame("Frame", nil, topPerkFrame)
     ownedFrame:SetSize(50, 24)
     ownedFrame:SetPoint("BOTTOM", iconFrame, "TOP", 0, 18)
@@ -1105,34 +1772,47 @@ local function AcquirePerkFrame(parent)
     frame.ownedCountText = ownedCountText
 
     local descText = topPerkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    descText:SetFont("Fonts\\ARIALN.TTF", 12)
-    descText:SetPoint("TOP", topPerkFrame, "CENTER", 0, 35)
-    descText:SetWidth(140)
-    descText:SetHeight(90)
+    descText:SetFont("Fonts\\ARIALN.TTF", 13)
+    descText:SetPoint("TOP", rarityText, "BOTTOM", 0, -7)
+    descText:SetWidth(188)
+    descText:SetHeight(96)
     descText:SetJustifyH("CENTER")
     descText:SetJustifyV("TOP")
+    descText:SetTextColor(0.87, 0.83, 0.76)
     frame.descText = descText
+
+    -- "Select (3)" when the option asks for the count of picks left
+    local selectHint = topPerkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    selectHint:SetFont("Fonts\\FRIZQT__.TTF", 11)
+    selectHint:SetPoint("BOTTOM", visual, "BOTTOM", 0, 14)
+    selectHint:SetTextColor(0.87, 0.83, 0.76)
+    selectHint:Hide()
+    frame.selectHint = selectHint
+
+    CardFx.BuildOverlay(frame, visual, topPerkFrame)
 
     -- Spec badge: the echo's specialization as its talent-tab icon, round, in the skill
     -- tree's gold ring (assets/class_ring, 1.16 x the icon like a tree node), centred above
-    -- the echo's name. Hidden on echoes without a spec.
-    local specBadge = CreateFrame("Frame", nil, frame)
-    specBadge:SetSize(32, 32)
-    specBadge:SetPoint("TOP", frame, "TOP", 0, -56)
-    specBadge:SetFrameLevel(frame:GetFrameLevel() + 6)
+    -- on the top right of the echo's icon, anchored to the icon so it follows it when it grows on hover.
+    -- Hidden on echoes without a spec.
+    local specBadge = CreateFrame("Frame", nil, visual)
+    specBadge:SetSize(28, 28)
+    specBadge:SetPoint("CENTER", frame.icon, "TOPRIGHT", -6, -6)
+    specBadge:SetFrameLevel(visual:GetFrameLevel() + 6)
+    specBadge._card = frame
     local specGlow = specBadge:CreateTexture(nil, "BACKGROUND")
     specGlow:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
     specGlow:SetBlendMode("ADD")
     specGlow:SetVertexColor(1, 0.75, 0.1, 0.6)
     specGlow:SetPoint("CENTER", specBadge, "CENTER", 0, 0)
-    specGlow:SetSize(68, 68)
+    specGlow:SetSize(60, 60)
     local specIcon = specBadge:CreateTexture(nil, "ARTWORK")
     specIcon:SetAllPoints(specBadge)
     specBadge.icon = specIcon
     local specRing = specBadge:CreateTexture(nil, "OVERLAY")
     specRing:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\class_ring")
     specRing:SetPoint("CENTER", specBadge, "CENTER", 0, 0)
-    specRing:SetSize(32 * 1.16, 32 * 1.16)
+    specRing:SetSize(28 * 1.16, 28 * 1.16)
     specBadge:EnableMouse(true)
     specBadge:SetScript("OnEnter", function(self)
         if not self.specName then return end
@@ -1145,32 +1825,28 @@ local function AcquirePerkFrame(parent)
     specBadge:Hide()
     frame.specBadge = specBadge
 
-    -- Invisible blocker behind buttons to prevent card tooltip when moving between them
-    local buttonBlocker = CreateFrame("Frame", nil, frame)
-    buttonBlocker:SetPoint("BOTTOM", frame, "BOTTOM", 0, 0)
-    buttonBlocker:SetSize(140, 100)
-    buttonBlocker:SetFrameLevel(frame:GetFrameLevel() + 5)
-    buttonBlocker:EnableMouse(true)
-    buttonBlocker:SetScript("OnEnter", function() GameTooltip:Hide() end)
-    frame.buttonBlocker = buttonBlocker
-
-    local selectButton = utils.CreateSimpleCustomButton(frame, "Select", nil, 130, 29)
-    selectButton:SetPoint("BOTTOM", frame, "BOTTOM", 0, 90)
-    selectButton:SetFrameLevel(buttonBlocker:GetFrameLevel() + 5)
-    selectButton:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Select", 1, 1, 1)
-        GameTooltip:AddLine("Choose this perk for your current run.", nil, nil, nil, true)
-        GameTooltip:Show()
+    -- The whole card is the Select button: invisible and stretched over the card, so every rule of a pick
+    -- (the grace time, the spec question, the EnableMouse switches below) stays where it was. Its mouse
+    -- also covers the frame, so the frame's right-click (chat link) has to be passed down.
+    local selectButton = utils.CreateSimpleCustomButton(frame, "Select", nil, CARD_W, CARD_H)
+    selectButton:ClearAllPoints()
+    selectButton:SetAllPoints(frame)
+    selectButton:SetFrameLevel(frame:GetFrameLevel() + 3)
+    selectButton:SetAlpha(0)
+    selectButton._card = frame
+    selectButton:SetScript("OnMouseDown", function(_, button)
+        local handler = frame:GetScript("OnMouseDown")
+        if handler then handler(frame, button) end
     end)
-    selectButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
     frame.selectButton = selectButton
 
-    -- Per-card Freeze button (text button below select, mirrors banish style)
-    local freezeCardButton = utils.CreateSimpleCustomButton(frame, "Freeze", nil, 130, 29,
+    -- Freeze and Banish: side by side at the bottom of the card, shown on hover (CardFx sets their alpha)
+    local freezeCardButton = utils.CreateSimpleCustomButton(visual, "Freeze", nil, 96, 24,
         "Interface\\AddOns\\ProjectEbonhold\\assets\\128redbutton9sliced_blue")
-    freezeCardButton:SetPoint("TOP", selectButton, "BOTTOM", 0, -5)
-    freezeCardButton:SetFrameLevel(buttonBlocker:GetFrameLevel() + 5)
+    freezeCardButton:SetPoint("BOTTOMRIGHT", visual, "BOTTOM", -2, 9)
+    freezeCardButton:SetFrameLevel(visual:GetFrameLevel() + 8)
+    freezeCardButton:SetAlpha(0)
+    freezeCardButton._card = frame
     freezeCardButton:Hide()
     freezeCardButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1198,9 +1874,7 @@ local function AcquirePerkFrame(parent)
             if runData then
                 runData.usedFreezes = (runData.usedFreezes or 0) + 1
             end
-            ApplyFreezeVisual(frame, true)
-            freezeCardButton:Hide()
-            freezeCardButton:EnableMouse(false)
+            ApplyFreezeVisual(frame)
             UpdateFreezeButtons()
             UpdateBanishButtons()
         end
@@ -1208,11 +1882,13 @@ local function AcquirePerkFrame(parent)
 
     frame.freezeCardButton = freezeCardButton
 
-    -- Per-card Banish button (below freeze, purple texture)
-    local banishCardButton = utils.CreateSimpleCustomButton(frame, "Banish", nil, 130, 29,
+    -- Per-card Banish button (next to freeze, purple texture)
+    local banishCardButton = utils.CreateSimpleCustomButton(visual, "Banish", nil, 96, 24,
         "Interface\\AddOns\\ProjectEbonhold\\assets\\128redbutton9sliced_purple")
-    banishCardButton:SetPoint("TOP", freezeCardButton, "BOTTOM", 0, -5)
-    banishCardButton:SetFrameLevel(buttonBlocker:GetFrameLevel() + 5)
+    banishCardButton:SetPoint("BOTTOMLEFT", visual, "BOTTOM", 2, 9)
+    banishCardButton:SetFrameLevel(visual:GetFrameLevel() + 8)
+    banishCardButton:SetAlpha(0)
+    banishCardButton._card = frame
     banishCardButton:Hide()
     banishCardButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1379,6 +2055,9 @@ local function AcquirePerkFrame(parent)
             for _, d in ipairs(memoryDeck) do d:EnableMouse(false) end
         end
         local success = ProjectEbonhold.PerkService.SelectPerk(frame._spellId)
+        if success and not (frame._perkData and frame._perkData.isGuaranteed) then
+            CardFx.PlayPick(frame)
+        end
         if not success then
             isSelecting = false
             for _, f in ipairs(perkFramePool) do
@@ -1424,44 +2103,6 @@ local function AcquirePerkFrame(parent)
             UpdateFreezeButtons()
         end
     end)
-
-    frame:SetScript("OnEnter", function(self)
-        local qd = self._qualityData or qualityInfo[0]
-        GameTooltip:SetOwner(self.iconFrame, "ANCHOR_RIGHT")
-        GameTooltip:ClearLines()
-        local sName = GetSpellInfo(self._spellId or 0)
-        GameTooltip:AddLine(sName or ("Spell " .. tostring(self._spellId)), qd.color[1], qd.color[2], qd.color[3])
-        GameTooltip:AddLine(qd.name, 0.5, 0.5, 0.5)
-        if self._perkData and self._perkData.isGuaranteed then
-            -- The choice itself is spelled out under the cards (memoryHint)
-            GameTooltip:AddLine("Souvenir from your previous build", 1, 0.82, 0.1)
-        end
-        local svcRule = ProjectEbonhold.PerkService
-            and ProjectEbonhold.PerkService.GetActiveEchoLoadoutRule
-        local rule = svcRule and svcRule(self._spellId)
-        if rule == "avoid" then
-            GameTooltip:AddLine("Your build refuses this echo", 1, 0.25, 0.25)
-            GameTooltip:AddLine("It is never taken for you. Take it yourself if you changed your mind.", 0.8, 0.6, 0.6, true)
-        elseif rule == "want" then
-            GameTooltip:AddLine("Wanted by your build", 0.1, 1, 0.1)
-        end
-        local st = self._stacks or 1
-        local ms = self._maxStacks or 1
-        if st > 1 then
-            GameTooltip:AddLine("Stacks: " .. st .. "/" .. ms, 1, 1, 1)
-        end
-        GameTooltip:AddLine(" ")
-        local description = utils.GetSpellDescription(self._spellId, 500, st)
-        GameTooltip:AddLine(description, 1, 0.82, 0, true)
-        -- stat echoes have their stat line instead (owner 2026-10-23)
-        local okStats, stats = pcall(GetEchoStats, self._spellId, description)
-        if (self._ownedCount or 0) >= 1 and not (okStats and stats and next(stats)) then
-            pcall(AddEchoStackLine, GameTooltip, self._spellId, self._ownedCount)
-        end
-        AddEchoStatLines(GameTooltip, self._spellId, description)
-        GameTooltip:Show()
-    end)
-    frame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
 
     frame.inUse = true
     table.insert(perkFramePool, frame)
@@ -1562,7 +2203,7 @@ local function ApplyLoadoutHighlight(frame, spellId)
             local star = ov:CreateTexture(nil, "OVERLAY")
             star:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")
             star:SetSize(16, 16)
-            star:SetPoint("TOPRIGHT", frame.icon, "TOPRIGHT", 8, 8)
+            star:SetPoint("TOPLEFT", frame.icon, "TOPLEFT", -8, 8) -- top right is the spec badge
             frame.loadoutStar = star
         end
         local iw = frame.icon and frame.icon:GetWidth() or 0
@@ -1613,7 +2254,9 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
         frame.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
     end
     frame.nameText:SetText(spellName or ("Spell " .. spellId))
-    frame.nameText:SetTextColor(unpack(qualityData.color))
+    frame.nameText:SetTextColor(unpack(qualityData.text or qualityData.color))
+    frame.rarityText:SetText(string.upper(qualityData.name))
+    frame._fxHiddenUntil = nil
     -- Reset locally-frozen flag; will be re-applied below if still frozen
     frame._locallyFrozen = false
     local isFrozenCard = perkData.justFrozen or perkData.isFrozen or perkData.isCarried
@@ -1627,15 +2270,7 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
             ClearFreezeVisual(frame)
         end
     end
-    -- Swap card background texture for frozen cards
-    if frame.bg then
-        if isFrozenCard then
-            frame.bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk_freeze")
-        else
-            frame.bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk")
-        end
-    end
-    local description = utils.GetSpellDescription(spellId, 120)
+    local description = utils.GetSpellDescription(spellId, 200)
     frame.descText:SetText(description)
 
     if frame.specBadge then
@@ -1679,11 +2314,14 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
         0
     frame.selectButton.text:SetText(GetSelectLabel(rollsCount))
     frame.selectButton.text:SetTextColor(1, 1, 1)
+    CardFx.SetSelectHint(frame, IsPerkShowSelectCountEnabled() and GetSelectLabel(rollsCount) or nil)
 
     -- Dynamic data stored as frame properties; handlers registered once in AcquirePerkFrame read these.
     frame._spellId = spellId
     frame._perkIndex = perkIndex
     frame._qualityData = qualityData
+    frame._fxQuality = quality
+    CardFx.Paint(frame, isFrozenCard)
     frame._stacks = stacks
     frame._maxStacks = maxStacks
     frame._perkData = perkData
@@ -1745,6 +2383,7 @@ local function InitializePerkUI()
     if perkMainFrame then return end
 
     perkMainFrame = CreateFrame("Frame", "ProjectEbonholdPerkFrame", UIParent)
+    ProjectEbonhold.GuidedTour.BarAlerts.SetBlocker(perkMainFrame)
     perkMainFrame:SetFrameStrata("DIALOG")
     perkMainFrame:SetFrameLevel(100)
     perkMainFrame:SetSize(800, 280)
@@ -1754,6 +2393,8 @@ local function InitializePerkUI()
 
     perkMainFrame:SetScript("OnUpdate", function(self, elapsed)
         if not self:IsShown() then return end
+
+        CardFx.Update(elapsed)
 
         self.banishPollElapsed = (self.banishPollElapsed or 0) + elapsed
         if self.banishPollElapsed >= 0.2 then
@@ -1768,6 +2409,7 @@ local function InitializePerkUI()
                 for _, f in ipairs(perkFramePool) do
                     if f.inUse and f.selectButton and f.selectButton.text then
                         f.selectButton.text:SetText(label)
+                        CardFx.SetSelectHint(f, IsPerkShowSelectCountEnabled() and label or nil)
                     end
                 end
             end
@@ -1797,16 +2439,16 @@ local function InitializePerkUI()
 
     rerollButton = utils.CreateSimpleCustomButton(perkMainFrame, "Reroll", nil, 160, 35)
     rerollButton:SetPoint("CENTER", perkMainFrame, "CENTER", 0, 310)
-    -- Red hover glow (manual overlay so it never gets lost; match banish darkness)
-    local rerollGlow = rerollButton:CreateTexture(nil, "OVERLAY")
-    rerollGlow:SetAllPoints(rerollButton)
-    rerollGlow:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
-    rerollGlow:SetBlendMode("ADD")
-    -- Tinted by ApplyRerollSkin: red for the run's reroll, mauve for an orb reroll.
-    rerollGlow:SetVertexColor(0.5, 0.14, 0.14, 0.4)
-    rerollGlow:Hide()
-    rerollButton._rerollGlow = rerollGlow
     if IsTransparentDesign() then
+        -- Red hover glow (manual overlay so it never gets lost; match banish darkness)
+        local rerollGlow = rerollButton:CreateTexture(nil, "OVERLAY")
+        rerollGlow:SetAllPoints(rerollButton)
+        rerollGlow:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+        rerollGlow:SetBlendMode("ADD")
+        -- Tinted by ApplyRerollSkin: red for the run's reroll, mauve for an orb reroll.
+        rerollGlow:SetVertexColor(0.5, 0.14, 0.14, 0.4)
+        rerollGlow:Hide()
+        rerollButton._rerollGlow = rerollGlow
         local function hideTex(t)
             if t then
                 t:Hide()
@@ -1830,6 +2472,8 @@ local function InitializePerkUI()
             rerollButton:SetBackdropBorderColor(0, 0, 0, 1)
         end
         if rerollButton.text then rerollButton.text:SetFontObject("GameFontNormalSmall") end
+    else
+        MakePlate(rerollButton, 160, 36, 13)
     end
     rerollButton:SetScript("OnEnter", function(self)
         if self:IsEnabled() then
@@ -1891,17 +2535,19 @@ local function InitializePerkUI()
     rerollButton:Hide()
 
     hideButton = CreateFrame("Button", "PerkHideButton", perkMainFrame)
-    hideButton:SetSize(200, 100)
-    hideButton:SetPoint("TOP", perkMainFrame, "BOTTOM", 0, -25)
+    hideButton:SetSize(120, 27)
+    -- Under the middle card, just clear of its bottom edge (-100) and level with the outer cards' (-114)
+    hideButton:SetPoint("TOP", perkMainFrame, "BOTTOM", 0, 22)
     hideButton:RegisterForClicks("LeftButtonUp")
     hideButton:Hide()
 
+    local hideButtonText = hideButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    hideButtonText:SetPoint("CENTER", hideButton, "CENTER", 0, 0)
+    hideButtonText:SetTextColor(0.7, 0.7, 0.7)
+    hideButton.text = hideButtonText
+
     if IsTransparentDesign() then
         hideButton:SetSize(120, 25)
-        local hideButtonText = hideButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        hideButtonText:SetPoint("CENTER", hideButton, "CENTER", 0, 0)
-        hideButton.text = hideButtonText
-        hideButtonText:SetTextColor(0.7, 0.7, 0.7)
         if hideButton.SetBackdrop then
             hideButton:SetBackdrop({
                 bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -1915,37 +2561,13 @@ local function InitializePerkUI()
             hideButton:SetBackdropBorderColor(0, 0, 0, 1)
         end
     else
-        local hideButtonTexture = hideButton:CreateTexture(nil, "BACKGROUND")
-        hideButtonTexture:SetAllPoints(hideButton)
-        hideButtonTexture:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\button_hide_perk")
-        hideButtonTexture:SetTexCoord(0, 1, 0.30, 0.80)
-
-        local glowTexture = hideButton:CreateTexture(nil, "ARTWORK")
-        glowTexture:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
-        glowTexture:SetBlendMode("ADD")
-        glowTexture:SetPoint("CENTER", hideButton, "CENTER", 0, 0)
-        glowTexture:SetSize(220, 110)
-        glowTexture:SetVertexColor(0.3, 0.3, 0.3, 0.4)
-        hideButton.glowTexture = glowTexture
-
-        hideButton.flameParticles = {}
-        for i = 1, 12 do
-            local particle = hideButton:CreateTexture(nil, "OVERLAY")
-            particle:SetTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-            particle:SetBlendMode("ADD")
-            particle:SetSize(18, 18)
-            particle:SetVertexColor(0.6, 0.6, 0.6, 0)
-            table.insert(hideButton.flameParticles, {
-                texture = particle,
-                life = math.random() * 2,
-                xOffset = (math.random() - 0.5) * 80,
-                speed = 30 + math.random() * 20
-            })
-        end
-
-        local hideButtonText = hideButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        hideButtonText:SetPoint("CENTER", hideButton, "CENTER", 0, 10)
-        hideButton.text = hideButtonText
+        -- The Button has no stock textures: MakePlate's clearing loop must not trip on them
+        hideButton:SetNormalTexture("Interface\\Buttons\\WHITE8X8")
+        hideButton:SetPushedTexture("Interface\\Buttons\\WHITE8X8")
+        hideButton:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
+        hideButton:SetDisabledTexture("Interface\\Buttons\\WHITE8X8")
+        MakePlate(hideButton, 120, 27, 12)
+        PaintPlate(hideButton, HIDE_PLATE, "rest")
     end
     hideButton:SetFrameLevel(perkMainFrame:GetFrameLevel() + 20)
 
@@ -2232,10 +2854,17 @@ local function InitializePerkUI()
                 perkMainFrame._hintWasShown = false
             end
         end
+        hideButton.text:SetTextColor(1, 1, 1) -- the cursor is still on it
     end)
 
-    hideButton:SetScript("OnEnter", function() hideButton.text:SetTextColor(0.7, 0.7, 0.7) end)
-    hideButton:SetScript("OnLeave", function() hideButton.text:SetTextColor(1, 1, 1) end)
+    hideButton:SetScript("OnEnter", function()
+        hideButton.text:SetTextColor(1, 1, 1)
+        if hideButton._plateStock then PaintPlate(hideButton, HIDE_PLATE_HOT, "hover") end
+    end)
+    hideButton:SetScript("OnLeave", function()
+        hideButton.text:SetTextColor(0.7, 0.7, 0.7)
+        if hideButton._plateStock then PaintPlate(hideButton, HIDE_PLATE, "rest") end
+    end)
 end
 
 local function ForceResetPerkUI()
@@ -2331,7 +2960,7 @@ end
 -- REQUEST_PERK_MEMORY_DRAW: the souvenir is lost for the climb and the server
 -- answers with the three random cards revealed. Three face-down cards stand
 -- where those will land, so the choice reads as "this echo, or those three".
-local MEMORY_CARD_PITCH = 202
+local MEMORY_CARD_PITCH = CARD_PITCH
 local MEMORY_GAP = 30
 -- (memoryDeck / memoryHint / memoryStageShown /
 --  pendingMemoryReveal are declared at the top of the file)
@@ -2353,17 +2982,13 @@ end
 function GetMemoryDeckCard(i)
     if memoryDeck[i] then return memoryDeck[i] end
     local f = CreateFrame("Frame", nil, perkMainFrame)
-    f:SetSize(200, 400)
+    f:SetSize(CARD_W, CARD_H)
     f:SetFrameLevel(perkMainFrame:GetFrameLevel() + 1)
 
     local body = CreateFrame("Frame", nil, f)
-    body:SetPoint("BOTTOM", f, "BOTTOM", 0, 0)
-    body:SetPoint("LEFT", f, "LEFT", 0, 0)
-    body:SetPoint("RIGHT", f, "RIGHT", 0, 0)
-    body:SetHeight(320)
+    body:SetAllPoints(f)
     f.body = body
-    -- Same background as the echo cards themselves (AcquirePerkFrame): the
-    -- dark backdrop of the transparent design, or the card art of the classic one
+    -- The dark backdrop of the transparent design, or the back of a card
     if IsTransparentDesign() then
         body:SetBackdrop({
             bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -2378,8 +3003,7 @@ function GetMemoryDeckCard(i)
     else
         local bg = f:CreateTexture(nil, "BACKGROUND")
         bg:SetAllPoints(f)
-        bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\background_one_perk")
-        bg:SetTexCoord(0.226562, 0.746094, 0.009766, 0.958984)
+        bg:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\echo_card_back")
         f.bg = bg
     end
 
@@ -2389,7 +3013,7 @@ function GetMemoryDeckCard(i)
     swirl:SetBlendMode("ADD")
     swirl:SetVertexColor(0.45, 0.55, 0.9, 0.35)
     swirl:SetSize(150, 150)
-    swirl:SetPoint("CENTER", f, "TOP", -5, -173)
+    swirl:SetPoint("CENTER", f, "CENTER", 0, 0)
     local spin = swirl:CreateAnimationGroup()
     spin:SetLooping("REPEAT")
     local rot = spin:CreateAnimation("Rotation")
@@ -2403,18 +3027,18 @@ function GetMemoryDeckCard(i)
     -- one path to change for another picture.
     local MEMORY_DECK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
     local iconBase = body:CreateTexture(nil, "BACKGROUND", nil, 2)
-    iconBase:SetSize(124, 124)
-    iconBase:SetPoint("CENTER", f, "TOP", -5, -173) -- where a card's iconFrame sits (topPerkFrame TOP -140, iconFrame TOP -20)
+    iconBase:SetSize(200, 200)
+    iconBase:SetPoint("CENTER", f, "CENTER", 0, 0)
     iconBase:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\perk_quality_0")
     local mark = body:CreateTexture(nil, "ARTWORK", nil, 1)
-    mark:SetSize(26, 26)
-    mark:SetPoint("CENTER", f, "TOP", -5, -176)
+    mark:SetSize(42, 42)
+    mark:SetPoint("CENTER", f, "CENTER", 0, -4)
     SetPortraitToTexture(mark, MEMORY_DECK_ICON)
     mark:SetDesaturated(true)
     mark:SetVertexColor(0.75, 0.8, 1)
     local ring = body:CreateTexture(nil, "OVERLAY")
-    ring:SetSize(124, 124)
-    ring:SetPoint("CENTER", f, "TOP", -5, -173)
+    ring:SetSize(200, 200)
+    ring:SetPoint("CENTER", f, "CENTER", 0, 0)
     ring:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\perk_border_quality_0")
     f.mark = mark
 
@@ -2640,13 +3264,13 @@ function LayoutMemoryStage(choices)
     end
 
     for i, f in ipairs(carried) do
-        if i <= 3 then PlaceCard(f, MemoryRowOffset(i - 1), 100) end
+        if i <= 3 then PlaceCard(f, MemoryRowOffset(i - 1), CARD_ROW_Y) end
     end
     local deckCount = 0
     for slot = #carried, 2 do
         deckCount = deckCount + 1
         local d = GetMemoryDeckCard(deckCount)
-        PlaceCard(d, MemoryRowOffset(slot), 100)
+        PlaceCard(d, MemoryRowOffset(slot), CARD_ROW_Y)
         d:SetAlpha(1)
         d:EnableMouse(true)
         d:Show()
@@ -2654,7 +3278,7 @@ function LayoutMemoryStage(choices)
     for i = deckCount + 1, #memoryDeck do memoryDeck[i]:Hide() end
 
     if souvenir then
-        PlaceCard(souvenir, MemoryRowOffset(3), 100)
+        PlaceCard(souvenir, MemoryRowOffset(3), CARD_ROW_Y)
     end
 
     -- Always visible, no hover needed: what the fourth card is and what the choice costs
@@ -2721,7 +3345,7 @@ local function ShowPerkUI(choices, isRerollRepopulate)
         memoryStageShown = ChoicesAreMemoryStage(choices)
         HideMemoryDeck()
         local layoutCount = memoryStageShown and 4 or perkCount
-        local frameWidth = (layoutCount * 180) + ((layoutCount - 1) * 22) + 40 + (memoryStageShown and MEMORY_GAP or 0)
+        local frameWidth = (layoutCount * CARD_PITCH) + 40 + (memoryStageShown and MEMORY_GAP or 0)
         perkMainFrame:SetWidth(frameWidth)
 
         local remainingBanishes = GetBanishInfo()
@@ -2731,11 +3355,13 @@ local function ShowPerkUI(choices, isRerollRepopulate)
             if not perkFrame then break end
             UpdatePerkFrame(perkFrame, perkData, i - 1)
 
-            local xOffset = ((i - 1) - ((perkCount - 1) / 2)) * 202
-            PlaceCard(perkFrame, xOffset, 100)
+            -- A slight arc: the further from the middle, the lower. Nothing leans, the client can't turn text.
+            local fromMiddle = (i - 1) - ((perkCount - 1) / 2)
+            PlaceCard(perkFrame, fromMiddle * CARD_PITCH, CARD_ROW_Y - math.abs(fromMiddle) * CARD_ARC)
 
             if autoReveal then
                 perkFrame:SetAlpha(1)
+                CardFx.Start(perkFrame, 0) -- or the finished card shows for one frame before the deal
                 perkFrame:Show()
                 perkFrame:EnableMouse(true)
                 perkFrame.selectButton:EnableMouse(true)
@@ -2766,7 +3392,7 @@ local function ShowPerkUI(choices, isRerollRepopulate)
             local anchor = middleCard.backdropFrame or middleCard
             autoShowCB:ClearAllPoints()
             autoShowCB:SetParent(anchor)
-            autoShowCB:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -5)
+            autoShowCB:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -18) -- on the Hide/Show row, below the outer cards
         end
 
         RefreshRerollButton()
@@ -2878,7 +3504,9 @@ ProjectEbonhold.PerkUI.UpdateSinglePerk = function(perkIndex, perkData)
     if not perkData then return end
     for _, f in ipairs(perkFramePool) do
         if f.inUse and f.perkIndex == perkIndex then
+            local newEcho = f._spellId ~= perkData.spellId
             UpdatePerkFrame(f, perkData, perkIndex)
+            if newEcho then CardFx.StartFlip(f) end
             UpdateBanishButtons()
             UpdateFreezeButtons()
             return
@@ -2900,6 +3528,7 @@ ProjectEbonhold.PerkUI.ResetSelection = function()
     isSelecting = false
     for _, f in ipairs(perkFramePool) do
         if f.inUse then
+            f._fxHiddenUntil = nil -- the pick was refused: the card comes back
             f:EnableMouse(true)
             f.selectButton:EnableMouse(true)
             if f.banishCardButton then f.banishCardButton:EnableMouse(true) end

@@ -147,6 +147,8 @@ WatchFrame:SetScript("OnUpdate", function(self, elapsed)
     if watchSince < 0.25 then return end
     watchSince = 0
     if not UIParent:IsShown() then return end
+    -- placed by Edit Mode (modules/editMode/edit_mode.lua), which keeps it there itself
+    if self.ebhEditModePlaced then return end
     -- WatchFrame holds the secure quest-item buttons, so it is protected: an addon SetPoint in
     -- combat is refused (4x a second, "Interface action failed because of an AddOn"). Wait.
     if InCombatLockdown() then return end
@@ -1983,6 +1985,9 @@ local function UpdatePlayerRunData(data)
     end
 
     if playerRunFrame.soulShardsText and data.soulShards ~= nil then
+        -- the counter rose while we watched it: what the first packet says is not a gain
+        local lastShards = playerRunFrame.currentSoulShards
+        if lastShards and data.soulShards > lastShards then playerRunFrame.gainedSoulShards = true end
         playerRunFrame.currentSoulShards = data.soulShards
         playerRunFrame.soulShardsText:SetText(string.format("|cffffffff%s|r",
             ProjectEbonhold.FormatThousands(data.soulShards)))
@@ -2226,7 +2231,8 @@ local hudTips = {
         }),
     },
     {
-        when = function() return (playerRunFrame.currentSoulShards or 0) > 0 end,
+        -- the first gain, not a run that already holds some when the HUD loads
+        when = function() return playerRunFrame.gainedSoulShards end,
         tour = HudTip("seenHudTipShards", {
             title = "Soul Shards",
             -- server sources: ContentCatalogueMgr::PayClear (the clear: every boss dead, via
@@ -2327,10 +2333,23 @@ EvaluateHudTips = function()
     if not hudTipsReady or not playerRunFrame or not playerRunFrame:IsShown() then return end
     if HudTipsAllSeen() then return end
     if ProjectEbonhold.GuidedTour.AnyActive() then return end
+    -- these two cover the spot of a tip, which comes back when they close
+    if EbonholdHardcoreUnlockAlert and EbonholdHardcoreUnlockAlert:IsShown() then return end
+    if WorldChannelPopupFrame and WorldChannelPopupFrame:IsShown() then return end
     for _, tip in ipairs(hudTips) do
         if not tip.tour:HasSeen() and tip.when() then
             if tip.tour:MaybeStart() then return end
         end
+    end
+end
+
+ProjectEbonhold.EvaluateHudTips = EvaluateHudTips
+
+-- A window opened over a tip already showing: the tip steps aside, not burnt, and is
+-- offered again when EvaluateHudTips next lets it.
+function ProjectEbonhold.PauseHudTips()
+    for _, tip in ipairs(hudTips) do
+        if tip.tour:IsActive() then tip.tour:Stop(false) end
     end
 end
 

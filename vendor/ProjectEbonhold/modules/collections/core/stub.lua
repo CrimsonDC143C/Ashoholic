@@ -183,7 +183,7 @@ ez.AceAddon = {
     -- Was a noop: the wardrobe's item-cache tickers (0.1 s) then never stopped, and a
     -- new one started each time an item was missing from the cache.
     CancelTimer = function(_, handle)
-        if type(handle) == "table" and handle.Cancel then handle.Cancel() end
+        if type(handle) == "table" and handle.Cancel then handle:Cancel() end
     end,
     CancelAllTimers = noop,
 }

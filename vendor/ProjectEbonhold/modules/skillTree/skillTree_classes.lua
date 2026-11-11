@@ -73,6 +73,16 @@ CT.pending = {}
 
 function CT.HasPending() return next(CT.pending) ~= nil end
 
+-- Apply sends one message per pending node plus the whole loadout (about 32 messages for a full
+-- common tree) in a single frame, and the server kicks past 50 (CheckAndKickSpam).
+local MAX_PENDING = 15
+
+local function pendingCount()
+    local n = 0
+    for _ in pairs(CT.pending) do n = n + 1 end
+    return n
+end
+
 -- Owned, or selected for the next Apply: everything (chain, level gate, visuals) reads this.
 function CT.Has(nodeId) return (CT.owned[nodeId] or CT.pending[nodeId]) and true or false end
 
@@ -191,6 +201,10 @@ function CT.OnClick(btn, button)
 
     if button ~= "LeftButton" then return end
     if btn.state ~= "ready" or CT.Has(btn.id) then return end
+    if pendingCount() >= MAX_PENDING then
+        UIErrorsFrame:AddMessage("Apply your changes before selecting more class nodes.", 1, 0.3, 0.3)
+        return
+    end
 
     CT.pending[btn.id] = true
     ST.PoolAdd("ash", -nodeCost(btn))

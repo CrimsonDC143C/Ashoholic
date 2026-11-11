@@ -35,20 +35,20 @@ AnchorSkillsTab()
 hooksecurefunc("PetPaperDollFrame_UpdateIsAvailable", AnchorSkillsTab)
 
 -- ToggleCharacter("ReputationFrame") est le seul point d'entree du panneau : raccourci
--- TOGGLECHARACTER2 (Bindings.xml) et clic sur la barre de reputation. Il ne fait plus rien.
-local ToggleCharacter_Orig = ToggleCharacter
-function ToggleCharacter(tab)
-    if tab == "ReputationFrame" then return end
-    return ToggleCharacter_Orig(tab)
-end
+-- TOGGLECHARACTER2 (Bindings.xml) et clic sur la barre de reputation. ToggleCharacter
+-- ignore un sous-cadre marque .hidden : il ne fait plus rien.
+-- Ne jamais remplacer ToggleCharacter : CharacterFrame est protege (CompanionButtonTemplate
+-- de PetPaperDollFrame), une version addon fait bloquer son ouverture en combat
+-- ("Interface action failed because of an AddOn", 2026-11-03).
+ReputationFrame.hidden = true
 
 -- CharacterFrame_TabBoundsCheck (FrameXML, appele a l'OnShow de chaque onglet) additionne
 -- la largeur des cinq onglets pour decider s'il faut retrecir les textes ; l'onglet cache
--- ne doit plus compter, sinon les autres retrecissent pour une place vide. Copie de
--- l'original avec ce seul filtre.
+-- ne doit plus compter, sinon les autres retrecissent pour une place vide. Refait apres
+-- l'original (hooksecurefunc, pas de remplacement) avec ce seul filtre.
 local NUM_TABS, MAX_WIDTH = 5, 465
 local sorted = {}
-function CharacterFrame_TabBoundsCheck(self)
+local function TabBoundsCheck(self)
     if string.sub(self:GetName(), 1, 17) ~= "CharacterFrameTab" then return end
     local totalSize = 60
     for i = 1, NUM_TABS do
@@ -76,3 +76,4 @@ function CharacterFrame_TabBoundsCheck(self)
         end
     end
 end
+hooksecurefunc("CharacterFrame_TabBoundsCheck", TabBoundsCheck)

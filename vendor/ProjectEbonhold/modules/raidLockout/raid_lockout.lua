@@ -6,14 +6,30 @@
 --
 -- Shown in the stock Raid Information window (Social, Raid, Raid Info): the 3.3.5 client can only
 -- list one line per raid ID there, so this module replaces the window's list with its own: every
--- raid with at least one boss looted, "looted / total", and a click opens its bosses.
+-- open raid with the item level of its Normal gear, highest first, "looted / total", and a click
+-- opens its bosses. A raid outside the list still shows once one of its bosses is looted.
 -- Boss names and order come from raid_lockout_data.lua (generated from the DBC).
 -- ==============================================================================
 ProjectEbonhold = ProjectEbonhold or {}
 local RL = {}
 ProjectEbonhold.RaidLockout = RL
 
-local DATA = ProjectEbonhold.RaidLockoutData or {}
+local DATA = {}
+for i, raid in ipairs(ProjectEbonhold.RaidLockoutData or {}) do
+    DATA[i] = raid
+    raid.order = i
+end
+table.sort(DATA, function(a, b)
+    local levelA, levelB = a.ilvl or 0, b.ilvl or 0
+    if levelA ~= levelB then return levelA > levelB end
+    return a.order < b.order
+end)
+
+-- The realm's release, known once the server has answered (raid_finder.lua keeps it).
+local function CurrentRelease()
+    local finder = ProjectEbonhold.RaidFinder
+    return finder and finder.GetRelease and finder.GetRelease() or nil
+end
 
 -- [encounter id] = GetTime() at which the lock ends
 local locks = {}
@@ -43,7 +59,8 @@ end
 -- ------------------------------------------------------------------ window content
 local ROW_RAID = 20
 local ROW_BOSS = 15
-local content, scroll, child, footer, empty
+local ROW_NOTE = 18
+local content, scroll, child, footer, empty, note
 local rows = {}
 
 local function BuildContent()
@@ -66,6 +83,12 @@ local function BuildContent()
     empty:SetPoint("RIGHT", -4, 0)
     empty:SetJustifyH("LEFT")
     empty:SetText("You have not looted any raid boss this week.")
+
+    note = child:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    note:SetPoint("TOPLEFT", child, "TOPLEFT", 2, -2)
+    note:SetPoint("RIGHT", child, "RIGHT", -2, 0)
+    note:SetJustifyH("LEFT")
+    note:SetText("Item level of the gear on Normal difficulty.")
 
     footer = RaidInfoFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     footer:SetPoint("BOTTOMLEFT", RaidInfoFrame, "BOTTOMLEFT", 18, 18)
@@ -109,7 +132,8 @@ local function SetRaidRow(row, raid, looted, y)
     row.name:SetFontObject(GameFontNormal)
     row.name:SetText((expanded[raid.map] and "- " or "+ ") .. raid.name)
     row.state:SetFontObject(GameFontHighlight)
-    row.state:SetText(looted .. "/" .. #raid.bosses)
+    local count = looted .. "/" .. #raid.bosses
+    row.state:SetText(raid.ilvl and ("|cffffd100ilvl " .. raid.ilvl .. "|r   " .. count) or count)
     row:EnableMouse(true)
     row:Show()
 end
@@ -134,7 +158,8 @@ function RL.Refresh()
     BuildContent()
     if not content then return end
 
-    local n, y, soonest = 0, 0, nil
+    local release = CurrentRelease()
+    local n, y, soonest = 0, ROW_NOTE, nil
     for _, raid in ipairs(DATA) do
         local looted = 0
         for _, boss in ipairs(raid.bosses) do
@@ -144,7 +169,7 @@ function RL.Refresh()
                 if not soonest or left < soonest then soonest = left end
             end
         end
-        if looted > 0 then
+        if looted > 0 or (release and raid.release and raid.release <= release) then
             n = n + 1
             SetRaidRow(Row(n), raid, looted, y)
             y = y + ROW_RAID
@@ -161,7 +186,13 @@ function RL.Refresh()
     for i = n + 1, #rows do rows[i]:Hide() end
 
     child:SetHeight(math.max(y, 1))
-    if n == 0 then empty:Show() else empty:Hide() end
+    if n == 0 then
+        empty:Show()
+        note:Hide()
+    else
+        empty:Hide()
+        note:Show()
+    end
 
     if soonest then
         footer:SetText("Each boss can be looted once a week. Resets in " .. FormatLeft(soonest) .. ".")
@@ -177,9 +208,13 @@ local function OnRaidInfoShow()
         if frame then frame:Hide() end
     end
     if RaidInfoInstanceLabel and RaidInfoInstanceLabel.text then RaidInfoInstanceLabel.text:SetText("Raid") end
-    if RaidInfoIDLabel and RaidInfoIDLabel.text then RaidInfoIDLabel.text:SetText("Bosses looted") end
+    if RaidInfoIDLabel and RaidInfoIDLabel.text then RaidInfoIDLabel.text:SetText("Item level, looted") end
     RL.Refresh()
     if RequestRaidInfo then RequestRaidInfo() end
+    -- The answer carries the realm's release, which opens the raid list (raid_finder.lua calls Refresh).
+    if not CurrentRelease() and ProjectEbonhold.sendToServer and ProjectEbonhold.CS and ProjectEbonhold.CS.REQUEST_RAID_FINDER_DATA then
+        ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_RAID_FINDER_DATA, "")
+    end
 end
 
 -- Raid Info is greyed out when the character has no raid ID, which is now always: keep it usable.

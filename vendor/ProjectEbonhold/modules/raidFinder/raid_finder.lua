@@ -632,6 +632,8 @@ RefreshPanel = function()
   end
 end
 RF.Refresh = function() RefreshPanel() end
+-- The realm's release, nil until the server has answered.
+RF.GetRelease = function() return state.known and state.release or nil end
 
 ------------------------------------------------------------
 -- Tabs under the Dungeon Finder window
@@ -918,6 +920,9 @@ local function OnData(body)
     end
   end
   RefreshPanel()
+  -- Raid Info lists the open raids: it waits for this answer to know the release.
+  local lockout = ProjectEbonhold.RaidLockout
+  if lockout and lockout.Refresh and RaidInfoFrame and RaidInfoFrame:IsShown() then lockout.Refresh() end
 end
 
 local function OnState(body)

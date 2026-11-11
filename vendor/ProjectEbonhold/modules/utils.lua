@@ -195,7 +195,9 @@ if not C_Timer then
                         t.cancelled = true
                     end
                     -- one failing callback must not stop the others
-                    local ok, err = pcall(t.callback)
+                    -- Tickers get their handle, like the real API (Details! reads fields on it).
+                    local ok, err
+                    if t.noHandle then ok, err = pcall(t.callback) else ok, err = pcall(t.callback, t) end
                     if not ok then geterrorhandler()(err) end
                 end
             end
@@ -223,7 +225,9 @@ if not C_Timer then
     end
 
     function C_Timer.After(delay, callback)
-        return Schedule(delay, callback, false)
+        local t = Schedule(delay, callback, false)
+        t.noHandle = true
+        return t
     end
 
     function C_Timer.NewTimer(delay, callback)

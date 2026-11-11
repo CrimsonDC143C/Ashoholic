@@ -53,6 +53,13 @@ local function MarkerOf(plate)
     return m
 end
 
+-- nameplate_dots.lua puts its debuff row above this icon on a champion's plate.
+ProjectEbonhold = ProjectEbonhold or {}
+function ProjectEbonhold.IsChampionPlate(plate)
+    local m = markers[plate]
+    return m ~= nil and m:IsShown()
+end
+
 local function Look()
     local plates = C_NamePlate.GetNamePlates()
     local n = math.min(MAX_TOKENS, (plates and #plates or 0) + 10)

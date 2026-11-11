@@ -1,0 +1,16 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="before_load.lua"/>
+    <Include file="embeds.xml"/>
+    <Include file="locales.xml"/>
+    <Include file="Dependence\load.xml"/>
+    <Include file="Templates\load.xml"/>
+    <Include file="CUFProfiles\CompactUnitFrameProfiles.xml"/>
+    <Script file="FlowContainer.lua"/>
+    <Include file="CompactUnitFrame.xml"/>
+    <Include file="CompactRaidGroup.xml"/>
+    <Include file="CompactPartyFrame.xml"/>
+    <Script file="CompactRaidFrames\CompactRaidFrameReservationManager.lua"/>
+    <Include file="CompactRaidFrames\CompactRaidFrameContainer.xml"/>
+    <Include file="CompactRaidFrames\CompactRaidFrameManager.xml"/>
+    <Script file="after_load.lua"/>
+</Ui>

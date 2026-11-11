@@ -157,6 +157,14 @@ popup:SetScript("OnShow", function(self)
     end
 end)
 
+-- The HUD tips wait for this window.
+popup:HookScript("OnShow", function()
+    if ProjectEbonhold.PauseHudTips then ProjectEbonhold.PauseHudTips() end
+end)
+popup:HookScript("OnHide", function()
+    if ProjectEbonhold.EvaluateHudTips then C_Timer.After(1.0, ProjectEbonhold.EvaluateHudTips) end
+end)
+
 -- Function to show the prompt. Pre-checks the English default and any channel
 -- the player is already in, so existing members see their state reflected.
 function ProjectEbonhold.WorldChannelUI.ShowPrompt()
