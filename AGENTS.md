@@ -6,14 +6,13 @@ Ashoholic is a World of Warcraft addon for Project Ebonhold on WotLK 3.3.5. Its 
 
 ## Start Here
 
-- `Ashoholic.toc` is the Ashoholic load manifest and shows the main Lua load order.
-- `Core.lua` owns addon initialization, saved variables, events, chat commands, character tracking, and integrations such as raid resets and hourly entries.
-- `Characters.lua` builds and organizes the character roster data.
-- `UI.lua` creates the roster window and configuration interface.
-- `Themes.lua` defines built-in and custom themes.
-- `RaidData.lua` contains raid and lockout metadata; `HourlyWidget.lua` handles the hourly-entry widget.
-- `Minimap.lua` and `NexusDock.lua` integrate with the minimap and optional Nexus panel.
-- `FastSwap/` is a separate addon and character-selection hook. `AshoholicSync.ps1` and `AshoholicMerge.ps1` handle local multi-account data syncing.
+- `AddOns/` contains the active addon sources. `AddOns/Ashoholic/` is the main Ashoholic addon; implement new functionality there.
+- `AddOns/Ashoholic/Ashoholic.toc` is the active load manifest and shows the main Lua load order.
+- `AddOns/Ashoholic/PreviewUI.lua` contains the new UI design with session-local sample data. `PreviewBootstrap.lua` exposes `/ash preview`; the preview is not live character tracking.
+- `AddOns/Ashoholic/Core.lua`, `Characters.lua`, `UI.lua`, `Trials.lua`, and `Integrations/ProjectEbonhold.lua` currently provide scaffolding for the live implementation, not the archived addon's full behavior.
+- `Archive/` contains the old Ashoholic implementation, including tracking, raid metadata, widgets, Nexus integration, and the offline sync/merge scripts. Use it for reference or inspiration; it is not the active addon.
+- `AddOns/FastSwap/` is a separate addon and character-selection hook. Keep its installation helper separate from character-data syncing.
+- `AddOns/SharedMedia/` supplies the bundled media addon.
 
 ## ProjectEbonhold Dependency
 
@@ -21,7 +20,7 @@ Ashoholic is a World of Warcraft addon for Project Ebonhold on WotLK 3.3.5. Its 
 
 ## Versioning and Publishing
 
-- Before pushing a release-bound change or publishing a release, read the current branch and `## Version:` in `Ashoholic.toc`. Raise the version question early enough to include any approved bump in a release-bound commit or PR merge.
+- Before pushing a release-bound change or publishing a release, read the current branch and `## Version:` in `AddOns/Ashoholic/Ashoholic.toc`. Raise the version question early enough to include any approved bump in a release-bound commit or PR merge.
 - Ask the user whether to bump the addon version and which exact version to use; suggest a branch-appropriate next version. Wait for their answer before proceeding unless they already explicitly chose a version or confirmed no bump for this publication. Do not bump automatically or ask again for an already confirmed publication.
 - The manifest version is manual and is not changed automatically by package builds. When handing off a push for the user to perform, include the version reminder if it has not been resolved.
 - Before merging development work into `main` for a stable release, confirm the final version and review manifests and package entries for files that are not intended for the release.

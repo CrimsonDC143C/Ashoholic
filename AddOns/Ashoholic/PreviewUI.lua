@@ -12,8 +12,8 @@ local SCROLLBAR_WIDTH = 26
 local SCROLL_WIDTH = CONTENT_WIDTH - SCROLLBAR_WIDTH
 local PANEL_GAP = 20
 local HALF_PANEL_WIDTH = (SCROLL_WIDTH - PANEL_GAP) / 2
-local PAGE_TOP = 207
-local PAGE_HEIGHT = 465
+local PAGE_TOP = 164
+local PAGE_HEIGHT = 508
 local FOCUS_PAGE_TOP = 110
 local FOCUS_HEIGHT_GAIN = PAGE_TOP - FOCUS_PAGE_TOP
 local TAB_TOP = 60
@@ -2327,10 +2327,9 @@ local function BuildPreview()
     }
     for i, definition in ipairs(definitions) do
         local cardWidth = (CONTENT_WIDTH - (#definitions - 1) * 18) / #definitions
-        local card = Surface(frame, 24 + (i - 1) * (cardWidth + 18), TAB_TOP + 48, cardWidth, 78)
-        card.title = Label(card, "", 12, 9, cardWidth - 24, 10, MUTED)
-        card.value = Label(card, "", 12, 30, cardWidth - 24, 22, i == 5 and GOLD or TEAL)
-        Label(card, definition[3], 12, 60, cardWidth - 24, 9, MUTED)
+        local card = Surface(frame, 24 + (i - 1) * (cardWidth + 18), TAB_TOP + 48, cardWidth, 50)
+        card.title = Label(card, "", 12, 5, cardWidth - 24, 9, MUTED)
+        card.value = Label(card, "", 12, 23, cardWidth - 24, 16, i == 5 and GOLD or TEAL)
         Tip(card, definition[1], definition[3] .. ". Totals combine the selected sample accounts, counting each account once. Preview balances are invented; this does not query your currencies.")
         cards[i] = card
     end
@@ -2340,7 +2339,7 @@ local function BuildPreview()
     BuildProgression()
     BuildTrials()
     Label(frame, "PREVIEW ONLY  /  /ash opens your existing roster. Escape closes this window.", 24, 690, 800, 11, MUTED)
-    Label(frame, "EBONHOLD / CONCEPT 01", WINDOW_WIDTH - 251, 690, 227, 10, GOLD)
+    Label(frame, "EBONHOLD / CONCEPT 02", WINDOW_WIDTH - 251, 690, 227, 10, GOLD)
     refresh = function()
         local count = CheckedCount()
         local filterText = count == #ACCOUNTS and "All Accounts" or (count == 0 and "No accounts selected" or count .. " accounts selected")
