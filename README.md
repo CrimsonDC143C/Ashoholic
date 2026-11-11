@@ -80,10 +80,23 @@ If you play on multiple WoW accounts and want to see all your characters in one 
 Use `/ash preview` for the separate, session-local design preview. All characters,
 balances, activity objectives, timers and records are samples, not live tracking.
 Account One contains ten sample characters for testing a fuller roster and raid matrix.
-The preview window defaults to 1320 UI units wide, giving the roster more space
-for its default columns and Swap buttons beside the character details panel.
+The preview window defaults to 1320 UI units wide. The currency cards and all
+five tabs use the available width, including the raid matrix, Activities cards,
+Progression panels and Trials columns.
+The roster has space for its default columns and Swap buttons beside the
+character details panel.
+The header has no design-preview banner: tabs sit directly below the title,
+followed by currency cards. All five tabs use the reclaimed height for their
+lists and panels; Focus views retain their expanded space.
 It scales down to fit smaller screens; extra columns and enlarged fonts can
 still require horizontal scrolling.
+Use **Focus roster** to temporarily hide the currency cards and show
+compact, single-line roster rows. All ten Account One sample characters fit
+without vertical scrolling at the default font and spacing. Account filtering,
+sorting, column resizing, details and preview Swap remain available.
+**Exit Focus** restores the normal header and your row-density settings.
+Other tabs keep their normal layout; returning to Roster resumes Focus until
+you exit it or reload. Larger fonts and custom row spacing can reduce capacity.
 Closing preserves preview choices until `/reload`; it does not change your saved roster.
 Hover the currency cards for explanations of their account-level totals.
 Preview roster Swap buttons explain switching without logging out or passing
@@ -101,14 +114,25 @@ column is primary; a second breaks ties. Selecting a third distinct column clear
 both and starts a new primary sort. Header markers show direction and priority.
 Sorting stays within account groups, keeps unknown values last, and returns to
 sample order when cleared. Hiding a column removes its sort.
-In Raids & Dungeons, hide the tracking-selection sidebar to make room for ten
+In Raids & Dungeons, hide the tracking-selection sidebar to make room for twelve
 compact character columns without widening the main window. Wider columns and
 horizontal scrolling remain available for larger selections.
+**Focus encounters** reclaims header and currency-card space for a taller
+encounter matrix and tracking picker. **Exit Focus** restores their normal
+heights. Watchlist, collapsed groups, account filters and column choices are
+preserved; roster and encounter Focus choices are independent and last until
+reload. Other tabs retain their normal header.
+Watched raid headings show Normal loot item level and release metadata when
+provided by ProjectEbonhold's catalogue. These describe the raid, not a
+character's queue eligibility; no live requests or release filtering are added.
 Click the watched matrix's Raids or Dungeons section header to collapse its
 instances and bosses without changing the watchlist.
 Activities uses the full width for one account, separating Daily and Weekly
 examples; multiple accounts retain a two-column overview. Reset times and
 objectives are explicitly illustrative, not live server data.
+Progression estimates sample Prestige Essence using the sample account's
+Prestige count, the increasing Shards-per-Essence rate, and the early-Prestige
+consumption cap. It does not read your real Prestige data.
 Themes separates read-only Default Presets from Custom Presets. Custom presets
 can be saved, applied, starred, renamed, edited and deleted; they capture colors,
 fonts, icons and row layout, but not account filters. They last until `/reload`
@@ -129,8 +153,10 @@ spacing and border thickness. Save as new or update an applied custom preset.
 Class-name colors and loot-status colors intentionally retain their meaning.
 
 Developer check: `lua tools\test_preview_ui.lua` exercises the preview with mocked
-WoW widgets, including resize minimums, all columns, ten populated raid columns,
-account filtering, encounter collapsing and custom preset save/restore.
+WoW widgets, including resize minimums, all columns, twelve populated raid columns,
+full-width tabs, ten fully fitting Focus roster rows, Focus restoration,
+sample Prestige estimates, account filtering, encounter collapsing and custom
+preset save/restore.
 This does not validate game-client rendering or real server behavior.
 
 <!-- *   `/ash` or `/ashoholic` - Toggles the main roster window.

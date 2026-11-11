@@ -102,8 +102,8 @@ environment.GameTooltip = NewObject("Frame")
 environment.ChatFontNormal = {}
 environment.RAID_CLASS_COLORS = setmetatable({}, { __index = function() return { r = 1, g = 1, b = 1 } end })
 environment.ProjectEbonhold = { RaidLockoutData = {
-    { map = 533, name = "Naxxramas", bosses = { { id = 1, name = "Sapphiron" }, { id = 2, name = "Kel'Thuzad" } } },
-    { map = 532, name = "Karazhan", bosses = { { id = 3, name = "Nightbane" } } },
+    { map = 533, name = "Naxxramas", ilvl = 213, release = 1, bosses = { { id = 1, name = "Sapphiron" }, { id = 2, name = "Kel'Thuzad" } } },
+    { map = 532, name = "Karazhan", ilvl = 213, release = 1, bosses = { { id = 3, name = "Nightbane" } } },
 } }
 function environment.wipe(value) for key in pairs(value) do value[key] = nil end end
 local function Forbidden() error("Preview attempted a live operation") end
@@ -166,6 +166,20 @@ Text("Swap to Aster")
 Click("OK")
 local defaultRoster = environment.AshoholicPreviewRosterScroll
 assert(environment.AshoholicPreviewFrame:GetWidth() == 1320, "Preview must use the wider default window")
+local contentWidth = environment.AshoholicPreviewFrame:GetWidth() - 48
+local scrollWidth = contentWidth - 26
+local halfPanelWidth = (scrollWidth - 20) / 2
+assert(essence.width == 240, "Currency cards must share the wider header evenly")
+assert(essence.points[3] == -108, "Currency cards must move up into the removed banner space")
+assert(defaultRoster.height == 335 and defaultRoster.parent.points[3] == -207,
+    "The normal roster must reclaim the banner space as additional viewport height")
+local defaultAccountButton = Click("Account One  v")
+assert(defaultAccountButton.points[3] == -60 and defaultAccountButton.parent == environment.AshoholicPreviewFrame,
+    "Account filtering must align with the raised tab row")
+Click("Done")
+local goldCard = Text("Character pockets + Warband").parent
+assert(goldCard.points[2] + goldCard.width == environment.AshoholicPreviewFrame.width - 24,
+    "Currency cards must fill the header up to the right margin")
 assert(defaultRoster.child:GetWidth() <= defaultRoster:GetWidth(),
     "Default roster columns and Swap buttons must fit beside the details panel without sideways scrolling")
 for _, object in ipairs(objects) do
@@ -253,7 +267,62 @@ assert(Above(3, 2) and Above(2, 1), "Clearing primary must promote the secondary
 SortHeader("runAsh")
 SortHeader("runAsh")
 
+SortHeader("level")
+local normalRowHeight = rosterPage.rows[1].height
+local normalViewportHeight = roster.height
+Click("Focus roster")
+assert(roster.height == 432 and rosterPage.points[3] == -110, "Focus must reclaim the header's vertical space")
+assert(not essence:IsVisible(), "Focus must hide the currency cards")
+assert(Above(3, 1), "Focus must preserve the roster sort")
+local fullyVisibleCharacters = 0
+for _, row in ipairs(rosterPage.rows) do
+    if row:IsVisible() then
+        local top = -row.points[3]
+        if top >= roster:GetVerticalScroll() and top + row.height <= roster:GetVerticalScroll() + roster.height then
+            fullyVisibleCharacters = fullyVisibleCharacters + 1
+        end
+        assert(not row.hint:IsVisible(), "Focus must use one-line compact rows")
+    end
+end
+assert(fullyVisibleCharacters == 10, "All ten Account One characters must fully fit in Focus without scrolling")
+local focusAccount = Click("Account One  v")
+assert(focusAccount.points[3] == -60, "Focus must retain accessible account filtering")
+Click("Done")
+Click("Swap")
+Click("OK")
+Click("Trials")
+assert(essence:IsVisible(), "Other tabs must restore the normal header while Focus is enabled")
+local trialScroll = environment.AshoholicPreviewTrialScroll
+assert(trialScroll.width == scrollWidth and trialScroll.parent.rows[1].width == scrollWidth,
+    "Trials must fill the available content width")
+assert(trialScroll.height == 309 and trialScroll.parent.points[3] == -207,
+    "Trials must use the reclaimed banner height")
+local updatedHeader = Text("UPDATED")
+local lastTrialValue
+for _, object in ipairs(objects) do
+    if object.kind == "FontString" and object.parent == trialScroll.parent.rows[1]
+        and object:GetText() == "Today" then lastTrialValue = object end
+end
+assert(lastTrialValue and lastTrialValue.points[2] == updatedHeader.points[2]
+    and lastTrialValue.points[2] > 1000
+    and lastTrialValue.points[2] + lastTrialValue.width <= scrollWidth,
+    "Trials headings and values must align across the wider row without overflow")
+Click("Roster")
+Text("Exit Focus")
+assert(not essence:IsVisible() and roster.height == 432, "Returning to the roster must preserve Focus")
+Click("Exit Focus")
+assert(roster.height == normalViewportHeight and rosterPage.points[3] == -207,
+    "Exiting Focus must restore normal geometry")
+assert(essence:IsVisible() and rosterPage.rows[1].height == normalRowHeight and rosterPage.rows[1].hint:IsVisible(),
+    "Exiting Focus must restore currency cards and the user's row density")
+assert(Above(3, 1), "Exiting Focus must preserve sorting")
+SortHeader("level")
+SortHeader("level")
+
 Click("Raids & Dungeons")
+assert(environment.AshoholicPreviewRaidMatrix.width == 890, "The matrix must gain width with its picker visible")
+assert(environment.AshoholicPreviewRaidPicker.points[2] == contentWidth - 332,
+    "The tracking picker must align to the new right margin")
 Click("Watch all")
 local matrix = environment.AshoholicPreviewRaidMatrix.child
 local function VisibleRows()
@@ -264,6 +333,34 @@ local function VisibleRows()
     return count
 end
 local expandedCount = VisibleRows()
+local raidScroll = environment.AshoholicPreviewRaidMatrix
+local raidPicker = environment.AshoholicPreviewRaidPicker
+local encounterPage = raidScroll.parent
+Click("Focus encounters")
+assert(raidScroll.height == 368 and raidPicker.height == 393 and encounterPage.points[3] == -110,
+    "Encounter Focus must enlarge both the matrix and tracking picker")
+assert(not essence:IsVisible() and VisibleRows() == expandedCount,
+    "Encounter Focus must hide currencies without changing the watchlist")
+Click("Roster")
+Text("Focus roster")
+assert(essence:IsVisible() and roster.height == normalViewportHeight,
+    "Encounter Focus must not enable roster Focus")
+Click("Raids & Dungeons")
+Text("Exit Focus")
+assert(raidScroll.height == 368 and not essence:IsVisible(),
+    "Returning to encounters must restore that tab's Focus choice")
+raidScroll:SetVerticalScroll(10000)
+raidPicker:SetVerticalScroll(10000)
+Click("Exit Focus")
+assert(raidScroll.height == 271 and raidPicker.height == 296 and encounterPage.points[3] == -207,
+    "Exiting encounter Focus must restore both viewports and page position")
+assert(essence:IsVisible() and VisibleRows() == expandedCount,
+    "Exiting encounter Focus must restore currencies and preserve the watchlist")
+assert(raidScroll:GetVerticalScroll() <= math.max(0, matrix.height - raidScroll.height)
+    and raidPicker:GetVerticalScroll() <= math.max(0, raidPicker.child.height - raidPicker.height),
+    "Focus transitions must clamp both vertical scroll positions")
+raidScroll:SetVerticalScroll(0)
+raidPicker:SetVerticalScroll(0)
 ClickObject(Text("- Dungeons").parent)
 assert(VisibleRows() < expandedCount, "Collapsing Dungeons must hide instances and bosses")
 Text("- Raids")
@@ -273,7 +370,17 @@ Click("Account One  v")
 Check("All Accounts", true)
 Click("Done")
 Click("Hide selection")
-assert(environment.AshoholicPreviewRaidMatrix.width == 1046, "Hidden picker must release its width")
+assert(environment.AshoholicPreviewRaidMatrix.width == scrollWidth, "Hidden picker must release its width")
+Click("Focus encounters")
+assert(raidScroll.width == scrollWidth and not raidPicker:IsVisible(),
+    "Encounter Focus must preserve the hidden tracking picker and full-width matrix")
+Click("Activities")
+assert(essence:IsVisible(), "Activities must retain its normal header when encounter Focus is enabled")
+Click("Raids & Dungeons")
+Click("Exit Focus")
+assert(raidScroll.width == scrollWidth and not raidPicker:IsVisible(),
+    "Exiting encounter Focus must preserve the picker visibility choice")
+Text("Normal ilvl 213 / Release 1")
 local raidPage = environment.AshoholicPreviewRaidMatrix.parent
 local characterHeaders = 0
 for _, object in ipairs(objects) do
@@ -286,7 +393,7 @@ for _, object in ipairs(objects) do
         end
     end
 end
-assert(characterHeaders == 10, "Compact full-width matrix must provide ten character slots")
+assert(characterHeaders == 12, "Compact full-width matrix must provide twelve character slots")
 local accountHeaders = {}
 for _, object in ipairs(objects) do
     if object.kind == "FontString" and object:IsVisible() and tostring(object:GetText()):match("^ACCOUNT ") then
@@ -294,8 +401,29 @@ for _, object in ipairs(objects) do
         accountHeaders[object:GetText()] = true
     end
 end
+Click("Progression")
+Text("+5 Essence (3.75k / 650 Shards)")
+Text("+3 Essence (1.35k / 400 Shards)")
+Text("+6 Essence (4.50k / 750 Shards)")
+Text("+250 Essence (62.50k / 250 Shards)")
+local progression = environment.AshoholicPreviewProgressionScroll
+assert(progression.width == halfPanelWidth and progression.points[2] == halfPanelWidth + 20,
+    "Progression must split the usable width between Torment and Prestige")
+assert(progression.height == 390 and progression.parent.points[3] == -207,
+    "Progression must use the reclaimed banner height")
+assert(progression.parent.prestigePanels[1].width == halfPanelWidth,
+    "Prestige cards must fill the wider progression column")
+local ladderRow = progression.parent.ladderRows[1]
+local lastPip = ladderRow.pips[10]
+assert(math.abs(lastPip.points[2] + lastPip.width - ladderRow.width) < 0.001,
+    "Torment pips must span their wider row")
 Click("Activities")
-assert(Text("Account One").parent.width == 510, "Multi-account overview should retain compact cards")
+local activityOne = Text("Account One").parent
+local activityTwo = Text("Account Two").parent
+assert(activityOne.width == halfPanelWidth and activityTwo.points[2] + activityTwo.width == scrollWidth,
+    "Multi-account Activities cards must span both columns of the wider view")
+assert(activityOne.height == 390 and environment.AshoholicPreviewActivityScroll.height == 390,
+    "Activities cards and their viewport must use the reclaimed banner height")
 Click("All Accounts  v")
 Check("All Accounts", false)
 Check("Account One (current)", true)
@@ -303,7 +431,12 @@ Click("Done")
 
 Text("DAILY  /  Sample reset: 08h 42m")
 Text("WEEKLY  /  Sample reset: 3d 08h")
-assert(Text("Account One").parent.width == 1046, "One-account activity panel should span the view")
+assert(Text("Account One").parent.width == scrollWidth, "One-account activity panel should span the view")
+local daily = Text("DAILY  /  Sample reset: 08h 42m")
+local weekly = Text("WEEKLY  /  Sample reset: 3d 08h")
+assert(daily.points[2] + daily.width < weekly.points[2]
+    and weekly.points[2] + weekly.width == scrollWidth - 16,
+    "Daily and Weekly sections must share the full-width card without overlap")
 Click("Progression")
 Text("Torment 6 unlocked")
 
@@ -445,4 +578,4 @@ environment.Ashoholic:TogglePreviewUI()
 Click("Discard changes and close")
 assert(not main:IsShown() and not previewSettings:IsShown(), "Discard must finish the requested main-window close")
 environment.Ashoholic:TogglePreviewUI()
-print("preview-ui: tooltips, safe Swap, eleven columns, resize minimum, scrolling, encounter groups, ten slots, activities and preset lifecycle passed")
+print("preview-ui: tooltips, safe Swap, eleven columns, resize minimum, scrolling, roster and encounter Focus, full-width tabs, twelve raid slots, Prestige and preset lifecycle passed")

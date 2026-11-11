@@ -7,6 +7,16 @@ local addon = _G[addonName]
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local FONT = "Fonts\\FRIZQT__.TTF"
 local WINDOW_WIDTH = 1320
+local CONTENT_WIDTH = WINDOW_WIDTH - 48
+local SCROLLBAR_WIDTH = 26
+local SCROLL_WIDTH = CONTENT_WIDTH - SCROLLBAR_WIDTH
+local PANEL_GAP = 20
+local HALF_PANEL_WIDTH = (SCROLL_WIDTH - PANEL_GAP) / 2
+local PAGE_TOP = 207
+local PAGE_HEIGHT = 465
+local FOCUS_PAGE_TOP = 110
+local FOCUS_HEIGHT_GAIN = PAGE_TOP - FOCUS_PAGE_TOP
+local TAB_TOP = 60
 local GOLD = { 1, 0.79, 0.39 }
 local TEXT = { 0.88, 0.88, 0.90 }
 local MUTED = { 0.58, 0.61, 0.67 }
@@ -18,7 +28,7 @@ local ACCOUNTS = {
     { name = "Account One", ash = 14800000, shards = 3750, essence = 16, artisan = 28, gold = 12420, warband = 4000, prestige = 12 },
     { name = "Account Two", ash = 9200000, shards = 1350, essence = 8, artisan = 14, gold = 6850, warband = 2200, prestige = 7 },
     { name = "Account Three", ash = 18200000, shards = 4500, essence = 22, artisan = 19, gold = 9600, warband = 3100, prestige = 18 },
-    { name = "Account Four", ash = 6400000, shards = 900, essence = 4, artisan = 32, gold = 5100, warband = 1800, prestige = 4 },
+    { name = "Account Four", ash = 6400000, shards = 63000, essence = 4, artisan = 32, gold = 5100, warband = 1800, prestige = 4 },
 }
 local CHARACTERS = {
     { name = "Aster", account = 1, class = "PALADIN", level = 80, ilvl = 226, tier = 6, runAsh = "284k", runShards = 145, gold = "7,200g", seen = "Just now", location = "Dalaran", action = "2 rewards to claim", offerings = "3 / 5", bonus = "+35%", build = "Dawnkeeper", anchor = "Dalaran", progress = 7 },
@@ -51,7 +61,7 @@ end
 local frame
 local state = {
     accounts = { [1] = true }, selected = 1, tab = "Roster", watched = {}, expanded = {}, collapsed = {},
-    matrixOffset = 0, detail = true, font = FONT, fontDelta = 0, density = "comfortable",
+    matrixOffset = 0, detail = true, rosterFocus = false, raidsFocus = false, font = FONT, fontDelta = 0, density = "comfortable",
     iconStyle = "icons", classIcons = true, statusStyle = "words", hiddenTabs = {}, defaultTab = "Roster",
     logo = "Interface\\Icons\\inv_soulash", scale = 1, opacity = 1,
     columnWidths = {}, rosterOffset = 0, encounterCollapsed = {}, fontRoles = {},
@@ -218,9 +228,9 @@ end
 local function Scroll(parent, name, x, y, width, height)
     local scroll = CreateFrame("ScrollFrame", name, parent, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", x, -y)
-    scroll:SetSize(width - 26, height)
+    scroll:SetSize(width - SCROLLBAR_WIDTH, height)
     local child = CreateFrame("Frame", nil, scroll)
-    child:SetSize(width - 26, height)
+    child:SetSize(width - SCROLLBAR_WIDTH, height)
     scroll:SetScrollChild(child)
     return scroll, child
 end
@@ -276,10 +286,10 @@ end
 
 local function Page(name, heading, subtitle)
     local page = CreateFrame("Frame", nil, frame)
-    page:SetPoint("TOPLEFT", 24, -252)
-    page:SetSize(WINDOW_WIDTH - 48, 420)
+    page:SetPoint("TOPLEFT", 24, -PAGE_TOP)
+    page:SetSize(CONTENT_WIDTH, PAGE_HEIGHT)
     Label(page, heading, 0, 0, 720, 17, GOLD)
-    Label(page, subtitle, 0, 27, 1072, 11, MUTED)
+    Label(page, subtitle, 0, 27, CONTENT_WIDTH, 11, MUTED)
     pages[name] = page
     return page
 end
@@ -354,6 +364,11 @@ end
 
 local function BuildRoster()
     local page = Page("Roster", "Your next adventure", "Characters first. Shared currencies stay at account level; run earnings stay with the character.")
+    local focusButton = Button(page, "Focus roster", CONTENT_WIDTH - 140, 0, 140, 26, function()
+        state.rosterFocus = not state.rosterFocus
+        refresh()
+    end)
+    Tip(focusButton, "Roster Focus view", "Preview only. Temporarily hide the currency cards and use compact rows for more characters. Exit Focus restores your normal layout and density.")
     local headerScroll = CreateFrame("ScrollFrame", nil, page)
     headerScroll:SetPoint("TOPLEFT", 0, -57)
     headerScroll:SetSize(690, 23)
@@ -410,9 +425,10 @@ local function BuildRoster()
         grip:SetScript("OnHide", StopResize)
         page.grips[i] = grip
     end
-    local scroll, body = Scroll(page, "AshoholicPreviewRosterScroll", 0, 84, 716, 290)
+    local normalViewportHeight = PAGE_HEIGHT - 130
+    local scroll, body = Scroll(page, "AshoholicPreviewRosterScroll", 0, 84, 716, normalViewportHeight)
     local hbar = CreateFrame("Slider", nil, page)
-    hbar:SetPoint("TOPLEFT", 0, -378)
+    hbar:SetPoint("TOPLEFT", 0, -(84 + normalViewportHeight + 4))
     hbar:SetSize(690, 10)
     hbar:SetOrientation("HORIZONTAL")
     hbar:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
@@ -466,7 +482,7 @@ local function BuildRoster()
             refresh()
         end)
     end
-    local detail = Surface(page, WINDOW_WIDTH - 380, 56, 332, 354)
+    local detail = Surface(page, WINDOW_WIDTH - 380, 56, 332, PAGE_HEIGHT - 66)
     page.detailTitle = Label(detail, "", 16, 16, 300, 17)
     page.detailLocation = Label(detail, "", 16, 42, 300, 11, MUTED)
     Label(detail, "PARKED RUN", 16, 75, 300, 10, GOLD)
@@ -475,10 +491,18 @@ local function BuildRoster()
     for i, title in ipairs(labels) do
         page.detailValues[i] = DetailLine(detail, title, "", 101 + (i - 1) * 28)
     end
-    page.detailNote = Label(detail, "", 16, 278, 300, 11, TEAL)
-    Button(detail, "Swap (preview)", 16, 317, 130, 25, function() PreviewSwap(CHARACTERS[state.selected]) end)
-    Label(page, "No hourly-entry counter: the new realm's cap has not been established.", 0, 391, 716, 10, MUTED)
+    page.detailNote = Label(detail, "", 16, detail:GetHeight() - 76, 300, 11, TEAL)
+    Button(detail, "Swap (preview)", 16, detail:GetHeight() - 37, 130, 25, function() PreviewSwap(CHARACTERS[state.selected]) end)
+    local note = Label(page, "No hourly-entry counter: the new realm's cap has not been established.", 0, PAGE_HEIGHT - 29, SCROLL_WIDTH, 10, MUTED)
     page.Refresh = function()
+        local viewportHeight = normalViewportHeight + (state.rosterFocus and FOCUS_HEIGHT_GAIN or 0)
+        local density = state.rosterFocus and "compact" or state.density
+        focusButton.text:SetText(state.rosterFocus and "Exit Focus" or "Focus roster")
+        scroll:SetHeight(viewportHeight)
+        hbar:ClearAllPoints()
+        hbar:SetPoint("TOPLEFT", 0, -(84 + viewportHeight + 4))
+        note:ClearAllPoints()
+        note:SetPoint("TOPLEFT", 0, -(84 + viewportHeight + 17))
         local width = WINDOW_WIDTH - (state.detail and 430 or 74)
         scroll:SetWidth(width)
         headerScroll:SetWidth(width)
@@ -551,9 +575,10 @@ local function BuildRoster()
                 accountLabel.text:SetTextColor(unpack(account.color or STYLE.accountText))
                 y = y + 28
             end
-            local rowHeight = state.rowHeight or (state.density == "compact" and 30 or (state.density == "spacious" and 54 or 44))
+            local rowHeight = state.rosterFocus and 30 or state.rowHeight
+                or (density == "compact" and 30 or (density == "spacious" and 54 or 44))
             local _, characterSize = FontFor("character", 11)
-            rowHeight = math.max(rowHeight, characterSize + (state.density == "compact" and 16 or 33))
+            rowHeight = math.max(rowHeight, characterSize + (density == "compact" and 16 or 33))
             for position, i in ipairs(SortedAccountCharacters(accountId)) do
                 local character = CHARACTERS[i]
                 local row = page.rows[i]
@@ -570,18 +595,18 @@ local function BuildRoster()
                     row:GetHighlightTexture():SetVertexColor(unpack(STYLE.rowHover))
                     row:SetBackdropBorderColor(unpack(i == state.selected and STYLE.selectedBorder or BORDER))
                     for j, fs in ipairs(row.cells) do
-                        PositionCell(fs, j, state.density == "spacious" and 11 or 8)
+                        PositionCell(fs, j, density == "spacious" and 11 or 8)
                         fs:SetHeight(characterSize + 3)
                         fs:SetText(j == 1 and ClassName(character) or tostring(character[columnOrder[j - 1]] or "Unknown"))
                     end
                     row.hint:SetText(character.action)
-                    SetVisible(row.hint, state.density ~= "compact")
+                    SetVisible(row.hint, density ~= "compact")
                     y = y + rowHeight + state.rowGap
                 end
             end
         end
-        body:SetHeight(math.max(290, y))
-        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - 290)))
+        body:SetHeight(math.max(viewportHeight, y))
+        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - viewportHeight)))
         local character = CHARACTERS[state.selected]
         page.detailTitle:SetText(ClassName(character))
         page.detailLocation:SetText(character.location .. "  /  " .. character.seen)
@@ -608,23 +633,40 @@ local function LootStatus(character, boss, index, instance)
     return icons and "|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t" or GREEN .. "Available|r"
 end
 
-local MATRIX_FIRST, MATRIX_HEIGHT = 210, 226
+local MATRIX_FIRST, MATRIX_HEIGHT = 210, PAGE_HEIGHT - 194
+
+local function RaidMetadata(raid)
+    local details = {}
+    if raid.ilvl then details[#details + 1] = "Normal ilvl " .. raid.ilvl end
+    if raid.release then details[#details + 1] = "Release " .. raid.release end
+    if #details == 0 then return nil end
+    return table.concat(details, " / ")
+end
 
 local function BuildRaids()
     local page = Page("Raids", "Raid & dungeon watchlist", "Select a category, expansion, instance or individual boss. All statuses are sample data.")
+    local pickerWidth = 332
+    local pickerX = CONTENT_WIDTH - pickerWidth
+    local matrixWithPicker = pickerX - 24 - SCROLLBAR_WIDTH
     local matrixColumns, matrixWidth = 5, 95
     local showPicker, compact = true, true
-    local pickerToggle = Button(page, "Hide selection", 740, 0, 160, 26, function()
+    local normalPickerHeight = PAGE_HEIGHT - 169
+    local focusButton = Button(page, "Focus encounters", pickerX - 164, 0, 156, 26, function()
+        state.raidsFocus = not state.raidsFocus
+        refresh()
+    end)
+    Tip(focusButton, "Encounter Focus view", "Temporarily hide the currency cards to show more encounters and tracking choices. Your watchlist, column settings and account filters are kept.")
+    local pickerToggle = Button(page, "Hide selection", pickerX, 0, 160, 26, function()
         showPicker = not showPicker
         page.Refresh()
     end)
-    local compactToggle = Button(page, "Compact columns", 908, 0, 164, 26, function()
+    local compactToggle = Button(page, "Compact columns", pickerX + 168, 0, 164, 26, function()
         compact = not compact
         page.Refresh()
     end)
     Label(page, "WATCHED ENCOUNTERS", 0, 61, 360, 10, GOLD)
-    local matrixScroll, matrix = Scroll(page, "AshoholicPreviewRaidMatrix", 0, 135, 716, MATRIX_HEIGHT)
-    local header = Surface(page, 0, 84, 690, 47)
+    local matrixScroll, matrix = Scroll(page, "AshoholicPreviewRaidMatrix", 0, 135, matrixWithPicker + SCROLLBAR_WIDTH, MATRIX_HEIGHT)
+    local header = Surface(page, 0, 84, matrixWithPicker, 47)
     Label(header, "ENCOUNTER", 7, 26, 198, 10, MUTED)
     local headerCells = {}
     for i = 1, #CHARACTERS do
@@ -646,9 +688,9 @@ local function BuildRaids()
         head:SetSize(2, 39)
         separators[i] = { head }
     end
-    local hint = Label(page, "Shift + mouse wheel: scroll characters", 0, 370, 205, 9, MUTED)
+    local hint = Label(page, "Shift + mouse wheel: scroll characters", 0, PAGE_HEIGHT - 50, 205, 9, MUTED)
     local hbar = CreateFrame("Slider", nil, page)
-    hbar:SetPoint("TOPLEFT", MATRIX_FIRST, -368)
+    hbar:SetPoint("TOPLEFT", MATRIX_FIRST, -(PAGE_HEIGHT - 52))
     hbar:SetSize(matrixColumns * matrixWidth - 6, 12)
     hbar:SetOrientation("HORIZONTAL")
     hbar:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
@@ -659,7 +701,7 @@ local function BuildRaids()
     hbar:SetValueStep(1)
     hbar:SetMinMaxValues(0, 0)
     hbar:SetValue(0)
-    local position = Label(page, "", 550, 61, 140, 9, MUTED)
+    local position = Label(page, "", matrixWithPicker - 140, 61, 140, 9, MUTED)
     local function ScrollCharacters(delta)
         local maxOffset = math.max(0, #VisibleCharacters() - matrixColumns)
         local value = math.max(0, math.min(maxOffset, state.matrixOffset - delta))
@@ -684,7 +726,7 @@ local function BuildRaids()
         widget:SetScript("OnMouseWheel", function(_, delta) ScrollCharacters(delta) end)
     end
     Tip(header, "Watched characters", "Shift + mouse wheel scrolls sideways. Gold lines separate accounts; the account name appears once above its first visible character.")
-    local pickerScroll, picker = Scroll(page, "AshoholicPreviewRaidPicker", 740, 127, 332, 251)
+    local pickerScroll, picker = Scroll(page, "AshoholicPreviewRaidPicker", pickerX, 127, pickerWidth, normalPickerHeight)
     page.matrixRows, page.pickerRows = {}, {}
     local function MatrixRow(i)
         local row = page.matrixRows[i]
@@ -701,18 +743,18 @@ local function BuildRaids()
         end
         return row
     end
-    local pickerTitle = Label(page, "TRACKING SELECTION", 740, 61, 332, 10, GOLD)
-    local watchAll = Button(page, "Watch all", 740, 84, 105, 28, function()
+    local pickerTitle = Label(page, "TRACKING SELECTION", pickerX, 61, pickerWidth, 10, GOLD)
+    local watchAll = Button(page, "Watch all", pickerX, 84, 105, 28, function()
         for _, raid in ipairs(raids) do
             for _, boss in ipairs(raid.bosses) do state.watched[boss.id] = true end
         end
         page.Refresh()
     end)
-    local clear = Button(page, "Clear", 852, 84, 82, 28, function()
+    local clear = Button(page, "Clear", pickerX + 112, 84, 82, 28, function()
         wipe(state.watched)
         page.Refresh()
     end)
-    local pickerHint = Label(page, "+ expands groups", 944, 92, 128, 10, MUTED)
+    local pickerHint = Label(page, "+ expands groups", pickerX + 204, 92, 128, 10, MUTED)
     page.empty = Label(matrix, "Nothing selected. Choose instances or bosses on the right.", 8, 12, 670, 12, MUTED)
     local function BuildNode(node, depth, ancestors)
         local row = CreateFrame("Frame", nil, picker)
@@ -745,16 +787,29 @@ local function BuildRaids()
         end
     end
     for _, category in ipairs(trackingTree) do BuildNode(category, 0, {}) end
-    Label(page, "Raids: sample weekly loot status. Dungeons: tracking only; no weekly loot lockout is assumed.", 0, 394, 1072, 10, MUTED)
+    local note = Label(page, "Raids: sample weekly loot status; catalogue Normal ilvl and release shown when available. Dungeons: tracking only; no weekly loot lockout is assumed.", 0, PAGE_HEIGHT - 26, CONTENT_WIDTH, 10, MUTED)
     page.Refresh = function()
+        local heightGain = state.raidsFocus and FOCUS_HEIGHT_GAIN or 0
+        local matrixHeight, pickerHeight = MATRIX_HEIGHT + heightGain, normalPickerHeight + heightGain
+        focusButton.text:SetText(state.raidsFocus and "Exit Focus" or "Focus encounters")
+        matrixScroll:SetHeight(matrixHeight)
+        pickerScroll:SetHeight(pickerHeight)
+        hbar:ClearAllPoints()
+        hbar:SetPoint("TOPLEFT", MATRIX_FIRST, -(PAGE_HEIGHT - 52 + heightGain))
+        hint:ClearAllPoints()
+        hint:SetPoint("TOPLEFT", 0, -(PAGE_HEIGHT - 50 + heightGain))
+        note:ClearAllPoints()
+        note:SetPoint("TOPLEFT", 0, -(PAGE_HEIGHT - 26 + heightGain))
         local y, rowIndex = 0, 0
         local allCharacters = VisibleCharacters()
-        local width = showPicker and 690 or 1046
+        local width = showPicker and matrixWithPicker or SCROLL_WIDTH
         matrixColumns = math.max(1, math.min(#CHARACTERS, math.floor((width - MATRIX_FIRST) / (compact and 80 or 110))))
         matrixWidth = (width - MATRIX_FIRST) / matrixColumns
         matrixScroll:SetWidth(width)
         matrix:SetWidth(width)
         header:SetWidth(width)
+        position:ClearAllPoints()
+        position:SetPoint("TOPLEFT", width - 140, -61)
         hbar:SetWidth(width - MATRIX_FIRST - 6)
         pickerToggle.text:SetText(showPicker and "Hide selection" or "Show selection")
         compactToggle.text:SetText(compact and "[x] Compact columns" or "[ ] Compact columns")
@@ -800,13 +855,23 @@ local function BuildRaids()
         SetVisible(hbar, maxOffset > 0)
         position:SetText(#allCharacters == 0 and "" or string.format("%d-%d of %d", state.matrixOffset + 1, math.min(#allCharacters, state.matrixOffset + matrixColumns), #allCharacters))
         hint:SetText(maxOffset > 0 and "Shift + wheel: characters" or "All selected characters fit")
-        local function AddRow(name, boss, instance, category)
+        local function AddRow(name, boss, instance, category, metadata)
             rowIndex = rowIndex + 1
             local row = MatrixRow(rowIndex)
             for j = #row.cells + 1, matrixColumns do
                 row.cells[j] = Label(row, "", 0, 7, matrixWidth - 8, 10, STYLE.rowText, "character")
             end
+            local rowHeight = metadata and 38 or 28
+            if metadata then
+                if not row.metadata then row.metadata = Label(row, "", 7, 19, 198, 9, MUTED) end
+                row.metadata:SetText(metadata)
+                SetVisible(row.metadata, true)
+            elseif row.metadata then
+                row.metadata:SetText("")
+                SetVisible(row.metadata, false)
+            end
             row:SetWidth(width)
+            row:SetHeight(rowHeight)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 0, -y)
             row.name:SetText(name)
@@ -814,10 +879,13 @@ local function BuildRaids()
                 state.encounterCollapsed[category.key] = not state.encounterCollapsed[category.key]
                 page.Refresh()
             end or nil)
-            Tip(row, boss and boss.name or name, category and "Click to collapse or expand all watched " .. category.name .. ". Tracking selections are kept."
+            local tooltip = category and "Click to collapse or expand all watched " .. category.name .. ". Tracking selections are kept."
                 or instance and instance.kind == "Dungeons"
                 and "Dungeon watchlist only. Tracked does not imply a weekly lockout or a recorded kill."
-                or "Sample raid loot eligibility. Looted does not prevent entry. Unknown needs a fresh snapshot.")
+                or "Sample raid loot eligibility. Looted does not prevent entry. Unknown needs a fresh snapshot."
+            local raidMetadata = instance and instance.kind == "Raids" and RaidMetadata(instance)
+            if raidMetadata then tooltip = tooltip .. "\n" .. raidMetadata end
+            Tip(row, boss and boss.name or name, tooltip)
             for i, cell in ipairs(row.cells) do
                 local character = characters[i]
                 cell:ClearAllPoints()
@@ -827,7 +895,7 @@ local function BuildRaids()
                 cell:SetText(character and boss and LootStatus(character.data, boss, character.index, instance) or "")
             end
             row:Show()
-            y = y + 28
+            y = y + rowHeight
         end
         for _, category in ipairs(trackingTree) do
             if WatchedCount(category) > 0 then
@@ -837,7 +905,7 @@ local function BuildRaids()
                         if WatchedCount(expansion) > 0 then
                             for _, instance in ipairs(expansion.children) do
                                 if WatchedCount(instance) > 0 then
-                                    AddRow(AMBER .. instance.name .. "|r", nil, instance)
+                                    AddRow(AMBER .. instance.name .. "|r", nil, instance, nil, RaidMetadata(instance))
                                     for _, boss in ipairs(instance.bosses) do
                                         if state.watched[boss.id] then AddRow(boss.name, boss, instance) end
                                     end
@@ -851,8 +919,8 @@ local function BuildRaids()
         end
         for i = rowIndex + 1, #page.matrixRows do page.matrixRows[i]:Hide() end
         SetVisible(page.empty, rowIndex == 0)
-        matrix:SetHeight(math.max(MATRIX_HEIGHT, y))
-        matrixScroll:SetVerticalScroll(math.min(matrixScroll:GetVerticalScroll(), math.max(0, y - MATRIX_HEIGHT)))
+        matrix:SetHeight(math.max(matrixHeight, y))
+        matrixScroll:SetVerticalScroll(math.min(matrixScroll:GetVerticalScroll(), math.max(0, y - matrixHeight)))
         y = 0
         for _, entry in ipairs(page.pickerRows) do
             local row, node = entry.widget, entry.data
@@ -870,29 +938,33 @@ local function BuildRaids()
                     local count = WatchedCount(node)
                     row.expand.text:SetText(state.expanded[node.key] and "-" or "+")
                     row.select.text:SetText((count == 0 and "[ ] " or (count == #node.bosses and "[x] " or "[-] ")) .. node.name)
-                    Tip(row.select, node.name, count .. " / " .. #node.bosses .. " bosses watched. Click to toggle this entire group.")
+                    local tooltip = count .. " / " .. #node.bosses .. " bosses watched. Click to toggle this entire group."
+                    local raidMetadata = node.kind == "Raids" and RaidMetadata(node)
+                    if raidMetadata then tooltip = tooltip .. "\n" .. raidMetadata end
+                    Tip(row.select, node.name, tooltip)
                 end
                 y = y + (entry.leaf and 25 or 28)
             end
         end
-        picker:SetHeight(math.max(251, y))
-        pickerScroll:SetVerticalScroll(math.min(pickerScroll:GetVerticalScroll(), math.max(0, y - 251)))
+        picker:SetHeight(math.max(pickerHeight, y))
+        pickerScroll:SetVerticalScroll(math.min(pickerScroll:GetVerticalScroll(), math.max(0, y - pickerHeight)))
     end
 end
 
 local function BuildActivities()
     local page = Page("Activities", "Rewards worth coming back for", "Daily and weekly Call Board activities are separate from the current run's Death contract.")
-    local scroll, body = Scroll(page, "AshoholicPreviewActivityScroll", 0, 57, 1072, 345)
+    local viewportHeight = PAGE_HEIGHT - 75
+    local scroll, body = Scroll(page, "AshoholicPreviewActivityScroll", 0, 57, CONTENT_WIDTH, viewportHeight)
     local panels = {}
     for accountId, account in ipairs(ACCOUNTS) do
-        local panel = Surface(body, 0, 0, 510, 345)
-        panel.title = Label(panel, account.name, 16, 17, 478, 16, GOLD)
-        Label(panel, "CALL BOARD CACHE (SAMPLE)", 16, 51, 490, 10, MUTED)
-        Label(panel, accountId == 1 and "7 / 10 progress" or "9 / 10 progress", 16, 73, 490, 21, TEAL)
-        panel.track, panel.fill = Progress(panel, 16, 106, 478, accountId == 1 and 7 or 9, 10)
-        panel.heading = Label(panel, "UNCLAIMED & IN PROGRESS", 16, 132, 490, 10, GOLD)
-        panel.daily = Label(panel, "DAILY  /  Sample reset: 08h 42m", 16, 132, 490, 11, GOLD)
-        panel.weekly = Label(panel, "WEEKLY  /  Sample reset: 3d 08h", 540, 132, 490, 11, GOLD)
+        local panel = Surface(body, 0, 0, HALF_PANEL_WIDTH, 345)
+        panel.title = Label(panel, account.name, 16, 17, HALF_PANEL_WIDTH - 32, 16, GOLD)
+        panel.cache = Label(panel, "CALL BOARD CACHE (SAMPLE)", 16, 51, HALF_PANEL_WIDTH - 32, 10, MUTED)
+        panel.progress = Label(panel, accountId == 1 and "7 / 10 progress" or "9 / 10 progress", 16, 73, HALF_PANEL_WIDTH - 32, 21, TEAL)
+        panel.track, panel.fill = Progress(panel, 16, 106, HALF_PANEL_WIDTH - 32, accountId == 1 and 7 or 9, 10)
+        panel.heading = Label(panel, "UNCLAIMED & IN PROGRESS", 16, 132, HALF_PANEL_WIDTH - 32, 10, GOLD)
+        panel.daily = Label(panel, "DAILY  /  Sample reset: 08h 42m", 16, 132, HALF_PANEL_WIDTH - 32, 11, GOLD)
+        panel.weekly = Label(panel, "WEEKLY  /  Sample reset: 3d 08h", 16, 132, HALF_PANEL_WIDTH - 32, 11, GOLD)
         local rows = accountId == 1 and {
             { "Aster / Daily dungeon", GREEN .. "Ready to claim|r", "Character activity  /  Ash + Shards + gold" },
             { "Account / Crafting contract", GREEN .. "Ready to claim|r", "Shared activity  /  1 Artisan Soul" },
@@ -913,7 +985,7 @@ local function BuildActivities()
         end
         panels[accountId] = panel
     end
-    Label(page, "Sample reset timers: Daily 08h 42m  /  Weekly 3d 08h. Shared activities count once per account.", 0, 411, 1072, 10, MUTED)
+    Label(page, "Sample reset timers: Daily 08h 42m  /  Weekly 3d 08h. Shared activities count once per account.", 0, PAGE_HEIGHT - 9, CONTENT_WIDTH, 10, MUTED)
     page.Refresh = function()
         local selected = 0
         for _, visible in pairs(state.accounts) do if visible then selected = selected + 1 end end
@@ -923,64 +995,88 @@ local function BuildActivities()
             local visible = state.accounts[accountId]
             SetVisible(panel, visible)
             if visible then
+                local width = single and SCROLL_WIDTH or HALF_PANEL_WIDTH
+                local innerWidth = width - 32
+                local columnWidth = single and (innerWidth - PANEL_GAP) / 2 or innerWidth
+                local statusWidth = 214
+                local titleWidth = columnWidth - statusWidth - 12
                 panel:ClearAllPoints()
                 panel.title:SetText(ACCOUNTS[accountId].name)
-                panel:SetWidth(single and 1046 or 510)
-                panel.track:SetWidth(single and 1014 or 478)
-                panel.fill:SetWidth((single and 1014 or 478) * (accountId == 1 and 0.7 or 0.9))
+                panel:SetSize(width, viewportHeight)
+                for _, label in ipairs({ panel.title, panel.cache, panel.progress, panel.heading }) do label:SetWidth(innerWidth) end
+                panel.daily:SetWidth(columnWidth)
+                panel.weekly:SetWidth(columnWidth)
+                panel.weekly:ClearAllPoints()
+                panel.weekly:SetPoint("TOPLEFT", 16 + columnWidth + PANEL_GAP, -132)
+                panel.track:SetWidth(innerWidth)
+                panel.fill:SetWidth(innerWidth * (accountId == 1 and 0.7 or 0.9))
                 SetVisible(panel.heading, not single)
                 SetVisible(panel.daily, single)
                 SetVisible(panel.weekly, single)
                 for i, row in ipairs(panel.rows) do
-                    local x = single and i == 3 and 540 or 16
+                    local x = single and i == 3 and (16 + columnWidth + PANEL_GAP) or 16
                     local y = single and (i == 2 and 251 or 170) or 159 + (i - 1) * 56
                     for j, fs in ipairs(row) do
                         fs:ClearAllPoints()
-                        fs:SetPoint("TOPLEFT", x + (j == 2 and 264 or 0), -(y + (j == 3 and 23 or 0)))
+                        fs:SetPoint("TOPLEFT", x + (j == 2 and titleWidth + 12 or 0), -(y + (j == 3 and 23 or 0)))
+                        fs:SetWidth(j == 1 and titleWidth or (j == 2 and statusWidth or columnWidth))
                     end
                 end
-                panel:SetPoint("TOPLEFT", single and 0 or (count % 2) * 530, -math.floor(count / 2) * 360)
+                panel:SetPoint("TOPLEFT", (count % 2) * (HALF_PANEL_WIDTH + PANEL_GAP), -math.floor(count / 2) * (viewportHeight + 15))
                 count = count + 1
             end
         end
-        local height = math.max(345, math.ceil(count / 2) * 360)
+        local height = math.max(viewportHeight, math.ceil(count / 2) * (viewportHeight + 15) - 15)
         body:SetHeight(height)
-        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), height - 345))
+        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), height - viewportHeight))
     end
 end
 
 local function BuildProgression()
     local page = Page("Progression", "Torment & Prestige", "Account-wide Torment access (the new Hardcore ladder), alongside account Prestige readiness.")
-    local ladder = Surface(page, 0, 57, 510, 345)
-    Label(ladder, "ACCOUNT TORMENT UNLOCKS", 16, 17, 478, 11, GOLD)
-    local scroll, body = Scroll(page, "AshoholicPreviewProgressionScroll", 530, 57, 542, 345)
+    local viewportHeight = PAGE_HEIGHT - 75
+    local ladder = Surface(page, 0, 57, HALF_PANEL_WIDTH, viewportHeight)
+    local innerWidth = HALF_PANEL_WIDTH - 32
+    Label(ladder, "ACCOUNT TORMENT UNLOCKS", 16, 17, innerWidth, 11, GOLD)
+    local scroll, body = Scroll(page, "AshoholicPreviewProgressionScroll", HALF_PANEL_WIDTH + PANEL_GAP, 57,
+        HALF_PANEL_WIDTH + SCROLLBAR_WIDTH, viewportHeight)
     scroll:EnableMouseWheel(true)
     scroll:SetScript("OnMouseWheel", ScrollBy)
     page.ladderRows = {}
     for i = 1, #ACCOUNTS do
         local row = CreateFrame("Frame", nil, ladder)
-        row:SetSize(490, 51)
+        row:SetSize(innerWidth, 51)
         row.name = Label(row, "", 0, 0, 150, 12)
-        row.note = Label(row, "", 155, 0, 323, 11, MUTED)
+        row.note = Label(row, "", 155, 0, innerWidth - 155, 11, MUTED)
         row.pips = {}
+        local pipWidth = (innerWidth - 9 * 6) / 10
         for tier = 1, 10 do
-            row.pips[tier] = Surface(row, (tier - 1) * 49, 23, 43, 17)
-            local fs = Label(row.pips[tier], tostring(tier), 0, 2, 43, 10)
+            row.pips[tier] = Surface(row, (tier - 1) * (pipWidth + 6), 23, pipWidth, 17)
+            local fs = Label(row.pips[tier], tostring(tier), 0, 2, pipWidth, 10)
             fs:SetJustifyH("CENTER")
         end
         page.ladderRows[i] = row
     end
     page.prestigePanels = {}
     for accountId, account in ipairs(ACCOUNTS) do
-        local panel = Surface(body, 0, 0, 510, 160)
-        panel.title = Label(panel, account.name .. "  /  Prestige " .. account.prestige, 16, 15, 478, 14, GOLD)
-        Label(panel, account.ash >= 10771440 and GREEN .. "Ready to Prestige|r" or AMBER .. "Ash requirement not met|r", 16, 44, 478, 13)
+        local shardRate = math.min(50 + 50 * account.prestige, 750)
+        local shardsConsumed
+        if account.prestige >= 15 then
+            shardsConsumed = account.shards
+        else
+            shardsConsumed = math.min(account.shards, shardRate * shardRate)
+        end
+        local essence = math.floor(shardsConsumed / shardRate)
+        local panel = Surface(body, 0, 0, HALF_PANEL_WIDTH, 160)
+        panel.title = Label(panel, account.name .. "  /  Prestige " .. account.prestige, 16, 15, innerWidth, 14, GOLD)
+        Label(panel, account.ash >= 10771440 and GREEN .. "Ready to Prestige|r" or AMBER .. "Ash requirement not met|r", 16, 44, innerWidth, 13)
         DetailLine(panel, "Committed Ash / gate", Short(account.ash) .. " / 10.77m", 74)
         DetailLine(panel, "Banked Shards", tostring(account.shards), 99)
-        DetailLine(panel, "Sample Essence preview", "+" .. math.floor(account.shards / 750) .. " Essence", 124)
+        DetailLine(panel, "Next Prestige / Essence", "+" .. essence .. " Essence (" ..
+            Short(shardsConsumed) .. " / " .. shardRate .. " Shards)", 124)
         page.prestigePanels[accountId] = panel
     end
-    Label(page, "Prestige preview: informational only. Exact reset effects require in-game confirmation.", 0, 411, 1072, 10, MUTED)
+    Label(page, "Prestige preview: informational only. Exact reset effects require in-game confirmation.", 0, PAGE_HEIGHT - 9, CONTENT_WIDTH, 10, MUTED)
     page.Refresh = function()
         local y = 52
         for i, account in ipairs(ACCOUNTS) do
@@ -1010,19 +1106,28 @@ local function BuildProgression()
             end
         end
         y = y - 17
-        body:SetHeight(math.max(345, y))
-        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - 345)))
+        body:SetHeight(math.max(viewportHeight, y))
+        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - viewportHeight)))
     end
 end
 
 local function BuildTrials()
     local page = Page("Trials", "Personal records", "Compare saved bests across your roster. Rankings are last-observed snapshots, not live standings.")
-    local headings = { { "CHARACTER", 16 }, { "CHAMPION BEST", 205 }, { "CLASS RANK", 409 }, { "CRUSADER BEST", 575 }, { "TEAM", 797 }, { "UPDATED", 912 } }
-    for _, column in ipairs(headings) do Label(page, column[1], column[2], 68, 190, 10, MUTED) end
-    Button(page, "What are these Trials?", 845, 0, 227, 26, function()
+    local headings = {
+        { "CHARACTER", 0.18 }, { "CHAMPION BEST", 0.19 }, { "CLASS RANK", 0.16 },
+        { "CRUSADER BEST", 0.22 }, { "TEAM", 0.11 }, { "UPDATED", 0.14 },
+    }
+    local x = 16
+    for _, column in ipairs(headings) do
+        column.x, column.width = x, (SCROLL_WIDTH - 32) * column[2]
+        Label(page, column[1], column.x, 68, column.width - 12, 10, MUTED)
+        x = x + column.width
+    end
+    Button(page, "What are these Trials?", CONTENT_WIDTH - 227, 0, 227, 26, function()
         ShowSettings("Help")
     end)
-    local scroll, body = Scroll(page, "AshoholicPreviewTrialScroll", 0, 98, 1072, 264)
+    local viewportHeight = PAGE_HEIGHT - 156
+    local scroll, body = Scroll(page, "AshoholicPreviewTrialScroll", 0, 98, CONTENT_WIDTH, viewportHeight)
     local records = {
         { "1.42m damage", "#42 / 1,280", "Wave 18 / 14:32", "Solo", "Today" },
         { "1.18m damage", "#67 / 940", "Wave 15 / 12:08", "3 players", "Today" },
@@ -1032,13 +1137,16 @@ local function BuildTrials()
     }
     page.rows = {}
     for i, character in ipairs(CHARACTERS) do
-        local row = Surface(body, 0, 0, 1046, 44)
-        Label(row, ClassName(character), 16, 15, 180, 12)
-        for j, value in ipairs(records[i] or { "Not recorded", "-", "Not recorded", "-", "-" }) do Label(row, value, headings[j + 1][2], 15, j == 3 and 210 or 140, 11) end
+        local row = Surface(body, 0, 0, SCROLL_WIDTH, 44)
+        Label(row, ClassName(character), headings[1].x, 15, headings[1].width - 12, 12)
+        for j, value in ipairs(records[i] or { "Not recorded", "-", "Not recorded", "-", "-" }) do
+            local column = headings[j + 1]
+            Label(row, value, column.x, 15, column.width - 12, 11)
+        end
         Tip(row, character.name .. " / " .. ACCOUNTS[character.account].name, "Champion: solo damage Trial, ranked within your class.\nCrusader: survival waves, 1-5 players. Team is the size of that recorded attempt.\nThese are sample records, not dungeon lockouts.")
         page.rows[i] = row
     end
-    Label(page, "Season: Example season  /  Practice runs excluded  /  Scores and ranks shown here are all invented.", 16, 375, 1030, 11, TEAL)
+    Label(page, "Season: Example season  /  Practice runs excluded  /  Scores and ranks shown here are all invented.", 16, PAGE_HEIGHT - 45, CONTENT_WIDTH - 32, 11, TEAL)
     page.Refresh = function()
         local y = 0
         for i, character in ipairs(CHARACTERS) do
@@ -1050,8 +1158,8 @@ local function BuildTrials()
                 y = y + 50
             end
         end
-        body:SetHeight(math.max(264, y))
-        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - 264)))
+        body:SetHeight(math.max(viewportHeight, y))
+        scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - viewportHeight)))
     end
 end
 
@@ -2108,7 +2216,10 @@ local function BuildPreview()
         if not expansion then
             print("|cffff6060Ashoholic preview:|r No expansion mapping for " .. raid.name .. "; not included in the sample tree.")
         else
-            AddInstance({ map = raid.map, name = raid.name, bosses = raid.bosses }, "Raids", expansion)
+            AddInstance({
+                map = raid.map, name = raid.name, bosses = raid.bosses,
+                ilvl = raid.ilvl, release = raid.release,
+            }, "Raids", expansion)
         end
         if raid.map == 533 or raid.map == 532 then
             for _, boss in ipairs(raid.bosses) do
@@ -2161,14 +2272,12 @@ local function BuildPreview()
     settingsButton:SetFrameLevel(titleBar:GetFrameLevel() + 5)
     Button(frame, "X", WINDOW_WIDTH - 44, 14, 28, 28, function() frame:Hide() end)
     tinsert(UISpecialFrames, "AshoholicPreviewFrame")
-    local banner = Surface(frame, 24, 60, WINDOW_WIDTH - 48, 33, { 0.18, 0.13, 0.065, 1 })
-    Label(banner, "DESIGN PREVIEW  /  All balances, characters, timers and eligibility are sample data. Nothing is sent or saved.", 12, 10, 1048, 11, GOLD)
-    local accountButton = Button(frame, "", WINDOW_WIDTH - 256, 105, 232, 30, function()
+    local accountButton = Button(frame, "", WINDOW_WIDTH - 256, TAB_TOP, 232, 30, function()
         if settings then settings:Hide() end
         SetVisible(accountMenu, not accountMenu:IsShown())
     end)
     Tip(accountButton, "Accounts to display", "Check any combination of accounts. The first view uses the current sample account. Selection lasts until reload in this UI-only preview.")
-    accountMenu = Surface(frame, WINDOW_WIDTH - 320, 139, 296, 98 + (#ACCOUNTS + 1) * 31)
+    accountMenu = Surface(frame, WINDOW_WIDTH - 320, TAB_TOP + 34, 296, 98 + (#ACCOUNTS + 1) * 31)
     accountMenu:SetFrameStrata("FULLSCREEN_DIALOG")
     accountMenu:EnableMouse(true)
     Label(accountMenu, "SHOW ACCOUNTS", 12, 12, 270, 11, GOLD)
@@ -2204,7 +2313,7 @@ local function BuildPreview()
     local tabOrder = { "Roster", "Raids", "Activities", "Progression", "Trials" }
     for i, name in ipairs(tabOrder) do
         local tabName = name
-        tabs[name] = Button(frame, name == "Raids" and "Raids & Dungeons" or name, 24 + (i - 1) * 158, 105, 148, 30, function()
+        tabs[name] = Button(frame, name == "Raids" and "Raids & Dungeons" or name, 24 + (i - 1) * 158, TAB_TOP, 148, 30, function()
             state.tab = tabName
             refresh()
         end)
@@ -2217,10 +2326,11 @@ local function BuildPreview()
         { "TOTAL GOLD", "gold", "Character pockets + Warband", "INV_Misc_Coin_02" },
     }
     for i, definition in ipairs(definitions) do
-        local card = Surface(frame, 24 + (i - 1) * 218, 153, 200, 78)
-        card.title = Label(card, "", 12, 9, 176, 10, MUTED)
-        card.value = Label(card, "", 12, 30, 176, 22, i == 5 and GOLD or TEAL)
-        Label(card, definition[3], 12, 60, 178, 9, MUTED)
+        local cardWidth = (CONTENT_WIDTH - (#definitions - 1) * 18) / #definitions
+        local card = Surface(frame, 24 + (i - 1) * (cardWidth + 18), TAB_TOP + 48, cardWidth, 78)
+        card.title = Label(card, "", 12, 9, cardWidth - 24, 10, MUTED)
+        card.value = Label(card, "", 12, 30, cardWidth - 24, 22, i == 5 and GOLD or TEAL)
+        Label(card, definition[3], 12, 60, cardWidth - 24, 9, MUTED)
         Tip(card, definition[1], definition[3] .. ". Totals combine the selected sample accounts, counting each account once. Preview balances are invented; this does not query your currencies.")
         cards[i] = card
     end
@@ -2264,18 +2374,28 @@ local function BuildPreview()
         Tip(cards[2], "Account Soul Shards", "Sample banked Shards. Do not count this shared balance again for every character.")
         Tip(cards[5], "Gold breakdown", string.format("Character pockets: %dg\nWarband bank: %dg\nTotal: %dg\nWarband gold is counted once per account.", totals.pockets, totals.warband, totals.gold))
         if state.hiddenTabs[state.tab] then state.tab = "Roster" end
+        local focused = (state.tab == "Roster" and state.rosterFocus)
+            or (state.tab == "Raids" and state.raidsFocus)
+        for _, card in ipairs(cards) do SetVisible(card, not focused) end
+        accountButton:ClearAllPoints()
+        accountButton:SetPoint("TOPLEFT", WINDOW_WIDTH - 256, -TAB_TOP)
+        accountMenu:ClearAllPoints()
+        accountMenu:SetPoint("TOPLEFT", WINDOW_WIDTH - 320, -(TAB_TOP + 34))
         local tabX = 24
         for _, name in ipairs(tabOrder) do
             local shown = not state.hiddenTabs[name]
             SetVisible(tabs[name], shown)
             if shown then
                 tabs[name]:ClearAllPoints()
-                tabs[name]:SetPoint("TOPLEFT", tabX, -105)
+                tabs[name]:SetPoint("TOPLEFT", tabX, -TAB_TOP)
                 tabX = tabX + 158
             end
         end
         for name, page in pairs(pages) do
             local active = state.tab == name
+            page:ClearAllPoints()
+            page:SetPoint("TOPLEFT", 24, -(focused and FOCUS_PAGE_TOP or PAGE_TOP))
+            page:SetHeight(PAGE_HEIGHT + (focused and FOCUS_HEIGHT_GAIN or 0))
             SetVisible(page, active)
             tabs[name]:SetBackdropColor(unpack(active and STYLE.tabActiveBg or STYLE.tabBg))
             tabs[name]:SetBackdropBorderColor(unpack(active and GOLD or BUTTON_BORDER))
