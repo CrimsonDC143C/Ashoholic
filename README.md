@@ -51,21 +51,6 @@ Ashoholic was originally a fork of [Altoholic](https://www.wowace.com/projects/a
 4.  Make sure you have the **ProjectEbonhold** addon enabled.
 5.  Log in and type `/ash` or `/ashoholic`, or left-click on the minimap icon, to open the roster! -->
 
-## PTR testing download
-
-For the Ebonhold PTR UI mock preview, download [Ashoholic-PTR.zip](https://github.com/CrimsonDC143C/Ashoholic/releases/download/ptr-latest/Ashoholic-PTR.zip). This link becomes available after the first successful PTR publication. The [PTR prerelease page](https://github.com/CrimsonDC143C/Ashoholic/releases/tag/ptr-latest) identifies the packaged commit.
-
-Close WoW, back up your PTR SavedVariables, remove any previous `Ashoholic` folder from your **PTR client's** `Interface\AddOns\` folder, and extract the ZIP there. The archive contains only the preview manifest, loader, color picker, and mock UI in an `Ashoholic` folder; it does not include the live roster, FastSwap, or SharedMedia. ProjectEbonhold must already be installed. Type `/ash preview` to open the mock UI. PTR builds are experimental and should not replace your live-client addon installation.
-
-### Publishing PTR builds
-
-- Commit and push PTR changes to `PTR-main`. The **Package PTR addon** workflow builds the preview-only ZIP and publishes it as a prerelease.
-- Each successful publication moves the dedicated `ptr-latest` tag to the packaged commit and replaces `Ashoholic-PTR.zip`, keeping the download URL unchanged. It does not retain previous PTR builds.
-- Live release tags, the live ZIP, and the latest stable release are not changed. The live packaging job only runs on `main`.
-- If the workflow is available in GitHub's manual-run menu, select `PTR-main` when running it. GitHub normally requires a workflow to exist on the default branch before exposing manual dispatch; automatic PTR pushes do not have that requirement.
-- Repository rules must allow GitHub Actions to create releases and update the dedicated `ptr-latest` tag. Do not use that tag for a stable release.
-- Nothing is published until these changes are committed and pushed. If the workflow fails, the download may still be the previous successful build; check the Actions run before announcing an update.
-
 <!-- ## Multi-Account Syncing (Optional)
 
 If you play on multiple WoW accounts and want to see all your characters in one list:
@@ -75,7 +60,7 @@ If you play on multiple WoW accounts and want to see all your characters in one 
  -->
 ## Commands
 
-### UI design preview (PTR)
+### UI design preview
 
 Use `/ash preview` for the separate, session-local design preview. All characters,
 balances, activity objectives, timers and records are samples, not live tracking.

@@ -21,11 +21,10 @@ Ashoholic is a World of Warcraft addon for Project Ebonhold on WotLK 3.3.5. Its 
 
 ## Versioning and Publishing
 
-- Before pushing to `PTR-main` or `main`, or publishing a release, read the current branch and `## Version:` in `Ashoholic.toc`. Before a release-bound commit or PR merge, raise the version question early enough to include any approved bump.
+- Before pushing a release-bound change or publishing a release, read the current branch and `## Version:` in `Ashoholic.toc`. Raise the version question early enough to include any approved bump in a release-bound commit or PR merge.
 - Ask the user whether to bump the addon version and which exact version to use; suggest a branch-appropriate next version. Wait for their answer before proceeding unless they already explicitly chose a version or confirmed no bump for this publication. Do not bump automatically or ask again for an already confirmed publication.
-- On `PTR-main`, use `<next-stable-version>-ptr.<build>` (for example, `2.6.0-ptr.1`, then `2.6.0-ptr.2`). Confirm the target stable version rather than assuming it. On `main`, use the approved stable version without a PTR suffix.
-- The manifest version is manual; the rolling `ptr-latest` tag and permanent PTR download URL do not increment it. When handing off a push for the user to perform, include the version reminder if it has not been resolved.
-- Before merging PTR into `main` for a stable release, confirm the final stable version and review PTR-only load and package entries, including `PreviewUI.lua`, so they are not shipped live unintentionally.
+- The manifest version is manual and is not changed automatically by package builds. When handing off a push for the user to perform, include the version reminder if it has not been resolved.
+- Before merging development work into `main` for a stable release, confirm the final version and review manifests and package entries for files that are not intended for the release.
 
 ## Validation
 

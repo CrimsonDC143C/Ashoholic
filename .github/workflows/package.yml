@@ -19,7 +19,7 @@ jobs:
 
       - name: Read addon version
         run: |
-          version="$(sed -n 's/^## Version:[[:space:]]*//p' Ashoholic.toc | tr -d '\r')"
+          version="$(sed -n 's/^## Version:[[:space:]]*//p' AddOns/Ashoholic/Ashoholic.toc | tr -d '\r')"
           if [ -z "$version" ]; then
             echo "Version missing from Ashoholic.toc" >&2
             exit 1

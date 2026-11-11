@@ -21,33 +21,10 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Source path -> path inside Ashoholic.zip. Kept aligned with the release
-# archive: addon files at the repo root are packed under Ashoholic/.
-EXPLICIT = {
-    "Ashoholic.toc": "Ashoholic/Ashoholic.toc",
-    "Ashoholic.bat": "Ashoholic/Ashoholic.bat",
-    "AshoholicMerge.ps1": "Ashoholic/AshoholicMerge.ps1",
-    "AshoholicSync.ps1": "Ashoholic/AshoholicSync.ps1",
-    "Characters.lua": "Ashoholic/Characters.lua",
-    "Core.lua": "Ashoholic/Core.lua",
-    "RaidData.lua": "Ashoholic/RaidData.lua",
-    "HourlyWidget.lua": "Ashoholic/HourlyWidget.lua",
-    "Minimap.lua": "Ashoholic/Minimap.lua",
-    "Themes.lua": "Ashoholic/Themes.lua",
-    "ColorPicker.lua": "Ashoholic/ColorPicker.lua",
-    "UI.lua": "Ashoholic/UI.lua",
-    "PreviewUI.lua": "Ashoholic/PreviewUI.lua",
-    "NexusDock.lua": "Ashoholic/NexusDock.lua",
-    "FastSwap/FastSwap.toc": "FastSwap/FastSwap.toc",
-    "FastSwap/FastSwap.lua": "FastSwap/FastSwap.lua",
-    "FastSwap/FastSwap_Glue.lua": "FastSwap/FastSwap_Glue.lua",
-    "FastSwap/Sync-FastSwapGlue.ps1": "FastSwap/Sync-FastSwapGlue.ps1",
-}
-
-# Entire tracked trees. The zip prefix is prepended to the source path.
+# Addon files live under AddOns/ in the repository. Strip that prefix so the
+# archive can be extracted directly into Interface/AddOns.
 PREFIXES = (
-    ("Libraries/", "Ashoholic/"),
-    ("SharedMedia/", ""),
+    ("AddOns/", ""),
 )
 
 REQUIRED_ZIP_ENTRIES = (
@@ -55,16 +32,6 @@ REQUIRED_ZIP_ENTRIES = (
     "FastSwap/FastSwap.toc",
     "SharedMedia/SharedMedia.toc",
 )
-
-PTR_PREVIEW_EXPLICIT = {
-    "AshoholicPreview.toc": "Ashoholic/Ashoholic.toc",
-    "PreviewBootstrap.lua": "Ashoholic/PreviewBootstrap.lua",
-    "ColorPicker.lua": "Ashoholic/ColorPicker.lua",
-    "PreviewUI.lua": "Ashoholic/PreviewUI.lua",
-}
-
-PTR_PREVIEW_REQUIRED_ZIP_ENTRIES = ("Ashoholic/Ashoholic.toc",)
-
 
 def git_files() -> list[str]:
     result = subprocess.run(
@@ -200,26 +167,21 @@ def require_tracked(path: str, origin: str, tracked: set[str], errors: list[str]
 
 
 def package_map(
-    tracked: set[str], errors: list[str], ptr_preview: bool = False
+    tracked: set[str], errors: list[str]
 ) -> dict[str, str]:
     mapping: dict[str, str] = {}
-    explicit = PTR_PREVIEW_EXPLICIT if ptr_preview else EXPLICIT
-    for source, archive in explicit.items():
-        require_tracked(source, "package list", tracked, errors)
-        mapping[source] = archive
-    if not ptr_preview:
-        for source_prefix, archive_prefix in PREFIXES:
-            matched = [path for path in tracked if path.startswith(source_prefix)]
-            if not matched:
-                errors.append(f"package tree is empty: {source_prefix}")
-                continue
-            for source in matched:
-                mapping[source] = archive_prefix + source
+    for source_prefix, archive_prefix in PREFIXES:
+        matched = [path for path in tracked if path.startswith(source_prefix)]
+        if not matched:
+            errors.append(f"package tree is empty: {source_prefix}")
+            continue
+        for source in matched:
+            mapping[source] = archive_prefix + source
     return mapping
 
 
 def version_of_ashoholic(errors: list[str]) -> None:
-    for line in read_text("Ashoholic.toc").splitlines():
+    for line in read_text("AddOns/Ashoholic/Ashoholic.toc").splitlines():
         if line.startswith("## Version:"):
             version = line.split(":", 1)[1].strip()
             if version:
@@ -246,21 +208,13 @@ def main() -> int:
         metavar="PATH",
         help="write the archive to this path and keep it (the release workflow)",
     )
-    parser.add_argument(
-        "--ptr-preview",
-        action="store_true",
-        help="build the preview-only PTR archive instead of the full addon package",
-    )
     args = parser.parse_args()
 
     errors: list[str] = []
     tracked = set(git_files())
     version_of_ashoholic(errors)
-    mapping = package_map(tracked, errors, ptr_preview=args.ptr_preview)
+    mapping = package_map(tracked, errors)
     loaded = manifest_files(tracked, set(mapping), errors)
-    required_entries = (
-        PTR_PREVIEW_REQUIRED_ZIP_ENTRIES if args.ptr_preview else REQUIRED_ZIP_ENTRIES
-    )
 
     missing_from_package = sorted({path for path in loaded if path not in mapping})
     for path in missing_from_package:
@@ -283,7 +237,7 @@ def main() -> int:
             names = build_zip(mapping, destination)
             kept = None
             zip_names = set(names)
-            for required in required_entries:
+            for required in REQUIRED_ZIP_ENTRIES:
                 if required not in zip_names:
                     errors.append(f"archive is missing {required}")
             packaged_sources = set(mapping)
@@ -302,7 +256,7 @@ def main() -> int:
             return 0
 
     zip_names = set(names)
-    for required in required_entries:
+    for required in REQUIRED_ZIP_ENTRIES:
         if required not in zip_names:
             errors.append(f"archive is missing {required}")
     for path in loaded:

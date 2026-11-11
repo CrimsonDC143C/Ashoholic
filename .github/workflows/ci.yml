@@ -1,7 +1,7 @@
 name: CI
 
-# Pull requests and pushes to main or PTR-main. Packaging is a dry run:
-# nothing is published and no release is created.
+# Pull requests and pushes to main and the existing PTR-main development branch.
+# Packaging is a dry run: nothing is published and no release is created.
 on:
   pull_request:
     branches:
