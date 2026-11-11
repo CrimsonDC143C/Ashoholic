@@ -1,5 +1,5 @@
 local addonName = ...
-local addon = {}
+local addon = _G[addonName] or {}
 _G[addonName] = addon
 
 SLASH_ASHOHOLICPREVIEW1 = "/ash"

@@ -9,6 +9,14 @@
 
 Libraries\Load_Libraries.xml
 
-PreviewBootstrap.lua
+Core.lua
+Characters.lua
+Trials.lua
+Integrations\ProjectEbonhold.lua
+Themes.lua
 ColorPicker.lua
+UI.lua
+UI\Trials.lua
+Minimap.lua
+PreviewBootstrap.lua
 PreviewUI.lua
