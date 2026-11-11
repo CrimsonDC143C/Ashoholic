@@ -6,6 +6,7 @@ sync_config.txt
 
 # Ignore extracted Project Ebonhold addon source
 /ProjectEbonhold/
+/Altoholic/
 
 # Ignore OS generated files
 .DS_Store
