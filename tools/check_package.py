@@ -176,7 +176,7 @@ def package_map(
             errors.append(f"package tree is empty: {source_prefix}")
             continue
         for source in matched:
-            mapping[source] = archive_prefix + source
+            mapping[source] = archive_prefix + source[len(source_prefix):]
     return mapping
 
 

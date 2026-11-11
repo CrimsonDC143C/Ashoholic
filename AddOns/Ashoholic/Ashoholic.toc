@@ -9,13 +9,6 @@
 
 Libraries\Load_Libraries.xml
 
-Core.lua
-RaidData.lua
-Characters.lua
-HourlyWidget.lua
-Minimap.lua
-Themes.lua
+PreviewBootstrap.lua
 ColorPicker.lua
-UI.lua
 PreviewUI.lua
-NexusDock.lua
