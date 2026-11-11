@@ -504,8 +504,6 @@ function addon:ChatCommand(input)
         end
         print("|cFFFFD700Ashoholic:|r Simulated a peer running v" .. simulatedVersion ..
             ". Use /ash ver reset when finished testing.")
-    elseif cmd == "preview" then
-        addon:TogglePreviewUI()
     elseif cmd == "config" or cmd == "options" then
         addon:ToggleConfigUI()
     elseif cmd == "sync" then
