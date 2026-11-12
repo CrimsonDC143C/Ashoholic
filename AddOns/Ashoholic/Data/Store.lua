@@ -23,6 +23,7 @@ local Data = {}
 addon.Data = Data
 
 local database
+local rosterListeners = {}
 local ROSTER_ANCHOR_POINTS = {
     TOPLEFT = true,
     TOP = true,
@@ -41,6 +42,25 @@ local function RequireTable(value, description)
         error("Ashoholic cannot use saved " .. description .. ": expected a table.")
     end
     return value
+end
+
+local function IsNonNegativeInteger(value)
+    return type(value) == "number" and value >= 0
+        and value < math.huge and value == math.floor(value)
+end
+
+-- Consumers subscribe once and redraw from GetRoster, never from saved tables.
+function Data.OnRosterChanged(listener)
+    if type(listener) ~= "function" then
+        error("Ashoholic roster listeners must be functions.")
+    end
+    table.insert(rosterListeners, listener)
+end
+
+local function NotifyRosterChanged()
+    for _, listener in ipairs(rosterListeners) do
+        listener()
+    end
 end
 
 -- WoW has no account-ID API. Keep a generated ID in SavedVariables so it stays
@@ -177,7 +197,41 @@ function Data.SaveCharacterBasics(realmName, characterName, snapshot)
         updatedAt = time(),
     }
 
+    NotifyRosterChanged()
     return character.basics
+end
+
+-- Local observations replace the run's balances even when they decrease or
+-- reach zero. Do not add them to the banked account currencies or to older runs.
+function Data.SaveCharacterRun(realmName, characterName, guid, snapshot)
+    if not database then
+        error("Ashoholic run data was saved before Data.Initialize().")
+    end
+    if type(realmName) ~= "string" or realmName == ""
+        or type(characterName) ~= "string" or characterName == ""
+        or type(guid) ~= "string" or guid == "" then
+        error("Ashoholic cannot save run data without a complete character identity.")
+    end
+    RequireTable(snapshot, "run snapshot")
+    if not IsNonNegativeInteger(snapshot.soulAsh)
+        or not IsNonNegativeInteger(snapshot.soulShards)
+        or not IsNonNegativeInteger(snapshot.updatedAt) or snapshot.updatedAt == 0 then
+        error("Ashoholic run data needs non-negative currency counts and an observation time.")
+    end
+
+    local account = database.accounts[database.myAccountId]
+    local realm = account.realms[realmName]
+    local character = realm and realm[characterName]
+    if not character or not character.basics or character.basics.guid ~= guid then
+        error("Ashoholic must collect matching character basics before saving run data.")
+    end
+
+    character.run = {
+        soulAsh = snapshot.soulAsh,
+        soulShards = snapshot.soulShards,
+        updatedAt = snapshot.updatedAt,
+    }
+    NotifyRosterChanged()
 end
 
 -- Return a display-safe copy of the saved roster.
@@ -213,6 +267,10 @@ function Data.GetRoster()
                             character.basics,
                             "basics for " .. tostring(characterName)
                         )
+                        local run = character.run
+                        if run ~= nil then
+                            RequireTable(run, "run data for " .. tostring(characterName))
+                        end
                         table.insert(accountEntry.characters, {
                             name = characterName,
                             realm = realmName,
@@ -222,6 +280,9 @@ function Data.GetRoster()
                             gold = basics.gold,
                             location = basics.location,
                             lastSeen = basics.updatedAt,
+                            runAsh = run and run.soulAsh,
+                            runShards = run and run.soulShards,
+                            runUpdatedAt = run and run.updatedAt,
                         })
                     end
                 end

@@ -15,6 +15,7 @@ Data\Store.lua
 Collectors\Character.lua
 Trials.lua
 Integrations\ProjectEbonhold.lua
+Collectors\Run.lua
 Themes.lua
 ColorPicker.lua
 UI.lua

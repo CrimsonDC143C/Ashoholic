@@ -9,7 +9,7 @@ Ashoholic is a World of Warcraft addon for Project Ebonhold on WotLK 3.3.5. Its 
 - `AddOns/` contains the active addon sources. `AddOns/Ashoholic/` is the main Ashoholic addon; implement new functionality there.
 - `AddOns/Ashoholic/Ashoholic.toc` is the active load manifest and shows the main Lua load order.
 - `AddOns/Ashoholic/PreviewUI.lua` contains the sample-data preview, opened with `/ash preview`; it is not live character tracking. `/ash` opens the live roster in `AddOns/Ashoholic/UI/Roster.lua`.
-- `AddOns/Ashoholic/Data/Schema.lua` defines the approved saved-data contract; `Data/Store.lua` initializes, reads, and writes the new database, and `Collectors/Character.lua` saves live character basics. The other live modules are still scaffolding, not the archived addon's full behavior.
+- `AddOns/Ashoholic/Data/Schema.lua` defines the approved saved-data contract; `Data/Store.lua` initializes, reads, and writes the new database. `Collectors/Character.lua` saves live character basics; `Collectors/Run.lua` saves run Ash and Shards through the passive observer in `Integrations/ProjectEbonhold.lua`. Other feature modules remain scaffolding, not the archived addon's full behavior.
 - `Archive/` contains the old Ashoholic implementation, including tracking, raid metadata, widgets, Nexus integration, and the offline sync/merge scripts. Use it for reference or inspiration; it is not the active addon.
 - `AddOns/FastSwap/` is a separate addon and character-selection hook. Keep its installation helper separate from character-data syncing.
 - `AddOns/SharedMedia/` supplies the bundled media addon.

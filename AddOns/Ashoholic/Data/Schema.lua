@@ -188,8 +188,19 @@
                                are only collected while the character is online
 
  run   (the "parked run" in the detail panel)
-   Source: three ProjectEbonhold modules, all refreshed by ProjectEbonhold
-           itself shortly after login.
+   Stage 5's first slice saves only soulAsh, soulShards, and updatedAt in this
+   already-defined group; the other fields below remain reserved for later.
+   Source: PlayerRunService.GetCurrentData(), observed after the companion's
+           PlayerRunUI.UpdateData via hooksecurefunc. The empty login table
+           is not data. A new parsed run table marks a new observation; HUD
+           refreshes of the same table do not advance updatedAt.
+   Collectors/Run.lua waits for matching character basics before saving and
+   preserves the observation time if loading delays that save. An existing
+   saved run stays visible with its old age until a fresh observation arrives.
+   All counts, including zero or a decrease after a run ends, replace the old
+   balances. They are never summed with banked account currencies.
+   Later fields use Contracts and Perks. Their independent freshness must be
+   addressed before those collectors are added; this slice does not collect them.
      soulAsh           number  Soul Ash in the current run
                                (PlayerRunService.GetCurrentData().soulPoints)
      soulShards        number  Soul Shards in the current run
@@ -207,7 +218,8 @@
      anchorPlace       string  where the soul anchor is (Contracts.anchorPlace)
      echoBuild         string  name of the active Echo loadout
                                (Perks.serverBuildSlots[Perks.serverActiveSlot].name)
-     updatedAt         time
+     updatedAt         time    when the run currencies were observed, not when
+                               the roster was opened or a cached value reread
 
  torment
    Source: ProjectEbonhold.HardmodeService.

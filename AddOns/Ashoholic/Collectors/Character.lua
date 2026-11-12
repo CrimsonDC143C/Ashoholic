@@ -7,9 +7,9 @@
  basics. It reads the live values from WoW and hands a small snapshot to
  addon.Data. It never writes AshoholicDB directly.
 
- Stage 2 stores only these basics: character GUID, class, level, gold, zone,
- and the time the character was last seen. Run, raid, currency, and other
- ProjectEbonhold information are later stages.
+ This collector stores only basics: character GUID, class, level, gold, zone,
+ and the time the character was last seen. Collectors/Run.lua handles the
+ separate Ebonhold run-currency snapshot.
 ]]
 
 local addonName = ...
@@ -59,6 +59,10 @@ function CharacterCollector.Collect()
         gold = gold,
         location = location,
     })
+
+    -- Other collectors can reuse this verified identity without guessing
+    -- whether the basics collector has already received the same WoW event.
+    return realmName, characterName, guid
 end
 
 local frame = CreateFrame("Frame")

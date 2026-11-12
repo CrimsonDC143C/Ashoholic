@@ -4,8 +4,8 @@
 ================================================================================
 
  The roster asks Data/Store.lua for a read-only copy of saved character
- basics. It never reads AshoholicDB directly and never calls WoW APIs to
- collect character information; Collectors/Character.lua owns collection.
+ basics and run currencies. It never reads AshoholicDB directly or collects
+ character information; the Collectors layer owns those observations.
 
  The visual style is deliberately based on the approved PreviewUI design,
  while this first live screen keeps its job focused: show the saved characters
@@ -37,6 +37,13 @@ local ACCOUNT_HEADER_HEIGHT = 28
 local ROW_GAP = 3
 
 local frame
+local rosterDirty = false
+
+Data.OnRosterChanged(function()
+    -- Several observations can arrive together. Redraw once on the next
+    -- visible frame rather than rebuilding the roster inside a server callback.
+    rosterDirty = true
+end)
 
 local function SetFontString(fontString, size, color)
     fontString:SetFont("Fonts\\FRIZQT__.TTF", size)
@@ -71,22 +78,30 @@ local function AddTextButton(parent, text, width, height, onClick)
     return button
 end
 
+local function FormatNumber(value)
+    if type(value) ~= "number" then
+        return UNKNOWN_TEXT
+    end
+
+    local text = tostring(math.floor(value))
+    local groups = {}
+    while #text > 3 do
+        table.insert(groups, 1, string.sub(text, -3))
+        text = string.sub(text, 1, -4)
+    end
+    table.insert(groups, 1, text)
+    return table.concat(groups, ",")
+end
+
 local function FormatCopper(copper)
     if type(copper) ~= "number" then
         return UNKNOWN_TEXT
     end
 
-    local goldText = tostring(math.floor(copper / 10000))
+    local gold = FormatNumber(math.floor(copper / 10000))
     local silver = math.floor((copper % 10000) / 100)
     local remainingCopper = copper % 100
-    local goldGroups = {}
-    while #goldText > 3 do
-        table.insert(goldGroups, 1, string.sub(goldText, -3))
-        goldText = string.sub(goldText, 1, -4)
-    end
-    table.insert(goldGroups, 1, goldText)
-
-    return table.concat(goldGroups, ",") .. "g " .. silver .. "s " .. remainingCopper .. "c"
+    return gold .. "g " .. silver .. "s " .. remainingCopper .. "c"
 end
 
 local function FormatLastSeen(timestamp)
@@ -107,6 +122,7 @@ end
 
 local function CreateRosterFrame()
     local rosterFrame = CreateFrame("Frame", "AshoholicRosterFrame", UIParent)
+    rosterFrame:Hide()
     rosterFrame:SetSize(1040, 570)
     rosterFrame:SetPoint("CENTER")
     rosterFrame:SetFrameStrata("DIALOG")
@@ -160,14 +176,16 @@ local function CreateRosterFrame()
     divider:SetHeight(1)
 
     local header = CreateFrame("Frame", nil, rosterFrame)
-    header:SetPoint("TOPLEFT", 24, -72)
+    header:SetPoint("TOPLEFT", 20, -72)
     header:SetPoint("TOPRIGHT", -38, -72)
     header:SetHeight(24)
-    AddLabel(header, "CHARACTER", 12, 0, 230, 20, 10, MUTED_COLOR)
-    AddLabel(header, "LEVEL", 260, 0, 65, 20, 10, MUTED_COLOR)
-    AddLabel(header, "GOLD", 340, 0, 145, 20, 10, MUTED_COLOR)
-    AddLabel(header, "LOCATION", 500, 0, 210, 20, 10, MUTED_COLOR)
-    AddLabel(header, "LAST SEEN", 735, 0, 180, 20, 10, MUTED_COLOR)
+    AddLabel(header, "CHARACTER", 12, 0, 208, 20, 10, MUTED_COLOR)
+    AddLabel(header, "LEVEL", 230, 0, 48, 20, 10, MUTED_COLOR)
+    AddLabel(header, "RUN ASH", 295, 0, 108, 20, 10, MUTED_COLOR)
+    AddLabel(header, "RUN SHARDS", 415, 0, 103, 20, 10, MUTED_COLOR)
+    AddLabel(header, "GOLD", 530, 0, 150, 20, 10, MUTED_COLOR)
+    AddLabel(header, "LOCATION", 695, 0, 155, 20, 10, MUTED_COLOR)
+    AddLabel(header, "LAST SEEN", 865, 0, 112, 20, 10, MUTED_COLOR)
 
     local scroll = CreateFrame("ScrollFrame", "AshoholicRosterScroll", rosterFrame)
     scroll:SetPoint("TOPLEFT", 20, -101)
@@ -193,6 +211,16 @@ local function CreateRosterFrame()
     rosterFrame.headingPool = {}
     rosterFrame.characterPool = {}
     rosterFrame.messagePool = {}
+    local ageRefreshElapsed = 0
+    rosterFrame:SetScript("OnUpdate", function(_, elapsed)
+        ageRefreshElapsed = ageRefreshElapsed + elapsed
+        -- Tick the age labels even while no new server data arrives. Redrawing
+        -- reads snapshots; it never changes their saved observation times.
+        if rosterDirty or ageRefreshElapsed >= 30 then
+            ageRefreshElapsed = 0
+            UI.RefreshRoster()
+        end
+    end)
 
     local savedPosition = Data.GetRosterPosition()
     if savedPosition then
@@ -231,12 +259,15 @@ local function CreateCharacterRow(parent)
     row.background:SetTexture(WHITE_TEXTURE)
     row.background:SetAllPoints()
 
-    row.name = AddLabel(row, "", 12, -2, 230, 18, 12, TEXT_COLOR)
-    row.realm = AddLabel(row, "", 12, -19, 230, 12, 9, MUTED_COLOR)
-    row.level = AddLabel(row, "", 260, -2, 65, 32, 11, TEXT_COLOR)
-    row.gold = AddLabel(row, "", 340, -2, 145, 32, 11, TEXT_COLOR)
-    row.location = AddLabel(row, "", 500, -2, 210, 32, 11, TEXT_COLOR)
-    row.lastSeen = AddLabel(row, "", 735, -2, 180, 32, 11, TEXT_COLOR)
+    row.name = AddLabel(row, "", 12, -2, 208, 18, 12, TEXT_COLOR)
+    row.realm = AddLabel(row, "", 12, -19, 208, 12, 9, MUTED_COLOR)
+    row.level = AddLabel(row, "", 230, -2, 48, 32, 11, TEXT_COLOR)
+    row.runAsh = AddLabel(row, "", 295, -2, 108, 32, 11, TEXT_COLOR)
+    row.runShards = AddLabel(row, "", 415, -2, 103, 32, 11, TEXT_COLOR)
+    row.gold = AddLabel(row, "", 530, -2, 150, 32, 11, TEXT_COLOR)
+    row.location = AddLabel(row, "", 695, -2, 155, 32, 11, TEXT_COLOR)
+    row.lastSeen = AddLabel(row, "", 865, -2, 112, 18, 11, TEXT_COLOR)
+    row.runSeen = AddLabel(row, "", 865, -19, 112, 12, 9, MUTED_COLOR)
     return row
 end
 
@@ -263,9 +294,12 @@ local function AddRosterEntry(row, character, yOffset, rowNumber)
     row.name:SetText(character.name .. "  |cff939baa" .. className .. "|r")
     row.realm:SetText(character.realm or UNKNOWN_TEXT)
     row.level:SetText(character.level ~= nil and tostring(character.level) or UNKNOWN_TEXT)
+    row.runAsh:SetText(FormatNumber(character.runAsh))
+    row.runShards:SetText(FormatNumber(character.runShards))
     row.gold:SetText(FormatCopper(character.gold))
     row.location:SetText(character.location or UNKNOWN_TEXT)
     row.lastSeen:SetText(FormatLastSeen(character.lastSeen))
+    row.runSeen:SetText("Run: " .. FormatLastSeen(character.runUpdatedAt))
     row:Show()
 end
 
@@ -273,6 +307,8 @@ function UI.RefreshRoster()
     if not frame then
         return
     end
+    rosterDirty = false
+    local scrollOffset = frame.scroll:GetVerticalScroll()
 
     for _, heading in ipairs(frame.headingPool) do
         heading:Hide()
@@ -347,11 +383,12 @@ function UI.RefreshRoster()
     end
 
     frame.content:SetHeight(math.max(1, yOffset))
-    frame.scroll:SetVerticalScroll(0)
+    frame.scroll:UpdateScrollChildRect()
+    frame.scroll:SetVerticalScroll(math.min(scrollOffset, frame.scroll:GetVerticalScrollRange()))
     frame.status:SetText(
         characterCount .. " saved character"
             .. (characterCount == 1 and "" or "s")
-            .. "  |  Last seen is when Ashoholic last collected that character's basics."
+            .. "  |  Last seen: character basics. Run: run-data age. Run earnings exclude banked balances."
     )
 end
 
