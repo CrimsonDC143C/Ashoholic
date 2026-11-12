@@ -9,8 +9,21 @@ local Integration = addon.Integrations.ProjectEbonhold
 
 local pendingSnapshot
 
+-- On a real login, Ebonhold can send run currencies before WoW knows the zone.
+-- While a snapshot is waiting, try again once per second until it can be saved.
+local RETRY_SECONDS = 1
+local retryElapsed = 0
+local frame = CreateFrame("Frame")
+local RetryWhilePending
+
+local function StopRetrying()
+    frame:SetScript("OnUpdate", nil)
+    retryElapsed = 0
+end
+
 local function SavePendingSnapshot()
     if not pendingSnapshot then
+        StopRetrying()
         return
     end
 
@@ -18,14 +31,25 @@ local function SavePendingSnapshot()
     -- It returns no identity while the world is still loading.
     local realmName, characterName, guid = Character.Collect()
     if not realmName then
+        frame:SetScript("OnUpdate", RetryWhilePending)
         return
     end
 
-    Data.SaveCharacterRun(realmName, characterName, guid, pendingSnapshot)
+    -- Clear first, so a rejected snapshot reports one error instead of retrying.
+    local snapshot = pendingSnapshot
     pendingSnapshot = nil
+    StopRetrying()
+    Data.SaveCharacterRun(realmName, characterName, guid, snapshot)
 end
 
-local frame = CreateFrame("Frame")
+RetryWhilePending = function(_, elapsed)
+    retryElapsed = retryElapsed + elapsed
+    if retryElapsed >= RETRY_SECONDS then
+        retryElapsed = 0
+        SavePendingSnapshot()
+    end
+end
+
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("PLAYER_LOGOUT")
