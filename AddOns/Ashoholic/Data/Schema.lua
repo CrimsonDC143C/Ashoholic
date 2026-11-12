@@ -22,8 +22,9 @@
    - The UI only asks Data/ for values. It never reads AshoholicDB itself.
 
  WHEN IS IT LOADED?
-   Not yet. Stage 2 adds it to Ashoholic.toc, right after Core.lua.
-   Until then this file is documentation that nothing loads in-game.
+   Stage 2 loads this file after Core.lua. Data/Store.lua follows it and
+   prepares AshoholicDB; Collectors/Character.lua then saves the current
+   character's basic information through that Data layer.
 
 ================================================================================
  1. THE SHAPE OF AshoholicDB
@@ -285,9 +286,9 @@
 
  - The old Ashoholic saved its data through the AceDB library, which left keys
    such as "global" and "profiles" at the top of AshoholicDB. As you chose,
-   Stage 2 deletes those old keys (listed in Schema.OLD_ACEDB_KEYS below) the
-   first time the new addon loads. The new addon does not use AceDB for its
-   saved data.
+   Stage 2 removes those old keys (listed in Schema.OLD_ACEDB_KEYS below) when
+   the new addon initializes. This cleanup is safe to repeat and becomes a
+   no-op after the first time. The new addon does not use AceDB for saved data.
  - Whenever this blueprint changes later, raise Schema.VERSION and add an
    upgrade step, so saved data is converted instead of lost.
 
@@ -314,7 +315,7 @@ Schema.CHARACTER_GROUPS = { "basics", "run", "torment", "raids", "activities" }
 Schema.TRIAL_GROUPS = { "champion", "crusader" }
 
 -- Keys that the old AceDB-based Ashoholic could leave at the top of
--- AshoholicDB. Stage 2 removes them once because you chose to start fresh.
+-- AshoholicDB. Stage 2 removes them because you chose to start fresh.
 -- None of these names are used by the new layout above.
 Schema.OLD_ACEDB_KEYS = {
     "global", "profiles", "profileKeys", "namespaces",
