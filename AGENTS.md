@@ -31,6 +31,8 @@ Data flows Game -> Collectors -> Data -> UI. UI code must not read game data or 
 
 Store character records as Account -> Realm -> Character -> information plus last-updated time, regardless of whether data came from logging in, in-game sharing, or an offline import.
 
+`AddOns/Ashoholic/Data/Schema.lua` is the approved data contract: saved layout, field sources, account vs character scope, and rules. Read it before changing saved data, and update it (raising `Schema.VERSION` with a migration when the layout changes) in the same change. Key rules: unknown values are `nil`, never 0; every data group has its own `updatedAt` from `time()` (never save `GetTime()`); merges keep the newer group, not the whole character.
+
 Split `PreviewUI.lua` gradually, one tab at a time as it becomes live. Update the `.toc` load order with each move.
 
 ## Working Style
@@ -42,6 +44,7 @@ Split `PreviewUI.lua` gradually, one tab at a time as it becomes live. Update th
 
 `vendor/ProjectEbonhold/` is source for the companion in-game addon, not the Ebonhold server backend. Ashoholic calls into its client-side APIs and server request protocol. Work in Ashoholic's own call sites first; inspect the companion source only when an issue depends on an API or protocol detail that cannot be established locally. Do not modify the companion source unless the task explicitly asks for it.
 
+Never call `ProjectEbonhold.onEventReceived` from Ashoholic: it stores one handler per server message ID, so a second registration replaces ProjectEbonhold's own handler. Read its public state and functions, use its `OnChanged` listener APIs, or `hooksecurefunc` its public functions instead.
 ## Versioning and Publishing
 
 - Before pushing a release-bound change or publishing a release, read the current branch and `## Version:` in `AddOns/Ashoholic/Ashoholic.toc`. Raise the version question early enough to include any approved bump in a release-bound commit or PR merge.
