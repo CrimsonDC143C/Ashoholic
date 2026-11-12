@@ -23,6 +23,14 @@ local Data = {}
 addon.Data = Data
 
 local database
+local progressionRules
+local rosterListeners = {}
+-- Each of these Ebonhold currencies has a spendable and a banked balance.
+-- Soul Ash is listed separately because every balance update includes it.
+local POOL_CURRENCIES = { "shard", "essence", "artisan" }
+local PRESTIGE_FIELDS = { "count", "gateProgress", "pendingShards", "pendingEssence", "updatedAt" }
+local CONTRACT_FIELDS = { "offeringBonusPct", "offeringsUsed", "offeringsMax", "anchorState", "anchorPlace", "updatedAt" }
+local ECHO_BUILD_FIELDS = { "enabled", "slot", "name", "updatedAt" }
 local ROSTER_ANCHOR_POINTS = {
     TOPLEFT = true,
     TOP = true,
@@ -41,6 +49,94 @@ local function RequireTable(value, description)
         error("Ashoholic cannot use saved " .. description .. ": expected a table.")
     end
     return value
+end
+
+local function IsNonNegativeNumber(value)
+    return type(value) == "number" and value >= 0
+        and value < math.huge
+end
+
+local function IsNonNegativeInteger(value)
+    return IsNonNegativeNumber(value) and value == math.floor(value)
+end
+
+local function RequireObservation(snapshot, description)
+    RequireTable(snapshot, description .. " snapshot")
+    if not IsNonNegativeInteger(snapshot.updatedAt) or snapshot.updatedAt == 0 then
+        error("Ashoholic " .. description .. " needs an observation time.")
+    end
+end
+
+local function CopyFields(source, fields)
+    local copy = {}
+    for _, field in ipairs(fields) do
+        copy[field] = source[field]
+    end
+    return copy
+end
+
+local function CopyOptionalGroup(record, name, fields)
+    if record[name] == nil then
+        return nil
+    end
+    return CopyFields(RequireTable(record[name], name), fields)
+end
+
+-- Consumers subscribe once and redraw from GetRoster, never from saved tables.
+-- Account and character groups share this notification; every live page reads
+-- the same display-safe model.
+function Data.OnRosterChanged(listener)
+    if type(listener) ~= "function" then
+        error("Ashoholic roster listeners must be functions.")
+    end
+    table.insert(rosterListeners, listener)
+end
+
+-- These are companion display rules, not character observations. Keep them
+-- only for this session so a companion update cannot leave stale saved names
+-- or thresholds. Collectors supply them; UI code never calls the companion.
+function Data.SetProgressionRules(snapshot)
+    RequireTable(snapshot, "progression rules")
+    local names = RequireTable(snapshot.tierNames, "Torment tier names")
+    if not IsNonNegativeInteger(snapshot.prestigeGate) or snapshot.prestigeGate == 0
+        or not IsNonNegativeInteger(snapshot.tormentLadderTop)
+        or snapshot.tormentLadderTop < 2 or snapshot.tormentLadderTop > #names then
+        error("Ashoholic received invalid Prestige or Torment display rules.")
+    end
+
+    local copiedNames = {}
+    for tier, name in ipairs(names) do
+        if type(name) ~= "string" or name == "" then
+            error("Ashoholic received an invalid Torment tier name.")
+        end
+        copiedNames[tier] = name
+    end
+    progressionRules = {
+        prestigeGate = snapshot.prestigeGate,
+        tormentLadderTop = snapshot.tormentLadderTop,
+        tierNames = copiedNames,
+    }
+end
+
+function Data.GetProgressionRules()
+    if not progressionRules then
+        error("Ashoholic progression rules were requested before collection.")
+    end
+    local names = {}
+    for tier, name in ipairs(progressionRules.tierNames) do
+        names[tier] = name
+    end
+    return {
+        prestigeGate = progressionRules.prestigeGate,
+        tormentLadderTop = progressionRules.tormentLadderTop,
+        tierNames = names,
+    }
+end
+
+local function NotifyRosterChanged()
+    for _, listener in ipairs(rosterListeners) do
+        listener()
+    end
 end
 
 -- WoW has no account-ID API. Keep a generated ID in SavedVariables so it stays
@@ -177,7 +273,217 @@ function Data.SaveCharacterBasics(realmName, characterName, snapshot)
         updatedAt = time(),
     }
 
+    NotifyRosterChanged()
     return character.basics
+end
+
+-- Every character-specific collector must attach its data to matching basics,
+-- including the GUID check for a deleted/recreated character with the same name.
+local function RequireCharacter(realmName, characterName, guid, description)
+    if not database then
+        error("Ashoholic " .. description .. " was saved before Data.Initialize().")
+    end
+    if type(realmName) ~= "string" or realmName == ""
+        or type(characterName) ~= "string" or characterName == ""
+        or type(guid) ~= "string" or guid == "" then
+        error("Ashoholic cannot save " .. description .. " without a complete character identity.")
+    end
+
+    local account = database.accounts[database.myAccountId]
+    local realm = account.realms[realmName]
+    local character = realm and realm[characterName]
+    if not character or not character.basics or character.basics.guid ~= guid then
+        error("Ashoholic must collect matching character basics before saving " .. description .. ".")
+    end
+    return character
+end
+
+-- Local observations replace the run's balances even when they decrease or
+-- reach zero. Do not add them to the banked account currencies or to older runs.
+function Data.SaveCharacterRun(realmName, characterName, guid, snapshot)
+    local character = RequireCharacter(realmName, characterName, guid, "run data")
+    RequireObservation(snapshot, "run data")
+    if not IsNonNegativeInteger(snapshot.soulAsh)
+        or not IsNonNegativeInteger(snapshot.soulShards) then
+        error("Ashoholic run data needs non-negative currency counts.")
+    end
+
+    character.run = {
+        soulAsh = snapshot.soulAsh,
+        soulShards = snapshot.soulShards,
+        updatedAt = snapshot.updatedAt,
+    }
+    NotifyRosterChanged()
+end
+
+function Data.SaveAccountPrestige(snapshot)
+    if not database then
+        error("Ashoholic Prestige data was saved before Data.Initialize().")
+    end
+    RequireObservation(snapshot, "Prestige data")
+    if not IsNonNegativeInteger(snapshot.count)
+        or not IsNonNegativeInteger(snapshot.gateProgress) then
+        error("Ashoholic Prestige data needs a count and gate progress.")
+    end
+    local bothUnknown = snapshot.pendingShards == nil and snapshot.pendingEssence == nil
+    local bothKnown = IsNonNegativeInteger(snapshot.pendingShards)
+        and IsNonNegativeInteger(snapshot.pendingEssence)
+    if not bothUnknown and not bothKnown then
+        error("Ashoholic received an incomplete Prestige reward.")
+    end
+
+    database.accounts[database.myAccountId].prestige = CopyFields(snapshot, PRESTIGE_FIELDS)
+    NotifyRosterChanged()
+end
+
+function Data.SaveCharacterContracts(realmName, characterName, guid, snapshot)
+    local character = RequireCharacter(realmName, characterName, guid, "contract data")
+    RequireObservation(snapshot, "contract data")
+    if not IsNonNegativeNumber(snapshot.offeringBonusPct)
+        or not IsNonNegativeInteger(snapshot.offeringsUsed)
+        or not IsNonNegativeInteger(snapshot.offeringsMax)
+        or not IsNonNegativeInteger(snapshot.anchorState) or snapshot.anchorState > 2
+        or type(snapshot.anchorPlace) ~= "string" then
+        error("Ashoholic received invalid offerings or Soul Anchor data.")
+    end
+
+    character.contracts = CopyFields(snapshot, CONTRACT_FIELDS)
+    NotifyRosterChanged()
+end
+
+function Data.SaveCharacterEchoBuild(realmName, characterName, guid, snapshot)
+    local character = RequireCharacter(realmName, characterName, guid, "Echo build")
+    RequireObservation(snapshot, "Echo build")
+    if type(snapshot.enabled) ~= "boolean" then
+        error("Ashoholic Echo build availability must be known.")
+    end
+    if snapshot.enabled then
+        if not IsNonNegativeInteger(snapshot.slot) or snapshot.slot == 0
+            or type(snapshot.name) ~= "string" then
+            error("Ashoholic received an invalid active Echo loadout.")
+        end
+    elseif snapshot.slot ~= nil or snapshot.name ~= nil then
+        error("Ashoholic cannot save an active slot when Echo loadouts are unavailable.")
+    end
+
+    character.echoBuild = CopyFields(snapshot, ECHO_BUILD_FIELDS)
+    NotifyRosterChanged()
+end
+
+function Data.SaveCharacterTorment(realmName, characterName, guid, snapshot)
+    local character = RequireCharacter(realmName, characterName, guid, "Torment data")
+    RequireObservation(snapshot, "Torment data")
+    if not progressionRules then
+        error("Ashoholic needs Torment display rules before saving tiers.")
+    end
+    local tierCount = #progressionRules.tierNames
+    if not IsNonNegativeInteger(snapshot.currentTier)
+        or snapshot.currentTier < 1 or snapshot.currentTier > tierCount then
+        error("Ashoholic received an invalid selected Torment tier.")
+    end
+
+    local unlocked = RequireTable(snapshot.unlockedTiers, "Torment unlocks")
+    local copiedUnlocks = {}
+    for tier, value in pairs(unlocked) do
+        if not IsNonNegativeInteger(tier) or tier < 1 or tier > tierCount or value ~= true then
+            error("Ashoholic received invalid Torment unlocks.")
+        end
+        copiedUnlocks[tier] = true
+    end
+    if not copiedUnlocks[1] then
+        error("Ashoholic Torment data must include Normal access.")
+    end
+
+    character.torment = {
+        currentTier = snapshot.currentTier,
+        unlockedTiers = copiedUnlocks,
+        updatedAt = snapshot.updatedAt,
+    }
+    NotifyRosterChanged()
+end
+
+-- Account currencies are shared by every character on this WoW account, so
+-- they need no character identity. A new server update replaces the whole
+-- group, including decreases after spending. Run currencies are never added
+-- here, and Warband gold stays unknown because it has no readable source.
+function Data.SaveAccountCurrencies(snapshot)
+    if not database then
+        error("Ashoholic account currencies were saved before Data.Initialize().")
+    end
+    RequireTable(snapshot, "account currency snapshot")
+    if not IsNonNegativeInteger(snapshot.ashSpendable)
+        or not IsNonNegativeInteger(snapshot.ashBanked)
+        or not IsNonNegativeInteger(snapshot.updatedAt) or snapshot.updatedAt == 0 then
+        error("Ashoholic account currencies need Soul Ash balances and an observation time.")
+    end
+
+    -- The other currencies arrive as spendable/banked pairs. Both values must
+    -- be known, or both stay unknown (nil); half of a pair is rejected.
+    for _, currency in ipairs(POOL_CURRENCIES) do
+        local spendable = snapshot[currency .. "Spendable"]
+        local banked = snapshot[currency .. "Banked"]
+        local bothUnknown = spendable == nil and banked == nil
+        local bothKnown = IsNonNegativeInteger(spendable) and IsNonNegativeInteger(banked)
+        if not bothUnknown and not bothKnown then
+            error("Ashoholic received an incomplete " .. currency .. " balance.")
+        end
+    end
+
+    local account = RequireTable(database.accounts[database.myAccountId], "current account")
+    account.currencies = {
+        ashSpendable = snapshot.ashSpendable,
+        ashBanked = snapshot.ashBanked,
+        shardSpendable = snapshot.shardSpendable,
+        shardBanked = snapshot.shardBanked,
+        essenceSpendable = snapshot.essenceSpendable,
+        essenceBanked = snapshot.essenceBanked,
+        artisanSpendable = snapshot.artisanSpendable,
+        artisanBanked = snapshot.artisanBanked,
+        updatedAt = snapshot.updatedAt,
+    }
+    NotifyRosterChanged()
+end
+
+-- Copy an account's saved currencies for the UI, or return nil when they have
+-- not been received yet.
+local function CopyAccountCurrencies(account, accountId)
+    local currencies = account.currencies
+    if currencies == nil then
+        return nil
+    end
+    RequireTable(currencies, "currencies for account " .. tostring(accountId))
+
+    return {
+        ashSpendable = currencies.ashSpendable,
+        ashBanked = currencies.ashBanked,
+        shardSpendable = currencies.shardSpendable,
+        shardBanked = currencies.shardBanked,
+        essenceSpendable = currencies.essenceSpendable,
+        essenceBanked = currencies.essenceBanked,
+        artisanSpendable = currencies.artisanSpendable,
+        artisanBanked = currencies.artisanBanked,
+        updatedAt = currencies.updatedAt,
+    }
+end
+
+local function CopyTorment(character)
+    if character.torment == nil then
+        return nil
+    end
+    local source = RequireTable(character.torment, "Torment data")
+    local unlocked = RequireTable(source.unlockedTiers, "Torment unlocks")
+    local copy = {
+        currentTier = source.currentTier,
+        updatedAt = source.updatedAt,
+        unlockedTiers = {},
+    }
+    for tier in pairs(unlocked) do
+        copy.unlockedTiers[tier] = true
+        if not copy.highestUnlocked or tier > copy.highestUnlocked then
+            copy.highestUnlocked = tier
+        end
+    end
+    return copy
 end
 
 -- Return a display-safe copy of the saved roster.
@@ -196,6 +502,8 @@ function Data.GetRoster()
             id = accountId,
             name = account.name,
             isCurrent = accountId == database.myAccountId,
+            currencies = CopyAccountCurrencies(account, accountId),
+            prestige = CopyOptionalGroup(account, "prestige", PRESTIGE_FIELDS),
             characters = {},
         }
         local realms = account.realms
@@ -213,6 +521,10 @@ function Data.GetRoster()
                             character.basics,
                             "basics for " .. tostring(characterName)
                         )
+                        local run = character.run
+                        if run ~= nil then
+                            RequireTable(run, "run data for " .. tostring(characterName))
+                        end
                         table.insert(accountEntry.characters, {
                             name = characterName,
                             realm = realmName,
@@ -222,6 +534,12 @@ function Data.GetRoster()
                             gold = basics.gold,
                             location = basics.location,
                             lastSeen = basics.updatedAt,
+                            runAsh = run and run.soulAsh,
+                            runShards = run and run.soulShards,
+                            runUpdatedAt = run and run.updatedAt,
+                            contracts = CopyOptionalGroup(character, "contracts", CONTRACT_FIELDS),
+                            echoBuild = CopyOptionalGroup(character, "echoBuild", ECHO_BUILD_FIELDS),
+                            torment = CopyTorment(character),
                         })
                     end
                 end
