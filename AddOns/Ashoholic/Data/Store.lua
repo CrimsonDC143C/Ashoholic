@@ -24,6 +24,7 @@ addon.Data = Data
 
 local database
 local progressionRules
+local encounterCatalog
 local rosterListeners = {}
 -- Each of these Ebonhold currencies has a spendable and a banked balance.
 -- Soul Ash is listed separately because every balance update includes it.
@@ -71,6 +72,22 @@ local function CopyFields(source, fields)
     local copy = {}
     for _, field in ipairs(fields) do
         copy[field] = source[field]
+    end
+    return copy
+end
+
+local function CopyTree(value, copies)
+    if type(value) ~= "table" then
+        return value
+    end
+    copies = copies or {}
+    if copies[value] then
+        return copies[value]
+    end
+    local copy = {}
+    copies[value] = copy
+    for key, child in pairs(value) do
+        copy[key] = CopyTree(child, copies)
     end
     return copy
 end
@@ -131,6 +148,23 @@ function Data.GetProgressionRules()
         tormentLadderTop = progressionRules.tormentLadderTop,
         tierNames = names,
     }
+end
+
+-- The catalogue is display data for this session, not a character snapshot.
+-- The collector supplies the companion's raids; the shared catalogue adds the
+-- preview's dungeon names without treating them as server encounters.
+function Data.SetEncounterCatalog(raids)
+    if not addon.EncounterCatalog then
+        error("Ashoholic cannot build encounters before Data/Encounters.lua is loaded.")
+    end
+    encounterCatalog = addon.EncounterCatalog.Build(raids)
+end
+
+function Data.GetEncounterCatalog()
+    if not encounterCatalog then
+        error("Ashoholic encounter catalogue was requested before collection.")
+    end
+    return CopyTree(encounterCatalog)
 end
 
 local function NotifyRosterChanged()
@@ -402,6 +436,31 @@ function Data.SaveCharacterTorment(realmName, characterName, guid, snapshot)
     NotifyRosterChanged()
 end
 
+local function CopyRaidLocks(lockedUntil)
+    RequireTable(lockedUntil, "raid loot locks")
+    local copy = {}
+    for bossId, endsAt in pairs(lockedUntil) do
+        if not IsNonNegativeInteger(bossId) or bossId == 0
+            or not IsNonNegativeInteger(endsAt) or endsAt == 0 then
+            error("Ashoholic received an invalid raid loot lock.")
+        end
+        copy[bossId] = endsAt
+    end
+    return copy
+end
+
+-- A complete reply replaces the old group, including an empty reply. A missing
+-- group is different: no server observation has been received yet.
+function Data.SaveCharacterRaids(realmName, characterName, guid, snapshot)
+    local character = RequireCharacter(realmName, characterName, guid, "raid data")
+    RequireObservation(snapshot, "raid data")
+    character.raids = {
+        lockedUntil = CopyRaidLocks(snapshot.lockedUntil),
+        updatedAt = snapshot.updatedAt,
+    }
+    NotifyRosterChanged()
+end
+
 -- Account currencies are shared by every character on this WoW account, so
 -- they need no character identity. A new server update replaces the whole
 -- group, including decreases after spending. Run currencies are never added
@@ -486,6 +545,18 @@ local function CopyTorment(character)
     return copy
 end
 
+local function CopyRaids(character)
+    if character.raids == nil then
+        return nil
+    end
+    local raids = RequireTable(character.raids, "raid data")
+    RequireObservation(raids, "raid data")
+    return {
+        lockedUntil = CopyRaidLocks(raids.lockedUntil),
+        updatedAt = raids.updatedAt,
+    }
+end
+
 -- Return a display-safe copy of the saved roster.
 -- The UI receives only the fields it needs and cannot change AshoholicDB by
 -- editing the tables returned here.
@@ -540,6 +611,7 @@ function Data.GetRoster()
                             contracts = CopyOptionalGroup(character, "contracts", CONTRACT_FIELDS),
                             echoBuild = CopyOptionalGroup(character, "echoBuild", ECHO_BUILD_FIELDS),
                             torment = CopyTorment(character),
+                            raids = CopyRaids(character),
                         })
                     end
                 end
@@ -565,6 +637,55 @@ function Data.GetRoster()
     end)
 
     return roster
+end
+
+local function CopyWatchlist(watched)
+    RequireTable(watched, "encounter watchlist")
+    local copy = {}
+    for key, selected in pairs(watched) do
+        if type(key) ~= "string" or key == "" or selected ~= true then
+            error("Ashoholic received an invalid encounter selection.")
+        end
+        copy[key] = true
+    end
+    return copy
+end
+
+function Data.GetEncounterWatchlist()
+    if not database then
+        error("Ashoholic encounter watchlist was requested before Data.Initialize().")
+    end
+    local ui = database.settings.ui
+    if ui == nil then
+        return {}
+    end
+    RequireTable(ui, "UI settings")
+    local raids = ui.raids
+    if raids == nil then
+        return {}
+    end
+    RequireTable(raids, "encounter settings")
+    if raids.watched == nil then
+        return {}
+    end
+    return CopyWatchlist(raids.watched)
+end
+
+function Data.SaveEncounterWatchlist(watched)
+    if not database then
+        error("Ashoholic encounter watchlist was saved before Data.Initialize().")
+    end
+    local copy = CopyWatchlist(watched)
+    local settings = database.settings
+    if settings.ui == nil then
+        settings.ui = {}
+    end
+    local ui = RequireTable(settings.ui, "UI settings")
+    if ui.raids == nil then
+        ui.raids = {}
+    end
+    local raids = RequireTable(ui.raids, "encounter settings")
+    raids.watched = copy
 end
 
 -- Return a small copy of the saved window position, never the settings table

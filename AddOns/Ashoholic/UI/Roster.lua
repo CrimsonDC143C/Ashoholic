@@ -10,8 +10,8 @@
  fetch account balances if this session has none yet.
 
  The visual style is deliberately based on the approved PreviewUI design,
- with separate character-details and Progression renderers. Only the live
- Roster and Progression pages are enabled; the sample preview stays separate.
+ with separate character-details, Progression and Raids renderers. The sample
+ preview stays separate from the live pages.
 ]]
 
 local addonName = ...
@@ -318,9 +318,10 @@ local function CreateRosterFrame()
     divider:SetHeight(1)
 
     rosterFrame.tabButtons = {}
-    for index, name in ipairs({ "Roster", "Progression" }) do
+    for index, name in ipairs({ "Roster", "Raids", "Progression" }) do
         local tabName = name
-        local button = AddTextButton(rosterFrame, name, 148, 30, function()
+        local title = name == "Raids" and "Raids & Dungeons" or name
+        local button = AddTextButton(rosterFrame, title, 148, 30, function()
             UI.ShowLiveTab(tabName)
         end)
         button:SetPoint("TOPLEFT", 20 + (index - 1) * 158, -60)
@@ -348,6 +349,7 @@ local function CreateRosterFrame()
     local body = CreateFrame("Frame", nil, rosterFrame)
     body:SetPoint("TOPLEFT", 20, -COLUMN_HEADER_TOP)
     body:SetPoint("BOTTOMRIGHT", -20, 43)
+    rosterFrame.body = body
     local rosterPage = CreateFrame("Frame", nil, body)
     rosterPage:SetAllPoints()
     rosterFrame.rosterPage = rosterPage
@@ -519,20 +521,59 @@ local function AddRosterEntry(row, accountId, character, yOffset, rowNumber)
     row:Show()
 end
 
+-- A missing or incompatible raid catalogue must not prevent the existing
+-- roster and progression pages from opening. The error is reported if the
+-- user opens the Raids tab.
+local function EnsureRaidsPage()
+    if not frame.raidsPage then
+        frame.raidsPage = UI.CreateRaidsPage(frame.body, FRAME_WIDTH - 40, function()
+            UI.RefreshRoster()
+        end)
+        frame.raidsPage:Hide()
+    end
+end
+
 function UI.RefreshRoster()
     if not frame then
         return
+    end
+    if activeTab == "Raids" then
+        EnsureRaidsPage()
     end
     rosterDirty = false
     local roster = Data.GetRoster()
     local rules = Data.GetProgressionRules()
     RefreshSummaryCards(roster)
+
+    -- Focus changes only the encounter page's available height. Switching to
+    -- another tab restores the shared cards without losing the Focus choice.
+    local encounterFocus = activeTab == "Raids" and frame.raidsPage.focused
+    if frame.encounterFocusApplied ~= encounterFocus then
+        frame.body:ClearAllPoints()
+        frame.body:SetPoint("TOPLEFT", 20, -(COLUMN_HEADER_TOP - (encounterFocus and 54 or 0)))
+        frame.body:SetPoint("BOTTOMRIGHT", -20, 43)
+        for _, card in ipairs(frame.currencyCards) do
+            if encounterFocus then card:Hide() else card:Show() end
+        end
+        if encounterFocus then frame.goldCard:Hide() else frame.goldCard:Show() end
+        frame.encounterFocusApplied = encounterFocus
+    end
+
     for name, button in pairs(frame.tabButtons) do
         button.text:SetTextColor(unpack(name == activeTab and TEAL_COLOR or MUTED_COLOR))
         button:GetNormalTexture():SetVertexColor(unpack(name == activeTab and ALT_ROW_COLOR or ROW_COLOR))
     end
-    if activeTab == "Progression" then
-        frame.rosterPage:Hide()
+    if activeTab ~= "Roster" then frame.rosterPage:Hide() end
+    if activeTab ~= "Progression" then frame.progressionPage:Hide() end
+    if frame.raidsPage and activeTab ~= "Raids" then frame.raidsPage:Hide() end
+    if activeTab == "Raids" then
+        frame.raidsPage:Show()
+        UI.RefreshRaids(frame.raidsPage, roster)
+        frame.status:SetText(
+            "Raid loot is per character; Available does not guarantee raid access. Dungeon status is Unknown."
+        )
+        return
+    elseif activeTab == "Progression" then
         frame.progressionPage:Show()
         UI.RefreshProgression(frame.progressionPage, roster, rules)
         frame.status:SetText(
@@ -542,7 +583,6 @@ function UI.RefreshRoster()
         )
         return
     end
-    frame.progressionPage:Hide()
     frame.rosterPage:Show()
     local selected = FindSelectedCharacter(roster)
     local scrollOffset = frame.scroll:GetVerticalScroll()
@@ -630,8 +670,11 @@ function UI.RefreshRoster()
 end
 
 function UI.ShowLiveTab(name)
-    if name ~= "Roster" and name ~= "Progression" then
+    if name ~= "Roster" and name ~= "Raids" and name ~= "Progression" then
         error("Ashoholic has no live tab named " .. tostring(name) .. ".")
+    end
+    if name == "Raids" and frame then
+        EnsureRaidsPage()
     end
     activeTab = name
     UI.RefreshRoster()

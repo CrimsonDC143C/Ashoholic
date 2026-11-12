@@ -115,6 +115,7 @@ environment.ColorPickerFrame:Hide()
 environment.ColorPickerFrameOpacitySlider = NewObject("Slider", nil, environment.ColorPickerFrame)
 environment.ColorPickerFrameOpacitySlider:SetMinMaxValues(0, 1)
 setfenv(assert(loadfile("ColorPicker.lua")), environment)("Ashoholic")
+setfenv(assert(loadfile("Data\\Encounters.lua")), environment)("Ashoholic")
 setfenv(assert(loadfile("PreviewUI.lua")), environment)("Ashoholic")
 environment.Ashoholic:TogglePreviewUI()
 

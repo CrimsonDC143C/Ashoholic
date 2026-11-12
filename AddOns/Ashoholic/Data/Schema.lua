@@ -37,7 +37,7 @@
  Text in <angle brackets> below is an example, not a real key.
 
  AshoholicDB = {
-     schemaVersion = 3,              -- which version of this blueprint the data uses
+     schemaVersion = 4,              -- which version of this blueprint the data uses
      myAccountId   = "<random ID>",  -- the account this copy of the file belongs to
 
      accounts = {
@@ -312,14 +312,16 @@
    instance-only tiers still retain their real names and selected values.
 
  raids
-   Source: ProjectEbonhold.RaidLockout.IsLooted(bossId), asked for every boss
-           in ProjectEbonhold.RaidLockoutData.
-     looted            table   { [bossId] = true } for bosses looted this week
-     resetAt           time    the weekly reset (Tuesday 03:00 UTC); after it,
-                               every boss is available again
+   Source: a complete SEND_RAID_LOOT_LOCKOUTS reply, also read by the
+           companion's RaidLockout service. The reply lists each looted boss
+           and its remaining lock time. Ashoholic observes it without
+           replacing the companion's handler or requesting data itself.
+     lockedUntil       table   { [bossId] = time } for each reported lock
      updatedAt         time
-   Dungeon lockouts have no source, so they are not saved and the UI shows
-   them as Unknown.
+   The group is nil until a complete reply arrives. Only then does an absent
+   or expired lock mean Available in that snapshot. Individual end times are
+   retained instead of assuming every server-provided timer is identical.
+   Dungeon names are a watchlist only; dungeon status remains Unknown.
 
  activities   (Hero's Call Board)
    Source: ProjectEbonhold.Callboard.OnChanged("board") and Callboard.board.
@@ -367,12 +369,15 @@
  ------------------------------------------------------------------------------
 
  settings
-   Stage 4 starts with the live roster window's saved position. More settings
-   are added only when their controls become part of the live UI. The PreviewUI
-   settings remain sample-only and are not copied into these saved settings.
+   Stage 4 starts with the live roster window's saved position. Stage 6 adds
+   the encounter watchlist. The PreviewUI settings remain sample-only and are
+   not copied into these saved settings.
      ui.roster.position { point, x, y }
        point             string  anchor on the screen, e.g. "CENTER"
        x, y              number  offsets from the matching UIParent anchor
+     ui.raids.watched    table   { [stable encounter key] = true }
+                               raid keys use real encounter IDs; dungeon keys
+                               use their names, not invented server IDs
    If this position is absent, the roster opens in the center of the screen.
 
 ================================================================================
@@ -400,7 +405,7 @@ addon.Schema = Schema
 
 -- Which version of the blueprint this code expects.
 -- Raise it by 1 whenever the saved layout changes (see section 4 above).
-Schema.VERSION = 3
+Schema.VERSION = 4
 
 -- The group names, so Data/ and Sync/ can loop over them instead of repeating
 -- the lists. A "group" is a small table with its own updatedAt (Rule 2).
@@ -447,6 +452,68 @@ function Schema.NewCharacter()
     return {}
 end
 
+-- Version 3 documented a single weekly reset even though the feature had no
+-- live writer yet. If a database already contains that documented shape,
+-- preserve each lock using its former shared reset time.
+local function MigrateRaidSnapshots(database)
+    if database.accounts == nil then
+        return
+    end
+    if type(database.accounts) ~= "table" then
+        error("Ashoholic cannot migrate invalid accounts.")
+    end
+    local migrations = {}
+    for _, account in pairs(database.accounts) do
+        if type(account) ~= "table" then
+            error("Ashoholic cannot migrate an invalid account.")
+        end
+        if account.realms ~= nil then
+            if type(account.realms) ~= "table" then
+                error("Ashoholic cannot migrate invalid realms.")
+            end
+            for _, realm in pairs(account.realms) do
+                if type(realm) ~= "table" then
+                    error("Ashoholic cannot migrate invalid character records.")
+                end
+                for _, character in pairs(realm) do
+                    if type(character) ~= "table" then
+                        error("Ashoholic cannot migrate an invalid character.")
+                    end
+                    local raids = character.raids
+                    if raids ~= nil then
+                        if type(raids) ~= "table" then
+                            error("Ashoholic cannot migrate invalid raid data.")
+                        end
+                        if raids.looted ~= nil then
+                            if type(raids.looted) ~= "table" or raids.lockedUntil ~= nil
+                                or type(raids.resetAt) ~= "number"
+                                or raids.resetAt <= 0 or raids.resetAt >= math.huge
+                                or raids.resetAt ~= math.floor(raids.resetAt) then
+                                error("Ashoholic cannot migrate an invalid raid snapshot.")
+                            end
+                            local lockedUntil = {}
+                            for bossId, looted in pairs(raids.looted) do
+                                if type(bossId) ~= "number" or bossId <= 0
+                                    or bossId >= math.huge or bossId ~= math.floor(bossId)
+                                    or looted ~= true then
+                                    error("Ashoholic cannot migrate an invalid raid encounter.")
+                                end
+                                lockedUntil[bossId] = raids.resetAt
+                            end
+                            migrations[#migrations + 1] = { raids = raids, lockedUntil = lockedUntil }
+                        end
+                    end
+                    for _, migration in ipairs(migrations) do
+                        migration.raids.lockedUntil = migration.lockedUntil
+                        migration.raids.looted = nil
+                        migration.raids.resetAt = nil
+                    end
+                end
+            end
+        end
+    end
+end
+
 -- Convert older saved databases one version at a time, keeping characters,
 -- currencies and settings. Optional groups remain nil until observed.
 function Schema.Migrate(database)
@@ -475,6 +542,10 @@ function Schema.Migrate(database)
             -- Version 3 gives the new sources independent groups and saves
             -- actual tier unlocks. No existing observations need moving.
             version = 3
+        elseif version == 3 then
+            MigrateRaidSnapshots(database)
+            -- Missing raid groups and watchlists remain missing until used.
+            version = 4
         else
             error("Ashoholic has no migration for saved schema version " .. tostring(version) .. ".")
         end

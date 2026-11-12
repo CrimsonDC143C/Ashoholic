@@ -64,7 +64,7 @@ If you play on multiple WoW accounts and want to see all your characters in one 
  -->
 ## Commands
 
-### Live roster and progression
+### Live roster, raids and progression
 
 Use `/ash` or `/ashoholic` to open the live window.
 
@@ -76,26 +76,38 @@ Use `/ash` or `/ashoholic` to open the live window.
   alongside account Prestige count, committed Ash progress, and the next
   server-reported Essence reward. Torment unlocks are not account-wide. Higher,
   instance-only Torments retain their actual names rather than being capped at X.
-- **Freshness:** run currencies, offerings/anchor, Echo builds, Torment and
-  Prestige keep independent timestamps. Offline characters retain their last
-  observations; missing observations display **Unknown**, not zero.
+- **Raids & Dungeons:** select encounters in the watchlist to compare saved
+  characters. Raid names, boss IDs and loot metadata come from
+  ProjectEbonhold's catalogue. **Looted** means the character has an active
+  boss loot lock; it does not prevent entering the raid. **Available** means
+  no active loot lock was reported, not that the raid is accessible. Hover a
+  status for its observation age and, when looted, remaining lock time.
+  Selection is saved across reloads. Dungeon names come from the preview's
+  catalogue; they are watchlist entries only and their status is **Unknown**.
+- **Freshness:** run currencies, offerings/anchor, Echo builds, Torment,
+  Prestige and raid loot keep independent timestamps. Offline characters
+  retain their last observations; missing observations display **Unknown**,
+  not zero. Raid locks become available when their reported end times pass.
 
 Ashoholic observes the companion's normal updates. The companion requests
 Prestige, Torment and contracts on entering the world, and requests Echo slots
 after its active-slot update. Opening the companion's Prestige panel obtains a
 fresh Prestige reply; the live **Refresh** button only redraws saved snapshots.
 The existing once-per-session currency request on opening `/ash` is unchanged.
-No Prestige, offering, anchor, difficulty or build-switch actions are performed
-by Ashoholic.
+Raid loot updates normally arrive at login and after a new lock; Ashoholic does
+not request them. Open the game's **Raid Info** on a character to ask the
+companion for a fresh update if necessary. No Prestige, offering, anchor,
+difficulty or build-switch actions are performed by Ashoholic.
 
 The Soul Anchor display uses its saved place, not the Spirit Healer's relative
 "here/elsewhere" wording. **Echo build** means the active live loadout, not a
 highlighted wishlist. Prestige rewards come from a complete server snapshot;
 older replies without reward fields leave those values Unknown.
 
-Schema version 3 preserves existing characters, currencies and window position.
-The new independently updated groups fill as their data arrives. The other
-preview tabs and settings are not yet part of the live window.
+Schema version 4 preserves existing characters, currencies and window position.
+Raid observations and watchlist selections fill as their data arrives or is
+selected. The other preview tabs and settings are not yet part of the live
+window.
 
 ### UI design preview
 

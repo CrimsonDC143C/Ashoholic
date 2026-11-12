@@ -370,6 +370,134 @@ function Integration.GetProgressionRules()
     }
 end
 
+-- The companion owns the raid names, real encounter IDs and loot metadata.
+-- Data/Encounters.lua builds its own tree from these values without changing
+-- the companion's catalogue.
+function Integration.GetRaidCatalog()
+    local catalog = ProjectEbonhold and ProjectEbonhold.RaidLockoutData
+    if type(catalog) ~= "table" or #catalog == 0 then
+        error("Ashoholic cannot read ProjectEbonhold's raid catalogue.")
+    end
+    return catalog
+end
+
+local function ParseRaidLoot(body)
+    local observedAt = time()
+    local lockedUntil, seen = {}, {}
+
+    -- Both an empty body and one trailing semicolon are valid complete replies.
+    if string.sub(body, 1, 1) == ";" or string.find(body, ";;", 1, true) then
+        error("Ashoholic received an invalid raid loot reply.")
+    end
+    if string.sub(body, -1) == ";" then
+        body = string.sub(body, 1, -2)
+    end
+    if body ~= "" then
+        for entry in string.gmatch(body, "[^;]+") do
+            local rawId, rawSeconds = string.match(entry, "^(%d+):(%d+)$")
+            if not rawId or not rawSeconds then
+                error("Ashoholic received an invalid raid loot entry.")
+            end
+            local bossId, seconds = tonumber(rawId), tonumber(rawSeconds)
+            if not bossId or bossId <= 0 or bossId >= math.huge
+                or not seconds or seconds >= math.huge or seen[bossId] then
+                error("Ashoholic received an invalid raid loot entry.")
+            end
+            seen[bossId] = true
+            if seconds > 0 then
+                local endsAt = observedAt + seconds
+                if endsAt >= math.huge then
+                    error("Ashoholic received an invalid raid loot reset time.")
+                end
+                lockedUntil[bossId] = endsAt
+            end
+        end
+    end
+    return { lockedUntil = lockedUntil, updatedAt = observedAt }
+end
+
+-- A raid reply can exceed one addon message. Assemble every numbered piece
+-- before replacing a saved snapshot, just as the companion's dispatcher does.
+-- Incomplete or unrecognized replies never turn Unknown into Available.
+function Integration.WatchRaidLoot(onSnapshot)
+    RequireObserver(onSnapshot, "raid loot")
+    local messageIds = ProjectEbonhold and ProjectEbonhold.SS
+    if type(messageIds) ~= "table" or type(messageIds.SEND_RAID_LOOT_LOCKOUTS) ~= "number" then
+        error("Ashoholic cannot collect raid loot: ProjectEbonhold's message ID is unavailable.")
+    end
+
+    local inflight = {}
+    local nextSequence, latestAppliedSequence = 0, 0
+    local function ApplyReply(body, sequence)
+        -- An older multi-part update can finish after a newer complete one.
+        -- It must not replace the newer character snapshot.
+        if sequence <= latestAppliedSequence then
+            return
+        end
+        local snapshot = ParseRaidLoot(body)
+        latestAppliedSequence = sequence
+        onSnapshot(snapshot)
+    end
+    local listener = CreateFrame("Frame")
+    listener:RegisterEvent("CHAT_MSG_ADDON")
+    listener:SetScript("OnEvent", ProtectObserver(function(_, _, prefix, message)
+        if prefix ~= SERVER_MESSAGE_PREFIX or type(message) ~= "string" then
+            return
+        end
+        local rawId, body = string.match(message, "^(%d+)\t(.*)$")
+        if not rawId or tonumber(rawId) ~= messageIds.SEND_RAID_LOOT_LOCKOUTS then
+            return
+        end
+
+        local now = GetTime()
+        for key, record in pairs(inflight) do
+            if now - record.startedAt > 15 then
+                inflight[key] = nil
+                print("|cffffca63Ashoholic:|r An incomplete raid loot update expired; waiting for another update.")
+            end
+        end
+
+        if string.sub(body, 1, 1) ~= "@" then
+            nextSequence = nextSequence + 1
+            ApplyReply(body, nextSequence)
+            return
+        end
+
+        local messageKey, rawIndex, rawTotal, part = string.match(
+            body, "^@(%x%x%x%x)\t(%x%x%x)/(%x%x%x)\t(.*)$"
+        )
+        if not messageKey then
+            error("Ashoholic received an invalid chunked raid loot reply.")
+        end
+        local index, total = tonumber(rawIndex, 16), tonumber(rawTotal, 16)
+        if total < 1 or index < 1 or index > total then
+            error("Ashoholic received an invalid raid loot chunk number.")
+        end
+        messageKey = string.upper(messageKey)
+        local record = inflight[messageKey]
+        if not record then
+            nextSequence = nextSequence + 1
+            record = { total = total, received = 0, parts = {}, startedAt = now, sequence = nextSequence }
+            inflight[messageKey] = record
+        elseif record.total ~= total then
+            inflight[messageKey] = nil
+            error("Ashoholic received conflicting raid loot chunks.")
+        end
+        if record.parts[index] and record.parts[index] ~= part then
+            inflight[messageKey] = nil
+            error("Ashoholic received conflicting copies of a raid loot chunk.")
+        end
+        if not record.parts[index] then
+            record.parts[index] = part
+            record.received = record.received + 1
+        end
+        if record.received == record.total then
+            inflight[messageKey] = nil
+            ApplyReply(table.concat(record.parts, "", 1, record.total), record.sequence)
+        end
+    end))
+end
+
 -- SEND_PRESTIGE_DATA is a small, unchunked reply:
 -- count;gateProgress[;oldBonus[;pendingShards;pendingEssence]].
 -- Read complete replies only. A Prestige result updates the companion's count
