@@ -10,7 +10,9 @@
 Libraries\Load_Libraries.xml
 
 Core.lua
-Characters.lua
+Data\Schema.lua
+Data\Store.lua
+Collectors\Character.lua
 Trials.lua
 Integrations\ProjectEbonhold.lua
 Themes.lua
