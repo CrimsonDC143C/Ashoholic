@@ -18,6 +18,7 @@ Integrations\ProjectEbonhold.lua
 Themes.lua
 ColorPicker.lua
 UI.lua
+UI\Roster.lua
 UI\Trials.lua
 Minimap.lua
 PreviewBootstrap.lua

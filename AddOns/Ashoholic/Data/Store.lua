@@ -172,3 +172,72 @@ function Data.SaveCharacterBasics(realmName, characterName, snapshot)
 
     return character.basics
 end
+
+-- Return a display-safe copy of the saved roster.
+-- The UI receives only the fields it needs and cannot change AshoholicDB by
+-- editing the tables returned here.
+function Data.GetRoster()
+    if not database then
+        error("Ashoholic roster was requested before Data.Initialize().")
+    end
+
+    local roster = {}
+    for accountId, account in pairs(database.accounts) do
+        RequireTable(account, "account " .. tostring(accountId))
+
+        local accountEntry = {
+            id = accountId,
+            name = account.name,
+            isCurrent = accountId == database.myAccountId,
+            characters = {},
+        }
+        local realms = account.realms
+        if realms ~= nil then
+            RequireTable(realms, "realms for account " .. tostring(accountId))
+
+            for realmName, characters in pairs(realms) do
+                RequireTable(characters, "characters on realm " .. tostring(realmName))
+
+                for characterName, character in pairs(characters) do
+                    RequireTable(character, "character " .. tostring(characterName))
+
+                    if character.basics ~= nil then
+                        local basics = RequireTable(
+                            character.basics,
+                            "basics for " .. tostring(characterName)
+                        )
+                        table.insert(accountEntry.characters, {
+                            name = characterName,
+                            realm = realmName,
+                            guid = basics.guid,
+                            class = basics.class,
+                            level = basics.level,
+                            gold = basics.gold,
+                            location = basics.location,
+                            lastSeen = basics.updatedAt,
+                        })
+                    end
+                end
+            end
+        end
+
+        table.sort(accountEntry.characters, function(left, right)
+            if left.realm ~= right.realm then
+                return left.realm < right.realm
+            end
+            return left.name < right.name
+        end)
+        table.insert(roster, accountEntry)
+    end
+
+    table.sort(roster, function(left, right)
+        local leftName = left.name or left.id
+        local rightName = right.name or right.id
+        if leftName ~= rightName then
+            return leftName < rightName
+        end
+        return left.id < right.id
+    end)
+
+    return roster
+end
