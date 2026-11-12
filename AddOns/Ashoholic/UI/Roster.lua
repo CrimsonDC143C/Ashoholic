@@ -132,6 +132,11 @@ local function CreateRosterFrame()
     end)
     titleBar:SetScript("OnDragStop", function()
         rosterFrame:StopMovingOrSizing()
+        local point, _, _, x, y = rosterFrame:GetPoint(1)
+        if not point or x == nil or y == nil then
+            error("Ashoholic could not read the roster window's position.")
+        end
+        Data.SaveRosterPosition(point, x, y)
     end)
 
     AddLabel(titleBar, "ASHOHOLIC", 22, -13, 230, 25, 18, GOLD_COLOR)
@@ -188,6 +193,19 @@ local function CreateRosterFrame()
     rosterFrame.headingPool = {}
     rosterFrame.characterPool = {}
     rosterFrame.messagePool = {}
+
+    local savedPosition = Data.GetRosterPosition()
+    if savedPosition then
+        rosterFrame:ClearAllPoints()
+        rosterFrame:SetPoint(
+            savedPosition.point,
+            UIParent,
+            savedPosition.point,
+            savedPosition.x,
+            savedPosition.y
+        )
+    end
+
     return rosterFrame
 end
 
