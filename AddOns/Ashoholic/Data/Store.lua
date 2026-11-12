@@ -23,6 +23,17 @@ local Data = {}
 addon.Data = Data
 
 local database
+local ROSTER_ANCHOR_POINTS = {
+    TOPLEFT = true,
+    TOP = true,
+    TOPRIGHT = true,
+    LEFT = true,
+    CENTER = true,
+    RIGHT = true,
+    BOTTOMLEFT = true,
+    BOTTOM = true,
+    BOTTOMRIGHT = true,
+}
 
 -- Returns a useful error rather than silently replacing unexpected saved data.
 local function RequireTable(value, description)
@@ -66,16 +77,12 @@ function Data.Initialize()
 
     database = RequireTable(AshoholicDB, "AshoholicDB")
 
-    -- Do not guess how a future or unknown schema should be converted.
-    -- A real migration must be written before changing the saved layout.
-    if database.schemaVersion ~= nil and database.schemaVersion ~= Schema.VERSION then
-        error(
-            "Ashoholic saved data uses schema version "
-                .. tostring(database.schemaVersion)
-                .. ", but this addon supports version "
-                .. tostring(Schema.VERSION)
-                .. ". A migration is required."
-        )
+    -- Older AceDB saves have no Ashoholic schema version. They are handled as
+    -- fresh data because the user chose not to import the old layout.
+    if database.schemaVersion == nil then
+        database.schemaVersion = Schema.VERSION
+    else
+        Schema.Migrate(database)
     end
 
     -- Remove the old AceDB layout. The user chose to start fresh, so these
@@ -240,4 +247,72 @@ function Data.GetRoster()
     end)
 
     return roster
+end
+
+-- Return a small copy of the saved window position, never the settings table
+-- itself. A missing position means the UI should use its default placement.
+function Data.GetRosterPosition()
+    if not database then
+        error("Ashoholic roster position was requested before Data.Initialize().")
+    end
+
+    local settings = database.settings
+    local ui = settings.ui
+    if ui == nil then
+        return nil
+    end
+    RequireTable(ui, "UI settings")
+
+    local roster = ui.roster
+    if roster == nil then
+        return nil
+    end
+    RequireTable(roster, "roster settings")
+
+    local position = roster.position
+    if position == nil then
+        return nil
+    end
+    RequireTable(position, "roster window position")
+
+    if not ROSTER_ANCHOR_POINTS[position.point]
+        or type(position.x) ~= "number"
+        or type(position.y) ~= "number" then
+        error("Ashoholic saved an invalid roster window position.")
+    end
+
+    return {
+        point = position.point,
+        x = position.x,
+        y = position.y,
+    }
+end
+
+-- Save the draggable roster's position through the Data layer.
+function Data.SaveRosterPosition(point, x, y)
+    if not database then
+        error("Ashoholic roster position was saved before Data.Initialize().")
+    end
+    if not ROSTER_ANCHOR_POINTS[point]
+        or type(x) ~= "number"
+        or type(y) ~= "number" then
+        error("Ashoholic cannot save an invalid roster window position.")
+    end
+
+    local settings = database.settings
+    if settings.ui == nil then
+        settings.ui = {}
+    end
+    local ui = RequireTable(settings.ui, "UI settings")
+
+    if ui.roster == nil then
+        ui.roster = {}
+    end
+    local roster = RequireTable(ui.roster, "roster settings")
+
+    roster.position = {
+        point = point,
+        x = x,
+        y = y,
+    }
 end

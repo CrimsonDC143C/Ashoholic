@@ -37,7 +37,7 @@
  Text in <angle brackets> below is an example, not a real key.
 
  AshoholicDB = {
-     schemaVersion = 1,              -- which version of this blueprint the data uses
+     schemaVersion = 2,              -- which version of this blueprint the data uses
      myAccountId   = "<random ID>",  -- the account this copy of the file belongs to
 
      accounts = {
@@ -276,9 +276,13 @@
  ------------------------------------------------------------------------------
 
  settings
-   Filled in Stage 4. It will hold the UI preferences from the preview: theme,
-   fonts, sizes, roster columns, tabs, alerts, account colors, collapsed
-   accounts and watched raid bosses.
+   Stage 4 starts with the live roster window's saved position. More settings
+   are added only when their controls become part of the live UI. The PreviewUI
+   settings remain sample-only and are not copied into these saved settings.
+     ui.roster.position { point, x, y }
+       point             string  anchor on the screen, e.g. "CENTER"
+       x, y              number  offsets from the matching UIParent anchor
+   If this position is absent, the roster opens in the center of the screen.
 
 ================================================================================
  4. UPGRADING OLD DATA (MIGRATIONS)
@@ -305,7 +309,7 @@ addon.Schema = Schema
 
 -- Which version of the blueprint this code expects.
 -- Raise it by 1 whenever the saved layout changes (see section 4 above).
-Schema.VERSION = 1
+Schema.VERSION = 2
 
 -- The group names, so Data/ and Sync/ can loop over them instead of repeating
 -- the lists. A "group" is a small table with its own updatedAt (Rule 2).
@@ -350,4 +354,35 @@ end
 -- Every group stays nil (unknown) until a Collector or Sync fills it in.
 function Schema.NewCharacter()
     return {}
+end
+
+-- Convert older saved databases one version at a time. Version 2 adds an
+-- optional live-roster position under settings.ui.roster.position. No value
+-- needs to be copied: a missing position intentionally means "open centered",
+-- and all existing character records and user settings stay untouched.
+function Schema.Migrate(database)
+    local version = database.schemaVersion
+    if type(version) ~= "number" then
+        error("Ashoholic cannot migrate saved data with an invalid schema version.")
+    end
+    if version > Schema.VERSION then
+        error(
+            "Ashoholic saved data uses newer schema version "
+                .. tostring(version)
+                .. "; this addon supports version "
+                .. tostring(Schema.VERSION)
+                .. "."
+        )
+    end
+
+    while version < Schema.VERSION do
+        if version == 1 then
+            -- Version 2 adds settings.ui.roster.position when the window is
+            -- first moved. Keeping it absent preserves the centered default.
+            version = 2
+        else
+            error("Ashoholic has no migration for saved schema version " .. tostring(version) .. ".")
+        end
+        database.schemaVersion = version
+    end
 end
