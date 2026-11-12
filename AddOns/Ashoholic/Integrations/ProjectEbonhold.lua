@@ -6,6 +6,23 @@ addon.Integrations.ProjectEbonhold = addon.Integrations.ProjectEbonhold or {}
 
 local Integration = addon.Integrations.ProjectEbonhold
 
+-- A post-hook still runs inside the companion's call. Report our errors to
+-- WoW without interrupting the rest of the companion's server handling.
+local function ProtectObserver(observer)
+    return function(...)
+        local ok, problem = pcall(observer, ...)
+        if not ok then
+            geterrorhandler()(problem)
+        end
+    end
+end
+
+local function RequireObserver(callback, description)
+    if type(callback) ~= "function" then
+        error("Ashoholic needs a callback to observe Ebonhold " .. description .. ".")
+    end
+end
+
 -- Observe the companion's parsed state, not its server-message registrations.
 -- Its parser replaces the run table before calling PlayerRunUI.UpdateData,
 -- including when the HUD is hidden. Other HUD updates may reuse that table;
@@ -271,12 +288,7 @@ function Integration.WatchAccountCurrencies(onSnapshot)
     -- These observers run inside ProjectEbonhold's server-message handling.
     -- Report an Ashoholic error normally, but never let it interrupt or look
     -- like an error in ProjectEbonhold's own code.
-    local function Deliver(snapshot)
-        local ok, problem = pcall(onSnapshot, snapshot)
-        if not ok then
-            geterrorhandler()(problem)
-        end
-    end
+    local Deliver = ProtectObserver(onSnapshot)
 
     local function ObserveServerSnapshot(snapshot)
         lastServerSnapshot = snapshot
@@ -334,4 +346,240 @@ function Integration.RequestAccountCurrencies()
     -- The hook in WatchLoadoutReplies records this request as well.
     ProjectEbonhold.RequestLoadoutFromServer()
     return true
+end
+
+-- These constants describe the companion's current display rules. Collectors
+-- pass a copy to Data; no UI file needs to read ProjectEbonhold itself.
+function Integration.GetProgressionRules()
+    local companion = ProjectEbonhold
+    local prestige = companion and companion.PrestigeService
+    local tiers = companion and companion.TormentTierData
+    if not prestige or type(prestige.GetGateThreshold) ~= "function"
+        or type(tiers) ~= "table" then
+        error("Ashoholic cannot read ProjectEbonhold's progression rules.")
+    end
+
+    local names = {}
+    for tier, definition in ipairs(tiers) do
+        names[tier] = definition.name
+    end
+    return {
+        prestigeGate = prestige.GetGateThreshold(),
+        tormentLadderTop = companion.TormentLadderTop,
+        tierNames = names,
+    }
+end
+
+-- SEND_PRESTIGE_DATA is a small, unchunked reply:
+-- count;gateProgress[;oldBonus[;pendingShards;pendingEssence]].
+-- Read complete replies only. A Prestige result updates the companion's count
+-- before its gate/reward, and old replies leave GetPendingEssence at a default
+-- zero; neither case is a complete, known reward snapshot.
+local function ReadPrestigeReply(message, expectedId)
+    local messageId, body = string.match(message, "^(%d+)\t(.*)$")
+    if tonumber(messageId) ~= expectedId then
+        return nil
+    end
+    local fields = {}
+    for field in string.gmatch(body .. ";", "([^;]*);") do
+        table.insert(fields, field)
+    end
+    if #fields ~= 2 and #fields ~= 3 and #fields ~= 5 then
+        return nil
+    end
+    if not string.match(fields[1], "^%d+$") or not string.match(fields[2], "^%d+$") then
+        return nil
+    end
+    if #fields >= 3 and not string.match(fields[3], "^%-?%d+%.?%d*$") then
+        return nil
+    end
+    local snapshot = {
+        count = tonumber(fields[1]),
+        gateProgress = tonumber(fields[2]),
+        updatedAt = time(),
+    }
+    if #fields == 5 then
+        if not string.match(fields[4], "^%d+$") or not string.match(fields[5], "^%d+$") then
+            return nil
+        end
+        snapshot.pendingShards = tonumber(fields[4])
+        snapshot.pendingEssence = tonumber(fields[5])
+    end
+    return snapshot
+end
+
+function Integration.WatchPrestige(onSnapshot)
+    RequireObserver(onSnapshot, "Prestige")
+    local messageIds = ProjectEbonhold and ProjectEbonhold.SS
+    if type(messageIds) ~= "table" or type(messageIds.SEND_PRESTIGE_DATA) ~= "number" then
+        error("Ashoholic cannot collect Prestige: ProjectEbonhold's message ID is unavailable.")
+    end
+
+    -- Install during addon loading, before the companion's login request.
+    -- This separate listener never registers or replaces a companion handler.
+    local listener = CreateFrame("Frame")
+    listener:RegisterEvent("CHAT_MSG_ADDON")
+    listener:SetScript("OnEvent", ProtectObserver(function(_, _, prefix, message)
+        if prefix ~= SERVER_MESSAGE_PREFIX or type(message) ~= "string" then
+            return
+        end
+        local snapshot = ReadPrestigeReply(message, messageIds.SEND_PRESTIGE_DATA)
+        if snapshot then
+            onSnapshot(snapshot)
+        end
+    end))
+end
+
+function Integration.WatchTorment(onSnapshot)
+    RequireObserver(onSnapshot, "Torment")
+    local companion = ProjectEbonhold
+    local service = companion and companion.HardmodeService
+    local hardmodeUI = companion and companion.HardmodeUI
+    if not service or not hardmodeUI or type(hardmodeUI.Refresh) ~= "function"
+        or type(companion.TormentTierData) ~= "table" then
+        error("Ashoholic cannot collect Torment: ProjectEbonhold's Torment API is unavailable.")
+    end
+    for _, name in ipairs({
+        "IsDifficultyKnown", "GetCurrentDifficulty", "IsTierUnlocked",
+        "GetSoulAshRequirement", "IsCommittedSoulAshesKnown",
+    }) do
+        if type(service[name]) ~= "function" then
+            error("Ashoholic cannot collect Torment: missing HardmodeService." .. name .. ".")
+        end
+    end
+
+    local loggedIn = false
+    local previous
+    local function Observe(force)
+        if not loggedIn or not service.IsDifficultyKnown() then
+            return
+        end
+
+        local unlocked = {}
+        for tier = 1, #companion.TormentTierData do
+            -- Current realms use achievements only. If an Ash gate returns,
+            -- do not mistake the login placeholder pool for a real zero.
+            if service.GetSoulAshRequirement(tier) > 0
+                and not service.IsCommittedSoulAshesKnown() then
+                return
+            end
+            if service.IsTierUnlocked(tier) then
+                unlocked[tier] = true
+            end
+        end
+
+        local currentTier = service.GetCurrentDifficulty()
+        local changed = not previous or currentTier ~= previous.currentTier
+        if previous then
+            for tier = 1, #companion.TormentTierData do
+                if unlocked[tier] ~= previous.unlockedTiers[tier] then
+                    changed = true
+                end
+            end
+        end
+        if not changed and not force then
+            return
+        end
+
+        previous = { currentTier = currentTier, unlockedTiers = unlocked, updatedAt = time() }
+        onSnapshot(previous)
+    end
+
+    hooksecurefunc(hardmodeUI, "Refresh", ProtectObserver(function()
+        Observe(false)
+    end))
+    local listener = CreateFrame("Frame")
+    listener:RegisterEvent("PLAYER_LOGIN")
+    listener:RegisterEvent("ACHIEVEMENT_EARNED")
+    listener:SetScript("OnEvent", ProtectObserver(function(self, event)
+        if event == "PLAYER_LOGIN" then
+            loggedIn = true
+            self:UnregisterEvent("PLAYER_LOGIN")
+        end
+        Observe(event == "ACHIEVEMENT_EARNED")
+    end))
+end
+
+function Integration.WatchContracts(onSnapshot)
+    RequireObserver(onSnapshot, "offerings and Soul Anchor")
+    local companion = ProjectEbonhold
+    local contracts = companion and companion.Contracts
+    local runUI = companion and companion.PlayerRunUI
+    if not contracts or not runUI or type(runUI.UpdateBracket) ~= "function" then
+        error("Ashoholic cannot collect offerings: ProjectEbonhold's Contracts API is unavailable.")
+    end
+
+    local lastList
+    local Observe = ProtectObserver(function()
+        if not contracts.received then
+            return
+        end
+        if type(contracts.list) ~= "table" then
+            error("Ashoholic received an invalid contract list from ProjectEbonhold.")
+        end
+        if contracts.list == lastList then
+            return
+        end
+        lastList = contracts.list
+        onSnapshot({
+            offeringBonusPct = contracts.gauge,
+            offeringsUsed = contracts.used,
+            offeringsMax = contracts.max,
+            anchorState = contracts.anchorState,
+            anchorPlace = contracts.anchorPlace,
+            updatedAt = time(),
+        })
+    end)
+
+    -- CT.OnData was registered as a function value, so hooking that table
+    -- field would miss the stored handler. The handler always calls the public
+    -- UpdateBracket after parsing; the timer calls it too, with the same list.
+    hooksecurefunc(runUI, "UpdateBracket", Observe)
+    Observe()
+end
+
+function Integration.WatchEchoBuild(onSnapshot)
+    RequireObserver(onSnapshot, "the active Echo build")
+    local companion = ProjectEbonhold
+    local service = companion and companion.PerkService
+    local perkUI = companion and companion.PerkUI
+    if not service or type(service.GetServerBuildSlots) ~= "function"
+        or type(service.GetServerActiveSlot) ~= "function"
+        or type(service.AreServerBuildSlotsEnabled) ~= "function"
+        or not perkUI or type(perkUI.RefreshLoadoutHighlights) ~= "function" then
+        error("Ashoholic cannot collect Echo builds: ProjectEbonhold's loadout API is unavailable.")
+    end
+
+    local lastSlots, lastSlot, lastEnabled
+    local Observe = ProtectObserver(function()
+        local slots = service.GetServerBuildSlots()
+        -- nil is the loading state, including the active-slot login push that
+        -- causes the companion to request the full slots for the first time.
+        if slots == nil then
+            return
+        end
+        if type(slots) ~= "table" then
+            error("Ashoholic received invalid Echo loadouts from ProjectEbonhold.")
+        end
+        local enabled = service.AreServerBuildSlotsEnabled()
+        local activeSlot = service.GetServerActiveSlot()
+        if slots == lastSlots and activeSlot == lastSlot and enabled == lastEnabled then
+            return
+        end
+
+        local snapshot = { enabled = enabled, updatedAt = time() }
+        if enabled then
+            local build = slots[activeSlot]
+            if not build or not build.verified then
+                return
+            end
+            snapshot.slot = activeSlot
+            snapshot.name = build.name
+        end
+        lastSlots, lastSlot, lastEnabled = slots, activeSlot, enabled
+        onSnapshot(snapshot)
+    end)
+
+    hooksecurefunc(perkUI, "RefreshLoadoutHighlights", Observe)
+    Observe()
 end

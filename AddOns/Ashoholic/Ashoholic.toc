@@ -17,9 +17,12 @@ Trials.lua
 Integrations\ProjectEbonhold.lua
 Collectors\Run.lua
 Collectors\Currencies.lua
+Collectors\Ebonhold.lua
 Themes.lua
 ColorPicker.lua
 UI.lua
+UI\CharacterDetails.lua
+UI\Progression.lua
 UI\Roster.lua
 UI\Trials.lua
 Minimap.lua

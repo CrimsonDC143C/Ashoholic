@@ -37,7 +37,7 @@
  Text in <angle brackets> below is an example, not a real key.
 
  AshoholicDB = {
-     schemaVersion = 2,              -- which version of this blueprint the data uses
+     schemaVersion = 3,              -- which version of this blueprint the data uses
      myAccountId   = "<random ID>",  -- the account this copy of the file belongs to
 
      accounts = {
@@ -50,6 +50,8 @@
                      ["<character name>"] = {
                          basics     = { ... },   -- GROUP
                          run        = { ... },   -- GROUP
+                         contracts  = { ... },   -- GROUP: offerings and Soul Anchor
+                         echoBuild  = { ... },   -- GROUP: active live Echo loadout
                          torment    = { ... },   -- GROUP
                          raids      = { ... },   -- GROUP
                          activities = { ... },   -- GROUP
@@ -124,7 +126,7 @@
 
  Rule 7 - Calculated values are not saved.
    Totals (gold including all characters, currency totals across accounts),
-   stale flags, countdowns, the Prestige Essence projection and
+   stale flags, countdowns, the highest unlocked Torment tier and
    "offerings remaining" are worked out when the UI needs them. Saving them
    would create copies that can disagree with the real values.
 
@@ -198,16 +200,26 @@
      updatedAt         time    when the balance update was observed
 
  prestige
-   Source: ProjectEbonhold.PrestigeService. Only save when
-           PrestigeService.IsGateProgressKnown() is true (see Rule 1).
-     count             number  Prestiges done so far (GetTotalPrestiges)
-     gateProgress      number  committed Soul Ash counted toward the Prestige
-                               gate (GetGateProgress)
-     pendingEssence    number  Soul Essence the next Prestige would give
-                               (second value returned by GetPendingEssence)
+   Source: the complete SEND_PRESTIGE_DATA reply that feeds PrestigeService.
+   The integration observes this small reply passively (Rule 5 d), rather
+   than treating every PrestigeUI.Refresh as fresh data. Refresh also follows
+   a Prestige result that changes only the count, leaving the old gate and
+   reward until the next complete reply. Saving that mixture would be wrong.
+   The companion requests data on login/reload and when its Prestige panel
+   opens; Ashoholic sends no additional request. Old saved values retain
+   their age until another reply arrives.
+     count             number  Prestiges done so far
+     gateProgress      number  committed Soul Ash counted toward the gate
+     pendingShards     number  banked Shards reported in this Prestige reply
+     pendingEssence    number  exact Soul Essence reward reported by the server
      updatedAt         time
-   The gate itself (10,771,440 Soul Ash) is a fixed number in
-   ProjectEbonhold, so it is not saved.
+   Older two/three-field replies omit both pending values; these stay nil,
+   not the placeholder zero returned by GetPendingEssence before those
+   fields arrive. A result message alone never changes this group.
+   The gate (currently 10,771,440 Soul Ash), tier names and Torment ladder
+   size are read through the integration into Data's session-only rules.
+   They are not saved. The UI shows currency requirements, not a promise that
+   a Prestige is allowed while dead, in combat, or under other server rules.
 
  ------------------------------------------------------------------------------
  CHARACTER GROUPS (one set per character)
@@ -229,8 +241,6 @@
                                are only collected while the character is online
 
  run   (the "parked run" in the detail panel)
-   Stage 5's first slice saves only soulAsh, soulShards, and updatedAt in this
-   already-defined group; the other fields below remain reserved for later.
    Source: PlayerRunService.GetCurrentData(), observed after the companion's
            PlayerRunUI.UpdateData via hooksecurefunc. The empty login table
            is not data. A new parsed run table marks a new observation; HUD
@@ -240,38 +250,66 @@
    saved run stays visible with its old age until a fresh observation arrives.
    All counts, including zero or a decrease after a run ends, replace the old
    balances. They are never summed with banked account currencies.
-   Later fields use Contracts and Perks. Their independent freshness must be
-   addressed before those collectors are added; this slice does not collect them.
      soulAsh           number  Soul Ash in the current run
                                (PlayerRunService.GetCurrentData().soulPoints)
      soulShards        number  Soul Shards in the current run
                                (PlayerRunService.GetCurrentData().soulShards)
-     offeringBonusPct  number  offering bonus in percent. Exact source is
-                               confirmed in-game in Stage 5 (Contracts.gauge
-                               or the run data's soulShardsBonusPct).
-     offeringsUsed     number  offerings used. Confirmed in Stage 5
-                               (Contracts.used or run data banksUsedWeek).
-     offeringsMax      number  offerings allowed (Contracts.max or
-                               banksMaxWeek). "Remaining" is calculated.
-     anchorState       number  soul anchor: 0 none, 1 at the Spirit Healer you
-                               were talking to, 2 elsewhere
-                               (Contracts.anchorState; meaning checked in Stage 5)
-     anchorPlace       string  where the soul anchor is (Contracts.anchorPlace)
-     echoBuild         string  name of the active Echo loadout
-                               (Perks.serverBuildSlots[Perks.serverActiveSlot].name)
      updatedAt         time    when the run currencies were observed, not when
                                the roster was opened or a cached value reread
+
+ contracts
+   Source: ProjectEbonhold.Contracts, only after received is true. Its parser
+   replaces Contracts.list before calling PlayerRunUI.UpdateBracket, even
+   when the Spirit Healer window is hidden. Observe that public function,
+   and use the new list's identity to distinguish a reply from HUD redraws.
+   Offerings and Soul Anchor arrive together, but separately from run
+   currencies; neither group is allowed to refresh the other's timestamp.
+   The companion requests this data on entering the world. Ashoholic does
+   not open the Spirit Healer window or send contract actions.
+     offeringBonusPct  number  offering bonus in percent (Contracts.gauge)
+     offeringsUsed     number  offerings used this run (Contracts.used)
+     offeringsMax      number  offerings allowed this run (Contracts.max)
+                               Remaining is max(0, max - used), not a weekly
+                               counter from the older player-run protocol.
+     anchorState       number  soul anchor: 0 none, 1 at the Spirit Healer you
+                               were talking to, 2 elsewhere
+                               (Contracts.anchorState)
+     anchorPlace       string  where the soul anchor is (Contracts.anchorPlace)
+     updatedAt         time
+   "Here" is relative to that healer, not the character's current location.
+   Offline displays show the saved place, or "Set (place unknown)", never
+   claim the anchor is at the character's current position.
+
+ echoBuild
+   Source: PerkService.GetServerBuildSlots / GetServerActiveSlot. Observe
+   PerkUI.RefreshLoadoutHighlights after server updates. A new slots table,
+   changed active slot or changed availability is a new observation; a
+   cosmetic redraw or highlighted wishlist is not.
+   The companion's active-slot login push requests the slots if needed.
+   Wait for the selected slot's live row instead of assuming slot 1 exists.
+     enabled           boolean whether server-side loadouts are available
+     slot              number  active live loadout slot (not a wishlist ID)
+     name              string  its name; "" means a known, unnamed loadout
+     updatedAt         time
+   A missing group means unknown. A server reply with enabled=false clears
+   the old slot/name and is shown as unavailable, not a guessed empty build.
 
  torment
    Source: ProjectEbonhold.HardmodeService.
    ProjectEbonhold checks Torment unlocks PER CHARACTER (through achievements).
-   The preview's per-account ladder becomes a calculated view built from these
-   values. Confirm this in-game.
+   Wait for IsDifficultyKnown, and for the committed pool if any tier has an
+   Ash gate. Observe HardmodeUI.Refresh and ACHIEVEMENT_EARNED. Repainting
+   unchanged cached values does not advance the timestamp.
      currentTier       number  selected Torment difficulty
-                               (GetCurrentDifficulty, only when IsDifficultyKnown)
-     highestUnlocked   number  highest tier this character may run
-                               (checked with IsTierUnlocked for each tier)
+                               (GetCurrentDifficulty), NOT a party's temporary
+                               instance difficulty. 1 = Normal; 2 = Torment I.
+     unlockedTiers     table   { [tier] = true } for each IsTierUnlocked result
      updatedAt         time
+   The highest unlocked tier is calculated for display. Keep the actual set:
+   one unlocked tier does not prove that every lower achievement was earned.
+   The progression view groups characters by account without claiming that
+   their unlocks are shared. Its ladder follows TormentLadderTop; higher,
+   instance-only tiers still retain their real names and selected values.
 
  raids
    Source: ProjectEbonhold.RaidLockout.IsLooted(bossId), asked for every boss
@@ -362,12 +400,12 @@ addon.Schema = Schema
 
 -- Which version of the blueprint this code expects.
 -- Raise it by 1 whenever the saved layout changes (see section 4 above).
-Schema.VERSION = 2
+Schema.VERSION = 3
 
 -- The group names, so Data/ and Sync/ can loop over them instead of repeating
 -- the lists. A "group" is a small table with its own updatedAt (Rule 2).
 Schema.ACCOUNT_GROUPS = { "currencies", "prestige" }
-Schema.CHARACTER_GROUPS = { "basics", "run", "torment", "raids", "activities" }
+Schema.CHARACTER_GROUPS = { "basics", "run", "contracts", "echoBuild", "torment", "raids", "activities" }
 -- These two groups live one level deeper, inside character.trials.
 Schema.TRIAL_GROUPS = { "champion", "crusader" }
 
@@ -409,10 +447,8 @@ function Schema.NewCharacter()
     return {}
 end
 
--- Convert older saved databases one version at a time. Version 2 adds an
--- optional live-roster position under settings.ui.roster.position. No value
--- needs to be copied: a missing position intentionally means "open centered",
--- and all existing character records and user settings stay untouched.
+-- Convert older saved databases one version at a time, keeping characters,
+-- currencies and settings. Optional groups remain nil until observed.
 function Schema.Migrate(database)
     local version = database.schemaVersion
     if type(version) ~= "number" then
@@ -433,6 +469,12 @@ function Schema.Migrate(database)
             -- Version 2 adds settings.ui.roster.position when the window is
             -- first moved. Keeping it absent preserves the centered default.
             version = 2
+        elseif version == 2 then
+            -- Version 2 collected only currencies in run. Its reserved
+            -- offerings/anchor/build fields and torment were never written.
+            -- Version 3 gives the new sources independent groups and saves
+            -- actual tier unlocks. No existing observations need moving.
+            version = 3
         else
             error("Ashoholic has no migration for saved schema version " .. tostring(version) .. ".")
         end

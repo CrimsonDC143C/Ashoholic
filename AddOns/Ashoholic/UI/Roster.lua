@@ -1,18 +1,17 @@
 --[[
 ================================================================================
- UI/Roster.lua - THE FIRST LIVE ASHOHOLIC WINDOW
+ UI/Roster.lua - THE LIVE ASHOHOLIC WINDOW
 ================================================================================
 
  The roster asks Data/Store.lua for a read-only copy of saved character
- basics, run currencies and account currencies. It never reads AshoholicDB
+ basics, run details and account progression. It never reads AshoholicDB
  directly or collects character information; the Collectors layer owns those
  observations. When the window opens, it only asks the currency collector to
  fetch account balances if this session has none yet.
 
  The visual style is deliberately based on the approved PreviewUI design,
- while this first live screen keeps its job focused: summary cards for the
- spendable account-wide currencies and gold, then the saved characters grouped by
- account, with Unknown for any field that has not been collected.
+ with separate character-details and Progression renderers. Only the live
+ Roster and Progression pages are enabled; the sample preview stays separate.
 ]]
 
 local addonName = ...
@@ -27,24 +26,33 @@ end
 local UI = addon.UI or {}
 addon.UI = UI
 
-local WHITE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
-local GOLD_COLOR = { 1, 0.79, 0.39, 1 }
-local TEAL_COLOR = { 0.40, 0.86, 0.78, 1 }
-local TEXT_COLOR = { 0.88, 0.88, 0.90, 1 }
-local MUTED_COLOR = { 0.58, 0.61, 0.67, 1 }
-local PANEL_COLOR = { 0.075, 0.083, 0.105, 0.99 }
-local BORDER_COLOR = { 0.19, 0.21, 0.26, 1 }
-local ROW_COLOR = { 0.10, 0.115, 0.145, 1 }
-local ALT_ROW_COLOR = { 0.12, 0.135, 0.165, 1 }
+local Style = UI.Style
+local WHITE_TEXTURE = Style.whiteTexture
+local GOLD_COLOR = Style.gold
+local TEAL_COLOR = Style.teal
+local TEXT_COLOR = Style.text
+local MUTED_COLOR = Style.muted
+local PANEL_COLOR = Style.panel
+local BORDER_COLOR = Style.border
+local ROW_COLOR = Style.row
+local ALT_ROW_COLOR = Style.alternateRow
+local SELECTED_ROW_COLOR = { 0.13, 0.24, 0.25, 1 }
+local AddLabel = UI.AddLabel
+local AddTextButton = UI.AddTextButton
+local FormatNumber = UI.FormatNumber
+local FormatCopper = UI.FormatCopper
+local FormatLastSeen = UI.FormatLastSeen
+local AddTooltipLine = UI.AddTooltipLine
+local ShowCardTooltip = UI.ShowTooltip
 local UNKNOWN_TEXT = "Unknown"
 local ROW_HEIGHT = 36
 local ACCOUNT_HEADER_HEIGHT = 28
 local ROW_GAP = 3
-local FRAME_WIDTH = 1040
--- Taller than before by the cards' height plus spacing, so the character list
--- keeps the same visible height under the new summary cards.
-local FRAME_HEIGHT = 632
-local CARD_TOP = 72
+local FRAME_WIDTH = 1320
+local FRAME_HEIGHT = 720
+local DETAIL_WIDTH = 332
+local ROSTER_CONTENT_WIDTH = FRAME_WIDTH - 40 - DETAIL_WIDTH - 20 - 18
+local CARD_TOP = 108
 local CARD_HEIGHT = 50
 local CARD_GAP = 18
 local COLUMN_HEADER_TOP = CARD_TOP + CARD_HEIGHT + 12
@@ -86,107 +94,14 @@ local SUMMARY_CARD_COUNT = #CURRENCY_CARDS + 1
 
 local frame
 local rosterDirty = false
+local activeTab = "Roster"
+local selectedCharacter
 
 Data.OnRosterChanged(function()
     -- Several observations can arrive together. Redraw once on the next
     -- visible frame rather than rebuilding the roster inside a server callback.
     rosterDirty = true
 end)
-
-local function SetFontString(fontString, size, color)
-    fontString:SetFont("Fonts\\FRIZQT__.TTF", size)
-    fontString:SetTextColor(unpack(color))
-    fontString:SetJustifyV("MIDDLE")
-end
-
-local function AddLabel(parent, text, x, y, width, height, size, color)
-    local label = parent:CreateFontString(nil, "OVERLAY")
-    label:SetPoint("TOPLEFT", x, y)
-    label:SetWidth(width)
-    label:SetHeight(height)
-    label:SetJustifyH("LEFT")
-    SetFontString(label, size, color)
-    label:SetText(text or "")
-    return label
-end
-
-local function AddTextButton(parent, text, width, height, onClick)
-    local button = CreateFrame("Button", nil, parent)
-    button:SetSize(width, height)
-    button:SetNormalTexture(WHITE_TEXTURE)
-    button:SetHighlightTexture(WHITE_TEXTURE, "ADD")
-    button:GetNormalTexture():SetVertexColor(0.10, 0.115, 0.145, 1)
-
-    local label = button:CreateFontString(nil, "OVERLAY")
-    label:SetPoint("CENTER")
-    SetFontString(label, 11, TEXT_COLOR)
-    label:SetText(text)
-
-    button:SetScript("OnClick", onClick)
-    return button
-end
-
-local function FormatNumber(value)
-    if type(value) ~= "number" then
-        return UNKNOWN_TEXT
-    end
-
-    local text = tostring(math.floor(value))
-    local groups = {}
-    while #text > 3 do
-        table.insert(groups, 1, string.sub(text, -3))
-        text = string.sub(text, 1, -4)
-    end
-    table.insert(groups, 1, text)
-    return table.concat(groups, ",")
-end
-
-local function FormatCopper(copper)
-    if type(copper) ~= "number" then
-        return UNKNOWN_TEXT
-    end
-
-    local gold = FormatNumber(math.floor(copper / 10000))
-    local silver = math.floor((copper % 10000) / 100)
-    local remainingCopper = copper % 100
-    return gold .. "g " .. silver .. "s " .. remainingCopper .. "c"
-end
-
-local function FormatLastSeen(timestamp)
-    if type(timestamp) ~= "number" then
-        return UNKNOWN_TEXT
-    end
-
-    local elapsed = time() - timestamp
-    if elapsed < 60 then
-        return "Just now"
-    elseif elapsed < 3600 then
-        return math.floor(elapsed / 60) .. " min ago"
-    elseif elapsed < 86400 then
-        return math.floor(elapsed / 3600) .. " hr ago"
-    end
-    return math.floor(elapsed / 86400) .. " days ago"
-end
-
--- Tooltip lines are prepared during each refresh and stored on the card.
--- A line with "right" text is shown as two columns.
-local function AddTooltipLine(lines, left, right, color)
-    table.insert(lines, { left = left, right = right, color = color or TEXT_COLOR })
-end
-
-local function ShowCardTooltip(card)
-    GameTooltip:SetOwner(card, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine(card.tooltipTitle, GOLD_COLOR[1], GOLD_COLOR[2], GOLD_COLOR[3])
-    for _, line in ipairs(card.tooltipLines) do
-        local r, g, b = line.color[1], line.color[2], line.color[3]
-        if line.right then
-            GameTooltip:AddDoubleLine(line.left, line.right, r, g, b, r, g, b)
-        else
-            GameTooltip:AddLine(line.left, r, g, b, true)
-        end
-    end
-    GameTooltip:Show()
-end
 
 local function CreateSummaryCard(parent, index, title, icon, valueColor)
     local contentWidth = FRAME_WIDTH - 40
@@ -205,14 +120,8 @@ local function CreateSummaryCard(parent, index, title, icon, valueColor)
 
     AddLabel(card, "|TInterface\\Icons\\" .. icon .. ":16|t " .. title, 12, -5, width - 24, 16, 9, MUTED_COLOR)
     card.value = AddLabel(card, UNKNOWN_TEXT, 12, -23, width - 24, 20, 16, valueColor)
+    UI.AttachTooltip(card)
     card.tooltipTitle = title
-    card.tooltipLines = {}
-
-    card:EnableMouse(true)
-    card:SetScript("OnEnter", ShowCardTooltip)
-    card:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
     return card
 end
 
@@ -356,6 +265,7 @@ local function CreateRosterFrame()
     local rosterFrame = CreateFrame("Frame", "AshoholicRosterFrame", UIParent)
     rosterFrame:Hide()
     rosterFrame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
+    rosterFrame:SetScale(math.min(1, (UIParent:GetWidth() - 40) / FRAME_WIDTH, (UIParent:GetHeight() - 40) / FRAME_HEIGHT))
     rosterFrame:SetPoint("CENTER")
     rosterFrame:SetFrameStrata("DIALOG")
     rosterFrame:SetClampedToScreen(true)
@@ -388,7 +298,7 @@ local function CreateRosterFrame()
     end)
 
     AddLabel(titleBar, "ASHOHOLIC", 22, -13, 230, 25, 18, GOLD_COLOR)
-    AddLabel(titleBar, "Your saved character roster", 24, -36, 360, 16, 11, MUTED_COLOR)
+    AddLabel(titleBar, "Saved characters and account progression", 24, -36, 460, 16, 11, MUTED_COLOR)
 
     local refreshButton = AddTextButton(rosterFrame, "Refresh", 84, 27, function()
         UI.RefreshRoster()
@@ -406,6 +316,16 @@ local function CreateRosterFrame()
     divider:SetPoint("TOPLEFT", 20, -59)
     divider:SetPoint("TOPRIGHT", -20, -59)
     divider:SetHeight(1)
+
+    rosterFrame.tabButtons = {}
+    for index, name in ipairs({ "Roster", "Progression" }) do
+        local tabName = name
+        local button = AddTextButton(rosterFrame, name, 148, 30, function()
+            UI.ShowLiveTab(tabName)
+        end)
+        button:SetPoint("TOPLEFT", 20 + (index - 1) * 158, -60)
+        rosterFrame.tabButtons[name] = button
+    end
 
     rosterFrame.currencyCards = {}
     for index, definition in ipairs(CURRENCY_CARDS) do
@@ -425,34 +345,32 @@ local function CreateRosterFrame()
         GOLD_COLOR
     )
 
-    local header = CreateFrame("Frame", nil, rosterFrame)
-    header:SetPoint("TOPLEFT", 20, -COLUMN_HEADER_TOP)
-    header:SetPoint("TOPRIGHT", -38, -COLUMN_HEADER_TOP)
-    header:SetHeight(24)
-    AddLabel(header, "CHARACTER", 12, 0, 208, 20, 10, MUTED_COLOR)
-    AddLabel(header, "LEVEL", 230, 0, 48, 20, 10, MUTED_COLOR)
-    AddLabel(header, "RUN ASH", 295, 0, 108, 20, 10, MUTED_COLOR)
-    AddLabel(header, "RUN SHARDS", 415, 0, 103, 20, 10, MUTED_COLOR)
-    AddLabel(header, "GOLD", 530, 0, 150, 20, 10, MUTED_COLOR)
-    AddLabel(header, "LOCATION", 695, 0, 155, 20, 10, MUTED_COLOR)
-    AddLabel(header, "LAST SEEN", 865, 0, 112, 20, 10, MUTED_COLOR)
+    local body = CreateFrame("Frame", nil, rosterFrame)
+    body:SetPoint("TOPLEFT", 20, -COLUMN_HEADER_TOP)
+    body:SetPoint("BOTTOMRIGHT", -20, 43)
+    local rosterPage = CreateFrame("Frame", nil, body)
+    rosterPage:SetAllPoints()
+    rosterFrame.rosterPage = rosterPage
+    rosterFrame.progressionPage = UI.CreateProgressionPage(body, FRAME_WIDTH - 40, Data.GetProgressionRules())
+    rosterFrame.progressionPage:Hide()
+    rosterFrame.details = UI.CreateCharacterDetails(rosterPage, DETAIL_WIDTH)
 
-    local scroll = CreateFrame("ScrollFrame", "AshoholicRosterScroll", rosterFrame)
-    scroll:SetPoint("TOPLEFT", 20, -(COLUMN_HEADER_TOP + 29))
-    scroll:SetPoint("BOTTOMRIGHT", -30, 43)
-    scroll:EnableMouseWheel(true)
-    local content = CreateFrame("Frame", nil, scroll)
-    content:SetWidth(990)
-    content:SetHeight(1)
-    scroll:SetScrollChild(content)
+    local header = CreateFrame("Frame", nil, rosterPage)
+    header:SetPoint("TOPLEFT", 0, 0)
+    header:SetSize(ROSTER_CONTENT_WIDTH, 24)
+    AddLabel(header, "CHARACTER", 12, 0, 165, 20, 10, MUTED_COLOR)
+    AddLabel(header, "LEVEL", 185, 0, 42, 20, 10, MUTED_COLOR)
+    AddLabel(header, "RUN ASH", 238, 0, 100, 20, 10, MUTED_COLOR)
+    AddLabel(header, "RUN SHARDS", 350, 0, 95, 20, 10, MUTED_COLOR)
+    AddLabel(header, "GOLD", 457, 0, 135, 20, 10, MUTED_COLOR)
+    AddLabel(header, "LOCATION", 604, 0, 160, 20, 10, MUTED_COLOR)
+    AddLabel(header, "LAST SEEN", 776, 0, 122, 20, 10, MUTED_COLOR)
 
-    scroll:SetScript("OnMouseWheel", function(self, delta)
-        local current = self:GetVerticalScroll()
-        local maximum = self:GetVerticalScrollRange()
-        self:SetVerticalScroll(math.max(0, math.min(maximum, current - delta * 70)))
-    end)
+    local scroll, content = UI.CreateScroll(rosterPage, "AshoholicRosterScroll", ROSTER_CONTENT_WIDTH)
+    scroll:SetPoint("TOPLEFT", 0, -29)
+    scroll:SetPoint("BOTTOMLEFT", 0, 0)
 
-    local status = AddLabel(rosterFrame, "", 24, -(FRAME_HEIGHT - 44), 980, 16, 10, MUTED_COLOR)
+    local status = AddLabel(rosterFrame, "", 24, -(FRAME_HEIGHT - 44), FRAME_WIDTH - 48, 16, 10, MUTED_COLOR)
     tinsert(UISpecialFrames, "AshoholicRosterFrame")
 
     rosterFrame.content = content
@@ -496,35 +414,46 @@ local function CreateAccountHeading(parent, text)
     background:SetVertexColor(0.075, 0.083, 0.105, 1)
     background:SetAllPoints()
 
-    local label = AddLabel(heading, text, 12, -2, 940, 24, 12, GOLD_COLOR)
+    local label = AddLabel(heading, text, 12, -2, ROSTER_CONTENT_WIDTH - 24, 24, 12, GOLD_COLOR)
     heading.label = label
     return heading
 end
 
 local function CreateCharacterRow(parent)
-    local row = CreateFrame("Frame", nil, parent)
+    local row = CreateFrame("Button", nil, parent)
     row:SetHeight(ROW_HEIGHT)
+    row:SetHighlightTexture(WHITE_TEXTURE, "ADD")
+    row:GetHighlightTexture():SetVertexColor(0.10, 0.10, 0.10, 0.3)
 
     row.background = row:CreateTexture(nil, "BACKGROUND")
     row.background:SetTexture(WHITE_TEXTURE)
     row.background:SetAllPoints()
 
-    row.name = AddLabel(row, "", 12, -2, 208, 18, 12, TEXT_COLOR)
-    row.realm = AddLabel(row, "", 12, -19, 208, 12, 9, MUTED_COLOR)
-    row.level = AddLabel(row, "", 230, -2, 48, 32, 11, TEXT_COLOR)
-    row.runAsh = AddLabel(row, "", 295, -2, 108, 32, 11, TEXT_COLOR)
-    row.runShards = AddLabel(row, "", 415, -2, 103, 32, 11, TEXT_COLOR)
-    row.gold = AddLabel(row, "", 530, -2, 150, 32, 11, TEXT_COLOR)
-    row.location = AddLabel(row, "", 695, -2, 155, 32, 11, TEXT_COLOR)
-    row.lastSeen = AddLabel(row, "", 865, -2, 112, 18, 11, TEXT_COLOR)
-    row.runSeen = AddLabel(row, "", 865, -19, 112, 12, 9, MUTED_COLOR)
+    row.name = AddLabel(row, "", 12, -2, 165, 18, 12, TEXT_COLOR)
+    row.realm = AddLabel(row, "", 12, -19, 165, 12, 9, MUTED_COLOR)
+    row.level = AddLabel(row, "", 185, -2, 42, 32, 11, TEXT_COLOR)
+    row.runAsh = AddLabel(row, "", 238, -2, 100, 32, 11, TEXT_COLOR)
+    row.runShards = AddLabel(row, "", 350, -2, 95, 32, 11, TEXT_COLOR)
+    row.gold = AddLabel(row, "", 457, -2, 135, 32, 11, TEXT_COLOR)
+    row.location = AddLabel(row, "", 604, -2, 160, 32, 11, TEXT_COLOR)
+    row.lastSeen = AddLabel(row, "", 776, -2, 122, 18, 11, TEXT_COLOR)
+    row.runSeen = AddLabel(row, "", 776, -19, 122, 12, 9, MUTED_COLOR)
+    row:SetScript("OnClick", function(self)
+        selectedCharacter = {
+            accountId = self.accountId,
+            realm = self.character.realm,
+            name = self.character.name,
+            guid = self.character.guid,
+        }
+        UI.RefreshRoster()
+    end)
     return row
 end
 
 local function ReuseMessage(index, text, yOffset)
     local message = frame.messagePool[index]
     if not message then
-        message = AddLabel(frame.content, "", 16, -yOffset, 920, ROW_HEIGHT, 11, MUTED_COLOR)
+        message = AddLabel(frame.content, "", 16, -yOffset, ROSTER_CONTENT_WIDTH - 32, ROW_HEIGHT, 11, MUTED_COLOR)
         frame.messagePool[index] = message
     end
 
@@ -534,11 +463,48 @@ local function ReuseMessage(index, text, yOffset)
     message:Show()
 end
 
-local function AddRosterEntry(row, character, yOffset, rowNumber)
+local function IsSelected(accountId, character)
+    return selectedCharacter and selectedCharacter.accountId == accountId
+        and selectedCharacter.realm == character.realm
+        and selectedCharacter.name == character.name
+        and selectedCharacter.guid == character.guid
+end
+
+local function FindSelectedCharacter(roster)
+    local firstAccount, firstCharacter
+    for _, account in ipairs(roster) do
+        for _, character in ipairs(account.characters) do
+            if not firstCharacter then
+                firstAccount, firstCharacter = account, character
+            end
+            if IsSelected(account.id, character) then
+                return character
+            end
+        end
+    end
+    selectedCharacter = nil
+    if firstCharacter then
+        selectedCharacter = {
+            accountId = firstAccount.id,
+            realm = firstCharacter.realm,
+            name = firstCharacter.name,
+            guid = firstCharacter.guid,
+        }
+    end
+    return firstCharacter
+end
+
+local function AddRosterEntry(row, accountId, character, yOffset, rowNumber)
     row:ClearAllPoints()
     row:SetPoint("TOPLEFT", 0, -yOffset)
     row:SetPoint("TOPRIGHT", 0, -yOffset)
-    row.background:SetVertexColor(unpack(rowNumber % 2 == 0 and ROW_COLOR or ALT_ROW_COLOR))
+    local color = rowNumber % 2 == 0 and ROW_COLOR or ALT_ROW_COLOR
+    if IsSelected(accountId, character) then
+        color = SELECTED_ROW_COLOR
+    end
+    row.background:SetVertexColor(unpack(color))
+    row.accountId = accountId
+    row.character = character
 
     local className = character.class or UNKNOWN_TEXT
     row.name:SetText(character.name .. "  |cff939baa" .. className .. "|r")
@@ -558,6 +524,27 @@ function UI.RefreshRoster()
         return
     end
     rosterDirty = false
+    local roster = Data.GetRoster()
+    local rules = Data.GetProgressionRules()
+    RefreshSummaryCards(roster)
+    for name, button in pairs(frame.tabButtons) do
+        button.text:SetTextColor(unpack(name == activeTab and TEAL_COLOR or MUTED_COLOR))
+        button:GetNormalTexture():SetVertexColor(unpack(name == activeTab and ALT_ROW_COLOR or ROW_COLOR))
+    end
+    if activeTab == "Progression" then
+        frame.rosterPage:Hide()
+        frame.progressionPage:Show()
+        UI.RefreshProgression(frame.progressionPage, roster, rules)
+        frame.status:SetText(
+            "Saved snapshots, not account-wide Torment unlocks. Tiers above "
+                .. UI.TierName(rules.tormentLadderTop, rules)
+                .. " are instance-only. No Prestige or difficulty actions are sent."
+        )
+        return
+    end
+    frame.progressionPage:Hide()
+    frame.rosterPage:Show()
+    local selected = FindSelectedCharacter(roster)
     local scrollOffset = frame.scroll:GetVerticalScroll()
 
     for _, heading in ipairs(frame.headingPool) do
@@ -570,8 +557,6 @@ function UI.RefreshRoster()
         message:Hide()
     end
 
-    local roster = Data.GetRoster()
-    RefreshSummaryCards(roster)
     local yOffset = 0
     local rowNumber = 0
     local characterCount = 0
@@ -613,7 +598,7 @@ function UI.RefreshRoster()
                     row = CreateCharacterRow(frame.content)
                     frame.characterPool[characterIndex] = row
                 end
-                AddRosterEntry(row, character, yOffset, rowNumber)
+                AddRosterEntry(row, account.id, character, yOffset, rowNumber)
                 yOffset = yOffset + ROW_HEIGHT + ROW_GAP
                 rowNumber = rowNumber + 1
                 characterCount = characterCount + 1
@@ -636,11 +621,20 @@ function UI.RefreshRoster()
     frame.content:SetHeight(math.max(1, yOffset))
     frame.scroll:UpdateScrollChildRect()
     frame.scroll:SetVerticalScroll(math.min(scrollOffset, frame.scroll:GetVerticalScrollRange()))
+    UI.RefreshCharacterDetails(frame.details, selected, rules)
     frame.status:SetText(
         characterCount .. " saved character"
             .. (characterCount == 1 and "" or "s")
-            .. "  |  Last seen: character basics. Run: run-data age. Cards: spendable currencies. Hover for banked balances and update times."
+            .. "  |  Click a character for details. Each source keeps its own update time. Cards show spendable balances."
     )
+end
+
+function UI.ShowLiveTab(name)
+    if name ~= "Roster" and name ~= "Progression" then
+        error("Ashoholic has no live tab named " .. tostring(name) .. ".")
+    end
+    activeTab = name
+    UI.RefreshRoster()
 end
 
 function UI.ToggleRoster()
