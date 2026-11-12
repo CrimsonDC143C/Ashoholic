@@ -104,7 +104,18 @@
    Instead, Collectors use, in order of preference:
      a) ProjectEbonhold's public state and functions (e.g. PrestigeService),
      b) its listener APIs (Callboard.OnChanged, Trials.OnChanged),
-     c) hooksecurefunc on its public functions (runs after them safely).
+     c) hooksecurefunc on its public functions (runs after them safely),
+     d) Ashoholic's own CHAT_MSG_ADDON listener, which reads a server reply
+        that ProjectEbonhold also receives but handles privately. Reading
+        never replaces a handler. Only Integrations/ProjectEbonhold.lua does
+        this, and it ignores any message whose layout it does not recognize.
+     e) Text that ProjectEbonhold shows in its own named frames, read only
+        at a moment when its meaning is certain (the Soul Ash tree's bottom
+        bar right after a successful Apply). Any unexpected text is ignored.
+   Ashoholic observes and does not send server requests, with one exception:
+   Integrations/ProjectEbonhold.lua may ask for the Soul Ash tree's loadout
+   reply once per UI session, only before the tree has asked for it (see the
+   currencies group below).
 
  Rule 6 - Daily and weekly data saves its reset time.
    Groups with daily or weekly counts save when they reset (resetAt, a time()
@@ -139,10 +150,40 @@
  ------------------------------------------------------------------------------
 
  currencies
-   Source: ProjectEbonhold's Soul Ash tree update. Hook
-           ProjectEbonhold.SkillTree.UpdateTotalSoulPoints(spendable,
-           committed, pools) with hooksecurefunc. It runs at login and on
-           every change.
+   Stage 5's second slice collects this group, except warbandGold.
+   The server sends no balances at login (confirmed in-game). They reach
+   Ashoholic in three ways:
+     1) A server balance update after a balance changes (banking a run,
+        buying a class node). Hook
+        ProjectEbonhold.SkillTree.UpdateTotalSoulPoints(spendable,
+        committed, pools) with hooksecurefunc.
+     2) The Soul Ash tree's loadout reply. The tree asks for it when it first
+        opens and handles it in a private function, so Ashoholic reads only
+        its balance header with its own CHAT_MSG_ADDON listener (Rule 5 d).
+        Replies are read only within 30 seconds of a loadout request.
+     3) A successful Apply in the Soul Ash tree. Its server reply only says
+        "success" (confirmed in-game: the cards did not change until
+        /reload). Hook ProjectEbonhold.SkillTree.OnApplyChangesResult; on
+        success, read the four spendable amounts from the tree's bottom bar
+        (Rule 5 e). Spending never changes banked balances, so those are
+        copied from the latest server balances of this session. Nothing is
+        saved if no server balances arrived this session or any amount
+        cannot be read. The bar is never read while choices are unapplied,
+        because it then subtracts them from the real balances.
+   When /ash opens and no balances arrived in this UI session, Ashoholic asks
+   for the loadout reply itself, but only if no loadout request has happened
+   yet in this session. The reply also resets ProjectEbonhold's tree display
+   and clears unapplied tree choices; before the tree's own first request,
+   the tree has never been opened, so there is nothing to lose. A /reload
+   starts a new session for both addons.
+   Collectors/Currencies.lua starts watching when Ashoholic loads, keeps an
+   early update pending until the database is ready, and saves each update as
+   a fresh observation. Saved balances stay visible with their old age until a
+   new update arrives. A decrease after spending replaces the old balance.
+   Older servers send only the Soul Ash pair: the other pairs then stay nil.
+   Each pair is saved complete (both values) or not at all.
+   The live currency cards show spendable totals; their tooltips show both
+   spendable and banked balances. These are not added together.
      ashSpendable      number  Soul Ash you can spend on the tree right now
      ashBanked         number  Soul Ash banked (committed) on the account
      shardSpendable    number  Soul Shards you can spend
@@ -153,8 +194,8 @@
      artisanBanked     number  Artisan Soul banked
      warbandGold       copper  Warband bank gold. ALWAYS nil for now:
                                ProjectEbonhold keeps it in a private variable
-                               that other addons cannot read. Revisit in Stage 5.
-     updatedAt         time
+                               that other addons cannot read.
+     updatedAt         time    when the balance update was observed
 
  prestige
    Source: ProjectEbonhold.PrestigeService. Only save when

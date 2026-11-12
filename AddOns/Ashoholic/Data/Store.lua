@@ -24,6 +24,9 @@ addon.Data = Data
 
 local database
 local rosterListeners = {}
+-- Each of these Ebonhold currencies has a spendable and a banked balance.
+-- Soul Ash is listed separately because every balance update includes it.
+local POOL_CURRENCIES = { "shard", "essence", "artisan" }
 local ROSTER_ANCHOR_POINTS = {
     TOPLEFT = true,
     TOP = true,
@@ -50,6 +53,8 @@ local function IsNonNegativeInteger(value)
 end
 
 -- Consumers subscribe once and redraw from GetRoster, never from saved tables.
+-- The roster read model includes account currencies, so their updates notify
+-- the same listeners.
 function Data.OnRosterChanged(listener)
     if type(listener) ~= "function" then
         error("Ashoholic roster listeners must be functions.")
@@ -234,6 +239,70 @@ function Data.SaveCharacterRun(realmName, characterName, guid, snapshot)
     NotifyRosterChanged()
 end
 
+-- Account currencies are shared by every character on this WoW account, so
+-- they need no character identity. A new server update replaces the whole
+-- group, including decreases after spending. Run currencies are never added
+-- here, and Warband gold stays unknown because it has no readable source.
+function Data.SaveAccountCurrencies(snapshot)
+    if not database then
+        error("Ashoholic account currencies were saved before Data.Initialize().")
+    end
+    RequireTable(snapshot, "account currency snapshot")
+    if not IsNonNegativeInteger(snapshot.ashSpendable)
+        or not IsNonNegativeInteger(snapshot.ashBanked)
+        or not IsNonNegativeInteger(snapshot.updatedAt) or snapshot.updatedAt == 0 then
+        error("Ashoholic account currencies need Soul Ash balances and an observation time.")
+    end
+
+    -- The other currencies arrive as spendable/banked pairs. Both values must
+    -- be known, or both stay unknown (nil); half of a pair is rejected.
+    for _, currency in ipairs(POOL_CURRENCIES) do
+        local spendable = snapshot[currency .. "Spendable"]
+        local banked = snapshot[currency .. "Banked"]
+        local bothUnknown = spendable == nil and banked == nil
+        local bothKnown = IsNonNegativeInteger(spendable) and IsNonNegativeInteger(banked)
+        if not bothUnknown and not bothKnown then
+            error("Ashoholic received an incomplete " .. currency .. " balance.")
+        end
+    end
+
+    local account = RequireTable(database.accounts[database.myAccountId], "current account")
+    account.currencies = {
+        ashSpendable = snapshot.ashSpendable,
+        ashBanked = snapshot.ashBanked,
+        shardSpendable = snapshot.shardSpendable,
+        shardBanked = snapshot.shardBanked,
+        essenceSpendable = snapshot.essenceSpendable,
+        essenceBanked = snapshot.essenceBanked,
+        artisanSpendable = snapshot.artisanSpendable,
+        artisanBanked = snapshot.artisanBanked,
+        updatedAt = snapshot.updatedAt,
+    }
+    NotifyRosterChanged()
+end
+
+-- Copy an account's saved currencies for the UI, or return nil when they have
+-- not been received yet.
+local function CopyAccountCurrencies(account, accountId)
+    local currencies = account.currencies
+    if currencies == nil then
+        return nil
+    end
+    RequireTable(currencies, "currencies for account " .. tostring(accountId))
+
+    return {
+        ashSpendable = currencies.ashSpendable,
+        ashBanked = currencies.ashBanked,
+        shardSpendable = currencies.shardSpendable,
+        shardBanked = currencies.shardBanked,
+        essenceSpendable = currencies.essenceSpendable,
+        essenceBanked = currencies.essenceBanked,
+        artisanSpendable = currencies.artisanSpendable,
+        artisanBanked = currencies.artisanBanked,
+        updatedAt = currencies.updatedAt,
+    }
+end
+
 -- Return a display-safe copy of the saved roster.
 -- The UI receives only the fields it needs and cannot change AshoholicDB by
 -- editing the tables returned here.
@@ -250,6 +319,7 @@ function Data.GetRoster()
             id = accountId,
             name = account.name,
             isCurrent = accountId == database.myAccountId,
+            currencies = CopyAccountCurrencies(account, accountId),
             characters = {},
         }
         local realms = account.realms

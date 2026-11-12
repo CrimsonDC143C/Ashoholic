@@ -4,20 +4,24 @@
 ================================================================================
 
  The roster asks Data/Store.lua for a read-only copy of saved character
- basics and run currencies. It never reads AshoholicDB directly or collects
- character information; the Collectors layer owns those observations.
+ basics, run currencies and account currencies. It never reads AshoholicDB
+ directly or collects character information; the Collectors layer owns those
+ observations. When the window opens, it only asks the currency collector to
+ fetch account balances if this session has none yet.
 
  The visual style is deliberately based on the approved PreviewUI design,
- while this first live screen keeps its job focused: show the saved characters
- grouped by account, with Unknown for any field that has not been collected.
+ while this first live screen keeps its job focused: summary cards for the
+ spendable account-wide currencies and gold, then the saved characters grouped by
+ account, with Unknown for any field that has not been collected.
 ]]
 
 local addonName = ...
 local addon = _G[addonName]
 local Data = addon.Data
+local CurrencyCollector = addon.Collectors and addon.Collectors.Currencies
 
-if not Data then
-    error("Ashoholic UI/Roster.lua loaded before Data/Store.lua.")
+if not Data or not CurrencyCollector then
+    error("Ashoholic UI/Roster.lua loaded before Data/Store.lua or Collectors/Currencies.lua.")
 end
 
 local UI = addon.UI or {}
@@ -25,6 +29,7 @@ addon.UI = UI
 
 local WHITE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
 local GOLD_COLOR = { 1, 0.79, 0.39, 1 }
+local TEAL_COLOR = { 0.40, 0.86, 0.78, 1 }
 local TEXT_COLOR = { 0.88, 0.88, 0.90, 1 }
 local MUTED_COLOR = { 0.58, 0.61, 0.67, 1 }
 local PANEL_COLOR = { 0.075, 0.083, 0.105, 0.99 }
@@ -35,6 +40,49 @@ local UNKNOWN_TEXT = "Unknown"
 local ROW_HEIGHT = 36
 local ACCOUNT_HEADER_HEIGHT = 28
 local ROW_GAP = 3
+local FRAME_WIDTH = 1040
+-- Taller than before by the cards' height plus spacing, so the character list
+-- keeps the same visible height under the new summary cards.
+local FRAME_HEIGHT = 632
+local CARD_TOP = 72
+local CARD_HEIGHT = 50
+local CARD_GAP = 18
+local COLUMN_HEADER_TOP = CARD_TOP + CARD_HEIGHT + 12
+
+-- The account currency cards use the preview's titles and icons. "field" is the
+-- start of the saved names, for example "ash" for ashBanked and ashSpendable.
+local CURRENCY_CARDS = {
+    {
+        field = "ash",
+        title = "SOUL ASH",
+        icon = "inv_soulash",
+        tooltipTitle = "Account Soul Ash",
+        note = "Run Soul Ash is shown on characters and is not included here.",
+    },
+    {
+        field = "shard",
+        title = "SOUL SHARDS",
+        icon = "inv_10_jewelcrafting3_soulcage_frost",
+        tooltipTitle = "Account Soul Shards",
+        note = "Run Soul Shards are shown on characters and are not included here.",
+    },
+    {
+        field = "essence",
+        title = "SOUL ESSENCE",
+        icon = "inv_misc_supersoulash",
+        tooltipTitle = "Account Soul Essence",
+        note = "Persistent Prestige currency.",
+    },
+    {
+        field = "artisan",
+        title = "ARTISAN SOUL",
+        icon = "ability_argus_soulbombdebufflarge",
+        tooltipTitle = "Account Artisan Soul",
+        note = "Persistent profession currency.",
+    },
+}
+local GOLD_CARD_ICON = "INV_Misc_Coin_02"
+local SUMMARY_CARD_COUNT = #CURRENCY_CARDS + 1
 
 local frame
 local rosterDirty = false
@@ -120,10 +168,194 @@ local function FormatLastSeen(timestamp)
     return math.floor(elapsed / 86400) .. " days ago"
 end
 
+-- Tooltip lines are prepared during each refresh and stored on the card.
+-- A line with "right" text is shown as two columns.
+local function AddTooltipLine(lines, left, right, color)
+    table.insert(lines, { left = left, right = right, color = color or TEXT_COLOR })
+end
+
+local function ShowCardTooltip(card)
+    GameTooltip:SetOwner(card, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine(card.tooltipTitle, GOLD_COLOR[1], GOLD_COLOR[2], GOLD_COLOR[3])
+    for _, line in ipairs(card.tooltipLines) do
+        local r, g, b = line.color[1], line.color[2], line.color[3]
+        if line.right then
+            GameTooltip:AddDoubleLine(line.left, line.right, r, g, b, r, g, b)
+        else
+            GameTooltip:AddLine(line.left, r, g, b, true)
+        end
+    end
+    GameTooltip:Show()
+end
+
+local function CreateSummaryCard(parent, index, title, icon, valueColor)
+    local contentWidth = FRAME_WIDTH - 40
+    local width = (contentWidth - (SUMMARY_CARD_COUNT - 1) * CARD_GAP) / SUMMARY_CARD_COUNT
+
+    local card = CreateFrame("Frame", nil, parent)
+    card:SetSize(width, CARD_HEIGHT)
+    card:SetPoint("TOPLEFT", 20 + (index - 1) * (width + CARD_GAP), -CARD_TOP)
+    card:SetBackdrop({
+        bgFile = WHITE_TEXTURE,
+        edgeFile = WHITE_TEXTURE,
+        edgeSize = 1,
+    })
+    card:SetBackdropColor(unpack(ROW_COLOR))
+    card:SetBackdropBorderColor(unpack(BORDER_COLOR))
+
+    AddLabel(card, "|TInterface\\Icons\\" .. icon .. ":16|t " .. title, 12, -5, width - 24, 16, 9, MUTED_COLOR)
+    card.value = AddLabel(card, UNKNOWN_TEXT, 12, -23, width - 24, 20, 16, valueColor)
+    card.tooltipTitle = title
+    card.tooltipLines = {}
+
+    card:EnableMouse(true)
+    card:SetScript("OnEnter", ShowCardTooltip)
+    card:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    return card
+end
+
+local function AccountLabel(account)
+    local name = account.name or "Unknown account"
+    if account.isCurrent then
+        return name .. " (this account)"
+    end
+    return name
+end
+
+-- Totals are calculated for display only (schema Rule 7). Each account counts
+-- once, no matter how many characters it has.
+local function RefreshCurrencyCard(card, definition, roster)
+    local bankedField = definition.field .. "Banked"
+    local spendableField = definition.field .. "Spendable"
+    local bankedTotal, spendableTotal = 0, 0
+    local knownAccounts, unknownAccounts = 0, 0
+    local accountLines = {}
+
+    for _, account in ipairs(roster) do
+        local currencies = account.currencies
+        local banked = currencies and currencies[bankedField]
+        local spendable = currencies and currencies[spendableField]
+
+        if type(banked) == "number" and type(spendable) == "number" then
+            knownAccounts = knownAccounts + 1
+            bankedTotal = bankedTotal + banked
+            spendableTotal = spendableTotal + spendable
+            AddTooltipLine(accountLines, AccountLabel(account), nil, GOLD_COLOR)
+            AddTooltipLine(accountLines, "  Spendable", FormatNumber(spendable))
+            AddTooltipLine(accountLines, "  Banked", FormatNumber(banked))
+            AddTooltipLine(accountLines, "  Updated", FormatLastSeen(currencies.updatedAt), MUTED_COLOR)
+        else
+            unknownAccounts = unknownAccounts + 1
+            AddTooltipLine(accountLines, AccountLabel(account), UNKNOWN_TEXT, MUTED_COLOR)
+        end
+    end
+
+    local lines = {}
+    if knownAccounts == 0 then
+        card.value:SetText(UNKNOWN_TEXT)
+        AddTooltipLine(lines, "Spendable total", UNKNOWN_TEXT)
+        AddTooltipLine(lines, "Banked total", UNKNOWN_TEXT)
+    else
+        card.value:SetText(FormatNumber(spendableTotal))
+        AddTooltipLine(lines, "Spendable total", FormatNumber(spendableTotal))
+        AddTooltipLine(lines, "Banked total", FormatNumber(bankedTotal))
+    end
+    AddTooltipLine(lines, " ")
+    for _, line in ipairs(accountLines) do
+        table.insert(lines, line)
+    end
+    AddTooltipLine(lines, " ")
+    if knownAccounts > 0 and unknownAccounts > 0 then
+        AddTooltipLine(lines, "Totals include only accounts whose balances are known.", nil, MUTED_COLOR)
+    end
+    if knownAccounts == 0 then
+        AddTooltipLine(lines, "Not received from Ebonhold yet. Unknown is not zero.", nil, MUTED_COLOR)
+    end
+    AddTooltipLine(lines, definition.note, nil, MUTED_COLOR)
+
+    card.tooltipTitle = definition.tooltipTitle
+    card.tooltipLines = lines
+end
+
+-- Gold is each character's own money (the "pockets"). Warband gold stays
+-- unknown because ProjectEbonhold keeps it private, so it is never counted.
+local function RefreshGoldCard(card, roster)
+    local pocketsTotal = 0
+    local knownCharacters, unknownCharacters = 0, 0
+    local accountLines = {}
+
+    for _, account in ipairs(roster) do
+        local accountGold = 0
+        local accountKnown = 0
+        for _, character in ipairs(account.characters) do
+            if type(character.gold) == "number" then
+                accountGold = accountGold + character.gold
+                accountKnown = accountKnown + 1
+            else
+                unknownCharacters = unknownCharacters + 1
+            end
+        end
+        pocketsTotal = pocketsTotal + accountGold
+        knownCharacters = knownCharacters + accountKnown
+
+        if accountKnown > 0 then
+            AddTooltipLine(accountLines, AccountLabel(account), FormatCopper(accountGold))
+        else
+            AddTooltipLine(accountLines, AccountLabel(account), UNKNOWN_TEXT, MUTED_COLOR)
+        end
+    end
+
+    local lines = {}
+    if knownCharacters == 0 then
+        card.value:SetText(UNKNOWN_TEXT)
+        AddTooltipLine(lines, "Character pockets", UNKNOWN_TEXT)
+    else
+        card.value:SetText(FormatNumber(math.floor(pocketsTotal / 10000)) .. "g")
+        AddTooltipLine(lines, "Character pockets", FormatCopper(pocketsTotal))
+    end
+    AddTooltipLine(lines, "Warband bank", UNKNOWN_TEXT, MUTED_COLOR)
+    AddTooltipLine(lines, " ")
+    for _, line in ipairs(accountLines) do
+        table.insert(lines, line)
+    end
+    AddTooltipLine(lines, " ")
+    if unknownCharacters > 0 then
+        AddTooltipLine(lines, unknownCharacters .. " saved character(s) have unknown gold and are not counted.", nil, MUTED_COLOR)
+    end
+    AddTooltipLine(
+        lines,
+        "The card counts character pockets only. Warband gold stays Unknown because ProjectEbonhold does not share it with other addons.",
+        nil,
+        MUTED_COLOR
+    )
+
+    card.tooltipTitle = "Gold breakdown"
+    card.tooltipLines = lines
+end
+
+local function RefreshSummaryCards(roster)
+    for index, definition in ipairs(CURRENCY_CARDS) do
+        RefreshCurrencyCard(frame.currencyCards[index], definition, roster)
+    end
+    RefreshGoldCard(frame.goldCard, roster)
+
+    -- Keep an open tooltip in step with new data or age labels.
+    for _, card in ipairs(frame.currencyCards) do
+        if GameTooltip:IsOwned(card) then
+            ShowCardTooltip(card)
+        end
+    end
+    if GameTooltip:IsOwned(frame.goldCard) then
+        ShowCardTooltip(frame.goldCard)
+    end
+end
+
 local function CreateRosterFrame()
     local rosterFrame = CreateFrame("Frame", "AshoholicRosterFrame", UIParent)
     rosterFrame:Hide()
-    rosterFrame:SetSize(1040, 570)
+    rosterFrame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
     rosterFrame:SetPoint("CENTER")
     rosterFrame:SetFrameStrata("DIALOG")
     rosterFrame:SetClampedToScreen(true)
@@ -175,9 +407,27 @@ local function CreateRosterFrame()
     divider:SetPoint("TOPRIGHT", -20, -59)
     divider:SetHeight(1)
 
+    rosterFrame.currencyCards = {}
+    for index, definition in ipairs(CURRENCY_CARDS) do
+        rosterFrame.currencyCards[index] = CreateSummaryCard(
+            rosterFrame,
+            index,
+            definition.title,
+            definition.icon,
+            TEAL_COLOR
+        )
+    end
+    rosterFrame.goldCard = CreateSummaryCard(
+        rosterFrame,
+        SUMMARY_CARD_COUNT,
+        "TOTAL GOLD",
+        GOLD_CARD_ICON,
+        GOLD_COLOR
+    )
+
     local header = CreateFrame("Frame", nil, rosterFrame)
-    header:SetPoint("TOPLEFT", 20, -72)
-    header:SetPoint("TOPRIGHT", -38, -72)
+    header:SetPoint("TOPLEFT", 20, -COLUMN_HEADER_TOP)
+    header:SetPoint("TOPRIGHT", -38, -COLUMN_HEADER_TOP)
     header:SetHeight(24)
     AddLabel(header, "CHARACTER", 12, 0, 208, 20, 10, MUTED_COLOR)
     AddLabel(header, "LEVEL", 230, 0, 48, 20, 10, MUTED_COLOR)
@@ -188,7 +438,7 @@ local function CreateRosterFrame()
     AddLabel(header, "LAST SEEN", 865, 0, 112, 20, 10, MUTED_COLOR)
 
     local scroll = CreateFrame("ScrollFrame", "AshoholicRosterScroll", rosterFrame)
-    scroll:SetPoint("TOPLEFT", 20, -101)
+    scroll:SetPoint("TOPLEFT", 20, -(COLUMN_HEADER_TOP + 29))
     scroll:SetPoint("BOTTOMRIGHT", -30, 43)
     scroll:EnableMouseWheel(true)
     local content = CreateFrame("Frame", nil, scroll)
@@ -202,7 +452,7 @@ local function CreateRosterFrame()
         self:SetVerticalScroll(math.max(0, math.min(maximum, current - delta * 70)))
     end)
 
-    local status = AddLabel(rosterFrame, "", 24, -526, 980, 16, 10, MUTED_COLOR)
+    local status = AddLabel(rosterFrame, "", 24, -(FRAME_HEIGHT - 44), 980, 16, 10, MUTED_COLOR)
     tinsert(UISpecialFrames, "AshoholicRosterFrame")
 
     rosterFrame.content = content
@@ -321,6 +571,7 @@ function UI.RefreshRoster()
     end
 
     local roster = Data.GetRoster()
+    RefreshSummaryCards(roster)
     local yOffset = 0
     local rowNumber = 0
     local characterCount = 0
@@ -388,7 +639,7 @@ function UI.RefreshRoster()
     frame.status:SetText(
         characterCount .. " saved character"
             .. (characterCount == 1 and "" or "s")
-            .. "  |  Last seen: character basics. Run: run-data age. Run earnings exclude banked balances."
+            .. "  |  Last seen: character basics. Run: run-data age. Cards: spendable currencies. Hover for banked balances and update times."
     )
 end
 
@@ -409,4 +660,11 @@ end
 -- how the roster's window is built.
 function addon:ToggleRosterUI()
     UI.ToggleRoster()
+
+    -- The window opens at once with the saved values. If this session has no
+    -- fresh account balances yet, the collector may ask the server for them;
+    -- the reply then updates the open window through Data.OnRosterChanged.
+    if frame:IsShown() then
+        CurrencyCollector.RequestBalancesIfNeeded()
+    end
 end
