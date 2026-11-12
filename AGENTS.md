@@ -14,6 +14,30 @@ Ashoholic is a World of Warcraft addon for Project Ebonhold on WotLK 3.3.5. Its 
 - `AddOns/FastSwap/` is a separate addon and character-selection hook. Keep its installation helper separate from character-data syncing.
 - `AddOns/SharedMedia/` supplies the bundled media addon.
 
+## Live Addon Architecture
+
+Build the live addon from the approved `PreviewUI.lua` design. Keep `AddOns/Ashoholic/` as one addon with one SavedVariables table, `AshoholicDB`; do not split it into DataStore-style addons.
+
+Use these internal layers as files are added or moved:
+
+- `Core/`: startup, events, and slash commands.
+- `Data/`: field definitions, saved data, migrations, and the read/write API.
+- `Collectors/`: reads WoW and ProjectEbonhold data, then saves it through `Data/`.
+- `Sync/`: offline imports and in-game sharing; writes only through `Data/`.
+- `UI/`: main window, shared widgets, and one file per tab.
+- `Preview/`: the sample-data preview, kept separate from live data.
+
+Data flows Game -> Collectors -> Data -> UI. UI code must not read game data or `AshoholicDB` directly. Collectors and Sync must not write `AshoholicDB` except through `Data/`.
+
+Store character records as Account -> Realm -> Character -> information plus last-updated time, regardless of whether data came from logging in, in-game sharing, or an offline import.
+
+Split `PreviewUI.lua` gradually, one tab at a time as it becomes live. Update the `.toc` load order with each move.
+
+## Working Style
+
+- Ask the user before implementing new ideas, features, or design changes that have not already been approved.
+- Write beginner-friendly Lua with clear names and many explanatory comments, including file purpose, data flow, WoW event timing, and non-obvious logic. Prioritize correct, working code when readability and correctness conflict.
+
 ## ProjectEbonhold Dependency
 
 `vendor/ProjectEbonhold/` is source for the companion in-game addon, not the Ebonhold server backend. Ashoholic calls into its client-side APIs and server request protocol. Work in Ashoholic's own call sites first; inspect the companion source only when an issue depends on an API or protocol detail that cannot be established locally. Do not modify the companion source unless the task explicitly asks for it.
