@@ -18,20 +18,32 @@ UI.Style = {
     alternateRow = { 0.12, 0.135, 0.165, 1 },
 }
 local Style = UI.Style
+local liveLabels, liveSurfaces, liveButtons = {}, {}, {}
+local appearanceState
 
-function UI.SetFontString(fontString, size, color)
-    fontString:SetFont("Fonts\\FRIZQT__.TTF", size)
-    fontString:SetTextColor(unpack(color))
+local function ApplyFont(label, size, color, role)
+    role = role or (size >= 14 and "title" or (color == Style.muted and "hint" or "character"))
+    local state = appearanceState or {}
+    local override = state.fontRoles and state.fontRoles[role] or {}
+    local height = math.max(8, size + (state.fontDelta or 0) + (override.delta or 0))
+    label:SetFont(override.font or state.font or "Fonts\\FRIZQT__.TTF", height)
+    label:SetHeight(math.max(label:GetHeight(), height + 3))
+    label:SetTextColor(unpack(color))
+end
+
+function UI.SetFontString(fontString, size, color, role)
+    liveLabels[fontString] = { size = size, color = color, role = role }
+    ApplyFont(fontString, size, color, role)
     fontString:SetJustifyV("MIDDLE")
 end
 
-function UI.AddLabel(parent, text, x, y, width, height, size, color)
+function UI.AddLabel(parent, text, x, y, width, height, size, color, role)
     local label = parent:CreateFontString(nil, "OVERLAY")
     label:SetPoint("TOPLEFT", x, y)
     label:SetWidth(width)
     label:SetHeight(height)
     label:SetJustifyH("LEFT")
-    UI.SetFontString(label, size, color)
+    UI.SetFontString(label, size, color, role)
     label:SetText(text or "")
     return label
 end
@@ -46,9 +58,10 @@ function UI.AddTextButton(parent, text, width, height, onClick)
 
     button.text = button:CreateFontString(nil, "OVERLAY")
     button.text:SetPoint("CENTER")
-    UI.SetFontString(button.text, 11, Style.text)
+    UI.SetFontString(button.text, 11, Style.text, "button")
     button.text:SetText(text)
     button:SetScript("OnClick", onClick)
+    liveButtons[#liveButtons + 1] = button
     return button
 end
 
@@ -62,7 +75,29 @@ function UI.CreateSurface(parent, width, height)
     })
     surface:SetBackdropColor(unpack(Style.row))
     surface:SetBackdropBorderColor(unpack(Style.border))
+    liveSurfaces[#liveSurfaces + 1] = surface
     return surface
+end
+
+function UI.ApplyDashboardAppearance(colors, state)
+    appearanceState = state
+    local mappings = {
+        panel = 2, border = 3, gold = 6, text = 12, muted = 8,
+        teal = 9, row = 14, alternateRow = 15,
+    }
+    for key, index in pairs(mappings) do
+        for component = 1, 4 do Style[key][component] = colors[index][component] end
+    end
+    for label, definition in pairs(liveLabels) do ApplyFont(label, definition.size, definition.color, definition.role) end
+    for _, surface in ipairs(liveSurfaces) do
+        surface:SetBackdrop({ bgFile = Style.whiteTexture, edgeFile = Style.whiteTexture, edgeSize = state.borderSize or 1 })
+        surface:SetBackdropColor(unpack(Style.row))
+        surface:SetBackdropBorderColor(unpack(Style.border))
+    end
+    for _, button in ipairs(liveButtons) do
+        button:GetNormalTexture():SetVertexColor(unpack(Style.row))
+        button.text:SetTextColor(unpack(Style.text))
+    end
 end
 
 function UI.CreateDetailLine(parent, title, x, y, width)

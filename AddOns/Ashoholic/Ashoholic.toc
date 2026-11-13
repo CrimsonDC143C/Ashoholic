@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: Ashoholic - Ebonhold Roster
-## Notes: Tracks characters, Ebonhold currencies, raid loot observations, and progression. Includes a separate sample-data UI preview.
+## Notes: Tracks characters, currencies, encounters, activities, progression, and Trials; includes optional account sync and a sample-data preview.
 ## Author: Crimson, MarkusLastu
-## Version: 3.0.0-ptr.5
+## Version: 3.0.0-ptr.6
 ## SavedVariables: AshoholicDB
 ## Dependencies: ProjectEbonhold
 ## OptionalDeps: Ace3, FastSwap, Nexus, SharedMedia
@@ -16,18 +16,30 @@ Data\Store.lua
 Collectors\Character.lua
 Trials.lua
 Integrations\ProjectEbonhold.lua
+Integrations\FastSwap.lua
 Collectors\Run.lua
 Collectors\Currencies.lua
 Collectors\Ebonhold.lua
 Collectors\Raids.lua
+Collectors\Activities.lua
+Sync\Codec.lua
+Sync\OfflineInbox.lua
+Sync\Transport.lua
+Sync\Offline.lua
 Themes.lua
 ColorPicker.lua
 UI.lua
 UI\CharacterDetails.lua
 UI\Progression.lua
 UI\Raids.lua
-UI\Roster.lua
+UI\Activities.lua
 UI\Trials.lua
+UI\Settings.lua
+UI\Alerts.lua
+UI\Roster.lua
+Integrations\Nexus.lua
 Minimap.lua
 PreviewBootstrap.lua
+UI\DashboardRenderer.lua
 PreviewUI.lua
+UI\Dashboard.lua

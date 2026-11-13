@@ -69,12 +69,15 @@ If you play on multiple WoW accounts and want to see all your characters in one 
 Use `/ash` or `/ashoholic` to open the live window.
 
 - **Roster:** saved character basics, run Ash/Shards, and spendable account
-  currency cards. Click a character for its parked-run details: offering bonus,
+  currency cards. Equipped item level comes from the latest Call Board reply,
+  so it remains Unknown until observed and may be stale after a gear change.
+  Click a character for its parked-run details: offering bonus,
   offerings remaining this run, Soul Anchor, active live Echo loadout, and
   selected/highest unlocked Torment. Hover a detail row for its source and age.
-- **Progression:** per-character Torment unlock ladders, grouped by account,
+- **Progression:** account-wide Torment unlock ladders,
   alongside account Prestige count, committed Ash progress, and the next
-  server-reported Essence reward. Torment unlocks are not account-wide. Higher,
+  server-reported Essence reward. Access is shared by all characters on the
+  account; selected difficulty remains character-specific. Higher,
   instance-only Torments retain their actual names rather than being capped at X.
 - **Raids & Dungeons:** select encounters in the watchlist to compare saved
   characters. Raid names, boss IDs and loot metadata come from
@@ -83,7 +86,16 @@ Use `/ash` or `/ashoholic` to open the live window.
   no active loot lock was reported, not that the raid is accessible. Hover a
   status for its observation age and, when looted, remaining lock time.
   Selection is saved across reloads. Dungeon names come from the preview's
-  catalogue; they are watchlist entries only and their status is **Unknown**.
+  catalogue; **Tracked** means a planning/watchlist reference only, not a kill,
+  loot, completion, accessibility or weekly-lockout claim.
+- **Activities:** the latest Hero's Call Board snapshots, rewards and reset
+  times, with shared objectives displayed once per account. Open the Call Board
+  on each character to collect them. Old daily or weekly objectives are marked
+  as needing a fresh board after their reset.
+- **Trials:** saved Champion and Crusader bests, ranks and their independent
+  observation ages. Open the relevant companion leaderboard or complete a
+  ranked Trial to update a record. Practice runs are excluded. Team size stays
+  Unknown if the companion did not provide an unambiguous value.
 - **Freshness:** run currencies, offerings/anchor, Echo builds, Torment,
   Prestige and raid loot keep independent timestamps. Offline characters
   retain their last observations; missing observations display **Unknown**,
@@ -104,10 +116,99 @@ The Soul Anchor display uses its saved place, not the Spirit Healer's relative
 highlighted wishlist. Prestige rewards come from a complete server snapshot;
 older replies without reward fields leave those values Unknown.
 
-Schema version 4 preserves existing characters, currencies and window position.
-Raid observations and watchlist selections fill as their data arrives or is
-selected. The other preview tabs and settings are not yet part of the live
-window.
+Schema version 6 preserves existing characters, currencies and window position,
+moving saved Torment unlock evidence to the owning account without changing
+each character's selected difficulty. Access accumulates actual observed
+unlocks; a higher tier does not invent all lower unlocks.
+Optional Call Board, Trial and sync data fill only after their sources are
+observed or imported.
+
+### Live settings and integrations
+
+Open **Settings** in the live window or use `/ash settings`. Live and preview
+share the approved roster/customization renderer but never their records or
+preferences. Themes, custom presets, colors/alpha, fonts, density, spacing,
+icons, resizable/reordered columns, two-key sorting, tabs, account colors and
+collapse preferences are saved locally. Use Shift + mouse wheel to scroll
+wide roster columns. Account filters exclude hidden accounts from all live
+pages and currency/gold totals. The current character is selected on first
+opening each session; later clicks keep their selection.
+
+**Tabs & Views** also controls login opening, combat hiding, position locking
+and Escape behavior. **Alerts** supports chat, center-screen or silent tab
+badges from saved cache/Prestige readiness, watched raid loot, server-reported
+lock expiry and snapshots at least seven days old. These are reminders from
+saved evidence, not live guarantees about offline characters.
+
+**Profiles & Sharing** creates, selects, copies and deletes local profiles,
+assigned to this character or this account. Changes save automatically.
+Export/import `ASHT1:` theme strings to share appearance; account-data sync
+intentionally does not copy profiles or other UI preferences.
+
+The minimap icon opens the roster; right-drag it to move it. **Swap** calls the
+separate FastSwap addon only for another character on the current account and
+realm. FastSwap's own character-selection hook lives in `ebonhold_glue.lua` in
+the game folder. **Ebonhold launcher updates replace that file with a stock
+copy, which silently removes the hook**: Swap then logs out but does not pick
+the character. To restore it, close WoW and run `.\Sync-FastSwapGlue.ps1 -Force`
+from the installed `Interface\AddOns\FastSwap` folder (the game folder is found
+automatically; `-GameRoot` is optional). `-InstallTask` points the Ebonhold
+shortcuts at a watcher that re-syncs automatically whenever `ebonhold.dll` or
+`ebonhold_glue.lua` changes. The hook waits for the requested name while the
+character list finishes loading.
+If Nexus is enabled, its Character Roster tab opens the live roster
+beside its panel; drag the roster to detach it.
+
+`/ash preview` remains an independent sample-data demonstration. Simulated
+sync and sample swap actions never run in the live dashboard.
+
+### Sharing accounts in game
+
+Both WoW accounts must be online with the same Ashoholic schema version. On
+**each** account, open Settings and enter the other online character's name
+under trusted sync; click **Trust**. Use `Character-Realm` when necessary (realm
+spaces are removed); a plain character name means the current realm. Same-realm
+whispers use bare names, including peers previously saved with a realm suffix.
+Then click
+**Sync** for that peer or **Sync all**. The chat reports sending, receiving,
+confirmation or errors; keep both characters online until both directions have
+finished.
+
+Equivalent commands are `/ash sync trust Character`, `/ash sync remove Character`,
+`/ash sync list`, `/ash sync Character` and `/ash sync all`. Trust is local and
+must be configured on both accounts. The game-provided whisper sender is the
+trust boundary; this is not cryptographic authentication. Only the current
+account's snapshots are shared, not settings, saved copies of other accounts,
+or account aliases. Imported accounts receive a neutral alias that can be
+renamed locally. Transfers are chunked and throttled and use a compact text
+format (sync protocol 2; both installations need this version). Large
+accounts with many Call Board activities can still take a few minutes. An
+account snapshot over 256 KiB is rejected rather than partially imported. If
+one side cannot prepare its snapshot, it tells the requesting character instead
+of letting it wait silently. Each group retains its
+original observation time, and an older group never overwrites a newer one.
+Keep the computers' clocks reasonably synchronized, since freshness comparisons
+use their wall-clock times.
+
+### Offline account merge
+
+This is separate from the FastSwap installation helper:
+
+1. Install the same Ashoholic version, log into each account at least once, and
+   log out normally so each account writes an offline export.
+2. Close all WoW and Ebonhold game/launcher processes. In PowerShell, run the
+   script from the installed addon, adjusting the path to your game folder:
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Games\Ebonhold\Interface\AddOns\Ashoholic\OfflineMerge.ps1" -GameRoot "C:\Games\Ebonhold"
+   ```
+
+3. Log into each account to import the prepared snapshots. Repeat the process
+   after collecting newer data. The script warns about accounts without an
+   export, backs up source saves under `WTF\AshoholicBackups`, and never edits
+   those saves. It replaces the installed addon's `Sync\OfflineInbox.lua`; keep
+   that generated file private and do not commit it. The addon validates and
+   merges its contents through the same data API used for in-game sync.
 
 ### UI design preview
 

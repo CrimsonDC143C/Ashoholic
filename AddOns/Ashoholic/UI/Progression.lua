@@ -1,5 +1,5 @@
 -- The preview's two-column Torment / Prestige view with real snapshots.
--- Torment rows belong to characters; Prestige panels belong to accounts.
+-- Access and Prestige belong to accounts; selected difficulty stays on characters.
 local addonName = ...
 local UI = _G[addonName].UI
 local Style = UI.Style
@@ -12,13 +12,13 @@ function UI.CreateProgressionPage(parent, width, rules)
     local page = CreateFrame("Frame", nil, parent)
     page:SetAllPoints()
     UI.AddLabel(page, "Torment & Prestige", 0, 0, width, 24, 16, Style.text)
-    UI.AddLabel(page, "Torment access is per character. Prestige is shared by the account.", 0, -27, width, 18, 11, Style.muted)
+    UI.AddLabel(page, "Torment access and Prestige are account-wide. Selected difficulty belongs to each character.", 0, -27, width, 18, 11, Style.muted)
 
     local halfWidth = (width - PANEL_GAP) / 2
     local ladder = UI.CreateSurface(page, halfWidth, 1)
     ladder:SetPoint("TOPLEFT", 0, -57)
     ladder:SetPoint("BOTTOMLEFT", 0, 0)
-    UI.AddLabel(ladder, "CHARACTER TORMENT UNLOCKS", 16, -13, halfWidth - 32, 20, 11, Style.gold)
+    UI.AddLabel(ladder, "ACCOUNT TORMENT UNLOCKS", 16, -13, halfWidth - 32, 20, 11, Style.gold)
     page.ladderScroll, page.ladderBody = UI.CreateScroll(ladder, nil, halfWidth - 32)
     page.ladderScroll:SetPoint("TOPLEFT", 16, -42)
     page.ladderScroll:SetPoint("BOTTOMRIGHT", -16, 12)
@@ -54,26 +54,23 @@ local function CreateTormentRow(parent, width, ladderTop)
     return row
 end
 
-local function RefreshTormentRow(row, character, rules)
-    local torment = character.torment
-    row.name:SetText(character.name .. "  /  " .. character.realm)
-    row.state:SetText(
-        "Selected: " .. UI.TierName(torment and torment.currentTier, rules)
-            .. "  |  Highest access: " .. UI.TierName(torment and torment.highestUnlocked, rules)
-    )
-    row.updated:SetText("Updated: " .. UI.FormatLastSeen(torment and torment.updatedAt))
+local function RefreshTormentRow(row, account, rules)
+    local torment = account.torment
+    row.name:SetText("Shared by every character on this account")
+    row.state:SetText("Highest access: " .. UI.TierName(torment and torment.highestUnlocked, rules))
+    row.updated:SetText("Updated: " .. UI.FormatLastSeen(torment and torment.accessUpdatedAt))
     for tier, pip in pairs(row.pips) do
         local unlocked = torment and torment.unlockedTiers[tier]
         pip:SetBackdropColor(unpack(unlocked and UNLOCKED_COLOR or Style.row))
         pip.label:SetText(torment and tostring(tier - 1) or "?")
         pip.label:SetTextColor(unpack(unlocked and Style.teal or Style.muted))
         local lines = {}
-        local state = "Unknown - log in to this character to collect its unlocks."
+        local state = "Unknown - log in to a character on this account to collect access."
         if torment then
-            state = unlocked and "Unlocked on this character." or "Locked on this character."
+            state = unlocked and "Unlocked account-wide." or "No saved unlock evidence on this account."
         end
         UI.AddTooltipLine(lines, state)
-        UI.AddTooltipLine(lines, "Updated", UI.FormatLastSeen(torment and torment.updatedAt), Style.muted)
+        UI.AddTooltipLine(lines, "Updated", UI.FormatLastSeen(torment and torment.accessUpdatedAt), Style.muted)
         UI.RefreshTooltip(pip, UI.TierName(tier, rules), lines)
     end
 end
@@ -118,16 +115,7 @@ end
 function UI.RefreshProgression(page, roster, rules)
     local y, characterIndex, prestigeY = 0, 0, 0
     for accountIndex, account in ipairs(roster) do
-        local highest, known = nil, 0
-        for _, character in ipairs(account.characters) do
-            if character.torment then
-                known = known + 1
-                local tier = character.torment.highestUnlocked
-                if tier and (not highest or tier > highest) then
-                    highest = tier
-                end
-            end
-        end
+        local highest = account.torment and account.torment.highestUnlocked
         local heading = page.headingPool[accountIndex]
         if not heading then
             heading = UI.AddLabel(page.ladderBody, "", 0, 0, page.halfWidth - 32, 40, 11, Style.gold)
@@ -135,12 +123,11 @@ function UI.RefreshProgression(page, roster, rules)
         end
         heading:ClearAllPoints()
         heading:SetPoint("TOPLEFT", 0, -y)
-        heading:SetText((account.name or "Unknown account") .. "\nHighest saved: " .. UI.TierName(highest, rules)
-            .. "  (" .. known .. "/" .. #account.characters .. " characters known)")
+        heading:SetText((account.name or "Unknown account") .. "\nAccount access: " .. UI.TierName(highest, rules))
         heading:Show()
         y = y + 46
 
-        for _, character in ipairs(account.characters) do
+        do
             characterIndex = characterIndex + 1
             local row = page.characterPool[characterIndex]
             if not row then
@@ -150,7 +137,7 @@ function UI.RefreshProgression(page, roster, rules)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", 0, -y)
             row:Show()
-            RefreshTormentRow(row, character, rules)
+            RefreshTormentRow(row, account, rules)
             y = y + TORMENT_ROW_HEIGHT
         end
         y = y + 8

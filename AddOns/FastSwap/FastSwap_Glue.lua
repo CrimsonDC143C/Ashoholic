@@ -17,6 +17,7 @@ local fastSwapClock = 0
 local fastSwapPendingIndex = nil
 local fastSwapPrimaryEnterCalled = false
 local fastSwapQueuedTarget = nil
+local fastSwapQueuedAt = nil
 local fastSwapConsumedSlots = {}
 local fastSwapConsumedTarget = false
 local fastSwapLastLoggedState = nil
@@ -32,6 +33,15 @@ local monitorTraceText = nil
 local monitorTraces = {}
 local monitorHiddenByUser = false
 local monitorStatusState = "Idle (waiting for swap target)"
+
+-- Register a default, not just a transient value: it remains readable after
+-- entering the world, so the addon can refuse a blind logout without a hook.
+if RegisterCVar then RegisterCVar("fastSwapGlueRevision", "2") end
+
+local function GlueLog(message)
+    if type(log) == "function" then log(message)
+    elseif type(print) == "function" then print(message) end
+end
 
 local function FastSwap_EnsureMonitor()
     if not SHOW_GLUE_MONITOR or monitorHiddenByUser then
@@ -128,7 +138,7 @@ local function FastSwap_UpdateMonitorDisplay(slotIndex, slotTarget, drvVal, cust
 end
 
 local function FastSwap_Trace(msg, statusOverride)
-    log("FastSwap Glue: " .. tostring(msg))
+    GlueLog("FastSwap Glue: " .. tostring(msg))
     if statusOverride then
         monitorStatusState = statusOverride
     end
@@ -279,8 +289,9 @@ local function FastSwap_OnCharacterListUpdate(triggerSource)
         return
     end
 
-    -- Clear queued target immediately so it can never loop
-    fastSwapQueuedTarget = nil
+    -- A nonempty character list can still be incomplete while loading.
+    -- Keep the requested name until it appears, with a bounded retry window.
+    if not fastSwapQueuedAt then fastSwapQueuedAt = fastSwapClock end
 
     local foundIndex = nil
     local matchedName = target
@@ -290,7 +301,6 @@ local function FastSwap_OnCharacterListUpdate(triggerSource)
         local cname = GetCharacterInfo(i)
         table.insert(charSummary, tostring(i) .. "=" .. tostring(cname or "?"))
     end
-    log("FastSwap Glue: roster (" .. tostring(numChars) .. "): " .. table.concat(charSummary, ", "))
 
     if numericTarget then
         local idx = math.floor(numericTarget)
@@ -311,13 +321,16 @@ local function FastSwap_OnCharacterListUpdate(triggerSource)
     end
 
     if foundIndex then
+        fastSwapQueuedTarget, fastSwapQueuedAt = nil, nil
         FastSwap_Trace(
             "resolved '" .. tostring(target) .. "' -> slot #" .. tostring(foundIndex) .. " (" .. tostring(matchedName) .. ")",
             "|cff00ff00Matched slot #" .. tostring(foundIndex) .. " (" .. tostring(matchedName) .. ")|r"
         )
         FastSwap_ApplySelection(foundIndex)
         FastSwap_StartEnterWorldTimer(foundIndex, matchedName)
-    else
+    elseif fastSwapClock - fastSwapQueuedAt >= 10 then
+        fastSwapQueuedTarget, fastSwapQueuedAt = nil, nil
+        GlueLog("FastSwap Glue: roster (" .. tostring(numChars) .. "): " .. table.concat(charSummary, ", "))
         FastSwap_Trace(
             "ERROR: target '" .. tostring(target) .. "' not found in " .. tostring(numChars) .. " chars",
             "|cffff4040Target '" .. tostring(target) .. "' not found on character list!|r"

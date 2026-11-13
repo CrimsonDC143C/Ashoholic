@@ -169,7 +169,7 @@ local function RefreshPicker(page)
             SetVisible(row.expand, false)
             row.select.text:SetText((page.watched[entry.boss.key] and "[x] " or "[ ] ") .. entry.boss.name)
             if entry.node.kind == "Dungeons" then
-                UI.AddTooltipLine(lines, "Watchlist name only; per-character dungeon status is Unknown.")
+                UI.AddTooltipLine(lines, "Tracked catalogue entry only; no dungeon kill or loot state is recorded.")
             else
                 UI.AddTooltipLine(lines, "Select this raid encounter for the character matrix.")
             end
@@ -223,7 +223,7 @@ local function CellStatus(character, instance, boss)
     if instance.kind == "Dungeons" then
         UI.AddTooltipLine(lines, "Dungeon names are a watchlist, not recorded kills or loot.")
         UI.AddTooltipLine(lines, "Per-character dungeon status is not collected.")
-        return "Unknown", Style.muted, lines
+        return "Tracked", Style.muted, lines
     end
 
     local raids = character.raids
@@ -256,7 +256,7 @@ end
 local function CreateHeaderCell(page)
     local cell = CreateFrame("Frame", nil, page.matrixHeader)
     cell:SetHeight(47)
-    cell.account = UI.AddLabel(cell, "", 0, -3, 80, 14, 9, Style.gold)
+    cell.account = UI.AddLabel(cell, "", 0, -3, 80, 14, 9, Style.gold, "account")
     cell.name = UI.AddLabel(cell, "", 0, -22, 80, 16, 11, Style.text)
     if cell.account.SetWordWrap then
         cell.account:SetWordWrap(false)
@@ -287,6 +287,13 @@ local function RefreshHeader(page)
         cell:SetWidth(page.columnWidth - 4)
         cell.name:SetWidth(page.columnWidth - 8)
         cell.name:SetText(entry and CharacterName(entry.character) or "")
+        if entry and page.classIcons then
+            local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[entry.character.class]
+            if coords then
+                cell.name:SetText(string.format("|TInterface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes:14:14:0:0:256:256:%d:%d:%d:%d|t ",
+                    coords[1] * 256, coords[2] * 256, coords[3] * 256, coords[4] * 256) .. CharacterName(entry.character))
+            end
+        end
         cell.account:SetText("")
         cell.separator:ClearAllPoints()
         cell.separator:SetPoint("TOPLEFT", FIRST_COLUMN + index * page.columnWidth - 6, -4)
@@ -306,6 +313,7 @@ local function RefreshHeader(page)
                 local continued = previous and previous.account.id == entry.account.id
                 cell.account:SetWidth(span * page.columnWidth - 10)
                 cell.account:SetText((continued and "< " or "") .. string.upper(entry.account.name or "Unknown account"))
+                cell.account:SetTextColor(unpack(entry.account.color or Style.gold))
             end
             local nextEntry = page.characters[position + 1]
             SetVisible(cell.separator, nextEntry ~= nil and nextEntry.account.id ~= entry.account.id)
@@ -395,7 +403,7 @@ local function RefreshMatrix(page)
         if category then
             UI.AddTooltipLine(rowLines, "Click to collapse or expand this section without changing the watchlist.")
         elseif instance and instance.kind == "Dungeons" then
-            UI.AddTooltipLine(rowLines, "Watchlist only; dungeon progress is Unknown.")
+            UI.AddTooltipLine(rowLines, "Tracked for planning only; not a completion or lockout indicator.")
         else
             UI.AddTooltipLine(rowLines, "Raid loot status is per character; a loot lock does not prevent entry.")
         end
@@ -411,11 +419,18 @@ local function RefreshMatrix(page)
             end
             local entry = page.characters[page.matrixOffset + index]
             local status, color, lines = CellStatus(entry.character, instance, boss)
+            UI.AddTooltipLine(lines, "Saved status", status)
             cell:ClearAllPoints()
             cell:SetPoint("TOPLEFT", FIRST_COLUMN + (index - 1) * page.columnWidth, 0)
             cell:SetWidth(page.columnWidth - 6)
             cell.label:SetWidth(page.columnWidth - 8)
-            cell.label:SetText(status)
+            local label = status
+            if page.statusStyle == "icons" then
+                if status == "Available" then label = "|TInterface\\RaidFrame\\ReadyCheck-Ready:14|t"
+                elseif status == "Looted" then label = "|TInterface\\RaidFrame\\ReadyCheck-NotReady:14|t"
+                elseif status == "Unknown" then label = "?" end
+            end
+            cell.label:SetText(label)
             cell.label:SetTextColor(unpack(color))
             UI.RefreshTooltip(cell, entry.character.name .. " - " .. boss.name, lines)
             cell:Show()

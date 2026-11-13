@@ -160,7 +160,7 @@ environment.AshoholicDB = {
 }
 local Data = environment.Ashoholic.Data
 Data.Initialize()
-assert(environment.AshoholicDB.schemaVersion == 4)
+assert(environment.AshoholicDB.schemaVersion == 6)
 assert(Character("Legacy").raids.lockedUntil[673] == 1050)
 Fire("PLAYER_LOGIN")
 assert(environment.AshoholicDB.accounts.account.realms.Realm.Main == nil)

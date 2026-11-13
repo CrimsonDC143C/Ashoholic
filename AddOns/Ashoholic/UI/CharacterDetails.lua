@@ -107,7 +107,7 @@ function UI.RefreshCharacterDetails(panel, character, rules)
     SetDetail(panel, "currentTier", UI.TierName(torment and torment.currentTier, rules),
         torment and torment.updatedAt, "This character's selected difficulty, not a party leader's instance difficulty.")
     SetDetail(panel, "unlockedTier", UI.TierName(torment and torment.highestUnlocked, rules),
-        torment and torment.updatedAt, "Highest access observed on this character. Tiers above "
+        torment and torment.accessUpdatedAt, "Highest access shared by every character on this account. Tiers above "
             .. UI.TierName(rules.tormentLadderTop, rules)
             .. " are instance-only. The Progression tab shows each actual ladder unlock.")
 end

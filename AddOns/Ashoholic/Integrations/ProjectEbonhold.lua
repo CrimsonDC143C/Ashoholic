@@ -381,6 +381,151 @@ function Integration.GetRaidCatalog()
     return catalog
 end
 
+-- Call Board replies are observed through the companion's listener. The
+-- countdowns are converted immediately to real-clock times; GetTime() is
+-- never saved and a disabled board is not mistaken for an empty board.
+function Integration.WatchActivities(onSnapshot)
+    RequireObserver(onSnapshot, "Call Board")
+    local boardService = ProjectEbonhold and ProjectEbonhold.Callboard
+    if not boardService or type(boardService.OnChanged) ~= "function" then
+        error("Ashoholic cannot collect activities: ProjectEbonhold's Call Board API is unavailable.")
+    end
+    local cadenceNames = { [0] = "daily", [1] = "weekly", [2] = "once" }
+
+    local function Observe(board)
+        if board == nil then
+            return
+        end
+        if type(board) ~= "table" or type(board.quests) ~= "table" then
+            error("Ashoholic received an invalid Call Board.")
+        end
+        if type(board.receivedAt) ~= "number"
+            or type(board.dailyResetIn) ~= "number" or board.dailyResetIn < 0
+            or type(board.weeklyResetIn) ~= "number" or board.weeklyResetIn < 0 then
+            error("Ashoholic received invalid Call Board reset timers.")
+        end
+        local now, elapsed = time(), GetTime() - board.receivedAt
+        if elapsed < 0 then error("Ashoholic received an invalid Call Board observation time.") end
+        -- Callboard.board can predate our listener. Convert its session clock
+        -- back to an approximate wall-clock observation instead of making an
+        -- old cached board look freshly received.
+        local observedAt = now - math.floor(elapsed)
+        local snapshot = {
+            cacheProgress = board.cacheProgress,
+            cacheRequired = board.cacheRequired,
+            cachesOpened = board.cachesOpened,
+            dailyResetAt = observedAt + math.floor(board.dailyResetIn),
+            weeklyResetAt = observedAt + math.floor(board.weeklyResetIn),
+            quests = {},
+            updatedAt = observedAt,
+        }
+        -- Zero is the companion's placeholder when this header field is not
+        -- present. A positive value is an actual Call Board observation.
+        if type(board.equippedIlvl) == "number" and board.equippedIlvl > 0 then
+            snapshot.equippedItemLevel = board.equippedIlvl
+        end
+        for _, quest in ipairs(board.quests) do
+            if type(quest) ~= "table" or type(quest.questId) ~= "number"
+                or not cadenceNames[quest.cadence] or snapshot.quests[quest.questId] then
+                error("Ashoholic received an invalid Call Board activity.")
+            end
+            snapshot.quests[quest.questId] = {
+                title = quest.title,
+                cadence = cadenceNames[quest.cadence],
+                done = quest.done,
+                max = quest.max,
+                state = quest.state,
+                accountWide = quest.accountWide,
+                rewards = {
+                    ash = quest.ashes,
+                    shards = quest.shards,
+                    copper = quest.copper,
+                    artisan = quest.artisan,
+                    orbs = quest.orbs,
+                },
+            }
+        end
+        onSnapshot(snapshot)
+    end
+
+    boardService.OnChanged(ProtectObserver(function(event, board)
+        if event == "board" then Observe(board) end
+    end))
+    if boardService.board then Observe(boardService.board) end
+end
+
+-- A Champion leaderboard for another class does not describe this character.
+-- Practice results never update the saved record. A result does not carry a
+-- season, so do not combine it with an older leaderboard's season or rank.
+function Integration.WatchTrials(onSnapshot)
+    RequireObserver(onSnapshot, "Trials")
+    local trials = ProjectEbonhold and ProjectEbonhold.Trials
+    if not trials or type(trials.OnChanged) ~= "function"
+        or type(trials.MyClassId) ~= "function" or type(trials.TYPE) ~= "table" then
+        error("Ashoholic cannot collect Trials: ProjectEbonhold's Trials API is unavailable.")
+    end
+    local function Group(trial)
+        if trial == trials.TYPE.CHAMPION then return "champion" end
+        if trial == trials.TYPE.CRUSADER then return "crusader" end
+        return nil
+    end
+    local function ObserveBoard(board)
+        if type(board) ~= "table" then return end
+        local group = Group(board.trial)
+        if not group then return end
+        if group == "champion" then
+            local classId = trials.MyClassId()
+            if classId == 0 or board.classFilter ~= classId then return end
+        end
+        local snapshot = {
+            best = board.myBest,
+            rank = board.myRank,
+            total = board.total,
+            season = board.season,
+            seasonName = board.seasonName,
+            updatedAt = time(),
+        }
+        if group == "crusader" and type(board.rows) == "table" and board.myRank > 0 then
+            for _, row in ipairs(board.rows) do
+                -- The companion defaults a missing board team size to 1, so
+                -- only larger values are certain here. A result reply has a
+                -- different default and can also establish a solo run.
+                if row.rank == board.myRank and row.score == board.myBest
+                    and type(row.teamSize) == "number" and row.teamSize > 1 and row.teamSize <= 5 then
+                    snapshot.teamSize = row.teamSize
+                    break
+                end
+            end
+        end
+        onSnapshot(group, snapshot)
+    end
+    local function ObserveResult(result)
+        if type(result) ~= "table" or result.startWave > 1 then return end
+        local group = Group(result.trial)
+        if not group then return end
+        local best = result.personalBest and result.score or result.previousBest
+        local snapshot = { best = best, updatedAt = time() }
+        if result.personalBest then
+            snapshot.rank, snapshot.total = result.rank, result.total
+            if group == "crusader" and type(result.teamSize) == "number"
+                and result.teamSize >= 1 and result.teamSize <= 5 then
+                snapshot.teamSize = result.teamSize
+            end
+        end
+        onSnapshot(group, snapshot)
+    end
+
+    trials.OnChanged(ProtectObserver(function(event, payload)
+        if event == "board" then
+            ObserveBoard(payload)
+        elseif event == "result" then
+            ObserveResult(payload)
+        end
+    end))
+    -- Cached Trial boards have no reception time; wait for a new event rather
+    -- than assigning an old board a fresh timestamp.
+end
+
 local function ParseRaidLoot(body)
     local observedAt = time()
     local lockedUntil, seen = {}, {}

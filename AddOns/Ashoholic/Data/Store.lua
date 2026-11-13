@@ -68,6 +68,14 @@ local function RequireObservation(snapshot, description)
     end
 end
 
+-- A login-time observation can wait for character identity while an import
+-- arrives. Do not let that delayed, older observation undo the newer group.
+local function HasNewerObservation(existing, snapshot, description)
+    if existing == nil then return false end
+    RequireObservation(existing, description)
+    return existing.updatedAt > snapshot.updatedAt
+end
+
 local function CopyFields(source, fields)
     local copy = {}
     for _, field in ipairs(fields) do
@@ -341,6 +349,7 @@ function Data.SaveCharacterRun(realmName, characterName, guid, snapshot)
         or not IsNonNegativeInteger(snapshot.soulShards) then
         error("Ashoholic run data needs non-negative currency counts.")
     end
+    if HasNewerObservation(character.run, snapshot, "run data") then return end
 
     character.run = {
         soulAsh = snapshot.soulAsh,
@@ -366,7 +375,9 @@ function Data.SaveAccountPrestige(snapshot)
         error("Ashoholic received an incomplete Prestige reward.")
     end
 
-    database.accounts[database.myAccountId].prestige = CopyFields(snapshot, PRESTIGE_FIELDS)
+    local account = RequireTable(database.accounts[database.myAccountId], "current account")
+    if HasNewerObservation(account.prestige, snapshot, "Prestige data") then return end
+    account.prestige = CopyFields(snapshot, PRESTIGE_FIELDS)
     NotifyRosterChanged()
 end
 
@@ -380,6 +391,7 @@ function Data.SaveCharacterContracts(realmName, characterName, guid, snapshot)
         or type(snapshot.anchorPlace) ~= "string" then
         error("Ashoholic received invalid offerings or Soul Anchor data.")
     end
+    if HasNewerObservation(character.contracts, snapshot, "contract data") then return end
 
     character.contracts = CopyFields(snapshot, CONTRACT_FIELDS)
     NotifyRosterChanged()
@@ -399,6 +411,7 @@ function Data.SaveCharacterEchoBuild(realmName, characterName, guid, snapshot)
     elseif snapshot.slot ~= nil or snapshot.name ~= nil then
         error("Ashoholic cannot save an active slot when Echo loadouts are unavailable.")
     end
+    if HasNewerObservation(character.echoBuild, snapshot, "Echo build") then return end
 
     character.echoBuild = CopyFields(snapshot, ECHO_BUILD_FIELDS)
     NotifyRosterChanged()
@@ -427,12 +440,19 @@ function Data.SaveCharacterTorment(realmName, characterName, guid, snapshot)
     if not copiedUnlocks[1] then
         error("Ashoholic Torment data must include Normal access.")
     end
+    if HasNewerObservation(character.torment, snapshot, "Torment data") then return end
 
     character.torment = {
         currentTier = snapshot.currentTier,
-        unlockedTiers = copiedUnlocks,
         updatedAt = snapshot.updatedAt,
     }
+    -- Access is shared. Unlock evidence is permanent; observing another
+    -- character's smaller achievement set must not relock an account's tier.
+    local account = database.accounts[database.myAccountId]
+    local access = account.torment or { unlockedTiers = {}, updatedAt = snapshot.updatedAt }
+    for tier in pairs(copiedUnlocks) do access.unlockedTiers[tier] = true end
+    access.updatedAt = math.max(access.updatedAt, snapshot.updatedAt)
+    account.torment = access
     NotifyRosterChanged()
 end
 
@@ -454,10 +474,103 @@ end
 function Data.SaveCharacterRaids(realmName, characterName, guid, snapshot)
     local character = RequireCharacter(realmName, characterName, guid, "raid data")
     RequireObservation(snapshot, "raid data")
+    local lockedUntil = CopyRaidLocks(snapshot.lockedUntil)
+    if HasNewerObservation(character.raids, snapshot, "raid data") then return end
     character.raids = {
-        lockedUntil = CopyRaidLocks(snapshot.lockedUntil),
+        lockedUntil = lockedUntil,
         updatedAt = snapshot.updatedAt,
     }
+    NotifyRosterChanged()
+end
+
+local REWARD_FIELDS = { "ash", "shards", "copper", "artisan", "orbs" }
+local TRIAL_FIELDS = { "best", "rank", "total", "season", "seasonName", "teamSize", "updatedAt" }
+
+local function CopyActivities(snapshot)
+    RequireObservation(snapshot, "activities")
+    if not IsNonNegativeInteger(snapshot.cacheProgress)
+        or not IsNonNegativeInteger(snapshot.cacheRequired) or snapshot.cacheRequired == 0
+        or not IsNonNegativeInteger(snapshot.cachesOpened)
+        or (snapshot.equippedItemLevel ~= nil
+            and (not IsNonNegativeInteger(snapshot.equippedItemLevel) or snapshot.equippedItemLevel == 0))
+        or not IsNonNegativeInteger(snapshot.dailyResetAt) or snapshot.dailyResetAt == 0
+        or not IsNonNegativeInteger(snapshot.weeklyResetAt) or snapshot.weeklyResetAt == 0 then
+        error("Ashoholic received invalid Call Board progress or reset times.")
+    end
+    local quests = RequireTable(snapshot.quests, "Call Board activities")
+    local copy = {
+        cacheProgress = snapshot.cacheProgress,
+        cacheRequired = snapshot.cacheRequired,
+        cachesOpened = snapshot.cachesOpened,
+        equippedItemLevel = snapshot.equippedItemLevel,
+        dailyResetAt = snapshot.dailyResetAt,
+        weeklyResetAt = snapshot.weeklyResetAt,
+        quests = {},
+        updatedAt = snapshot.updatedAt,
+    }
+    for questId, quest in pairs(quests) do
+        if not IsNonNegativeInteger(questId) or questId == 0 or type(quest) ~= "table"
+            or type(quest.title) ~= "string" or quest.title == ""
+            or (quest.cadence ~= "daily" and quest.cadence ~= "weekly" and quest.cadence ~= "once")
+            or not IsNonNegativeInteger(quest.done) or not IsNonNegativeInteger(quest.max)
+            or not IsNonNegativeInteger(quest.state) or quest.state > 3
+            or type(quest.accountWide) ~= "boolean" then
+            error("Ashoholic received an invalid Call Board activity.")
+        end
+        local rewards
+        if quest.rewards ~= nil then
+            RequireTable(quest.rewards, "activity rewards")
+            rewards = {}
+            for _, field in ipairs(REWARD_FIELDS) do
+                local value = quest.rewards[field]
+                if value ~= nil and not IsNonNegativeInteger(value) then
+                    error("Ashoholic received an invalid Call Board reward.")
+                end
+                rewards[field] = value
+            end
+        end
+        copy.quests[questId] = {
+            title = quest.title, cadence = quest.cadence, done = quest.done,
+            max = quest.max, state = quest.state, accountWide = quest.accountWide,
+            rewards = rewards,
+        }
+    end
+    return copy
+end
+
+local function CopyTrial(snapshot, group)
+    RequireObservation(snapshot, "Trial " .. group)
+    if not IsNonNegativeInteger(snapshot.best)
+        or (snapshot.rank ~= nil and not IsNonNegativeInteger(snapshot.rank))
+        or (snapshot.total ~= nil and not IsNonNegativeInteger(snapshot.total))
+        or (snapshot.season ~= nil and not IsNonNegativeInteger(snapshot.season))
+        or (snapshot.seasonName ~= nil and type(snapshot.seasonName) ~= "string")
+        or (snapshot.teamSize ~= nil and (group ~= "crusader"
+            or not IsNonNegativeInteger(snapshot.teamSize)
+            or snapshot.teamSize < 1 or snapshot.teamSize > 5)) then
+        error("Ashoholic received an invalid Trial record.")
+    end
+    return CopyFields(snapshot, TRIAL_FIELDS)
+end
+
+function Data.SaveCharacterActivities(realmName, characterName, guid, snapshot)
+    local character = RequireCharacter(realmName, characterName, guid, "activities")
+    local copy = CopyActivities(snapshot)
+    if HasNewerObservation(character.activities, copy, "activities") then return end
+    character.activities = copy
+    NotifyRosterChanged()
+end
+
+function Data.SaveCharacterTrial(realmName, characterName, guid, group, snapshot)
+    if group ~= "champion" and group ~= "crusader" then
+        error("Ashoholic received an unknown Trial group.")
+    end
+    local character = RequireCharacter(realmName, characterName, guid, "Trials")
+    local copy = CopyTrial(snapshot, group)
+    if character.trials == nil then character.trials = {} end
+    RequireTable(character.trials, "Trials")
+    if HasNewerObservation(character.trials[group], copy, "Trial " .. group) then return end
+    character.trials[group] = copy
     NotifyRosterChanged()
 end
 
@@ -489,6 +602,7 @@ function Data.SaveAccountCurrencies(snapshot)
     end
 
     local account = RequireTable(database.accounts[database.myAccountId], "current account")
+    if HasNewerObservation(account.currencies, snapshot, "account currencies") then return end
     account.currencies = {
         ashSpendable = snapshot.ashSpendable,
         ashBanked = snapshot.ashBanked,
@@ -525,15 +639,19 @@ local function CopyAccountCurrencies(account, accountId)
     }
 end
 
-local function CopyTorment(character)
-    if character.torment == nil then
+local function CopyTorment(character, account)
+    local selected = character.torment
+    local access
+    if account then access = account.torment else access = character.torment end
+    if not selected and not access then
         return nil
     end
-    local source = RequireTable(character.torment, "Torment data")
-    local unlocked = RequireTable(source.unlockedTiers, "Torment unlocks")
+    local unlocked = access and RequireTable(access.unlockedTiers, "Torment unlocks") or {}
     local copy = {
-        currentTier = source.currentTier,
-        updatedAt = source.updatedAt,
+        currentTier = selected and selected.currentTier,
+        updatedAt = selected and selected.updatedAt,
+        accessUpdatedAt = access and access.updatedAt,
+        accessKnown = access ~= nil,
         unlockedTiers = {},
     }
     for tier in pairs(unlocked) do
@@ -557,9 +675,423 @@ local function CopyRaids(character)
     }
 end
 
+local function CopyCharacterTrials(character)
+    if character.trials == nil then return nil end
+    local source = RequireTable(character.trials, "Trials")
+    local copy = {}
+    for _, group in ipairs(Schema.TRIAL_GROUPS) do
+        if source[group] ~= nil then
+            copy[group] = CopyTrial(source[group], group)
+        end
+    end
+    return copy
+end
+
+-- Synchronization accepts only the contract's fields. Validate the entire
+-- incoming account before changing anything, then merge each group by its own
+-- observation time. No settings or other accounts are exported.
+local BASIC_FIELDS = { "guid", "class", "level", "gold", "location", "updatedAt" }
+local CURRENCY_FIELDS = {
+    "ashSpendable", "ashBanked", "shardSpendable", "shardBanked",
+    "essenceSpendable", "essenceBanked", "artisanSpendable", "artisanBanked", "updatedAt",
+}
+
+local function RequireName(value, description)
+    if type(value) ~= "string" or value == "" or #value > 128
+        or string.match(value, "^%s*$")
+        or string.find(value, "[%c]") then
+        error("Ashoholic received an invalid " .. description .. ".")
+    end
+end
+
+local function CopySyncAccountGroup(group, snapshot)
+    RequireObservation(snapshot, group)
+    if group == "currencies" then
+        if not IsNonNegativeInteger(snapshot.ashSpendable) or not IsNonNegativeInteger(snapshot.ashBanked) then
+            error("Ashoholic received invalid shared Soul Ash balances.")
+        end
+        for _, currency in ipairs(POOL_CURRENCIES) do
+            local spendable, banked = snapshot[currency .. "Spendable"], snapshot[currency .. "Banked"]
+            if not ((spendable == nil and banked == nil)
+                or (IsNonNegativeInteger(spendable) and IsNonNegativeInteger(banked))) then
+                error("Ashoholic received an incomplete shared currency balance.")
+            end
+        end
+        return CopyFields(snapshot, CURRENCY_FIELDS)
+    elseif group == "prestige" then
+        if not IsNonNegativeInteger(snapshot.count) or not IsNonNegativeInteger(snapshot.gateProgress)
+            or not ((snapshot.pendingShards == nil and snapshot.pendingEssence == nil)
+                or (IsNonNegativeInteger(snapshot.pendingShards) and IsNonNegativeInteger(snapshot.pendingEssence))) then
+            error("Ashoholic received invalid shared Prestige data.")
+        end
+        return CopyFields(snapshot, PRESTIGE_FIELDS)
+    elseif group == "torment" then
+        local copy = { unlockedTiers = {}, updatedAt = snapshot.updatedAt }
+        for tier, unlocked in pairs(RequireTable(snapshot.unlockedTiers, "shared Torment access")) do
+            if not IsNonNegativeInteger(tier) or tier == 0 or unlocked ~= true then
+                error("Ashoholic received invalid shared Torment access.")
+            end
+            copy.unlockedTiers[tier] = true
+        end
+        if not copy.unlockedTiers[1] then error("Ashoholic shared Torment access is missing Normal.") end
+        return copy
+    end
+    error("Ashoholic cannot share unknown account group " .. tostring(group) .. ".")
+end
+
+local function CopySyncCharacterGroup(group, snapshot)
+    RequireObservation(snapshot, group)
+    if group == "basics" then
+        RequireName(snapshot.guid, "character GUID")
+        RequireName(snapshot.class, "character class")
+        if not IsNonNegativeInteger(snapshot.level) or snapshot.level == 0
+            or not IsNonNegativeInteger(snapshot.gold) or type(snapshot.location) ~= "string" then
+            error("Ashoholic received invalid shared character basics.")
+        end
+        return CopyFields(snapshot, BASIC_FIELDS)
+    elseif group == "run" then
+        if not IsNonNegativeInteger(snapshot.soulAsh) or not IsNonNegativeInteger(snapshot.soulShards) then
+            error("Ashoholic received invalid shared run data.")
+        end
+        return CopyFields(snapshot, { "soulAsh", "soulShards", "updatedAt" })
+    elseif group == "contracts" then
+        if not IsNonNegativeNumber(snapshot.offeringBonusPct)
+            or not IsNonNegativeInteger(snapshot.offeringsUsed) or not IsNonNegativeInteger(snapshot.offeringsMax)
+            or not IsNonNegativeInteger(snapshot.anchorState) or snapshot.anchorState > 2
+            or type(snapshot.anchorPlace) ~= "string" then
+            error("Ashoholic received invalid shared contracts.")
+        end
+        return CopyFields(snapshot, CONTRACT_FIELDS)
+    elseif group == "echoBuild" then
+        if type(snapshot.enabled) ~= "boolean"
+            or (snapshot.enabled and (not IsNonNegativeInteger(snapshot.slot) or snapshot.slot == 0
+                or type(snapshot.name) ~= "string"))
+            or (not snapshot.enabled and (snapshot.slot ~= nil or snapshot.name ~= nil)) then
+            error("Ashoholic received an invalid shared Echo build.")
+        end
+        return CopyFields(snapshot, ECHO_BUILD_FIELDS)
+    elseif group == "torment" then
+        if not IsNonNegativeInteger(snapshot.currentTier) or snapshot.currentTier == 0 then
+            error("Ashoholic received an invalid shared Torment selection.")
+        end
+        return { currentTier = snapshot.currentTier, updatedAt = snapshot.updatedAt }
+    elseif group == "raids" then
+        return { lockedUntil = CopyRaidLocks(snapshot.lockedUntil), updatedAt = snapshot.updatedAt }
+    elseif group == "activities" then
+        return CopyActivities(snapshot)
+    end
+    error("Ashoholic cannot share unknown character group " .. tostring(group) .. ".")
+end
+
+local function CopySyncAccount(account)
+    RequireTable(account, "shared account")
+    RequireName(account.name, "account name")
+    local copy = { name = account.name, realms = {} }
+    for _, group in ipairs(Schema.ACCOUNT_GROUPS) do
+        if account[group] ~= nil then copy[group] = CopySyncAccountGroup(group, account[group]) end
+    end
+    local realms = RequireTable(account.realms, "shared realms")
+    local characterCount = 0
+    for realmName, realm in pairs(realms) do
+        RequireName(realmName, "realm name")
+        RequireTable(realm, "shared realm")
+        copy.realms[realmName] = {}
+        for name, character in pairs(realm) do
+            RequireName(name, "character name")
+            RequireTable(character, "shared character")
+            characterCount = characterCount + 1
+            if characterCount > 500 then error("Ashoholic shared account contains too many characters.") end
+            local characterCopy = {}
+            for _, group in ipairs(Schema.CHARACTER_GROUPS) do
+                if character[group] ~= nil then
+                    characterCopy[group] = CopySyncCharacterGroup(group, character[group])
+                end
+            end
+            if not characterCopy.basics then
+                error("Ashoholic cannot share a character without its identity.")
+            end
+            characterCopy.trials = CopyCharacterTrials(character)
+            copy.realms[realmName][name] = characterCopy
+        end
+    end
+    return copy
+end
+
+function Data.GetLocalAccountId()
+    if not database then error("Ashoholic account identity requested before initialization.") end
+    return database.myAccountId
+end
+
+function Data.ExportCurrentAccount()
+    if not database then error("Ashoholic cannot export before Data.Initialize().") end
+    local account = CopySyncAccount(database.accounts[database.myAccountId])
+    -- The initial local alias can come from WoW's login account name. Never
+    -- transmit it; the receiving installation can assign its own alias.
+    account.name = "Synced account " .. string.sub(database.myAccountId, -8)
+    return {
+        schemaVersion = Schema.VERSION,
+        accountId = database.myAccountId,
+        account = account,
+    }
+end
+
+local function MergeGroup(destination, source, group)
+    local incoming = source[group]
+    if incoming and (not destination[group] or incoming.updatedAt > destination[group].updatedAt) then
+        destination[group] = incoming
+        return true
+    end
+    return false
+end
+
+function Data.ImportAccount(packet)
+    if not database then error("Ashoholic cannot import before Data.Initialize().") end
+    RequireTable(packet, "shared account packet")
+    if packet.schemaVersion == 5 then
+        local migrated = { schemaVersion = 5, accounts = { imported = CopyTree(packet.account) } }
+        Schema.Migrate(migrated)
+        packet = { schemaVersion = Schema.VERSION, accountId = packet.accountId, account = migrated.accounts.imported }
+    end
+    if packet.schemaVersion ~= Schema.VERSION then
+        error("Ashoholic cannot import a different schema version. Update both addon installations.")
+    end
+    RequireName(packet.accountId, "account ID")
+    local incoming = CopySyncAccount(packet.account)
+    local account = database.accounts[packet.accountId]
+    local changed = false
+    if not account then
+        database.accounts[packet.accountId] = incoming
+        NotifyRosterChanged()
+        return true
+    end
+    -- Work on a validated copy, so neither invalid incoming data nor an
+    -- invalid existing record can leave a partly merged account behind.
+    account = CopySyncAccount(account)
+    for _, group in ipairs(Schema.ACCOUNT_GROUPS) do
+        if group == "torment" and account.torment and incoming.torment then
+            for tier in pairs(incoming.torment.unlockedTiers) do
+                if not account.torment.unlockedTiers[tier] then
+                    account.torment.unlockedTiers[tier] = true
+                    changed = true
+                end
+            end
+            if incoming.torment.updatedAt > account.torment.updatedAt then
+                account.torment.updatedAt = incoming.torment.updatedAt
+                changed = true
+            end
+        elseif MergeGroup(account, incoming, group) then changed = true end
+    end
+    for realmName, incomingRealm in pairs(incoming.realms) do
+        if not account.realms[realmName] then account.realms[realmName] = {} end
+        local realm = RequireTable(account.realms[realmName], "existing realm")
+        for name, incomingCharacter in pairs(incomingRealm) do
+            local character = realm[name]
+            if not character then
+                realm[name] = incomingCharacter
+                changed = true
+            else
+                RequireTable(character, "existing character")
+                local oldBasics = RequireTable(character.basics, "existing character basics")
+                local sameCharacter = oldBasics.guid == incomingCharacter.basics.guid
+                if not sameCharacter and incomingCharacter.basics.updatedAt > oldBasics.updatedAt then
+                    -- A recreated character must never inherit the old one's
+                    -- runs, locks, Trials or other groups.
+                    realm[name] = incomingCharacter
+                    changed = true
+                elseif sameCharacter then
+                    for _, group in ipairs(Schema.CHARACTER_GROUPS) do
+                        if MergeGroup(character, incomingCharacter, group) then changed = true end
+                    end
+                    if incomingCharacter.trials then
+                        if not character.trials then character.trials = {} end
+                        RequireTable(character.trials, "existing Trials")
+                        for _, group in ipairs(Schema.TRIAL_GROUPS) do
+                            if MergeGroup(character.trials, incomingCharacter.trials, group) then changed = true end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if changed then
+        database.accounts[packet.accountId] = account
+        NotifyRosterChanged()
+    end
+    return changed
+end
+
+local function SyncSettings(create)
+    if not database then error("Ashoholic sync settings were requested before Data.Initialize().") end
+    local settings = database.settings
+    if settings.sync == nil and create then settings.sync = {} end
+    if settings.sync ~= nil then RequireTable(settings.sync, "sync settings") end
+    return settings.sync
+end
+
+function Data.GetTrustedPeers()
+    local settings = SyncSettings(false)
+    if not settings or settings.peers == nil then return {} end
+    RequireTable(settings.peers, "trusted peers")
+    local peers = {}
+    for key, name in pairs(settings.peers) do
+        RequireName(key, "trusted peer key")
+        RequireName(name, "trusted peer name")
+        peers[key] = name
+    end
+    return peers
+end
+
+function Data.SetTrustedPeer(key, name)
+    RequireName(key, "trusted peer key")
+    if name ~= nil then RequireName(name, "trusted peer name") end
+    local settings = SyncSettings(true)
+    if settings.peers == nil then settings.peers = {} end
+    RequireTable(settings.peers, "trusted peers")
+    settings.peers[key] = name
+end
+
+function Data.SetOfflineExport(encoded)
+    if type(encoded) ~= "string" or encoded == "" or string.find(encoded, "[^%x]") then
+        error("Ashoholic cannot save an invalid offline export.")
+    end
+    SyncSettings(true).ashoholicOfflineExport = encoded
+end
+
+function Data.ClearOfflineExport()
+    local settings = SyncSettings(false)
+    if settings then settings.ashoholicOfflineExport = nil end
+end
+
+function Data.SetAccountName(accountId, name)
+    if not database then error("Ashoholic cannot rename an account before Data.Initialize().") end
+    RequireName(accountId, "account ID")
+    RequireName(name, "account name")
+    local account = RequireTable(database.accounts[accountId], "account to rename")
+    account.name = name
+    NotifyRosterChanged()
+end
+
+function Data.GetMinimapSettings()
+    if not database then error("Ashoholic minimap settings were requested before Data.Initialize().") end
+    local ui = database.settings.ui
+    if ui == nil then return { angle = 225, hidden = false } end
+    RequireTable(ui, "UI settings")
+    local minimap = ui.minimap
+    if minimap == nil then return { angle = 225, hidden = false } end
+    RequireTable(minimap, "minimap settings")
+    if type(minimap.angle) ~= "number" or minimap.angle ~= minimap.angle
+        or minimap.angle == math.huge or minimap.angle == -math.huge
+        or type(minimap.hidden) ~= "boolean" then
+        error("Ashoholic saved invalid minimap settings.")
+    end
+    return { angle = minimap.angle, hidden = minimap.hidden }
+end
+
+function Data.SaveMinimapSettings(angle, hidden)
+    if not database then error("Ashoholic minimap settings were saved before Data.Initialize().") end
+    if type(angle) ~= "number" or angle ~= angle or angle == math.huge or angle == -math.huge
+        or type(hidden) ~= "boolean" then
+        error("Ashoholic cannot save invalid minimap settings.")
+    end
+    if database.settings.ui == nil then database.settings.ui = {} end
+    local ui = RequireTable(database.settings.ui, "UI settings")
+    ui.minimap = { angle = angle % 360, hidden = hidden }
+end
+
+local LIVE_TABS = { Roster = true, Raids = true, Activities = true, Progression = true, Trials = true }
+
+function Data.GetDefaultTab()
+    if not database then error("Ashoholic default tab was requested before Data.Initialize().") end
+    local ui = database.settings.ui
+    if ui == nil then return "Roster" end
+    RequireTable(ui, "UI settings")
+    if ui.defaultTab == nil then return "Roster" end
+    if not LIVE_TABS[ui.defaultTab] then error("Ashoholic saved an invalid default tab.") end
+    return ui.defaultTab
+end
+
+function Data.SaveDefaultTab(name)
+    if not database then error("Ashoholic default tab was saved before Data.Initialize().") end
+    if not LIVE_TABS[name] then error("Ashoholic cannot save an unknown default tab.") end
+    if database.settings.ui == nil then database.settings.ui = {} end
+    RequireTable(database.settings.ui, "UI settings").defaultTab = name
+end
+
+function Data.IsAccountVisible(accountId)
+    if not database then error("Ashoholic account visibility was requested before Data.Initialize().") end
+    RequireName(accountId, "account ID")
+    local ui = database.settings.ui
+    if ui == nil then return true end
+    RequireTable(ui, "UI settings")
+    local accounts = ui.accounts
+    if accounts == nil then return true end
+    RequireTable(accounts, "account view settings")
+    if accounts.hidden == nil then return true end
+    RequireTable(accounts.hidden, "hidden accounts")
+    local hidden = accounts.hidden[accountId]
+    if hidden ~= nil and hidden ~= true then error("Ashoholic saved invalid account visibility.") end
+    return not hidden
+end
+
+function Data.SetAccountVisible(accountId, visible)
+    if not database then error("Ashoholic account visibility was saved before Data.Initialize().") end
+    RequireName(accountId, "account ID")
+    RequireTable(database.accounts[accountId], "account to show or hide")
+    if type(visible) ~= "boolean" then error("Ashoholic account visibility must be true or false.") end
+    if database.settings.ui == nil then database.settings.ui = {} end
+    local ui = RequireTable(database.settings.ui, "UI settings")
+    if ui.accounts == nil then ui.accounts = {} end
+    local accounts = RequireTable(ui.accounts, "account view settings")
+    if accounts.hidden == nil then accounts.hidden = {} end
+    local hidden = RequireTable(accounts.hidden, "hidden accounts")
+    hidden[accountId] = not visible and true or nil
+    NotifyRosterChanged()
+end
+
 -- Return a display-safe copy of the saved roster.
 -- The UI receives only the fields it needs and cannot change AshoholicDB by
 -- editing the tables returned here.
+local currentCharacter
+
+function Data.SetCurrentCharacter(realm, name, guid)
+    RequireName(realm, "current realm")
+    RequireName(name, "current character")
+    RequireName(guid, "current character GUID")
+    currentCharacter = { realm = realm, name = name, guid = guid }
+end
+
+function Data.GetDashboardSettings()
+    if not database then error("Ashoholic dashboard settings requested before initialization.") end
+    local ui = database.settings.ui
+    return ui and CopyTree(ui.dashboard) or nil
+end
+
+function Data.SaveDashboardSettings(settings)
+    if not database then error("Ashoholic dashboard settings saved before initialization.") end
+    RequireTable(settings, "dashboard settings")
+    if not database.settings.ui then database.settings.ui = {} end
+    database.settings.ui.dashboard = CopyTree(settings)
+end
+
+function Data.GetUIProfiles()
+    if not database then error("Ashoholic profiles requested before initialization.") end
+    local ui = database.settings.ui
+    return ui and CopyTree(ui.profiles) or { saved = {}, characters = {} }
+end
+
+function Data.SaveUIProfiles(profiles)
+    if not database then error("Ashoholic profiles saved before initialization.") end
+    RequireTable(profiles.saved, "saved profiles")
+    RequireTable(profiles.characters, "character profile assignments")
+    if not database.settings.ui then database.settings.ui = {} end
+    database.settings.ui.profiles = CopyTree(profiles)
+end
+
+function Data.GetCurrentCharacterKey()
+    if not currentCharacter then return nil end
+    return currentCharacter.guid
+end
+
 function Data.GetRoster()
     if not database then
         error("Ashoholic roster was requested before Data.Initialize().")
@@ -575,6 +1107,7 @@ function Data.GetRoster()
             isCurrent = accountId == database.myAccountId,
             currencies = CopyAccountCurrencies(account, accountId),
             prestige = CopyOptionalGroup(account, "prestige", PRESTIGE_FIELDS),
+            torment = CopyTorment(account),
             characters = {},
         }
         local realms = account.realms
@@ -600,18 +1133,25 @@ function Data.GetRoster()
                             name = characterName,
                             realm = realmName,
                             guid = basics.guid,
+                            isPlayer = accountId == database.myAccountId and currentCharacter
+                                and currentCharacter.realm == realmName and currentCharacter.name == characterName
+                                and currentCharacter.guid == basics.guid or false,
                             class = basics.class,
                             level = basics.level,
                             gold = basics.gold,
                             location = basics.location,
                             lastSeen = basics.updatedAt,
+                            itemLevel = character.activities and character.activities.equippedItemLevel,
+                            itemLevelUpdatedAt = character.activities and character.activities.updatedAt,
                             runAsh = run and run.soulAsh,
                             runShards = run and run.soulShards,
                             runUpdatedAt = run and run.updatedAt,
                             contracts = CopyOptionalGroup(character, "contracts", CONTRACT_FIELDS),
                             echoBuild = CopyOptionalGroup(character, "echoBuild", ECHO_BUILD_FIELDS),
-                            torment = CopyTorment(character),
+                            torment = CopyTorment(character, account),
                             raids = CopyRaids(character),
+                            activities = character.activities and CopyActivities(character.activities),
+                            trials = CopyCharacterTrials(character),
                         })
                     end
                 end

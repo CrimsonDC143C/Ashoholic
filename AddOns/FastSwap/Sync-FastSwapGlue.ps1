@@ -1,5 +1,5 @@
 param(
-    [string]$GameRoot = "D:\Games\Ebonhold",
+    [string]$GameRoot = "",
     [switch]$Force,
     [switch]$Watch,
     [switch]$LaunchGame,
@@ -8,6 +8,19 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# When no -GameRoot is given, find it from this script's own location:
+# <GameRoot>\Interface\AddOns\FastSwap\Sync-FastSwapGlue.ps1 -> three folders up.
+# This avoids a hard-coded drive, because every installation lives elsewhere.
+if ([string]::IsNullOrWhiteSpace($GameRoot)) {
+    $candidate = Split-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) -Parent
+    if ($candidate -and (Test-Path (Join-Path $candidate "ebonhold.dll"))) {
+        $GameRoot = $candidate
+    } else {
+        throw "Could not find ebonhold.dll three folders above $PSScriptRoot. Run this script from the installed Interface\AddOns\FastSwap folder or pass -GameRoot."
+    }
+}
+
 $TaskName = "Ebonhold_FastSwap_GlueSync"
 $DllPath  = Join-Path $GameRoot "ebonhold.dll"
 $GlueOut  = Join-Path $GameRoot "ebonhold_glue.lua"
@@ -166,7 +179,7 @@ if ($LaunchGame) {
 
         $watcher = New-Object System.IO.FileSystemWatcher
         $watcher.Path = $GameRoot
-        $watcher.Filter = "ebonhold.dll"
+        $watcher.Filter = "*"
         $watcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite -bor [System.IO.NotifyFilters]::FileName -bor [System.IO.NotifyFilters]::Size
         $watcher.EnableRaisingEvents = $true
 
@@ -177,7 +190,10 @@ if ($LaunchGame) {
         try {
             while ($true) {
                 $result = $watcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed -bor [System.IO.WatcherChangeTypes]::Created -bor [System.IO.WatcherChangeTypes]::Renamed, 500)
-                if (-not $result.TimedOut) {
+                # The launcher can replace ebonhold.dll or overwrite ebonhold_glue.lua
+                # with its stock copy during an update. Either one removes the hook.
+                # Our own write also raises an event, but the stamp then matches.
+                if (-not $result.TimedOut -and ($result.Name -eq "ebonhold.dll" -or $result.Name -eq "ebonhold_glue.lua")) {
                     Start-Sleep -Milliseconds 500
                     try {
                         Sync-FastSwapGlue | Out-Null
@@ -225,14 +241,14 @@ Sync-FastSwapGlue -ForceSync:$Force | Out-Null
 if ($Watch) {
     $watcher = New-Object System.IO.FileSystemWatcher
     $watcher.Path = $GameRoot
-    $watcher.Filter = "ebonhold.dll"
+    $watcher.Filter = "*"
     $watcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite -bor [System.IO.NotifyFilters]::FileName -bor [System.IO.NotifyFilters]::Size
     $watcher.EnableRaisingEvents = $true
 
-    Write-Host "[FastSwap] Watching $DllPath for updates..."
+    Write-Host "[FastSwap] Watching $DllPath and $GlueOut for updates..."
     while ($true) {
         $result = $watcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed -bor [System.IO.WatcherChangeTypes]::Created -bor [System.IO.WatcherChangeTypes]::Renamed, 30000)
-        if (-not $result.TimedOut) {
+        if (-not $result.TimedOut -and ($result.Name -eq "ebonhold.dll" -or $result.Name -eq "ebonhold_glue.lua")) {
             Start-Sleep -Milliseconds 500
             try {
                 Sync-FastSwapGlue | Out-Null
