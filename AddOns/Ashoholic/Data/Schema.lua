@@ -37,7 +37,7 @@
  Text in <angle brackets> below is an example, not a real key.
 
  AshoholicDB = {
-     schemaVersion = 6,              -- which version of this blueprint the data uses
+     schemaVersion = 7,              -- which version of this blueprint the data uses
      myAccountId   = "<random ID>",  -- the account this copy of the file belongs to
 
      accounts = {
@@ -46,6 +46,7 @@
              currencies = { ... },   -- GROUP: account-wide currencies
              prestige   = { ... },   -- GROUP: account-wide Prestige progress
              torment    = { ... },   -- GROUP: account-wide unlock evidence
+             warband    = { ... },   -- GROUP: account-wide Warband bank gold
              realms = {
                  ["<realm name>"] = {
                      ["<character name>"] = {
@@ -158,7 +159,8 @@
  ------------------------------------------------------------------------------
 
  currencies
-   Stage 5's second slice collects this group, except warbandGold.
+   Stage 5's second slice collects this group. Warband bank gold has its own
+   group (warband, below) because it arrives from a different source.
    The server sends no balances at login (confirmed in-game). They reach
    Ashoholic in three ways:
      1) A server balance update after a balance changes (banking a run,
@@ -200,9 +202,6 @@
      essenceBanked     number  Soul Essence banked
      artisanSpendable  number  Artisan Soul you can spend
      artisanBanked     number  Artisan Soul banked
-     warbandGold       copper  Warband bank gold. ALWAYS nil for now:
-                               ProjectEbonhold keeps it in a private variable
-                               that other addons cannot read.
      updatedAt         time    when the balance update was observed
 
  prestige
@@ -226,6 +225,32 @@
    size are read through the integration into Data's session-only rules.
    They are not saved. The UI shows currency requirements, not a promise that
    a Prestige is allowed while dead, in combat, or under other server rules.
+
+ warband   (Warband bank gold)
+   Source: the companion's extended-bank packets. ebonhold.dll delivers every
+           bank update to the companion's global function
+           ExtBank_OnPacket(hex); Ashoholic reads the same packet after it
+           with hooksecurefunc (Rule 5 c). The companion keeps the gold in a
+           private variable, so the packet is the only readable source.
+   Packets arrive only while the bank is used (opening it, moving items,
+   depositing or withdrawing gold), never at login, so the group stays nil
+   until this account's bank has been used with Ashoholic installed. One
+   Warband bank and its gold are shared by every character of the account.
+   Only the packet's tail is read: the gold (8 bytes) and the optional "open"
+   byte after it. A packet from an older server without the gold, or with
+   any unexpected layout, is ignored. Collectors/Currencies.lua starts
+   watching when Ashoholic loads; an older companion without the extended
+   bank leaves the group nil.
+   Every bank packet repeats the gold. When gold and unlocked are unchanged,
+   only updatedAt moves forward (a fresher confirmation) and the roster is not
+   redrawn; a new value replaces the whole group.
+     gold              copper  gold stored in the account's Warband bank
+     unlocked          boolean true when the server reports the Warband bank
+                               unlocked for this account, false when it reports
+                               it locked; nil when the packet had no open byte
+     updatedAt         time    when the latest bank packet was observed
+   Older saved data and synced accounts without this group stay valid: absent
+   means unknown, never 0 copper.
 
  ------------------------------------------------------------------------------
  CHARACTER GROUPS (one set per character)
@@ -333,6 +358,10 @@
    Source: ProjectEbonhold.Callboard.OnChanged("board") and Callboard.board.
            Arrives after the companion receives the board, normally when the
            Call Board is opened. Ashoholic observes it without a request.
+   The companion turns a missing number into 0. Ashoholic therefore leaves
+   category, cost and weeklyClaims out (nil) unless the server reported them,
+   and skips only an activity it cannot identify (no ID, an unknown cadence
+   or a repeated ID, keeping the first copy) instead of the whole board.
      cacheProgress     number  cache bar progress
      cacheRequired     number  progress needed for the next cache
      cachesOpened      number  caches opened
@@ -346,14 +375,43 @@
                                    state       = number (ProjectEbonhold's
                                                  Callboard.STATE value),
                                    accountWide = true or false,
+                                   category    = number or nil: the Call Board
+                                                 category ID (1 Dungeons,
+                                                 2 Raids, 3 Open World,
+                                                 4 Profession, 6 Other,
+                                                 7 Torment, 8 Frostveil =
+                                                 seasonal winter-event dailies,
+                                                 posted only while the event
+                                                 runs); nil when not reported,
+                                   cost        = copper or nil: what claiming
+                                                 the reward TAKES; nil means
+                                                 the board reported no cost
+                                                 (a free claim),
                                    rewards     = { ash, shards, copper, artisan,
                                                    orbs } (server amounts),
                                } }
      dailyResetAt      time    when daily quests reset
      weeklyResetAt     time    when weekly quests reset
+     weeklyClaims      number  contracts claimed this board week; nil unless
+                               a rail was saved (older servers send neither)
+     rail              table   the weekly reward rail, nil when the server sent
+                               none or it could not be stored completely:
+                               1 to 10 steps in climbing order,
+                               { { count = claims needed,
+                                   items = { { id = itemId,
+                                               name = string or nil }, ...
+                                             up to 4 } }, ... }
+                               Names are resolved when the board is observed
+                               (the UI may not call game APIs), at most
+                               64 bytes; nil when the game did not know it.
      updatedAt         time
-   Each character keeps its own board. Shared quests are displayed once per
-   account using the newest observation; cache progress uses the newest board.
+   Each character keeps its own board. The cache bar (cacheProgress,
+   cacheRequired, cachesOpened), weeklyClaims and rail are PER CHARACTER: the
+   cache bar is relative to that character's item level, so one character's
+   board never stands in for another's. Shared (accountWide) quests are
+   displayed once per account using the newest observation.
+   A quest with a cost is not "ready to claim" for free: claiming takes that
+   copper, so the companion does not count it as claimable.
    The roster's item level uses this board's timestamp, not basics/last seen;
    it can therefore be stale until the Call Board is opened again.
    After a reset, old quest progress is shown as needing a fresh observation.
@@ -384,8 +442,8 @@
  ------------------------------------------------------------------------------
 
  settings
-   The preview remains session-local. The shared renderer's live instance
-   saves customization through Data, separately from all character snapshots.
+   The live dashboard saves its customization through Data, separately from
+   all character snapshots.
      ui.roster.position { point, x, y }
        point             string  anchor on the screen, e.g. "CENTER"
        x, y              number  offsets from the matching UIParent anchor
@@ -400,9 +458,18 @@
      ui.dashboard        table   state, columnOrder, appearance, customThemes,
                                nextThemeId, raidView, accountConfig by account ID
                                (colors, collapsed state, original alias)
+     ui.dashboard.state.window
+                         table   window options, all booleans:
+                               { openLogin  = open the window at login,
+                                 combatHide = hide it when combat starts,
+                                 lockWindow = lock its position,
+                                 escClose   = Escape closes it }
+                               Schema version 7 renamed it from state.mock.
      ui.profiles         table   saved appearance/view presets by name,
-                               account default and character GUID assignments
-   Dashboard state includes columns/sorting, tabs, window extras and alert
+                               account default and character GUID assignments;
+                               a preset's options.window has the same shape
+                               as state.window (renamed from options.mock)
+   Dashboard state includes columns/sorting, tabs, window options and alert
    preferences. Alerts use saved lock end times, never a hardcoded reset day.
    Profiles and theme presets are local; manual theme strings share only
    appearance, not account identities or character observations.
@@ -439,11 +506,11 @@ addon.Schema = Schema
 
 -- Which version of the blueprint this code expects.
 -- Raise it by 1 whenever the saved layout changes (see section 4 above).
-Schema.VERSION = 6
+Schema.VERSION = 7
 
 -- The group names, so Data/ and Sync/ can loop over them instead of repeating
 -- the lists. A "group" is a small table with its own updatedAt (Rule 2).
-Schema.ACCOUNT_GROUPS = { "currencies", "prestige", "torment" }
+Schema.ACCOUNT_GROUPS = { "currencies", "prestige", "torment", "warband" }
 Schema.CHARACTER_GROUPS = { "basics", "run", "contracts", "echoBuild", "torment", "raids", "activities" }
 -- These two groups live one level deeper, inside character.trials.
 Schema.TRIAL_GROUPS = { "champion", "crusader" }
@@ -596,6 +663,44 @@ local function MigrateTormentAccess(database)
     end
 end
 
+-- Version 7 renames the dashboard's window options from "mock" (a name left
+-- over from the preview) to "window", both in the dashboard's own state and
+-- in every saved profile. These are local UI preferences, not observations:
+-- an unexpected value is dropped instead of stopping the addon from loading.
+local function MoveWindowOptions(options)
+    -- A "window" value that is not a table is malformed: drop it.
+    if options.window ~= nil and type(options.window) ~= "table" then
+        options.window = nil
+    end
+    -- Keep an existing "window" table; otherwise move a valid "mock" table.
+    if type(options.mock) == "table" and options.window == nil then
+        options.window = options.mock
+    end
+    options.mock = nil
+end
+
+local function MigrateWindowOptions(database)
+    -- Any missing or unexpected table on the way simply means there is
+    -- nothing to rename there.
+    local settings = database.settings
+    local ui = type(settings) == "table" and settings.ui
+    if type(ui) ~= "table" then
+        return
+    end
+    local dashboard = ui.dashboard
+    if type(dashboard) == "table" and type(dashboard.state) == "table" then
+        MoveWindowOptions(dashboard.state)
+    end
+    local profiles = ui.profiles
+    if type(profiles) == "table" and type(profiles.saved) == "table" then
+        for _, profile in pairs(profiles.saved) do
+            if type(profile) == "table" and type(profile.options) == "table" then
+                MoveWindowOptions(profile.options)
+            end
+        end
+    end
+end
+
 function Schema.Migrate(database)
     local version = database.schemaVersion
     if type(version) ~= "number" then
@@ -634,6 +739,12 @@ function Schema.Migrate(database)
         elseif version == 5 then
             MigrateTormentAccess(database)
             version = 6
+        elseif version == 6 then
+            MigrateWindowOptions(database)
+            -- Version 7 also adds optional Call Board fields (quest category
+            -- and cost, weeklyClaims, rail) and the account warband group.
+            -- Absent means unknown, so no saved observation needs converting.
+            version = 7
         else
             error("Ashoholic has no migration for saved schema version " .. tostring(version) .. ".")
         end

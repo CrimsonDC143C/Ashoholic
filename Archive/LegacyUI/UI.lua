@@ -1,3 +1,4 @@
+-- Archived legacy widget implementation; not loaded or packaged by Ashoholic.
 local addonName = ...
 local addon = _G[addonName]
 

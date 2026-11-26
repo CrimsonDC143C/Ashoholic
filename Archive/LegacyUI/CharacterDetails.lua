@@ -1,4 +1,4 @@
--- The approved preview's parked-run panel, fed only by Data.GetRoster copies.
+-- Archived legacy parked-run panel; not loaded or packaged by Ashoholic.
 -- Each row carries the age of its own source, not the character's last login.
 local addonName = ...
 local UI = _G[addonName].UI

@@ -1,16 +1,15 @@
+-- ARCHIVED DESIGN REFERENCE - NOT PART OF THE ASHOHOLIC ADDON.
+-- This is the approved sample-data preview (/ash preview) that the live
+-- dashboard in AddOns\Ashoholic\UI\ was built from. It is kept only so the
+-- original look and behaviour can be compared later. It is not loaded by any
+-- .toc file and is not packaged in releases.
+
 local addonName = ...
 local addon = _G[addonName]
 
--- One renderer serves the sample preview and the live data adapter. Keeping
--- columns and customization here prevents the two windows drifting apart.
-function addon:CreateDashboard(live)
-local function WindowName(name)
-    if not live then return name end
-    if name == "AshoholicPreviewFrame" then return "AshoholicRosterFrame" end
-    return (string.gsub(name, "Preview", "Live"))
-end
--- All window state is private to this instance. The live adapter persists
--- preferences through Data; preview instances keep only temporary samples.
+-- The preview owns only session-local sample data; it never reads or writes the roster.
+-- /ash preview: Settings previews themes, colors, fonts, icons, columns, tabs, accounts, alerts and profiles.
+-- Account filters, collapsed groups and layout choices survive closing, but not /reload.
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local FONT = "Fonts\\FRIZQT__.TTF"
 local WINDOW_WIDTH = 1320
@@ -31,9 +30,39 @@ local TEAL = { 0.40, 0.86, 0.78 }
 local GREEN = "|cff7edba0"
 local DIM = "|cff939baa"
 local AMBER = "|cffffca63"
-local ACCOUNTS, CHARACTERS
-if live then ACCOUNTS, CHARACTERS = live.Read()
-else ACCOUNTS, CHARACTERS = addon:CreatePreviewRecords() end
+local ACCOUNTS = {
+    { name = "Account One", ash = 14800000, shards = 3750, essence = 16, artisan = 28, gold = 12420, warband = 4000, prestige = 12 },
+    { name = "Account Two", ash = 9200000, shards = 1350, essence = 8, artisan = 14, gold = 6850, warband = 2200, prestige = 7 },
+    { name = "Account Three", ash = 18200000, shards = 4500, essence = 22, artisan = 19, gold = 9600, warband = 3100, prestige = 18 },
+    { name = "Account Four", ash = 6400000, shards = 63000, essence = 4, artisan = 32, gold = 5100, warband = 1800, prestige = 4 },
+}
+local CHARACTERS = {
+    { name = "Aster", account = 1, class = "PALADIN", level = 80, ilvl = 226, tier = 6, runAsh = "284k", runShards = 145, gold = "7,200g", seen = "Just now", location = "Dalaran", action = "2 rewards to claim", offerings = "3 / 5", bonus = "+35%", build = "Dawnkeeper", anchor = "Dalaran", progress = 7 },
+    { name = "Cinder", account = 1, class = "MAGE", level = 80, ilvl = 213, tier = 4, runAsh = "96k", runShards = 60, gold = "3,480g", seen = "2 hours ago", location = "Karazhan", action = "Nightbane loot available", offerings = "4 / 5", bonus = "+15%", build = "Living Flame", anchor = "Deadwind Pass", progress = 3 },
+    { name = "Thorn", account = 1, class = "DRUID", level = 64, ilvl = 118, tier = 1, runAsh = "38k", runShards = 12, gold = "1,740g", seen = "Yesterday", location = "Nagrand", action = "Continue leveling", offerings = "5 / 5", bonus = "+10%", build = "Wildheart", anchor = "Nagrand", progress = 0 },
+    { name = "Vesper", account = 2, class = "WARLOCK", level = 80, ilvl = 232, tier = 8, runAsh = "410k", runShards = 210, gold = "4,900g", seen = "35 min ago", location = "Icecrown", action = "Cache nearly ready", offerings = "2 / 5", bonus = "+50%", build = "Void Chorus", anchor = "Icecrown", progress = 9 },
+    { name = "Rook", account = 2, class = "WARRIOR", level = 80, ilvl = 200, tier = 2, runAsh = "Unknown", runShards = nil, gold = "1,950g", seen = "8 days ago", location = "Stormwind", action = "Refresh stale snapshot", offerings = "Unknown", bonus = "Unknown", build = "Ironbound", anchor = "Unknown", progress = 2, stale = true },
+}
+for i, sample in ipairs({
+    { "Ember", "SHAMAN", 1 }, { "Lumen", "PRIEST", 1 },
+    { "Flint", "HUNTER", 2 }, { "Shade", "ROGUE", 2 },
+    { "Briar", "DRUID", 3 }, { "Sol", "PALADIN", 3 }, { "Nyx", "MAGE", 3 },
+    { "Ashen", "DEATHKNIGHT", 3 }, { "Gale", "SHAMAN", 4 },
+    { "Rune", "WARLOCK", 4 }, { "Vale", "PRIEST", 4 }, { "Steel", "WARRIOR", 4 },
+    { "Fable", "HUNTER", 1 }, { "Wisp", "ROGUE", 1 }, { "Anvil", "WARRIOR", 1 },
+    { "Dusk", "WARLOCK", 1 }, { "Rime", "DEATHKNIGHT", 1 },
+}) do
+    CHARACTERS[#CHARACTERS + 1] = {
+        name = sample[1], class = sample[2], account = sample[3], level = 80, ilvl = 200 + i,
+        runAsh = (40 + i * 12) .. "k", runShards = 25 + i * 8, gold = "Sample",
+        seen = "Today", location = "Dalaran", action = "Sample character snapshot",
+        offerings = "4 / 5", bonus = "+20%", build = "Build " .. i, anchor = "Dalaran",
+    }
+end
+for i, account in ipairs(ACCOUNTS) do
+    account.originalName = account.name
+    account.tier = ({ 6, 8, 10, 3 })[i]
+end
 
 local frame
 local state = {
@@ -72,19 +101,6 @@ local columns = {
     { key = "location", title = "Location" },
 }
 local columnOrder = { "level", "ilvl", "runAsh", "runShards", "gold", "seen" }
-local selectedPlayer = false
-if live then
-    local saved = live.Load()
-    if saved then
-        for key, value in pairs(saved.state or {}) do state[key] = value end
-        columnOrder = saved.columnOrder or columnOrder
-    end
-    state.accounts = {}
-    for i, account in ipairs(ACCOUNTS) do state.accounts[i] = account.visible end
-    for i, character in ipairs(CHARACTERS) do
-        if character.isPlayer then state.selected = i; selectedPlayer = true; break end
-    end
-end
 local raids = {}
 local trackingTree = {}
 -- The same names and expansion mapping also feed the live watchlist. The
@@ -158,7 +174,6 @@ local function Tip(widget, title, body)
 end
 
 local function Scroll(parent, name, x, y, width, height)
-    name = WindowName(name)
     local scroll = CreateFrame("ScrollFrame", name, parent, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", x, -y)
     scroll:SetSize(width - SCROLLBAR_WIDTH, height)
@@ -196,7 +211,7 @@ local function VisibleCharacters()
 end
 
 local function ClassName(character)
-    local color = RAID_CLASS_COLORS[character.class] or { r = 0.88, g = 0.88, b = 0.90 }
+    local color = RAID_CLASS_COLORS[character.class]
     local icon = ""
     local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[character.class]
     if state.classIcons and coords then
@@ -235,12 +250,10 @@ local function DetailLine(parent, title, value, y)
 end
 
 local function PreviewSwap(character)
-    if live then live.Swap(character); return end
     Dialog("Swap to " .. character.name, "Preview only: this fictional character cannot be selected. In the live roster, Swap uses FastSwap for characters on the current account. Other accounts require logging in separately. No logout was requested.")
 end
 
 local function RosterSortValue(character, key)
-    if live and character.sortValues then return character.sortValues[key] end
     if key == "character" then return string.lower(character.name) end
     local value = character[key]
     if type(value) == "number" then return value end
@@ -392,14 +405,10 @@ local function BuildRoster()
     headerScroll:EnableMouseWheel(true)
     headerScroll:SetScript("OnMouseWheel", ScrollRoster)
     page.rows = {}
-    page.accountLabels = {}
-    local function EnsureRows()
     for i, character in ipairs(CHARACTERS) do
-        if not page.rows[i] then
         local index = i
         local row = Button(body, "", 0, 0, 690, 44, function()
             state.selected = index
-            selectedPlayer = true
             refresh()
         end)
         row.cells = {}
@@ -410,44 +419,30 @@ local function BuildRoster()
         end
         row.hint = Label(row, "", 12, 27, 680, 10, MUTED)
         row.swap = Button(row, "Swap", 620, 5, 60, 24, function() PreviewSwap(character) end)
-        Tip(row.swap, live and "Swap character" or "Swap (preview)", live and "Switch on the current account and realm using FastSwap. Its separate selection hook must be installed." or "Simulate switching to this character. Never logs out or calls FastSwap with sample names.")
+        Tip(row.swap, "Swap (preview)", "Simulate switching to this character. Never logs out or calls FastSwap with sample names.")
         page.rows[i] = row
-        end
     end
+    page.accountLabels = {}
     for i = 1, #ACCOUNTS do
-        if not page.accountLabels[i] then
         local id = i
         page.accountLabels[i] = Button(body, "", 0, 0, 690, 25, function()
             state.collapsed[id] = not state.collapsed[id]
             refresh()
         end)
-        end
     end
-    end
-    EnsureRows()
     local detail = Surface(page, WINDOW_WIDTH - 380, 56, 332, PAGE_HEIGHT - 66)
     page.detailTitle = Label(detail, "", 16, 16, 300, 17)
     page.detailLocation = Label(detail, "", 16, 42, 300, 11, MUTED)
     Label(detail, "PARKED RUN", 16, 75, 300, 10, GOLD)
     page.detailValues = {}
-    page.detailTooltips = {}
     local labels = { "Run Soul Ash", "Run Soul Shards", "Offering bonus", "Offerings remaining", "Echo build", "Soul anchor" }
-    if live then labels[7], labels[8] = "Selected Torment", "Account access" end
     for i, title in ipairs(labels) do
         page.detailValues[i] = DetailLine(detail, title, "", 101 + (i - 1) * 28)
-        if live then
-            local tooltip = CreateFrame("Frame", nil, detail)
-            tooltip:SetPoint("TOPLEFT", 16, -(98 + (i - 1) * 28))
-            tooltip:SetSize(300, 24)
-            page.detailTooltips[i] = tooltip
-        end
     end
     page.detailNote = Label(detail, "", 16, detail:GetHeight() - 76, 300, 11, TEAL)
-    Button(detail, live and "Swap" or "Swap (preview)", 16, detail:GetHeight() - 37, 130, 25, function() PreviewSwap(CHARACTERS[state.selected]) end)
+    Button(detail, "Swap (preview)", 16, detail:GetHeight() - 37, 130, 25, function() PreviewSwap(CHARACTERS[state.selected]) end)
     local note = Label(page, "No hourly-entry counter: the new realm's cap has not been established.", 0, PAGE_HEIGHT - 29, SCROLL_WIDTH, 10, MUTED)
     page.Refresh = function()
-        EnsureRows()
-        if not CHARACTERS[state.selected] then detail:Hide(); return end
         local viewportHeight = normalViewportHeight + (state.rosterFocus and FOCUS_HEIGHT_GAIN or 0)
         local density = state.rosterFocus and "compact" or state.density
         focusButton.text:SetText(state.rosterFocus and "Exit Focus" or "Focus roster")
@@ -512,7 +507,7 @@ local function BuildRoster()
                 grip:SetPoint("TOPLEFT", cell.x + cell.width - 4, 0)
             end
         end
-        local y, selectedY = 0, nil
+        local y = 0
         for accountId, account in ipairs(ACCOUNTS) do
             local accountLabel = page.accountLabels[accountId]
             local show = state.accounts[accountId]
@@ -544,7 +539,6 @@ local function BuildRoster()
                     row:SetHeight(rowHeight)
                     row:ClearAllPoints()
                     row:SetPoint("TOPLEFT", 0, -y)
-                    if i == state.selected then selectedY = y end
                     row:SetBackdropColor(unpack(position % 2 == 1 and STYLE.rowOdd or STYLE.rowEven))
                     row:GetHighlightTexture():SetVertexColor(unpack(STYLE.rowHover))
                     row:SetBackdropBorderColor(unpack(i == state.selected and STYLE.selectedBorder or BORDER))
@@ -554,7 +548,6 @@ local function BuildRoster()
                         fs:SetText(j == 1 and ClassName(character) or tostring(character[columnOrder[j - 1]] or "Unknown"))
                     end
                     row.hint:SetText(character.action)
-                    if live then live.RowTooltip(row, character) end
                     SetVisible(row.hint, density ~= "compact")
                     y = y + rowHeight + state.rowGap
                 end
@@ -563,19 +556,11 @@ local function BuildRoster()
         body:SetHeight(math.max(viewportHeight, y))
         scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - viewportHeight)))
         local character = CHARACTERS[state.selected]
-        if live and not page.scrolledToPlayer and character.isPlayer and selectedY then
-            scroll:SetVerticalScroll(math.min(selectedY, math.max(0, y - viewportHeight)))
-            page.scrolledToPlayer = true
-        end
         page.detailTitle:SetText(ClassName(character))
         page.detailLocation:SetText(character.location .. "  /  " .. character.seen)
         local values = { character.runAsh, character.runShards and tostring(character.runShards) or "Unknown", character.bonus, character.offerings, character.build, character.anchor }
-        if live then values[7], values[8] = character.selectedTier, character.highestTier end
         for i, value in ipairs(values) do page.detailValues[i]:SetText(value) end
-        if live then
-            for index, tooltip in ipairs(page.detailTooltips) do live.DetailTooltip(tooltip, character, index) end
-        end
-        page.detailNote:SetText(live and character.action or (character.stale and "Stale snapshot. Unknown is not zero; log in to refresh." or "Sample reminder: bank this run at a Spirit Healer to collect its offering bonus."))
+        page.detailNote:SetText(character.stale and "Stale snapshot. Unknown is not zero; log in to refresh." or "Sample reminder: bank this run at a Spirit Healer to collect its offering bonus.")
     end
 end
 
@@ -1177,102 +1162,13 @@ for _, key in ipairs(STYLE_KEYS) do THEME_COLORS[#THEME_COLORS + 1] = STYLE[key]
 local THEME_OPTIONS = { "font", "fontDelta", "density", "opacity", "scale", "iconStyle", "classIcons", "statusStyle", "logo",
     "fontRoles", "rowHeight", "rowGap", "borderSize" }
 local customThemes, nextThemeId = {}, 0
-if live then
-    local saved = live.Load()
-    if saved then customThemes, nextThemeId = saved.customThemes or {}, saved.nextThemeId or 0 end
-end
 local themeCheckpoint
 
 local function CaptureTheme()
     local result = { colors = {}, options = {} }
-    for i, color in ipairs(THEME_COLORS) do
-        result.colors[i] = Clone(color)
-        result.colors[i][4] = color[4] or 1
-    end
+    for i, color in ipairs(THEME_COLORS) do result.colors[i] = Clone(color) end
     for _, key in ipairs(THEME_OPTIONS) do result.options[key] = Clone(state[key]) end
     return result
-end
-
-local SaveActiveProfile
-local function Persist()
-    if live then
-        live.Save({
-            state = state, columnOrder = columnOrder, appearance = CaptureTheme(),
-            customThemes = customThemes, nextThemeId = nextThemeId,
-        }, ACCOUNTS)
-        if SaveActiveProfile then SaveActiveProfile() end
-    end
-end
-
-local function ValidAppearance(source)
-        if type(source) ~= "table" or type(source.colors) ~= "table"
-            or type(source.options) ~= "table" or #source.colors ~= #THEME_COLORS then
-            error("Unsupported theme layout.")
-        end
-        local result = { colors = {}, options = {} }
-        for index = 1, #THEME_COLORS do
-            local color = source.colors[index]
-            if type(color) ~= "table" then error("Missing theme color.") end
-            result.colors[index] = {}
-            for component = 1, 4 do
-                local value = color[component]
-                if type(value) ~= "number" or value ~= value or value < 0 or value > 1 then
-                    error("Theme color components must be between 0 and 1.")
-                end
-                result.colors[index][component] = value
-            end
-        end
-        local options = source.options
-        local function Path(key)
-            local value = options[key]
-            if type(value) ~= "string" or value == "" or #value > 255 or value:find("[%c|]") then
-                error("Invalid theme " .. key .. ".")
-            end
-            result.options[key] = value
-        end
-        Path("font")
-        Path("logo")
-        for key, range in pairs({
-            fontDelta = { -10, 20 }, scale = { 0.1, 3 }, opacity = { 0, 1 },
-            rowHeight = { 20, 120 }, rowGap = { 0, 30 }, borderSize = { 0, 10 },
-        }) do
-            local value = options[key]
-            if value ~= nil then
-                if type(value) ~= "number" or value ~= value or value < range[1] or value > range[2] then
-                    error("Invalid theme " .. key .. ".")
-                end
-                result.options[key] = value
-            elseif key ~= "rowHeight" then error("Missing theme " .. key .. ".") end
-        end
-        for key, allowed in pairs({
-            density = { compact = true, comfortable = true, spacious = true },
-            iconStyle = { icons = true, large = true, text = true },
-            statusStyle = { words = true, icons = true },
-        }) do
-            if type(options[key]) ~= "string" or not allowed[options[key]] then error("Invalid theme " .. key .. ".") end
-            result.options[key] = options[key]
-        end
-        if type(options.classIcons) ~= "boolean" or type(options.fontRoles) ~= "table" then
-            error("Invalid theme font or icon options.")
-        end
-        result.options.classIcons, result.options.fontRoles = options.classIcons, {}
-        for role, override in pairs(options.fontRoles) do
-            if not ({ title = true, header = true, character = true, account = true, button = true, hint = true, body = true })[role]
-                or type(override) ~= "table" then error("Invalid font role.") end
-            local copy = {}
-            if override.font ~= nil then
-                if type(override.font) ~= "string" or override.font == "" or #override.font > 255
-                    or override.font:find("[%c|]") then error("Invalid role font.") end
-                copy.font = override.font
-            end
-            if override.delta ~= nil then
-                if type(override.delta) ~= "number" or override.delta ~= override.delta
-                    or override.delta < -10 or override.delta > 20 then error("Invalid role size.") end
-                copy.delta = override.delta
-            end
-            result.options.fontRoles[role] = copy
-        end
-        return result
 end
 
 local function RememberTheme()
@@ -1325,7 +1221,6 @@ local function ApplyAppearance()
     end
     if frame.logo then frame.logo:SetTexture(state.logo) end
     if settings and settings.logo then settings.logo:SetTexture(state.logo) end
-    if live then live.Appearance(THEME_COLORS, state) end
     refresh()
     if settings and settings.current then settings.ShowSection(settings.current) end
 end
@@ -1370,65 +1265,7 @@ local function ApplyCustomTheme(theme)
     ApplyAppearance()
 end
 
-local Profiles = { store = live and live.Profiles() or { saved = {}, characters = {} } }
-local PROFILE_OPTIONS = {
-    "hiddenTabs", "openTab", "detail", "columnWidths", "rosterSort",
-    "mock", "alerts", "alertStyle",
-}
-function Profiles.Capture()
-    local profile = { appearance = CaptureTheme(), columnOrder = Clone(columnOrder), options = {} }
-    for _, key in ipairs(PROFILE_OPTIONS) do profile.options[key] = Clone(state[key]) end
-    profile.theme, profile.customTheme = state.theme, state.customTheme
-    return profile
-end
-
-function Profiles.Bind(name)
-    local characterKey = live and live.CharacterKey()
-    if state.profileScope == "character" then
-        if characterKey then Profiles.store.characters[characterKey] = name end
-    else
-        Profiles.store.account = name
-        if characterKey then Profiles.store.characters[characterKey] = nil end
-    end
-end
-
-function Profiles.Use(name)
-    local profile = Profiles.store.saved[name]
-    if not profile then error("Unknown Ashoholic profile " .. tostring(name) .. ".") end
-    local appearance = ValidAppearance(profile.appearance)
-    for index, color in ipairs(THEME_COLORS) do Copy(color, appearance.colors[index]) end
-    for _, key in ipairs(THEME_OPTIONS) do state[key] = Clone(appearance.options[key]) end
-    for _, key in ipairs(PROFILE_OPTIONS) do state[key] = Clone(profile.options[key]) end
-    columnOrder = Clone(profile.columnOrder)
-    state.profile, state.theme, state.customTheme = name, profile.theme, profile.customTheme
-    Profiles.Bind(name)
-    RememberTheme()
-    if frame then
-        frame:SetScale((frame.baseScale or 1) * state.scale)
-        ApplyAppearance()
-    end
-end
-
-if live then
-    local saved = live.Load()
-    if saved and saved.appearance then
-        local appearance = ValidAppearance(saved.appearance)
-        for index, color in ipairs(THEME_COLORS) do Copy(color, appearance.colors[index]) end
-    end
-    if not Profiles.store.saved.Default then Profiles.store.saved.Default = Profiles.Capture() end
-    local key = live.CharacterKey()
-    local assigned = key and Profiles.store.characters[key]
-    state.profileScope = assigned and "character" or "account"
-    Profiles.Use(assigned or Profiles.store.account or "Default")
-    SaveActiveProfile = function()
-        Profiles.store.saved[state.profile] = Profiles.Capture()
-        Profiles.Bind(state.profile)
-        live.SaveProfiles(Profiles.store)
-    end
-end
-
 local function Popup(name, width, height)
-    name = WindowName(name)
     local popup = CreateFrame("Frame", name, UIParent)
     popup:SetSize(width, height)
     popup:SetPoint("CENTER")
@@ -1543,7 +1380,7 @@ local function BuildSettings()
     settings.logo:SetSize(32, 32)
     settings.logo:SetTexture(state.logo)
     Label(settings, "ASHOHOLIC SETTINGS", 60, 15, 500, 18, GOLD)
-    Label(settings, live and "Live dashboard / appearance and preferences are saved locally, not shared with account snapshots." or "Design preview  /  every choice applies to this preview immediately and is forgotten on /reload.", 60, 38, 760, 10, MUTED)
+    Label(settings, "Design preview  /  every choice applies to this preview immediately and is forgotten on /reload.", 60, 38, 760, 10, MUTED)
     Button(settings, "X", 856, 14, 28, 26, function() settings.RequestClose() end)
     local nav = Surface(settings, 16, 70, 186, 476)
     local bodies, navButtons = {}, {}
@@ -1564,7 +1401,6 @@ local function BuildSettings()
         button = Button(parent, "", x, y, width, 28, function()
             set(not get())
             button.Update()
-            Persist()
         end)
         button.Update = function() button.text:SetText((get() and "[x] " or "[ ] ") .. text) end
         button.Update()
@@ -1578,7 +1414,6 @@ local function BuildSettings()
             local button = Button(parent, option[2], x + ((i - 1) % perRow) * (width + 8), y + math.floor((i - 1) / perRow) * 34, width, 28, function()
                 set(value)
                 group.Update()
-                Persist()
             end)
             button.value = value
             group[i] = button
@@ -1673,7 +1508,7 @@ local function BuildSettings()
                 state.theme, state.customTheme = name, theme.id
                 RememberTheme()
                 settings.ShowSection("Themes")
-                Say("Saved '" .. name .. (live and "' on this installation." or "' until /reload."))
+                Say("Saved '" .. name .. "' until /reload.")
                 if onSaved then onSaved() end
             end,
         })
@@ -1692,7 +1527,7 @@ local function BuildSettings()
         theme.appearance = CaptureTheme()
         state.theme = theme.name
         RememberTheme()
-        Say("Updated '" .. theme.name .. (live and "' on this installation." or "' until /reload."))
+        Say("Updated '" .. theme.name .. "' until /reload.")
         return true
     end
     local function FinishClose()
@@ -1746,9 +1581,8 @@ local function BuildSettings()
             end)
         end
         local custom = SelectedCustomTheme()
-        local lifetime = live and " Presets are saved on this installation." or " Presets last until /reload."
-        closePrompt.text:SetText(custom and ("Save your edits as a new custom preset, update '" .. custom.name .. "', or discard them." .. lifetime)
-            or ("Default presets are read-only. Save your edits as a new custom preset or discard them." .. lifetime))
+        closePrompt.text:SetText(custom and ("Save your edits as a new custom preset, update '" .. custom.name .. "', or discard them. Presets last until /reload.")
+            or "Default presets are read-only. Save your edits as a new custom preset or discard them. Presets last until /reload.")
         SetVisible(closePrompt.update, custom ~= nil)
         closePrompt:SetScale(settings:GetScale())
         closePrompt:Show()
@@ -1802,7 +1636,7 @@ local function BuildSettings()
                 end)
                 Button(row, "Rename", 458, 0, 82, 28, function()
                     local target = row.theme
-                    Dialog("Rename preset", live and "Rename this saved custom preset. Default presets cannot be renamed." or "Default presets cannot be renamed. This custom preset lasts until /reload.", {
+                    Dialog("Rename preset", "Default presets cannot be renamed. This custom preset lasts until /reload.", {
                         box = target.name, primary = "Rename", onAccept = function(value)
                             local name = ThemeName(value, target.id)
                             if not name then return end
@@ -1996,7 +1830,7 @@ local function BuildSettings()
         local button = Button(iconBody, "", (i - 1) * 54, 214, 46, 46, function()
             state.logo = logo
             ApplyAppearance()
-            Say(live and "Logo and minimap icon updated." or "Logo changed. The live addon would update the minimap button too.")
+            Say("Logo changed. The live addon would update the minimap button too.")
         end)
         local texture = button:CreateTexture(nil, "ARTWORK")
         texture:SetPoint("TOPLEFT", 4, -4)
@@ -2013,25 +1847,16 @@ local function BuildSettings()
     end
     settings.groups[#settings.groups + 1] = logoButtons
     Button(iconBody, "Use custom icon path...", 0, 276, 240, 30, function()
-        Dialog("Custom icon", "Enter an existing game icon path, such as Interface\\Icons\\INV_Misc_QuestionMark.", {
+        Dialog("Custom icon", "Enter any game icon path. The live addon would validate it before use.", {
             box = "Interface\\Icons\\INV_Misc_QuestionMark", primary = "Use icon",
-            validate = function(path)
-                if path == "" or #path > 255 or path:find("[%c|]") then return "Enter a plain game icon path of 1-255 characters." end
-            end,
             onAccept = function(path)
                 state.logo = path
                 ApplyAppearance()
-                Say(live and "Custom icon applied." or "Custom icon applied to the preview.")
+                Say("Custom icon applied to the preview.")
             end,
         })
     end)
-    if live then
-        Toggle(iconBody, "Show minimap icon", 0, 324, 320,
-            function() return not live.MinimapHidden() end,
-            function(value) live.MinimapHidden(not value) end)
-    else
-        Label(iconBody, "Later ideas: role icons, Torment tier badges, Prestige emblems and per-account icons.", 0, 326, 660, 10, MUTED)
-    end
+    Label(iconBody, "Later ideas: role icons, Torment tier badges, Prestige emblems and per-account icons.", 0, 326, 660, 10, MUTED)
 
     -- Roster Columns
     local columnBody = bodies["Roster Columns"]
@@ -2102,7 +1927,7 @@ local function BuildSettings()
         Toggle(tabBody, option[2], ((i - 1) % 2) * 330, 240 + math.floor((i - 1) / 2) * 34, 320,
             function() return state.mock[key] end, function(value) state.mock[key] = value end)
     end
-    Label(tabBody, live and "Changes are saved on this installation. Combat hiding does not reopen the window automatically." or "Hidden tabs disappear immediately. 'Extras' are mock switches only.", 0, 330, 660, 10, MUTED)
+    Label(tabBody, "Hidden tabs disappear immediately. 'Extras' are mock switches only.", 0, 330, 660, 10, MUTED)
 
     -- Accounts
     local accountBody = bodies.Accounts
@@ -2117,10 +1942,9 @@ local function BuildSettings()
         if name == "" then Say("Enter a name, or use Restore default."); return end
         if name:find("|", 1, true) or name:find("[%c]") then Say("Use a plain-text name without control codes or |."); return end
         ACCOUNTS[1].name = name
-        if live then live.Rename(ACCOUNTS[1].id, name) end
         input:SetText(name)
         input:ClearFocus()
-        Say(live and "Account alias saved." or "Alias updated everywhere in the preview.")
+        Say("Alias updated everywhere in the preview.")
         settings.ShowSection("Accounts")
         refresh()
     end
@@ -2129,13 +1953,10 @@ local function BuildSettings()
     input:SetScript("OnEnterPressed", function() Rename(input:GetText()) end)
     input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     Label(accountBody, "ALL ACCOUNTS", 0, 82, 660, 11, GOLD)
-    local accountScroll, accountRowsBody = Scroll(accountBody, "AshoholicPreviewSettingsAccounts", 0, 104, 660, 270)
     local accountRows = {}
-    local function EnsureAccounts()
     for i, account in ipairs(ACCOUNTS) do
-        if not accountRows[i] then
         local id, data = i, account
-        local row = Surface(accountRowsBody, 0, (i - 1) * 46, 628, 40)
+        local row = Surface(accountBody, 0, 104 + (i - 1) * 46, 640, 40)
         row.name = Label(row, "", 12, 14, 240, 12)
         row.swatch = row:CreateTexture(nil, "OVERLAY")
         row.swatch:SetTexture(WHITE)
@@ -2152,14 +1973,10 @@ local function BuildSettings()
         Toggle(row, "Start collapsed", 398, 6, 234, function() return state.collapsed[id] end,
             function(value) state.collapsed[id] = value; refresh() end)
         accountRows[i] = row
-        end
     end
-    accountRowsBody:SetHeight(math.max(270, #ACCOUNTS * 46))
-    end
-    Label(accountBody, "Account 1 is the account you are playing on. Aliases never change account identity; filters are separate.", 0, 390, 660, 10, MUTED)
+    Label(accountBody, "Account 1 is the account you are playing on. Aliases never change account identity; filters are separate.", 0, 300, 660, 10, MUTED)
     bodies.Accounts.Refresh = function()
-        EnsureAccounts()
-        if not input:HasFocus() then input:SetText(ACCOUNTS[1].name) end
+        input:SetText(ACCOUNTS[1].name)
         for i, row in ipairs(accountRows) do
             local account = ACCOUNTS[i]
             row.name:SetText(account.name .. (i == 1 and "  (current)" or ""))
@@ -2172,7 +1989,7 @@ local function BuildSettings()
     local alertBody = bodies.Alerts
     Label(alertBody, "REMIND ME ABOUT", 0, 0, 400, 11, GOLD)
     state.alerts = state.alerts or { reset = true, cache = true, boss = true, prestige = false, stale = true }
-    for i, option in ipairs({ { "reset", live and "Raid loot lock expired (server-reported time)" or "Weekly raid reset (Tuesday 03:00 UTC)" }, { "cache", "Call Board cache ready" }, { "boss", "Watched boss available in saved snapshot" }, { "prestige", "Account ready to Prestige" }, { "stale", "Character snapshot is at least 7 days old" } }) do
+    for i, option in ipairs({ { "reset", "Weekly raid reset (Tuesday 03:00 UTC)" }, { "cache", "Call Board cache ready" }, { "boss", "Watched boss available on login" }, { "prestige", "Account ready to Prestige" }, { "stale", "Character snapshot is stale" } }) do
         local key = option[1]
         Toggle(alertBody, option[2], 0, 22 + (i - 1) * 34, 420, function() return state.alerts[key] end,
             function(value) state.alerts[key] = value end)
@@ -2181,12 +1998,6 @@ local function BuildSettings()
     Choices(alertBody, { { "chat", "Chat message" }, { "center", "Center of screen" }, { "silent", "Silent (badge only)" } }, 0, 224, 210, 3,
         function() return state.alertStyle or "chat" end, function(value) state.alertStyle = value end)
     Button(alertBody, "Send test alert", 0, 274, 210, 30, function()
-        if live then
-            live.TestAlert(state.alertStyle or "chat")
-            Say("Test reminder sent; see the Roster tab badge in silent mode.")
-            refresh()
-            return
-        end
         local text = "Ashoholic preview: Nightbane loot is available on Cinder."
         local style = state.alertStyle or "chat"
         if style == "chat" then print("|cffffca63" .. text .. "|r")
@@ -2196,68 +2007,6 @@ local function BuildSettings()
 
     -- Profiles & Sharing
     local profileBody = bodies["Profiles & Sharing"]
-    if live then
-        Label(profileBody, "ACTIVE PROFILE", 0, 0, 640, 11, GOLD)
-        local active = Label(profileBody, "", 0, 28, 380, 12)
-        Button(profileBody, "Choose profile...", 438, 22, 210, 28, function()
-            local names = {}
-            for name in pairs(Profiles.store.saved) do names[#names + 1] = name end
-            table.sort(names)
-            Dialog("Choose profile", "Saved profiles: " .. table.concat(names, ", "), {
-                box = state.profile, primary = "Use",
-                validate = function(name) if not Profiles.store.saved[name] then return "Enter an existing profile name." end end,
-                onAccept = function(name) Profiles.Use(name); settings.ShowSection("Profiles & Sharing") end,
-            })
-        end)
-        Label(profileBody, "PROFILE APPLIES TO", 0, 72, 400, 11, GOLD)
-        Choices(profileBody, { { "character", "This character" }, { "account", "This account" } }, 0, 94, 210, 2,
-            function() return state.profileScope end,
-            function(scope) state.profileScope = scope; Profiles.Bind(state.profile) end)
-        Button(profileBody, "New profile...", 0, 146, 210, 30, function()
-            Dialog("New profile", "Copies your current appearance, columns, tabs, alerts and window preferences. Changes are saved automatically.", {
-                box = "", primary = "Create",
-                validate = function(name)
-                    if name == "" or #name > 40 or name:find("[%c|]") or name:match("^%s*$") then return "Use a plain profile name of 1-40 characters." end
-                    if Profiles.store.saved[name] then return "That profile already exists." end
-                end,
-                onAccept = function(name)
-                    Profiles.store.saved[name] = Profiles.Capture()
-                    Profiles.Use(name)
-                    settings.ShowSection("Profiles & Sharing")
-                end,
-            })
-        end)
-        Button(profileBody, "Copy from...", 218, 146, 210, 30, function()
-            Dialog("Copy profile", "Enter an existing profile to copy into '" .. state.profile .. "'.", {
-                box = "", primary = "Copy",
-                validate = function(name) if not Profiles.store.saved[name] then return "Enter an existing profile name." end end,
-                onAccept = function(name)
-                    local target = state.profile
-                    Profiles.store.saved[target] = Clone(Profiles.store.saved[name])
-                    Profiles.Use(target)
-                    settings.ShowSection("Profiles & Sharing")
-                end,
-            })
-        end)
-        Button(profileBody, "Delete profile", 436, 146, 210, 30, function()
-            local name = state.profile
-            if name == "Default" then Say("The Default profile cannot be deleted."); return end
-            Dialog("Delete profile", "Delete '" .. name .. "' and return its assignments to Default?", {
-                primary = "Delete", onAccept = function()
-                    Profiles.store.saved[name] = nil
-                    for key, assigned in pairs(Profiles.store.characters) do
-                        if assigned == name then Profiles.store.characters[key] = nil end
-                    end
-                    if Profiles.store.account == name then Profiles.store.account = "Default" end
-                    Profiles.Use("Default")
-                    settings.ShowSection("Profiles & Sharing")
-                end,
-            })
-        end)
-        bodies["Profiles & Sharing"].Refresh = function()
-            active:SetText(state.profile .. " / changes save automatically")
-        end
-    else
     Label(profileBody, "ACTIVE PROFILE", 0, 0, 400, 11, GOLD)
     Choices(profileBody, { { "Default", "Default" }, { "Raid Night", "Raid Night" }, { "Transmog Hunter", "Transmog Hunter" } }, 0, 22, 210, 3,
         function() return state.profile or "Default" end, function(value) state.profile = value; Say("Switched to profile '" .. value .. "'.") end)
@@ -2279,46 +2028,22 @@ local function BuildSettings()
             primary = "Delete", onAccept = function() Say("Nothing was deleted; this is a preview.") end,
         })
     end)
-    end
     Label(profileBody, "SHARE THEMES", 0, 202, 400, 11, GOLD)
     Button(profileBody, "Export current theme...", 0, 224, 260, 30, function()
-        local code = "ASHT1:" .. addon.Sync.Codec.Encode({
-            name = state.theme or "Imported theme", appearance = CaptureTheme(),
-        })
+        local code = "ASH2:" .. (state.theme or "Ember & Ash") .. ":" .. Hex(BACKGROUND) .. ":" .. Hex(PANEL) .. ":" .. Hex(BORDER) .. ":" .. Hex(GOLD) .. ":" .. Hex(TEXT)
         Dialog("Export theme", "Copy this string (Ctrl+C) and share it with friends.", { box = code })
     end)
     Button(profileBody, "Import theme...", 268, 224, 260, 30, function()
-        local imported
         Dialog("Import theme", "Paste a theme string (Ctrl+V).", {
-            box = "", primary = "Import",
-            validate = function(code)
-                local ok, result = pcall(function()
-                    code = code:gsub("%s+", "")
-                    if code:sub(1, 6) ~= "ASHT1:" then error("Expected an ASHT1 theme string.") end
-                    local packet = addon.Sync.Codec.Decode(code:sub(7))
-                    if type(packet.name) ~= "string" or packet.name == "" or #packet.name > 40
-                        or packet.name:find("[%c|]") then error("Invalid theme name.") end
-                    return { name = packet.name, appearance = ValidAppearance(packet.appearance) }
-                end)
-                if not ok then return tostring(result) end
-                imported = result
-            end,
-            onAccept = function()
-                nextThemeId = nextThemeId + 1
-                imported.id = nextThemeId
-                customThemes[#customThemes + 1] = imported
-                ApplyCustomTheme(imported)
-                Say("Theme imported and applied.")
+            box = "", primary = "Import", onAccept = function(code)
+                Say(code == "" and "Nothing pasted." or "String received; import is not applied in the preview.")
             end,
         })
     end)
-    Label(profileBody, live and "Profiles are local to this WoW account. Share appearance with theme strings; character-data sync does not transmit settings." or "Share appearance with theme strings. Preview changes are session-local.", 0, 274, 660, 10, MUTED)
+    Label(profileBody, "Idea: a community theme gallery in-game, filled from strings shared on Discord.", 0, 274, 660, 10, MUTED)
 
     -- Sync
     local syncBody = bodies.Sync
-    if live then
-        live.BuildSync(syncBody, Label, Button, Say)
-    else
     Label(syncBody, "MULTI-ACCOUNT SYNC", 0, 0, 660, 11, GOLD)
     Label(syncBody, "The real addon merges SavedVariables from several WoW accounts with its sync scripts. This preview shows four sample accounts; nothing is read or written.", 0, 24, 660, 11)
     local rows = { { "Account One", "This account", "Live" }, { "Account Two", "Synced 2 hours ago", "OK" }, { "Account Three", "Synced yesterday", "OK" }, { "Account Four", "Synced 8 days ago", "Stale" } }
@@ -2334,7 +2059,6 @@ local function BuildSettings()
     Button(syncBody, "How does sync work?", 218, 246, 210, 30, function()
         Dialog("How sync works", "1. Log out of WoW.\n2. Run the Ashoholic sync launcher.\n3. It merges each account's roster into the others.\n4. Log in; every account sees every character.\n\nShared balances are counted once per account.")
     end)
-    end
 
     -- Help
     Label(bodies.Help, "TRIALS", 0, 0, 660, 11, GOLD)
@@ -2355,30 +2079,7 @@ local function BuildSettings()
                 elseif section == "Icons" then
                     state.iconStyle, state.statusStyle, state.classIcons, state.logo = "icons", "words", true, LOGOS[1]
                     ApplyAppearance()
-                elseif section == "Roster Columns" then
-                    columnOrder = { "level", "ilvl", "runAsh", "runShards", "gold", "seen" }
-                    state.columnWidths, state.rosterSort, state.rosterOffset, state.detail = {}, {}, 0, true
-                elseif section == "Tabs & Views" then
-                    state.hiddenTabs, state.openTab = {}, "last"
-                    state.mock = { openLogin = false, combatHide = false, lockWindow = false, escClose = true }
-                elseif section == "Accounts" then
-                    state.collapsed = {}
-                    for _, account in ipairs(ACCOUNTS) do account.color = nil end
-                    ACCOUNTS[1].name = ACCOUNTS[1].originalName
-                    if live then live.Rename(ACCOUNTS[1].id, ACCOUNTS[1].name) end
-                elseif section == "Alerts" then
-                    state.alerts = { reset = true, cache = true, boss = true, prestige = false, stale = true }
-                    state.alertStyle = "chat"
-                elseif section == "Profiles & Sharing" and live then
-                    Profiles.Use("Default")
-                elseif section == "Sync" and live then
-                    live.ResetSync()
-                else
-                    Say("This section has no resettable preferences.")
-                    return
                 end
-                refresh()
-                settings.ShowSection(section)
                 Say(section .. " reset.")
             end,
         })
@@ -2399,7 +2100,6 @@ local function BuildSettings()
         end
         for _, group in ipairs(settings.groups) do group.Update() end
         if bodies[section].Refresh then bodies[section].Refresh() end
-        Persist()
     end
     settings:SetScript("OnHide", function()
         if not closing and themeCheckpoint and not SameTheme(CaptureTheme(), themeCheckpoint.appearance) then
@@ -2409,7 +2109,6 @@ local function BuildSettings()
         if closePrompt then closePrompt:Hide() end
         if dialog then dialog:Hide() end
         addon:CloseColorPicker(settings)
-        Persist()
     end)
     settings:Hide()
 end
@@ -2424,8 +2123,7 @@ ShowSettings = function(section)
     settings:Raise()
 end
 
-local function BuildDashboard()
-    if not live then
+local function BuildPreview()
     local catalog = ProjectEbonhold and ProjectEbonhold.RaidLockoutData
     if not catalog or #catalog == 0 then
         print("|cffff6060Ashoholic:|r UI preview needs ProjectEbonhold's raid catalogue. Update/enable the companion addon.")
@@ -2495,8 +2193,7 @@ local function BuildDashboard()
             table.sort(expansion.children, function(a, b) return a.name < b.name end)
         end
     end
-    end
-    frame = CreateFrame("Frame", WindowName("AshoholicPreviewFrame"), UIParent)
+    frame = CreateFrame("Frame", "AshoholicPreviewFrame", UIParent)
     frame:SetSize(WINDOW_WIDTH, 720)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
@@ -2508,19 +2205,11 @@ local function BuildDashboard()
     frame:SetBackdropBorderColor(0.40, 0.31, 0.17, 1)
     local titleBar = CreateFrame("Frame", nil, frame)
     titleBar:SetPoint("TOPLEFT")
-    titleBar:SetSize(WINDOW_WIDTH - (live and 280 or 220), 58)
+    titleBar:SetSize(WINDOW_WIDTH - 220, 58)
     titleBar:EnableMouse(true)
     titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function()
-        if not (state.mock and state.mock.lockWindow) then
-            if live then live.Detach() end
-            frame:StartMoving()
-        end
-    end)
-    titleBar:SetScript("OnDragStop", function()
-        frame:StopMovingOrSizing()
-        if live then live.SavePosition(frame) end
-    end)
+    titleBar:SetScript("OnDragStart", function() if not (state.mock and state.mock.lockWindow) then frame:StartMoving() end end)
+    titleBar:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
     frame.logo = titleBar:CreateTexture(nil, "ARTWORK")
     frame.logo:SetPoint("TOPLEFT", 24, -12)
     frame.logo:SetSize(30, 30)
@@ -2529,19 +2218,13 @@ local function BuildDashboard()
     Label(titleBar, "A new chapter for your roster", 282, 24, 400, 12, MUTED)
     local settingsButton = Button(frame, "Settings", WINDOW_WIDTH - 172, 14, 115, 28, function() ShowSettings() end)
     settingsButton:SetFrameLevel(titleBar:GetFrameLevel() + 5)
-    local closeButton = Button(frame, "X", WINDOW_WIDTH - 44, 14, 28, 28, function() frame:Hide() end)
-    closeButton:SetFrameLevel(titleBar:GetFrameLevel() + 5)
-    if live then
-        local redraw = Button(frame, "Refresh", WINDOW_WIDTH - 265, 14, 85, 28, function() refresh() end)
-        redraw:SetFrameLevel(titleBar:GetFrameLevel() + 5)
-        Tip(redraw, "Refresh display", "Redraw saved observations; this does not request new character data from the server.")
-    end
-    tinsert(UISpecialFrames, WindowName("AshoholicPreviewFrame"))
+    Button(frame, "X", WINDOW_WIDTH - 44, 14, 28, 28, function() frame:Hide() end)
+    tinsert(UISpecialFrames, "AshoholicPreviewFrame")
     local accountButton = Button(frame, "", WINDOW_WIDTH - 256, TAB_TOP, 232, 30, function()
         if settings then settings:Hide() end
         SetVisible(accountMenu, not accountMenu:IsShown())
     end)
-    Tip(accountButton, "Accounts to display", live and "Choose which accounts appear in the roster, live tabs and totals. Your selection is saved." or "Check any combination of accounts. The first view uses the current sample account. Selection lasts until reload in this UI-only preview.")
+    Tip(accountButton, "Accounts to display", "Check any combination of accounts. The first view uses the current sample account. Selection lasts until reload in this UI-only preview.")
     accountMenu = Surface(frame, WINDOW_WIDTH - 320, TAB_TOP + 34, 296, 98 + (#ACCOUNTS + 1) * 31)
     accountMenu:SetFrameStrata("FULLSCREEN_DIALOG")
     accountMenu:EnableMouse(true)
@@ -2554,14 +2237,11 @@ local function BuildDashboard()
     end
     local function FilterChanged()
         local characters = VisibleCharacters()
-        local selected = CHARACTERS[state.selected]
-        if (not selected or not state.accounts[selected.account]) and characters[1] then state.selected = characters[1].index end
+        if not state.accounts[CHARACTERS[state.selected].account] and characters[1] then state.selected = characters[1].index end
         state.matrixOffset = 0
         refresh()
     end
-    local function EnsureChecks()
     for i = 0, #ACCOUNTS do
-        if not checks[i] then
         local id = i
         local check = CreateFrame("CheckButton", nil, accountMenu, "UICheckButtonTemplate")
         check:SetPoint("TOPLEFT", 10, -(35 + i * 31))
@@ -2575,11 +2255,8 @@ local function BuildDashboard()
             FilterChanged()
         end)
         checks[i] = check
-        end
     end
-    end
-    EnsureChecks()
-    local accountDone = Button(accountMenu, "Done", 178, 45 + (#ACCOUNTS + 1) * 31, 106, 28, function() accountMenu:Hide() end)
+    Button(accountMenu, "Done", 178, 45 + (#ACCOUNTS + 1) * 31, 106, 28, function() accountMenu:Hide() end)
     accountMenu:Hide()
     local tabOrder = { "Roster", "Raids", "Activities", "Progression", "Trials" }
     for i, name in ipairs(tabOrder) do
@@ -2588,7 +2265,6 @@ local function BuildDashboard()
             state.tab = tabName
             refresh()
         end)
-        tabs[name].baseTitle = name == "Raids" and "Raids & Dungeons" or name
     end
     local definitions = {
         { "SOUL ASH", "ash", "Banked, once per account", "inv_soulash" },
@@ -2606,35 +2282,13 @@ local function BuildDashboard()
         cards[i] = card
     end
     BuildRoster()
-    if live then
-        for _, name in ipairs({ "Raids", "Activities", "Progression", "Trials" }) do
-            pages[name] = live.CreatePage(name, frame, CONTENT_WIDTH, function() refresh() end)
-        end
-    else
-        BuildRaids()
-        BuildActivities()
-        BuildProgression()
-        BuildTrials()
-    end
-    Label(frame, live and "Saved observations / hover values for their freshness. Unknown is not zero." or "PREVIEW ONLY  /  /ash opens your existing roster. Escape closes this window.", 24, 690, 800, 11, MUTED)
-    Label(frame, live and "EBONHOLD / LIVE ROSTER" or "EBONHOLD / CONCEPT 02", WINDOW_WIDTH - 251, 690, 227, 10, GOLD)
+    BuildRaids()
+    BuildActivities()
+    BuildProgression()
+    BuildTrials()
+    Label(frame, "PREVIEW ONLY  /  /ash opens your existing roster. Escape closes this window.", 24, 690, 800, 11, MUTED)
+    Label(frame, "EBONHOLD / CONCEPT 02", WINDOW_WIDTH - 251, 690, 227, 10, GOLD)
     refresh = function()
-        if live then
-            live.Read()
-            if not selectedPlayer then
-                for index, character in ipairs(CHARACTERS) do
-                    if character.isPlayer then state.selected = index; selectedPlayer = true; break end
-                end
-            end
-            for index, account in ipairs(ACCOUNTS) do
-                if state.accounts[index] == nil then state.accounts[index] = account.visible end
-                if state.collapsed[index] == nil then state.collapsed[index] = account.collapsed or false end
-            end
-            EnsureChecks()
-            accountMenu:SetHeight(98 + (#ACCOUNTS + 1) * 31)
-            accountDone:ClearAllPoints()
-            accountDone:SetPoint("TOPLEFT", 178, -(45 + (#ACCOUNTS + 1) * 31))
-        end
         local count = CheckedCount()
         local filterText = count == #ACCOUNTS and "All Accounts" or (count == 0 and "No accounts selected" or count .. " accounts selected")
         if count == 1 then
@@ -2650,9 +2304,9 @@ local function BuildDashboard()
         local totals = { ash = 0, shards = 0, essence = 0, artisan = 0, gold = 0, pockets = 0, warband = 0 }
         for accountId, account in ipairs(ACCOUNTS) do
             if state.accounts[accountId] then
-                for _, key in ipairs({ "ash", "shards", "essence", "artisan" }) do totals[key] = totals[key] + (account[key] or 0) end
-                totals.pockets = totals.pockets + (account.gold or 0)
-                totals.warband = totals.warband + (account.warband or 0)
+                for _, key in ipairs({ "ash", "shards", "essence", "artisan" }) do totals[key] = totals[key] + account[key] end
+                totals.pockets = totals.pockets + account.gold
+                totals.warband = totals.warband + account.warband
             end
         end
         totals.gold = totals.pockets + totals.warband
@@ -2666,11 +2320,7 @@ local function BuildDashboard()
         Tip(cards[1], "Account Soul Ash", "Sample banked balance. Run earnings are shown only on characters. Banked and spendable are distinct; a future live view would show both.")
         Tip(cards[2], "Account Soul Shards", "Sample banked Shards. Do not count this shared balance again for every character.")
         Tip(cards[5], "Gold breakdown", string.format("Character pockets: %dg\nWarband bank: %dg\nTotal: %dg\nWarband gold is counted once per account.", totals.pockets, totals.warband, totals.gold))
-        if live then live.Cards(cards, state.accounts) end
         if state.hiddenTabs[state.tab] then state.tab = "Roster" end
-        if live then
-            for _, page in pairs(pages) do live.ConfigurePage(page, state) end
-        end
         local focused = (state.tab == "Roster" and state.rosterFocus)
             or (state.tab == "Raids" and state.raidsFocus)
         for _, card in ipairs(cards) do SetVisible(card, not focused) end
@@ -2678,11 +2328,8 @@ local function BuildDashboard()
         accountButton:SetPoint("TOPLEFT", WINDOW_WIDTH - 256, -TAB_TOP)
         accountMenu:ClearAllPoints()
         accountMenu:SetPoint("TOPLEFT", WINDOW_WIDTH - 320, -(TAB_TOP + 34))
-        local badges = live and live.Alerts(state) or {}
         local tabX = 24
         for _, name in ipairs(tabOrder) do
-            local count = badges[name] or 0
-            tabs[name].text:SetText(tabs[name].baseTitle .. (count > 0 and (" (" .. count .. ")") or ""))
             local shown = not state.hiddenTabs[name]
             SetVisible(tabs[name], shown)
             if shown then
@@ -2702,31 +2349,18 @@ local function BuildDashboard()
             tabs[name].text:SetTextColor(unpack(active and STYLE.tabActiveText or STYLE.tabText))
             if active then page.Refresh() end
         end
-        if live then
-            local escapeCloses = not state.mock or state.mock.escClose ~= false
-            local name, found = WindowName("AshoholicPreviewFrame"), false
-            for index = #UISpecialFrames, 1, -1 do
-                if UISpecialFrames[index] == name then
-                    found = true
-                    if not escapeCloses then table.remove(UISpecialFrames, index) end
-                end
-            end
-            if escapeCloses and not found then tinsert(UISpecialFrames, name) end
-        end
-        Persist()
     end
     frame:SetScript("OnHide", function()
         frame:StopMovingOrSizing()
         GameTooltip:Hide()
         if settings then settings:Hide() end
         accountMenu:Hide()
-        Persist()
     end)
 end
 
-local function Toggle()
+function addon:TogglePreviewUI()
     if not frame then
-        BuildDashboard()
+        BuildPreview()
         if not frame then return end
         frame:Hide()
     end
@@ -2736,29 +2370,8 @@ local function Toggle()
         local scale = math.min(1, (UIParent:GetWidth() - 32) / WINDOW_WIDTH, (UIParent:GetHeight() - 32) / 720)
         frame.baseScale = math.max(0.1, scale)
         frame:SetScale(frame.baseScale * state.scale)
-        if live then live.RestorePosition(frame) end
         if state.openTab and state.openTab ~= "last" then state.tab = state.openTab end
-        ApplyAppearance()
+        refresh()
         frame:Show()
     end
-end
-return {
-    Toggle = Toggle,
-    Show = function()
-        if not frame or not frame:IsShown() then Toggle() end
-        return frame
-    end,
-    Settings = function(section)
-        if settings and settings:IsShown() and not section then settings.RequestClose(); return end
-        if not frame then Toggle() else refresh() end
-        ShowSettings(section)
-    end,
-    Refresh = function()
-        if frame and (frame:IsShown() or (settings and settings:IsShown())) then
-            refresh()
-            if settings and settings:IsShown() then settings.ShowSection(settings.current) end
-        end
-    end,
-    Save = Persist,
-}
 end

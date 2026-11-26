@@ -1,3 +1,5 @@
+-- Historical preview test. Its layout assertions predate the final shared
+-- renderer and it is not a test of the live addon.
 local objects, methods = {}, {}
 local environment = setmetatable({}, { __index = _G })
 environment._G = environment
@@ -116,7 +118,8 @@ environment.ColorPickerFrameOpacitySlider = NewObject("Slider", nil, environment
 environment.ColorPickerFrameOpacitySlider:SetMinMaxValues(0, 1)
 setfenv(assert(loadfile("ColorPicker.lua")), environment)("Ashoholic")
 setfenv(assert(loadfile("Data\\Encounters.lua")), environment)("Ashoholic")
-setfenv(assert(loadfile("PreviewUI.lua")), environment)("Ashoholic")
+setfenv(assert(loadfile("..\\..\\Archive\\Preview\\DashboardRenderer.lua")), environment)("Ashoholic")
+setfenv(assert(loadfile("..\\..\\Archive\\Preview\\SampleRecords.lua")), environment)("Ashoholic")
 environment.Ashoholic:TogglePreviewUI()
 
 local function Text(value, parent)
@@ -157,7 +160,9 @@ end
 
 local essence
 for _, object in ipairs(objects) do
-    if object.textValue == "Persistent Prestige currency" then essence = object.parent end
+    if type(object.textValue) == "string" and string.find(object.textValue, "SOUL ESSENCE", 1, true) then
+        essence = object.parent
+    end
 end
 assert(essence and essence.scripts.OnEnter)
 essence.scripts.OnEnter(essence)

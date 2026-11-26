@@ -39,8 +39,11 @@ local function CreateButton()
     button:RegisterForDrag("RightButton")
     local icon = button:CreateTexture(nil, "BACKGROUND")
     button.icon = icon
+    -- The dashboard sets the chosen logo one frame after login. Until then,
+    -- show the saved logo; damaged saved settings fall back to the default.
     local saved = Data.GetDashboardSettings()
-    icon:SetTexture(selectedIcon or (saved and saved.state.logo) or "Interface\\Icons\\inv_soulash")
+    local savedLogo = type(saved) == "table" and type(saved.state) == "table" and saved.state.logo
+    icon:SetTexture(selectedIcon or (type(savedLogo) == "string" and savedLogo) or "Interface\\Icons\\inv_soulash")
     icon:SetSize(21, 21)
     icon:SetPoint("CENTER")
     local border = button:CreateTexture(nil, "OVERLAY")

@@ -159,8 +159,8 @@ function Data.GetProgressionRules()
 end
 
 -- The catalogue is display data for this session, not a character snapshot.
--- The collector supplies the companion's raids; the shared catalogue adds the
--- preview's dungeon names without treating them as server encounters.
+-- The collector supplies the companion's raids; the catalogue adds dungeon
+-- names without treating them as server encounters.
 function Data.SetEncounterCatalog(raids)
     if not addon.EncounterCatalog then
         error("Ashoholic cannot build encounters before Data/Encounters.lua is loaded.")
@@ -485,6 +485,60 @@ end
 
 local REWARD_FIELDS = { "ash", "shards", "copper", "artisan", "orbs" }
 local TRIAL_FIELDS = { "best", "rank", "total", "season", "seasonName", "teamSize", "updatedAt" }
+-- Limits of the Call Board's weekly reward rail (see Data/Schema.lua).
+local RAIL_MAX_STEPS = 10
+local RAIL_MAX_ITEMS = 4
+local RAIL_NAME_BYTES = 64
+
+local function IsPositiveInteger(value)
+    return IsNonNegativeInteger(value) and value > 0
+end
+
+-- Counts every key of a table. A list whose key count differs from its
+-- length (#) has holes or extra keys and is rejected.
+local function CountKeys(value)
+    local count = 0
+    for _ in pairs(value) do
+        count = count + 1
+    end
+    return count
+end
+
+-- The rail is an ordered list: 1 to 10 steps whose counts never go down,
+-- each with 1 to 4 reward items. An item name is optional (nil when the game
+-- did not know it when the board was observed).
+local function CopyRail(rail)
+    RequireTable(rail, "Call Board reward rail")
+    local stepCount = #rail
+    if stepCount < 1 or stepCount > RAIL_MAX_STEPS or CountKeys(rail) ~= stepCount then
+        error("Ashoholic received an invalid Call Board reward rail.")
+    end
+    local copy, previousCount = {}, 0
+    for stepIndex = 1, stepCount do
+        local step = rail[stepIndex]
+        if type(step) ~= "table" or not IsPositiveInteger(step.count)
+            or step.count < previousCount or type(step.items) ~= "table" then
+            error("Ashoholic received an invalid Call Board reward step.")
+        end
+        local itemCount = #step.items
+        if itemCount < 1 or itemCount > RAIL_MAX_ITEMS or CountKeys(step.items) ~= itemCount then
+            error("Ashoholic received an invalid Call Board reward step.")
+        end
+        local items = {}
+        for itemIndex = 1, itemCount do
+            local item = step.items[itemIndex]
+            if type(item) ~= "table" or not IsPositiveInteger(item.id)
+                or (item.name ~= nil and (type(item.name) ~= "string"
+                    or item.name == "" or #item.name > RAIL_NAME_BYTES)) then
+                error("Ashoholic received an invalid Call Board reward item.")
+            end
+            items[itemIndex] = { id = item.id, name = item.name }
+        end
+        copy[stepIndex] = { count = step.count, items = items }
+        previousCount = step.count
+    end
+    return copy
+end
 
 local function CopyActivities(snapshot)
     RequireObservation(snapshot, "activities")
@@ -497,6 +551,10 @@ local function CopyActivities(snapshot)
         or not IsNonNegativeInteger(snapshot.weeklyResetAt) or snapshot.weeklyResetAt == 0 then
         error("Ashoholic received invalid Call Board progress or reset times.")
     end
+    -- Optional: contracts claimed this board week (0 is a real count).
+    if snapshot.weeklyClaims ~= nil and not IsNonNegativeInteger(snapshot.weeklyClaims) then
+        error("Ashoholic received an invalid Call Board weekly claim count.")
+    end
     local quests = RequireTable(snapshot.quests, "Call Board activities")
     local copy = {
         cacheProgress = snapshot.cacheProgress,
@@ -505,16 +563,25 @@ local function CopyActivities(snapshot)
         equippedItemLevel = snapshot.equippedItemLevel,
         dailyResetAt = snapshot.dailyResetAt,
         weeklyResetAt = snapshot.weeklyResetAt,
+        weeklyClaims = snapshot.weeklyClaims,
         quests = {},
         updatedAt = snapshot.updatedAt,
     }
+    -- Older snapshots have no rail; it stays nil (unknown).
+    if snapshot.rail ~= nil then
+        copy.rail = CopyRail(snapshot.rail)
+    end
     for questId, quest in pairs(quests) do
         if not IsNonNegativeInteger(questId) or questId == 0 or type(quest) ~= "table"
             or type(quest.title) ~= "string" or quest.title == ""
             or (quest.cadence ~= "daily" and quest.cadence ~= "weekly" and quest.cadence ~= "once")
             or not IsNonNegativeInteger(quest.done) or not IsNonNegativeInteger(quest.max)
             or not IsNonNegativeInteger(quest.state) or quest.state > 3
-            or type(quest.accountWide) ~= "boolean" then
+            or type(quest.accountWide) ~= "boolean"
+            -- Optional: the Call Board category ID and the claim price in
+            -- copper. Both are absent (nil) rather than 0 when not reported.
+            or (quest.category ~= nil and not IsPositiveInteger(quest.category))
+            or (quest.cost ~= nil and not IsPositiveInteger(quest.cost)) then
             error("Ashoholic received an invalid Call Board activity.")
         end
         local rewards
@@ -532,6 +599,7 @@ local function CopyActivities(snapshot)
         copy.quests[questId] = {
             title = quest.title, cadence = quest.cadence, done = quest.done,
             max = quest.max, state = quest.state, accountWide = quest.accountWide,
+            category = quest.category, cost = quest.cost,
             rewards = rewards,
         }
     end
@@ -577,7 +645,7 @@ end
 -- Account currencies are shared by every character on this WoW account, so
 -- they need no character identity. A new server update replaces the whole
 -- group, including decreases after spending. Run currencies are never added
--- here, and Warband gold stays unknown because it has no readable source.
+-- here. Warband bank gold has its own group (Data.SaveAccountWarband below).
 function Data.SaveAccountCurrencies(snapshot)
     if not database then
         error("Ashoholic account currencies were saved before Data.Initialize().")
@@ -637,6 +705,51 @@ local function CopyAccountCurrencies(account, accountId)
         artisanBanked = currencies.artisanBanked,
         updatedAt = currencies.updatedAt,
     }
+end
+
+-- Lua numbers count whole copper exactly only below 2^53.
+local LARGEST_EXACT_COPPER = 2 ^ 53
+
+-- Validate and copy a Warband bank group: { gold, unlocked, updatedAt }.
+-- unlocked is optional (nil when the bank packet had no "open" byte).
+-- Used for saving, sync and the roster, so all three accept the same shape.
+local function CopyWarband(snapshot, description)
+    RequireObservation(snapshot, description)
+    if not IsNonNegativeInteger(snapshot.gold) or snapshot.gold >= LARGEST_EXACT_COPPER
+        or (snapshot.unlocked ~= nil and type(snapshot.unlocked) ~= "boolean") then
+        error("Ashoholic received invalid Warband bank gold.")
+    end
+    return { gold = snapshot.gold, unlocked = snapshot.unlocked, updatedAt = snapshot.updatedAt }
+end
+
+-- The Warband bank and its gold are shared by every character on this WoW
+-- account, so no character identity is needed. The companion's bank sends a
+-- packet for every item moved, each repeating the gold. An unchanged balance
+-- only confirms the saved one: its observation time moves forward, but the
+-- roster listeners are not called, so the UI is not redrawn for every move.
+function Data.SaveAccountWarband(snapshot)
+    if not database then
+        error("Ashoholic Warband bank gold was saved before Data.Initialize().")
+    end
+    local copy = CopyWarband(snapshot, "Warband bank gold")
+    local account = RequireTable(database.accounts[database.myAccountId], "current account")
+    local existing = account.warband
+    if HasNewerObservation(existing, copy, "Warband bank gold") then return end
+    if existing ~= nil and existing.gold == copy.gold and existing.unlocked == copy.unlocked then
+        existing.updatedAt = copy.updatedAt
+        return
+    end
+    account.warband = copy
+    NotifyRosterChanged()
+end
+
+-- Copy an account's Warband bank gold for the UI, or return nil when no bank
+-- packet has been observed for that account yet (unknown, never 0 copper).
+local function CopyAccountWarband(account, accountId)
+    if account.warband == nil then
+        return nil
+    end
+    return CopyWarband(account.warband, "Warband bank gold for account " .. tostring(accountId))
 end
 
 local function CopyTorment(character, account)
@@ -735,6 +848,8 @@ local function CopySyncAccountGroup(group, snapshot)
         end
         if not copy.unlockedTiers[1] then error("Ashoholic shared Torment access is missing Normal.") end
         return copy
+    elseif group == "warband" then
+        return CopyWarband(snapshot, "shared Warband bank gold")
     end
     error("Ashoholic cannot share unknown account group " .. tostring(group) .. ".")
 end
@@ -847,8 +962,14 @@ end
 function Data.ImportAccount(packet)
     if not database then error("Ashoholic cannot import before Data.Initialize().") end
     RequireTable(packet, "shared account packet")
-    if packet.schemaVersion == 5 then
-        local migrated = { schemaVersion = 5, accounts = { imported = CopyTree(packet.account) } }
+    -- Packets from an older installation are upgraded with the same steps as
+    -- saved data. Version 6 packets simply have no warband group and no new
+    -- Call Board fields, which stay unknown; settings are never in a packet.
+    if packet.schemaVersion == 5 or packet.schemaVersion == 6 then
+        local migrated = {
+            schemaVersion = packet.schemaVersion,
+            accounts = { imported = CopyTree(packet.account) },
+        }
         Schema.Migrate(migrated)
         packet = { schemaVersion = Schema.VERSION, accountId = packet.accountId, account = migrated.accounts.imported }
     end
@@ -1108,6 +1229,7 @@ function Data.GetRoster()
             currencies = CopyAccountCurrencies(account, accountId),
             prestige = CopyOptionalGroup(account, "prestige", PRESTIGE_FIELDS),
             torment = CopyTorment(account),
+            warband = CopyAccountWarband(account, accountId),
             characters = {},
         }
         local realms = account.realms

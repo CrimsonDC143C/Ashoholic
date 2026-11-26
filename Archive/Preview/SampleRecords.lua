@@ -1,4 +1,4 @@
--- Session-local examples for /ash preview. Live data never uses these records.
+-- Archived sample records for the shared preview renderer; never loaded by the addon.
 local addonName = ...
 local addon = _G[addonName]
 

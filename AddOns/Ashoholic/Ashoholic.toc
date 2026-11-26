@@ -1,6 +1,6 @@
 ## Interface: 30300
 ## Title: Ashoholic - Ebonhold Roster
-## Notes: Tracks characters, currencies, encounters, activities, progression, and Trials; includes optional account sync and a sample-data preview.
+## Notes: Tracks characters, currencies, encounters, activities, progression, and Trials; includes optional account sync.
 ## Author: Crimson, MarkusLastu
 ## Version: 3.0.0-ptr.6
 ## SavedVariables: AshoholicDB
@@ -14,7 +14,6 @@ Data\Schema.lua
 Data\Encounters.lua
 Data\Store.lua
 Collectors\Character.lua
-Trials.lua
 Integrations\ProjectEbonhold.lua
 Integrations\FastSwap.lua
 Collectors\Run.lua
@@ -26,20 +25,21 @@ Sync\Codec.lua
 Sync\OfflineInbox.lua
 Sync\Transport.lua
 Sync\Offline.lua
-Themes.lua
 ColorPicker.lua
-UI.lua
-UI\CharacterDetails.lua
+UI\Widgets.lua
+UI\Theme.lua
+UI\Model.lua
+UI\Alerts.lua
+UI\Roster.lua
 UI\Progression.lua
 UI\Raids.lua
 UI\Activities.lua
 UI\Trials.lua
 UI\Settings.lua
-UI\Alerts.lua
-UI\Roster.lua
+UI\SettingsAppearance.lua
+UI\SettingsGeneral.lua
+UI\Window.lua
 Integrations\Nexus.lua
 Minimap.lua
-PreviewBootstrap.lua
-UI\DashboardRenderer.lua
-PreviewUI.lua
 UI\Dashboard.lua
+Core\Commands.lua

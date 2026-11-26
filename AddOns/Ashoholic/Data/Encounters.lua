@@ -1,5 +1,5 @@
--- The live and preview watchlists share these dungeon names and expansion
--- mappings. Dungeon entries are names only: their keys are not server IDs.
+-- Dungeon names and expansion mappings for the live watchlist.
+-- Dungeon entries are names only: their keys are not server IDs.
 local addonName = ...
 local addon = _G[addonName]
 

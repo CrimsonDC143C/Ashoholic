@@ -1,4 +1,4 @@
--- Focused Lua 5.1 checks for the live raid collector, data contract and UI.
+-- Focused Lua 5.1 checks for the live raid collector and data contract.
 -- Run from the repository root; the game client is still needed for live tests.
 local environment = setmetatable({}, { __index = _G })
 environment._G = environment
@@ -160,7 +160,7 @@ environment.AshoholicDB = {
 }
 local Data = environment.Ashoholic.Data
 Data.Initialize()
-assert(environment.AshoholicDB.schemaVersion == 6)
+assert(environment.AshoholicDB.schemaVersion == 7)
 assert(Character("Legacy").raids.lockedUntil[673] == 1050)
 Fire("PLAYER_LOGIN")
 assert(environment.AshoholicDB.accounts.account.realms.Realm.Main == nil)
@@ -196,102 +196,14 @@ local copy = Character("Main")
 copy.raids.lockedUntil[673] = 9999
 assert(Character("Main").raids.lockedUntil[673] == 1040)
 
-Data.SetProgressionRules({ prestigeGate = 1, tormentLadderTop = 2, tierNames = { "Normal", "Torment I" } })
-Load("AddOns\\Ashoholic\\UI.lua")
-Load("AddOns\\Ashoholic\\UI\\CharacterDetails.lua")
-Load("AddOns\\Ashoholic\\UI\\Progression.lua")
-Load("AddOns\\Ashoholic\\UI\\Raids.lua")
-Load("AddOns\\Ashoholic\\UI\\Roster.lua")
-local UI = environment.Ashoholic.UI
-environment.Ashoholic:ToggleRosterUI()
-UI.ShowLiveTab("Raids")
-local window = environment.AshoholicRosterFrame
-local page = window.raidsPage
-
-local function Click(button)
-    assert(button.scripts.OnClick, "Button has no click handler")(button)
-end
-
-local function PickerBoss(key)
-    for _, row in ipairs(page.pickerRows) do
-        if row.shown and row.boss and row.boss.key == key then return row end
-    end
-    error("Picker boss not found: " .. key)
-end
-
-local function MatrixRow(name)
-    for _, row in ipairs(page.matrixRows) do
-        if row.shown and row.name:GetText() == name then return row end
-    end
-    error("Matrix row not found: " .. name)
-end
-
-local function Column(name)
-    for index, entry in ipairs(page.characters) do
-        if entry.character.name == name then return index - page.matrixOffset end
-    end
-    error("Character column not found: " .. name)
-end
-
-page.expanded["Raids:exp:3"] = true
-page.expanded["Raids:map:533"] = true
-page.expanded["Dungeons:exp:3"] = true
-page.expanded["Dungeons:name:Utgarde Keep"] = true
-UI.RefreshRoster()
 local raidKey = "raid:673"
-Click(PickerBoss(raidKey).select)
-assert(Data.GetEncounterWatchlist()[raidKey])
-Click(PickerBoss(raidKey).select)
-assert(not Data.GetEncounterWatchlist()[raidKey])
-Click(PickerBoss(raidKey).select)
-
 local dungeonKey = "dungeon:12:Utgarde Keep:Prince Keleseth"
-Click(PickerBoss(dungeonKey).select)
+Data.SaveEncounterWatchlist({ [raidKey] = true, [dungeonKey] = true })
 local watched = Data.GetEncounterWatchlist()
 watched[raidKey] = nil
 assert(Data.GetEncounterWatchlist()[raidKey])
 Data.Initialize()
 assert(Data.GetEncounterWatchlist()[raidKey] and Data.GetEncounterWatchlist()[dungeonKey])
-
-local raidRow = MatrixRow("Anub'Rekhan")
-assert(raidRow.cells[Column("Main")].label:GetText() == "Looted")
-assert(raidRow.cells[Column("Available")].label:GetText() == "Available")
-assert(raidRow.cells[Column("Unknown")].label:GetText() == "Unknown")
-local dungeonRow = MatrixRow("Prince Keleseth")
-assert(dungeonRow.cells[Column("Main")].label:GetText() == "Unknown")
-clock = 1041
-UI.RefreshRoster()
-raidRow = MatrixRow("Anub'Rekhan")
-assert(raidRow.cells[Column("Main")].label:GetText() == "Available")
-assert(raidRow.cells[Column("Legacy")].label:GetText() == "Looted")
-
-Click(page.focusButton)
-assert(page.focused and not window.goldCard:IsShown())
-UI.ShowLiveTab("Roster")
-assert(window.goldCard:IsShown())
-UI.ShowLiveTab("Raids")
-assert(not window.goldCard:IsShown())
-Click(page.focusButton)
-assert(window.goldCard:IsShown())
-local narrowWidth = page.matrixWidth
-Click(page.pickerToggle)
-assert(page.matrixWidth > narrowWidth)
-Click(page.pickerToggle)
-
-local largeRoster = Data.GetRoster()
-for index = 1, 20 do
-    largeRoster[1].characters[#largeRoster[1].characters + 1] = {
-        name = "Alt" .. index, realm = "Realm", class = "MAGE",
-    }
-end
-UI.RefreshRaids(page, largeRoster)
-assert(#page.characters > page.columnCount and page.horizontal:IsShown())
-page.horizontal:SetValue(#page.characters - page.columnCount)
-assert(page.matrixOffset == #page.characters - page.columnCount)
-
-UI.RefreshRoster()
-Click(page.watchAll)
-assert(Data.GetEncounterWatchlist()[raidKey] and Data.GetEncounterWatchlist()[dungeonKey])
-Click(page.clear)
-assert(next(Data.GetEncounterWatchlist()) == nil and page.empty:IsShown())
-print("Live raid collector, watchlist and UI checks passed.")
+Data.SaveEncounterWatchlist({})
+assert(next(Data.GetEncounterWatchlist()) == nil)
+print("Live raid collector and watchlist checks passed.")

@@ -17,11 +17,37 @@ local MAX_ENCODED = Codec.MAX_WIRE_BYTES
 local MAX_PARTS = math.ceil(MAX_ENCODED / (PART_SIZE - 2))
 local SEND_INTERVAL = 0.30
 local TIMEOUT = 900
+-- A peer may ask for a new exchange only this many seconds after its last.
+local REQUEST_COOLDOWN = 10
+-- An untrusted sender is reported in chat once per WARNING_MEMORY seconds.
+-- At most MAX_WARNINGS senders are remembered; beyond that, further untrusted
+-- senders are ignored silently until older warnings expire, so a flood of
+-- strangers can neither grow this table nor fill the chat.
+local WARNING_MEMORY = 600
+local MAX_WARNINGS = 50
+-- lastRequest and warned map a peer key to the GetTime() of its last request
+-- or warning; both are forgotten once they no longer matter.
 local outgoing, incoming, lastRequest, warned = {}, {}, {}, {}
 local awaiting, requests = {}, {}
 local ready, elapsed = false, 0
 local nextTransferId = 0
 local frame = CreateFrame("Frame")
+-- The updater (OnUpdate below) sends queued messages and expires old
+-- transfers. WoW runs OnUpdate only while a frame is shown, but delivers
+-- events to hidden frames too. The frame therefore starts hidden, is shown
+-- whenever work is added, and hides itself once nothing is left to do.
+frame:Hide()
+
+local function WakeUpdater()
+    frame:Show()
+end
+
+-- True while anything still needs sending, a reply or timeout is pending, or
+-- a remembered request or warning has yet to expire.
+local function HasWork()
+    return outgoing[1] ~= nil or next(incoming) ~= nil or next(awaiting) ~= nil
+        or next(requests) ~= nil or next(lastRequest) ~= nil or next(warned) ~= nil
+end
 
 local function Say(message)
     print("|cffffca63Ashoholic sync:|r " .. message)
@@ -101,6 +127,7 @@ local function EnqueueData(target)
     nextTransferId = nextTransferId + 1
     local id = tostring(time()) .. string.format("%08x", nextTransferId)
     outgoing[#outgoing + 1] = { target = target, parts = parts, id = id, total = #parts, index = 1 }
+    WakeUpdater()
 end
 
 function Sync.GetStatus()
@@ -140,6 +167,7 @@ function Sync.Start(name)
     -- cannot start a one-sided transfer.
     EnqueueData(destination)
     table.insert(outgoing, 1, { target = destination, request = true })
+    WakeUpdater()
     Say("Exchanging snapshots with " .. destination .. ". Both characters must trust each other; larger accounts take several minutes.")
 end
 
@@ -177,6 +205,9 @@ local function SendNext()
         local key = NormalizePeer(job.target)
         requests[key] = { target = job.target, startedAt = GetTime() }
         table.remove(outgoing, 1)
+        -- The updater calls SendNext, so it is already running; waking it
+        -- keeps the reply timeout working even if that ever changes.
+        WakeUpdater()
     elseif job.message then
         table.remove(outgoing, 1)
     else
@@ -184,6 +215,7 @@ local function SendNext()
         if job.index > job.total then
             table.remove(outgoing, 1)
             awaiting[job.id] = { key = NormalizePeer(job.target), target = job.target, startedAt = GetTime() }
+            WakeUpdater()
             Say("Finished sending to " .. job.target .. "; waiting for confirmation.")
         end
     end
@@ -204,6 +236,8 @@ local function ReceiveData(senderKey, sender, message)
         if active >= 8 then error("Too many incomplete account transfers.") end
         record = { sender = sender, total = total, parts = {}, count = 0, bytes = 0, startedAt = GetTime() }
         incoming[key] = record
+        -- Wake the updater so this transfer times out if it never completes.
+        WakeUpdater()
         Say("Receiving " .. total .. " chunks from " .. sender .. ".")
     elseif record.total ~= total then
         incoming[key] = nil
@@ -233,6 +267,7 @@ local function ReceiveData(senderKey, sender, message)
             return Data.ImportAccount(packet)
         end)
         table.insert(outgoing, 1, { target = sender, message = (ok and "A:" or "E:") .. id })
+        WakeUpdater()
         if not ok then error("Could not import " .. sender .. "'s account: " .. tostring(changed)) end
         Say("Received " .. sender .. "'s account" .. (changed and "." or "; it was already up to date."))
     end
@@ -244,18 +279,29 @@ local function Receive(prefix, message, distribution, sender)
     local key = NormalizePeer(sender)
     local trusted = Data.GetTrustedPeers()[key]
     if not trusted then
-        if not warned[key] then
-            warned[key] = true
-            Say("Ignored an untrusted request or transfer from " .. sender .. ".")
+        local now = GetTime()
+        local warnedAt = warned[key]
+        if warnedAt == nil or now - warnedAt >= WARNING_MEMORY then
+            -- Count the remembered senders (at most MAX_WARNINGS, so cheap).
+            local remembered = 0
+            for _ in pairs(warned) do remembered = remembered + 1 end
+            if warnedAt ~= nil or remembered < MAX_WARNINGS then
+                warned[key] = now
+                -- The updater forgets this warning after WARNING_MEMORY.
+                WakeUpdater()
+                Say("Ignored an untrusted request or transfer from " .. sender .. ".")
+            end
         end
         return
     end
     if message == "Q:1" then
         local now = GetTime()
-        if lastRequest[key] and now - lastRequest[key] < 10 then
+        if lastRequest[key] and now - lastRequest[key] < REQUEST_COOLDOWN then
             error("Repeated sync request from " .. sender .. ".")
         end
         lastRequest[key] = now
+        -- The updater forgets this request time after REQUEST_COOLDOWN.
+        WakeUpdater()
         -- Reply to the actual sender, not a possibly outdated saved whisper
         -- spelling. Reuse an exchange already queued in this direction.
         local queued = false
@@ -269,6 +315,7 @@ local function Receive(prefix, message, distribution, sender)
             local built, problem = pcall(EnqueueData, sender)
             if not built then
                 table.insert(outgoing, 1, { target = sender, message = "F:1" })
+                WakeUpdater()
                 error("Could not prepare this account for " .. sender .. ": " .. tostring(problem))
             end
         end
@@ -331,4 +378,16 @@ frame:SetScript("OnUpdate", function(_, delta)
             Say("No account reply from " .. request.target .. ". Check that both characters are online and trusted.")
         end
     end
+    -- Forget request times once they can no longer block a repeat, and
+    -- untrusted senders once they may be reported again.
+    for key, requestedAt in pairs(lastRequest) do
+        if now - requestedAt >= REQUEST_COOLDOWN then lastRequest[key] = nil end
+    end
+    for key, warnedAt in pairs(warned) do
+        if now - warnedAt >= WARNING_MEMORY then warned[key] = nil end
+    end
+    -- Nothing left to send or time out: stop running every frame. Adding new
+    -- work shows the frame again (WakeUpdater). elapsed is 0 here, so the
+    -- next message still waits a full SEND_INTERVAL after the previous one.
+    if not HasWork() then frame:Hide() end
 end)

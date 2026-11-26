@@ -1,3 +1,4 @@
+-- Historical test for an older roster implementation, not the live UI.
 local allocations, objects = 0, {}
 local fontCalls = 0
 local environment = setmetatable({}, { __index = _G })
