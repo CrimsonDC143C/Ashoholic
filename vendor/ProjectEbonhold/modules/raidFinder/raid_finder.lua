@@ -20,6 +20,8 @@
 --   CS.REQUEST_RAID_FINDER_LEAVE  (1257) ""
 --   CS.REQUEST_RAID_FINDER_ANSWER (1266) "1" / "0"
 --   CS.REQUEST_RAID_FINDER_SEARCH (1267) "1" / "0"    -- leader of a Raid Finder raid: search for replacements
+--   CS.REQUEST_RAID_FINDER_TELEPORT (1269) "1" / "0"  -- member of a Raid Finder raid: into / out of the raid, from the
+--                                                        eye's right-click menu, like a Dungeon Finder group
 --   DATA:  "<release>|<maxQueueable>|<maxTier>|<roles>|<classRoles>|<map>,<lootable>,<bosses>;..."
 -- The raid list is static (owner 2026-11-02): no open / closed state from the server. The item level each
 -- raid asks for is shown and pre-checked here on the player's own average (same slots as
@@ -28,6 +30,7 @@
 --          | "2|map|tier|tanks|healers|damage|players|secondsLeft|accepted|total|answered|myRole|refill"
 --          | "3|map|tier|tank|healer|damage|players|target|searching|leader|searchSecs"  (in a Raid Finder raid)
 -- ==============================================================================
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local RF = {}
 ProjectEbonhold = ProjectEbonhold or {}
 ProjectEbonhold.RaidFinder = RF
@@ -120,7 +123,7 @@ end
 local function TierName(tier)
   local DF = ProjectEbonhold.DungeonFinder
   if DF and DF.TierName then return DF.TierName(tier) end
-  return tier <= 1 and "Normal" or ("Torment " .. (tier - 1))
+  return tier <= 1 and L["Normal"] or T("Torment {n}", { n = tier - 1 })
 end
 
 local function MaxTier()
@@ -140,11 +143,11 @@ local function LockReason(tier)
   local svc = ProjectEbonhold.HardmodeService
   if svc and svc.GetAchievementName then
     local link = (svc.GetAchievementLink and svc.GetAchievementLink(tier)) or ""
-    if link ~= "" then return "Requires " .. link end
+    if link ~= "" then return T("Requires {link}", { link = link }) end
     local name = svc.GetAchievementName(tier)
-    if name and name ~= "" then return "Requires the achievement |cffFFD100" .. name .. "|r" end
+    if name and name ~= "" then return T("Requires the achievement |cffFFD100{name}|r", { name = name }) end
   end
-  return "Locked"
+  return L["Locked"]
 end
 
 -- Roles each class can take, same table as RaidFinder::RolesOfClass: drawn without waiting for the
@@ -197,8 +200,8 @@ end
 
 local function FormatTime(s)
   s = math.max(0, math.floor(s))
-  if s >= 60 then return string.format("%d min %02d s", math.floor(s / 60), s % 60) end
-  return s .. " s"
+  if s >= 60 then return T("{m} min {s} s", { m = math.floor(s / 60), s = string.format("%02d", s % 60) }) end
+  return T("{s} s", { s = s })
 end
 
 local function RoleCoords(role)
@@ -246,16 +249,16 @@ local RefreshPanel
 
 local function JoinReason()
   local raids = SelectedRaids()
-  if UnitLevel("player") < MIN_LEVEL then return "The Raid Finder opens at level 80." end
-  if #raids == 0 then return "Pick at least one raid." end
+  if UnitLevel("player") < MIN_LEVEL then return L["The Raid Finder opens at level 80."] end
+  if #raids == 0 then return L["Pick at least one raid."] end
   for _, raid in ipairs(raids) do
     if not MeetsItemLevel(raid) then
-      return string.format("%s requires an average item level of %d (yours: %d).", raid.name, RequiredItemLevel(raid), math.floor(PlayerItemLevel()))
+      return T("{raid} requires an average item level of {req} (yours: {have}).", { raid = L[raid.name], req = RequiredItemLevel(raid), have = math.floor(PlayerItemLevel()) }) -- raid.name: display only
     end
   end
-  if IsLocked(state.tier) then return "This difficulty is locked." end
-  if InParty() and not IsPartyLeader() and not IsRaidLeader() then return "Only your group leader can queue the group." end
-  if bit.band(state.roles, state.classRoles) == 0 then return "Pick at least one role." end
+  if IsLocked(state.tier) then return L["This difficulty is locked."] end
+  if InParty() and not IsPartyLeader() and not IsRaidLeader() then return L["Only your group leader can queue the group."] end
+  if bit.band(state.roles, state.classRoles) == 0 then return L["Pick at least one role."] end
   return nil
 end
 
@@ -280,7 +283,7 @@ end
 
 local function ToggleRole(role)
   if IsFrozen() then
-    UIErrorsFrame:AddMessage("Leave the queue before changing your roles.", 1.0, 0.1, 0.1, 1.0)
+    UIErrorsFrame:AddMessage(L["Leave the queue before changing your roles."], 1.0, 0.1, 0.1, 1.0)
     return
   end
   if bit.band(state.classRoles, role) == 0 then return end
@@ -309,11 +312,11 @@ local function CreateRoleButton(parent, role)
   btn:SetScript("OnClick", function() ToggleRole(role) end)
   btn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText(info.name, info.r, info.g, info.b)
+    GameTooltip:SetText(L[info.name], info.r, info.g, info.b) -- display only
     if bit.band(state.classRoles, role) == 0 then
-      GameTooltip:AddLine("Your class cannot take this role.", 1, 0.3, 0.3, true)
+      GameTooltip:AddLine(L["Your class cannot take this role."], 1, 0.3, 0.3, true)
     else
-      GameTooltip:AddLine("Tick every role you can play: you get the seat the raid is missing.", 1, 1, 1, true)
+      GameTooltip:AddLine(L["Tick every role you can play: you get the seat the raid is missing."], 1, 1, 1, true)
     end
     GameTooltip:Show()
   end)
@@ -340,7 +343,7 @@ local function CreateSeat(parent, role, index)
   seat.icon:SetTexCoord(RoleCoords(info.key))
   seat.label = seat:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   seat.label:SetPoint("TOP", seat.icon, "BOTTOM", 0, -4)
-  seat.label:SetText(info.name)
+  seat.label:SetText(L[info.name]) -- display only
   seat.state = seat:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   seat.state:SetPoint("TOP", seat.label, "BOTTOM", 0, -1)
   -- A seat still searched for shows the stock Dungeon Finder eye, turning, in its corner.
@@ -366,12 +369,12 @@ local function CreateSeat(parent, role, index)
     self.searching = searching and not found
     if self.searching then self.eye:Show() else self.eye:Hide() end
     if found then
-      self.state:SetText("found")
+      self.state:SetText(L["found"])
       self.state:SetTextColor(0.1, 1, 0.1)
     elseif searching then
       self.state:SetText("")   -- the eye says it
     else
-      self.state:SetText("open")
+      self.state:SetText(L["open"])
       self.state:SetTextColor(0.6, 0.6, 0.6)
     end
   end
@@ -383,14 +386,15 @@ local function RaidDropdown_Initialize(self, level)
   for release = 1, LAST_RELEASE do
     local req = RequiredItemLevel({ release = release })
     local info = UIDropDownMenu_CreateInfo()
-    info.text = "Patch " .. release .. (PlayerItemLevel() >= req and " |cff808080" or " |cffff4040") .. "(item level " .. req .. ")|r"
+    info.text = PlayerItemLevel() >= req and T("Patch {release} |cff808080(item level {req})|r", { release = release, req = req })
+          or T("Patch {release} |cffff4040(item level {req})|r", { release = release, req = req })
     info.isTitle = true
     info.notCheckable = true
     UIDropDownMenu_AddButton(info, level)
     for _, raid in ipairs(RAIDS) do
       if raid.release == release then
         info = UIDropDownMenu_CreateInfo()
-        info.text = raid.name
+        info.text = L[raid.name] -- display only
         info.value = raid.map
         info.checked = state.selected[raid.map] and true or false
         info.disabled = not MeetsItemLevel(raid)
@@ -428,7 +432,7 @@ local function CreatePanel()
   CopyArt("LFDQueueFrameBackground", "BORDER", 512, 256, "LEFT", 21, -64)
   panel.title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
   panel.title:SetPoint("TOP", panel, "TOP", 12, -17)
-  panel.title:SetText("Raid Finder")
+  panel.title:SetText(L["Raid Finder"])
 
   local X, WIDTH = 32, 300
 
@@ -444,7 +448,7 @@ local function CreatePanel()
   -- Raid picker
   panel.raidLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   panel.raidLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", X, -132)
-  panel.raidLabel:SetText("Raid:")
+  panel.raidLabel:SetText(L["Raid:"])
   panel.dropdown = CreateFrame("Frame", "ProjectEbonholdRaidFinderDropDown", panel, "UIDropDownMenuTemplate")
   panel.dropdown:SetPoint("LEFT", panel.raidLabel, "RIGHT", -8, -2)
   UIDropDownMenu_SetWidth(panel.dropdown, 200)
@@ -480,7 +484,7 @@ local function CreatePanel()
   panel.selector:SetPoint("TOPLEFT", panel, "TOPLEFT", X, -166)
 
   -- The group: five seats, then the extra damage seats as a count.
-  local header = W.CreateSectionHeader(panel, WIDTH, "The group", "5 to start, up to 10")
+  local header = W.CreateSectionHeader(panel, WIDTH, L["The group"], L["5 to start, up to 10"])
   header:SetPoint("TOPLEFT", panel, "TOPLEFT", X, -258)
   panel.seats = {}
   for i, role in ipairs(SEATS) do
@@ -500,7 +504,7 @@ local function CreatePanel()
   panel.reason:SetTextColor(1, 0.25, 0.25)
 
   -- Find Raid / Leave Queue and Close, where the Dungeons tab has its two buttons.
-  panel.find = W.CreateBlizzardButton(panel, "ProjectEbonholdRaidFinderFind", 135, 22, "Find Raid")
+  panel.find = W.CreateBlizzardButton(panel, "ProjectEbonholdRaidFinderFind", 135, 22, L["Find Raid"])
   if LFDQueueFrameFindGroupButton then
     panel.find:SetAllPoints(LFDQueueFrameFindGroupButton)   -- same size and place as the stock buttons
   else
@@ -510,7 +514,7 @@ local function CreatePanel()
   panel.find:SetScript("OnEnter", function(self)
     local reason
     if ReplaceMode() then
-      if state.queue.leader ~= 1 then reason = "Only your raid leader or an assistant can search for replacements." end
+      if state.queue.leader ~= 1 then reason = L["Only your raid leader or an assistant can search for replacements."] end
     elseif not IsBusy() then
       reason = JoinReason()
     end
@@ -521,7 +525,7 @@ local function CreatePanel()
     end
   end)
   panel.find:SetScript("OnLeave", GameTooltip_Hide)
-  panel.close = W.CreateBlizzardButton(panel, "ProjectEbonholdRaidFinderClose", 135, 22, CLOSE or "Close")
+  panel.close = W.CreateBlizzardButton(panel, "ProjectEbonholdRaidFinderClose", 135, 22, CLOSE)
   if LFDQueueFrameCancelButton then
     panel.close:SetAllPoints(LFDQueueFrameCancelButton)
   else
@@ -547,38 +551,38 @@ local function RefreshSeats()
 
   if q.status == 1 then
     local missing = {}
-    if hasTank == 0 then missing[#missing + 1] = "1 Tank" end
-    if hasHealer == 0 then missing[#missing + 1] = "1 Healer" end
+    if hasTank == 0 then missing[#missing + 1] = L["1 Tank"] end
+    if hasHealer == 0 then missing[#missing + 1] = L["1 Healer"] end
     local dmgNeeded = math.max(0, 5 - 2 - damage)
-    if dmgNeeded > 0 then missing[#missing + 1] = dmgNeeded .. " DPS" end
+    if dmgNeeded > 0 then missing[#missing + 1] = T("{n} DPS", { n = dmgNeeded }) end
     local line
     if SecondsLeft("soakLeft") >= 0 then
-      line = string.format("|cff1eff00Raid found (%d players).|r Invitations in %s; more DPS can still join, up to 10.",
-        q.players, FormatTime(SecondsLeft("soakLeft")))
+      line = T("|cff1eff00Raid found ({players} players).|r Invitations in {time}; more DPS can still join, up to 10.",
+        { players = q.players, time = FormatTime(SecondsLeft("soakLeft")) })
     else
-      line = "|cffffb000Missing: " .. table.concat(missing, ", ") .. ".|r"
+      line = T("|cffffb000Missing: {list}.|r", { list = table.concat(missing, ", ") })
     end
-    if q.inRaid == 0 then line = line .. " The raid being built has no seat for your roles yet: you are next." end
-    panel.groupLine:SetText(line .. "\nIn queue for " .. FormatTime((q.queuedSecs or 0) + (GetTime() - (q.receivedAt or GetTime()))) .. ".")
+    if q.inRaid == 0 then line = line .. L[" The raid being built has no seat for your roles yet: you are next."] end
+    panel.groupLine:SetText(line .. "\n" .. T("In queue for {time}.", { time = FormatTime((q.queuedSecs or 0) + (GetTime() - (q.receivedAt or GetTime()))) }))
   elseif q.status == 2 then
-    panel.groupLine:SetText(q.refill == 1 and "|cff1eff00A raid under way needs you.|r Answer the invitation."
-      or "|cff1eff00Your raid is ready.|r Answer the invitation.")
+    panel.groupLine:SetText(q.refill == 1 and L["|cff1eff00A raid under way needs you.|r Answer the invitation."]
+      or L["|cff1eff00Your raid is ready.|r Answer the invitation."])
   elseif q.status == 3 then
     local tank, healer, dmg = RaidMissing()
     local missing = {}
-    if tank > 0 then missing[#missing + 1] = "1 Tank" end
-    if healer > 0 then missing[#missing + 1] = "1 Healer" end
-    if dmg > 0 then missing[#missing + 1] = dmg .. " DPS" end
-    local line = string.format("Your Raid Finder raid: %d / %d players.", q.players or 0, q.target or 5)
+    if tank > 0 then missing[#missing + 1] = L["1 Tank"] end
+    if healer > 0 then missing[#missing + 1] = L["1 Healer"] end
+    if dmg > 0 then missing[#missing + 1] = T("{n} DPS", { n = dmg }) end
+    local line = T("Your Raid Finder raid: {n} / {total} players.", { n = q.players or 0, total = q.target or 5 })
     if #missing == 0 then
-      line = line .. " |cff1eff00Every seat is filled.|r"
+      line = line .. L[" |cff1eff00Every seat is filled.|r"]
     elseif IsSearching() then
-      line = line .. " |cffffb000Searching for " .. table.concat(missing, ", ") .. "|r for "
-        .. FormatTime((q.searchSecs or 0) + (GetTime() - (q.receivedAt or GetTime()))) .. "."
+      line = line .. " " .. T("|cffffb000Searching for {list}|r for {time}.", { list = table.concat(missing, ", "),
+        time = FormatTime((q.searchSecs or 0) + (GetTime() - (q.receivedAt or GetTime()))) })
     elseif q.leader == 1 then
-      line = line .. " |cffffb000Missing: " .. table.concat(missing, ", ") .. ".|r Find Replacements to fill the seats."
+      line = line .. " " .. T("|cffffb000Missing: {list}.|r Find Replacements to fill the seats.", { list = table.concat(missing, ", ") })
     else
-      line = line .. " |cffffb000Missing: " .. table.concat(missing, ", ") .. ".|r Your leader or an assistant can search for replacements."
+      line = line .. " " .. T("|cffffb000Missing: {list}.|r Your leader or an assistant can search for replacements.", { list = table.concat(missing, ", ") })
     end
     panel.groupLine:SetText(line)
   else
@@ -614,7 +618,7 @@ RefreshPanel = function()
     state.pickedOnce = true
   end
   local raids = SelectedRaids()
-  UIDropDownMenu_SetText(panel.dropdown, #raids == 1 and raids[1].name or #raids > 1 and (#raids .. " raids") or "Pick raids")
+  UIDropDownMenu_SetText(panel.dropdown, #raids == 1 and L[raids[1].name] or #raids > 1 and T("{n} raids", { n = #raids }) or L["Pick raids"]) -- raid name: display only
   if busy then UIDropDownMenu_DisableDropDown(panel.dropdown) else UIDropDownMenu_EnableDropDown(panel.dropdown) end
 
   state.tier = math.max(1, math.min(MaxTier(), state.tier))
@@ -624,10 +628,10 @@ RefreshPanel = function()
   RefreshSeats()
 
   if ReplaceMode() then
-    panel.find:SetText(IsSearching() and "Stop Searching" or "Find Replacements")
+    panel.find:SetText(IsSearching() and L["Stop Searching"] or L["Find Replacements"])
     if state.queue.leader == 1 then panel.find:Enable() else panel.find:Disable() end
   else
-    panel.find:SetText(IsBusy() and "Leave Queue" or "Find Raid")
+    panel.find:SetText(IsBusy() and L["Leave Queue"] or L["Find Raid"])
     if IsBusy() or not JoinReason() then panel.find:Enable() else panel.find:Disable() end
   end
 end
@@ -656,7 +660,7 @@ end
 local function CreateTabs()
   if tabs or not LFDParentFrame then return end
   tabs = {}
-  local names = { "Dungeons", "Raids" }
+  local names = { L["Dungeons"], L["Raids"] }
   for i, text in ipairs(names) do
     local tab = CreateFrame("Button", "LFDParentFrameTab" .. i, LFDParentFrame, "CharacterFrameTabButtonTemplate")
     tab:SetID(i)
@@ -746,7 +750,7 @@ local function StatusTooltip(owner)
   local raid = RAID_BY_MAP[q.map]
   f:ClearAllPoints()
   f:SetPoint("TOPRIGHT", owner, "TOPLEFT", 0, 0)
-  f.raid:SetText((raid and raid.name or "?") .. " · " .. TierName(q.tier or 1))
+  f.raid:SetText((raid and L[raid.name] or "?") .. " · " .. TierName(q.tier or 1))
 
   local tank, healer, damage
   if q.status == 3 then
@@ -762,22 +766,26 @@ local function StatusTooltip(owner)
 
   local since = GetTime() - (q.receivedAt or GetTime())
   if q.status == 1 then
-    f.title:SetText("Assembling Raid...")
-    f.time:SetText("Time in Queue: " .. FormatTime((q.queuedSecs or 0) + since))
+    f.title:SetText(L["Assembling Raid..."])
+    f.time:SetText(T("Time in Queue: {time}", { time = FormatTime((q.queuedSecs or 0) + since) }))
     local soak = SecondsLeft("soakLeft")
     if soak >= 0 then
-      f.line:SetText(string.format("%d players found. Invitations in %s...", q.players or 0, FormatTime(soak)))
+      f.line:SetText(T("{n} players found. Invitations in {time}...", { n = q.players or 0, time = FormatTime(soak) }))
     else
-      f.line:SetText("Looking for players...")
+      f.line:SetText(L["Looking for players..."])
     end
+  elseif q.status == 3 and q.searching ~= 1 then
+    f.title:SetText(L["Raid Finder"])
+    f.time:SetText(L["Right-click to teleport into or out of the raid."])
+    f.line:SetText(T("{n} / {total} players", { n = q.players or 0, total = q.target or 5 }))
   elseif q.status == 3 then
-    f.title:SetText("Finding Replacements...")
-    f.time:SetText("Time Searching: " .. FormatTime((q.searchSecs or 0) + since))
-    f.line:SetText(string.format("Looking for players... (%d / %d)", q.players or 0, q.target or 5))
+    f.title:SetText(L["Finding Replacements..."])
+    f.time:SetText(T("Time Searching: {time}", { time = FormatTime((q.searchSecs or 0) + since) }))
+    f.line:SetText(T("Looking for players... ({n} / {total})", { n = q.players or 0, total = q.target or 5 }))
   else
-    f.title:SetText(q.refill == 1 and "A Raid Needs You" or "Your Raid Is Ready")
+    f.title:SetText(q.refill == 1 and L["A Raid Needs You"] or L["Your Raid Is Ready"])
     f.time:SetText("")
-    f.line:SetText("Accept the invitation to join.")
+    f.line:SetText(L["Accept the invitation to join."])
   end
   f:Show()
 end
@@ -801,10 +809,28 @@ local function CreateStatus()
   status.border:SetPoint("TOPLEFT", status, "TOPLEFT", 0, 0)
   status.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
   status:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  status:SetScript("OnClick", function(_, button)
+  -- In a Raid Finder raid the right-click menu is the Dungeon Finder eye's: teleport into or out of the raid
+  -- (someone who stepped out to the Call Board gets back in), and the leader's Stop Searching.
+  local menu = CreateFrame("Frame", "ProjectEbonholdRaidFinderStatusMenu", status, "UIDropDownMenuTemplate")
+  status:SetScript("OnClick", function(self, button)
     if button == "RightButton" then
       if InFinderRaid() then
-        if state.queue.leader == 1 then Send(CS.REQUEST_RAID_FINDER_SEARCH, "0") end
+        local _, kind = IsInInstance()
+        local items = { { text = L["Raid Finder"], isTitle = true, notCheckable = true } }
+        if kind == "raid" then
+          items[#items + 1] = { text = L["Teleport out of Raid"], notCheckable = true,
+            func = function() Send(CS.REQUEST_RAID_FINDER_TELEPORT, "0") end }
+        else
+          items[#items + 1] = { text = L["Teleport to Raid"], notCheckable = true,
+            func = function() Send(CS.REQUEST_RAID_FINDER_TELEPORT, "1") end }
+        end
+        if IsSearching() and state.queue.leader == 1 then
+          items[#items + 1] = { text = L["Stop Searching"], notCheckable = true,
+            func = function() Send(CS.REQUEST_RAID_FINDER_SEARCH, "0") end }
+        end
+        items[#items + 1] = { text = CANCEL, notCheckable = true }
+        StatusTooltipHide()
+        EasyMenu(items, menu, self, 0, 0, "MENU")
         return
       end
       Send(CS.REQUEST_RAID_FINDER_LEAVE, "")
@@ -830,7 +856,7 @@ local function CreatePopup()
   })
   popup.title = popup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   popup.title:SetPoint("TOP", popup, "TOP", 0, -20)
-  popup.title:SetText("Your raid is ready!")
+  popup.title:SetText(L["Your raid is ready!"])
   popup.raid = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   popup.raid:SetPoint("TOP", popup.title, "BOTTOM", 0, -6)
   popup.info = popup:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -841,17 +867,17 @@ local function CreatePopup()
   popup.timer = popup:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   popup.timer:SetPoint("TOP", popup.role, "BOTTOM", 0, -6)
   local W = ProjectEbonhold.TormentWidgets
-  popup.accept = W.CreateBlizzardButton(popup, "ProjectEbonholdRaidFinderAccept", 115, 22, "Enter Raid")
+  popup.accept = W.CreateBlizzardButton(popup, "ProjectEbonholdRaidFinderAccept", 115, 22, L["Enter Raid"])
   popup.accept:SetPoint("BOTTOMRIGHT", popup, "BOTTOM", -6, 18)
   popup.accept:SetScript("OnClick", function() Send(CS.REQUEST_RAID_FINDER_ANSWER, "1") end)
-  popup.decline = W.CreateBlizzardButton(popup, "ProjectEbonholdRaidFinderDecline", 115, 22, "Leave Queue")
+  popup.decline = W.CreateBlizzardButton(popup, "ProjectEbonholdRaidFinderDecline", 115, 22, L["Leave Queue"])
   popup.decline:SetPoint("BOTTOMLEFT", popup, "BOTTOM", 6, 18)
   popup.decline:SetScript("OnClick", function() Send(CS.REQUEST_RAID_FINDER_ANSWER, "0") end)
   popup:SetScript("OnUpdate", function(self, elapsed)
     self.tick = (self.tick or 0) + elapsed
     if self.tick < 0.25 then return end
     self.tick = 0
-    self.timer:SetText(FormatTime(SecondsLeft("secondsLeft")) .. " left")
+    self.timer:SetText(T("{time} left", { time = FormatTime(SecondsLeft("secondsLeft")) }))
   end)
   popup:Hide()
 end
@@ -863,25 +889,45 @@ local function RefreshPopup()
     return
   end
   local raid = RAID_BY_MAP[q.map]
-  popup.title:SetText(q.refill == 1 and "A raid under way needs you!" or "Your raid is ready!")
-  popup.raid:SetText(raid and raid.name or "?")
-  popup.info:SetText(string.format("%s · %d players · %d / %d accepted", TierName(q.tier or 1), q.players or 0, q.accepted or 0, q.total or 0))
+  popup.title:SetText(q.refill == 1 and L["A raid under way needs you!"] or L["Your raid is ready!"])
+  popup.raid:SetText(raid and L[raid.name] or "?")
+  popup.info:SetText(T("{tier} · {players} players · {accepted} / {total} accepted", { tier = TierName(q.tier or 1), players = q.players or 0, accepted = q.accepted or 0, total = q.total or 0 }))
   local role = ROLE_INFO[q.myRole or 0]
-  popup.role:SetText(role and ("Your seat: " .. role.name) or "")
+  popup.role:SetText(role and T("Your seat: {role}", { role = L[role.name] }) or "")
   if role then popup.role:SetTextColor(role.r, role.g, role.b) end
   if q.answered == 1 then
     popup.accept:Disable()
-    popup.accept:SetText("Waiting...")
+    popup.accept:SetText(L["Waiting..."])
   else
     popup.accept:Enable()
-    popup.accept:SetText("Enter Raid")
+    popup.accept:SetText(L["Enter Raid"])
   end
   if not popup:IsShown() then PlaySound("ReadyCheck") end
   popup:Show()
 end
 
+-- The raid eye sits where the Dungeon Finder eye is (DragonUI / ElvUI move that one), beside it when both
+-- show, and above the minimap's border art: in its old minimap corner it was covered or clipped (PTR report
+-- "queue icon doesn't appear while queued for a raid").
+local function PlaceStatus()
+  status:ClearAllPoints()
+  local eye = MiniMapLFGFrame
+  if eye and eye:GetNumPoints() > 0 then
+    if eye:IsShown() then
+      status:SetPoint("RIGHT", eye, "LEFT", -2, 0)
+    else
+      status:SetPoint("CENTER", eye, "CENTER", 0, 0)
+    end
+    status:SetFrameLevel(math.max(eye:GetFrameLevel(), Minimap:GetFrameLevel()) + 10)
+  else
+    status:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", -8, 24)
+    status:SetFrameLevel(Minimap:GetFrameLevel() + 10)
+  end
+end
+
 local function RefreshStatus()
-  if IsBusy() or IsSearching() then status:Show() else status:Hide(); StatusTooltipHide() end
+  -- Shown for the whole life of a Raid Finder raid, like the Dungeon Finder's eye: it holds the teleport.
+  if IsBusy() or InFinderRaid() then PlaceStatus(); status:Show() else status:Hide(); StatusTooltipHide() end
   if status:IsShown() and searchStatus and searchStatus:IsShown() then StatusTooltip(status) end
 end
 

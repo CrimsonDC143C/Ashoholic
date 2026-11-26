@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 
 
 
@@ -73,7 +74,7 @@ function AchievementBonusUI:AddCriteriaCounts(id)
             local width = criteria:GetWidth()
             oldWidth = math.max(oldWidth, width)
             if not completed and reqQuantity and reqQuantity > 1 then
-                local text = string.format("- %s (%d/%d)", criteriaString, quantity or 0, reqQuantity)
+                local text = T("- {criteria} ({done}/{total})", { criteria = criteriaString, done = string.format("%d", quantity or 0), total = string.format("%d", reqQuantity) })
                 table.insert(pending, { criteria = criteria, text = text })
                 criteria.name:SetText(text)
                 width = criteria.name:GetStringWidth() + criteria.check:GetWidth()
@@ -167,13 +168,13 @@ function AchievementBonusUI:AddBonusIndicator(button, bonus)
         bonusFrame:EnableMouse(true)
         bonusFrame:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine("Bonus Soul Ashes Multiplier", 1, 0.82, 0)
+            GameTooltip:AddLine(L["Bonus Soul Ashes Multiplier"], 1, 0.82, 0)
             GameTooltip:AddLine(" ", 1, 1, 1)
-            GameTooltip:AddLine("Complete this achievement to get a", 1, 1, 1)
-            GameTooltip:AddLine("permanent soul ashes multiplier for", 1, 1, 1)
-            GameTooltip:AddLine("your entire account.", 1, 1, 1)
+            GameTooltip:AddLine(L["Complete this achievement to get a"], 1, 1, 1)
+            GameTooltip:AddLine(L["permanent soul ashes multiplier for"], 1, 1, 1)
+            GameTooltip:AddLine(L["your entire account."], 1, 1, 1)
             GameTooltip:AddLine(" ", 1, 1, 1)
-            GameTooltip:AddLine(string.format("+%.0f%% Soul Ashes", (self.bonus - 1) * 100), 0, 1, 0)
+            GameTooltip:AddLine(T("+{bonus}% Soul Ashes", { bonus = string.format("%.0f", (self.bonus - 1) * 100) }), 0, 1, 0)
             GameTooltip:Show()
         end)
 

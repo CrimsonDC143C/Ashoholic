@@ -35,8 +35,8 @@ end
 -- forms. Every class: the server acts on the form, not on the class. The box
 -- shows the server's state (SEND_FORM_LOOK_STATE); a click sends the wish and
 -- waits for the answer.
-local FORM_LOOK_LABEL = "Show transmog in forms";
-local FORM_LOOK_TOOLTIP = "Cat, Bear, Dire Bear, Moonkin, Tree of Life and Metamorphosis keep your character and its transmog, and Shadowform no longer darkens it. The forms work as usual. Travel, Aquatic, Flight and Ghost Wolf forms are unchanged.";
+local FORM_LOOK_LABEL = ProjectEbonhold.L["Show transmog in forms"];
+local FORM_LOOK_TOOLTIP = ProjectEbonhold.L["Cat, Bear, Dire Bear, Moonkin, Tree of Life and Metamorphosis keep your character and its transmog, and Shadowform no longer darkens it. The forms work as usual. Travel, Aquatic, Flight and Ghost Wolf forms are unchanged."];
 
 function WardrobeTransmogFrame_CreateFormLookCheck(self)
 	local label = FORM_LOOK_LABEL;
@@ -583,12 +583,12 @@ function WardrobeTransmogFrame_ConfirmApplyPending()
 		WardrobeTransmogFrame_UpdateApplyButton();
 		return;
 	end
-	local slots = (numChanges == 1) and "1 slot" or format("%d slots", numChanges);
+	local slots = ProjectEbonhold.T("{count} slot{s}", { count = numChanges, s = (numChanges == 1 and "" or "s") });
 	local message;
 	if ( cost > 0 ) then
-		message = format("Apply the pending appearance changes to %s for %s?", slots, GetCoinTextureString(cost));
+		message = ProjectEbonhold.T("Apply the pending appearance changes to {slots} for {cost}?", { slots = slots, cost = GetCoinTextureString(cost) });
 	else
-		message = format("Apply the pending appearance changes to %s? This one costs nothing.", slots);
+		message = ProjectEbonhold.T("Apply the pending appearance changes to {slots}? This one costs nothing.", { slots = slots });
 	end
 	StaticPopup_Show("CONFIRM_APPLY_TRANSMOG", message);
 	WardrobeTransmogFrame_UpdateApplyButton();
@@ -1741,6 +1741,15 @@ function WardrobeItemsCollectionMixin:FilterVisuals()
 	local showUnobtainable = ezCollections.Developer and ezCollections:GetCVarBool("transmogrifyShowUnobtainable");
 	local showCollected = ezCollections:GetCVarBool("transmogrifyShowCollected");
 	local showUncollected = ezCollections:GetCVarBool("transmogrifyShowUncollected");
+	-- [shell] "Collector's" (Archive coin cosmetics) / "Torment" (Archive Torment pieces): when one
+	-- or both are checked, only the looks of the checked groups show (item looks only)
+	local isItems = self.transmogType == LE_TRANSMOG_TYPE_APPEARANCE;
+	local wantCollectors = isItems and ezCollections:GetCVarBool("transmogrifyShowCollectors");
+	local wantTorment = isItems and ezCollections:GetCVarBool("transmogrifyShowTorment");
+	local function groupHidden(v)
+		if ( v.isHideVisual or not (wantCollectors or wantTorment) ) then return false; end
+		return not ((wantCollectors and ezCollections:IsCollectorsVisual(v.visualID)) or (wantTorment and ezCollections:IsTormentVisual(v.visualID)));
+	end
 	local isAtTransmogrifier = WardrobeFrame_IsAtTransmogrifier();
 	local visualsList = self.visualsList;
 	local filteredVisualsList = { };
@@ -1781,6 +1790,8 @@ function WardrobeItemsCollectionMixin:FilterVisuals()
 			if ( searchNameMissing ) then warmCache(visualsList[i].visualID); end
 		elseif ( C_TransmogCollection.IsVisualArmorTypeShown and not C_TransmogCollection.IsVisualArmorTypeShown(visualsList[i].visualID) ) then
 			-- filtered out by the Armor Type filter
+		elseif ( groupHidden(visualsList[i]) ) then
+			-- filtered out by the Collector's / Torment filters
 		elseif ( isAtTransmogrifier ) then
 			local v = visualsList[i];
 			if ( v.isHideVisual ) then
@@ -2090,6 +2101,43 @@ function WardrobeItemsCollectionMixin:UpdateItems()
 			end
 			-- favorite
 			model.Favorite.Icon:SetShown(visualInfo.isFavorite);
+			-- [shell] unlock price badge, top right of an uncollected unlockable look:
+			-- coin count + coin icon, or the icon of the Tormented Trophy it asks for
+			local unlockCost, _, unlockReq;
+			if ( self.transmogType == LE_TRANSMOG_TYPE_APPEARANCE and not visualInfo.isHideVisual ) then
+				unlockCost, _, unlockReq = ezCollections:GetVisualUnlock(visualInfo.visualID);
+			end
+			if ( unlockCost ) then
+				local badge = model.UnlockBadge;
+				if ( not badge ) then
+					badge = CreateFrame("Frame", nil, model);
+					badge:SetSize(48, 18);
+					badge:SetPoint("TOPRIGHT", model, "TOPRIGHT", -4, -4);
+					badge:SetFrameLevel(model:GetFrameLevel() + 5);
+					local bg = badge:CreateTexture(nil, "BACKGROUND");
+					bg:SetAllPoints(badge);
+					bg:SetTexture("Interface\\Buttons\\WHITE8X8");
+					bg:SetVertexColor(0, 0, 0, 0.7);
+					badge.Icon = badge:CreateTexture(nil, "ARTWORK");
+					badge.Icon:SetSize(14, 14);
+					badge.Icon:SetPoint("RIGHT", badge, "RIGHT", -3, 0);
+					badge.Text = badge:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall");
+					badge.Text:SetPoint("RIGHT", badge.Icon, "LEFT", -2, 0);
+					model.UnlockBadge = badge;
+				end
+				if ( unlockReq ~= 0 ) then
+					badge.Icon:SetTexture(GetItemIcon(unlockReq) or "Interface\\Icons\\INV_Misc_Token_ArgentDawn3");
+					badge.Text:SetText("");
+					badge:SetWidth(20);
+				else
+					badge.Icon:SetTexture(GetItemIcon(ezCollections.UnlockCoinItem) or "Interface\\Icons\\INV_Misc_Coin_02");
+					badge.Text:SetText(unlockCost);
+					badge:SetWidth(badge.Text:GetStringWidth() + 24);
+				end
+				badge:Show();
+			elseif ( model.UnlockBadge ) then
+				model.UnlockBadge:Hide();
+			end
 			-- hide visual option
 			model.HideVisual.Icon:SetShown(isAtTransmogrifier and visualInfo.isHideVisual);
 			model.ClaimQuest:SetShown(not visualInfo.isCollected and visualInfo.isClaimable);
@@ -2380,12 +2428,31 @@ function WardrobeItemsCollectionMixin:RefreshAppearanceTooltip(cycle)
 		-- sourceText required: GetAppearanceSourceTextAndColor concatenates
 		-- sourceType when it's absent.
 		sources = { { sourceID = self.tooltipVisualID, visualID = self.tooltipVisualID,
-			isCollected = true, sourceText = "Weapon Illusion" } };
+			isCollected = true, sourceText = ProjectEbonhold.L["Weapon Illusion"] } };
 	else
 		sources = CollectionWardrobeUtil.GetSortedAppearanceSources(self.tooltipVisualID, self.activeCategory);
 	end
 	local chosenSourceID = self:GetChosenVisualSource(self.tooltipVisualID);
 	local selectedSource = WardrobeCollectionFrame_SetAppearanceTooltip(self, sources, chosenSourceID, ezCollections.Config.Wardrobe.ShowSetsInAppearances);
+	-- [shell] coin unlock / Collector's lines (item looks only)
+	if ( self.transmogType == LE_TRANSMOG_TYPE_APPEARANCE ) then
+		local unlockCost, _, unlockReq = ezCollections:GetVisualUnlock(self.tooltipVisualID);
+		local collectors = ezCollections:IsCollectorsVisual(self.tooltipVisualID);
+		local torment = ezCollections:IsTormentVisual(self.tooltipVisualID);
+		if ( collectors ) then
+			GameTooltip:AddLine(ProjectEbonhold.L["Collector's - Warpweaver's Archive"], 1, 0.5, 0);
+		elseif ( torment ) then
+			GameTooltip:AddLine(ProjectEbonhold.L["Torment - Warpweaver's Archive"], 0.8, 0.1, 0.1);
+		end
+		if ( unlockCost and unlockReq ~= 0 ) then
+			GameTooltip:AddLine(ProjectEbonhold.T("Right-click to unlock: requires {item} in your bags (kept)", { item = ezCollections:GetUnlockReqName(unlockReq) }), 0.1, 1, 0.1, true);
+		elseif ( unlockCost ) then
+			GameTooltip:AddLine(format(ProjectEbonhold.L["Right-click to unlock: %d |4Coin:Coins; of Forgotten Appearances"], unlockCost), 0.1, 1, 0.1, true);
+		end
+		if ( collectors or torment or unlockCost ) then
+			GameTooltip:Show();
+		end
+	end
 	if cycle and selectedSource then
 		self.tooltipItemFrame.previewedSource = selectedSource.sourceID;
 		if ezCollections.Developer then
@@ -3057,6 +3124,17 @@ function WardrobeCollectionFrameRightClickDropDown_Init(self, level, menuList)
 		end
 		return;
 	end
+	-- [shell] Unlock this look for Coins of Forgotten Appearances
+	if ( self.activeFrame:GetParent().transmogType == LE_TRANSMOG_TYPE_APPEARANCE ) then
+		local unlockCost, _, unlockReq = ezCollections:GetVisualUnlock(appearanceID);
+		if ( unlockCost ) then
+			info.text = ProjectEbonhold.T("Unlock ({price})", { price = ezCollections:GetUnlockPriceText(unlockCost, unlockReq) });
+			info.notCheckable = true;
+			info.func = function() ezCollections:PromptUnlockAppearance(appearanceID); end;
+			UIDropDownMenu_AddButton(info);
+			info = UIDropDownMenu_CreateInfo();
+		end
+	end
 	-- Set Favorite
 	if ( C_TransmogCollection.GetIsAppearanceFavorite(appearanceID) ) then
 		info.text = BATTLE_PET_UNFAVORITE;
@@ -3512,6 +3590,26 @@ function WardrobeFilterDropDown_InitializeItems(self, level)
 						C_TransmogCollection.SetUncollectedShown(value);
 					end 
 		info.checked = C_TransmogCollection.GetUncollectedShown();
+		info.isNotRadio = true;
+		UIDropDownMenu_AddButton(info, level)
+
+		-- [shell] the looks sold by the Warpweaver's Archive
+		info.text = ProjectEbonhold.L["Collector's"]
+		info.func = function(_, _, _, value)
+						ezCollections:SetCVarBool("transmogrifyShowCollectors", value);
+						ezCollections:RaiseEvent("TRANSMOG_COLLECTION_UPDATED");
+					end
+		info.checked = ezCollections:GetCVarBool("transmogrifyShowCollectors");
+		info.isNotRadio = true;
+		UIDropDownMenu_AddButton(info, level)
+
+		-- [shell] the Archive's Torment pieces (Torment XX armor, XXX weapons)
+		info.text = ProjectEbonhold.L["Torment"]
+		info.func = function(_, _, _, value)
+						ezCollections:SetCVarBool("transmogrifyShowTorment", value);
+						ezCollections:RaiseEvent("TRANSMOG_COLLECTION_UPDATED");
+					end
+		info.checked = ezCollections:GetCVarBool("transmogrifyShowTorment");
 		info.isNotRadio = true;
 		UIDropDownMenu_AddButton(info, level)
 

@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: Ashoholic - Ebonhold Roster
-## Notes: Tracks characters, Soul Ash, Raid Reset Costs, and instance lockouts on Project Ebonhold. Hover a character name for saved lockouts and the 10-instance rolling-hour timer. A small widget keeps that timer on screen while the roster is closed. Adds a Character Roster tab to the Nexus panel when Nexus is installed.
+## Notes: Tracks characters, currencies, encounters, activities, progression, and Trials; includes optional account sync.
 ## Author: Crimson, MarkusLastu
-## Version: 3.0.0-ptr.5
+## Version: 3.0.0-ptr.6
 ## SavedVariables: AshoholicDB
 ## Dependencies: ProjectEbonhold
 ## OptionalDeps: Ace3, FastSwap, Nexus, SharedMedia
@@ -11,20 +11,35 @@ Libraries\Load_Libraries.xml
 
 Core.lua
 Data\Schema.lua
+Data\Encounters.lua
 Data\Store.lua
 Collectors\Character.lua
-Trials.lua
 Integrations\ProjectEbonhold.lua
+Integrations\FastSwap.lua
 Collectors\Run.lua
 Collectors\Currencies.lua
 Collectors\Ebonhold.lua
-Themes.lua
+Collectors\Raids.lua
+Collectors\Activities.lua
+Sync\Codec.lua
+Sync\OfflineInbox.lua
+Sync\Transport.lua
+Sync\Offline.lua
 ColorPicker.lua
-UI.lua
-UI\CharacterDetails.lua
-UI\Progression.lua
+UI\Widgets.lua
+UI\Theme.lua
+UI\Model.lua
+UI\Alerts.lua
 UI\Roster.lua
+UI\Progression.lua
+UI\Raids.lua
+UI\Activities.lua
 UI\Trials.lua
+UI\Settings.lua
+UI\SettingsAppearance.lua
+UI\SettingsGeneral.lua
+UI\Window.lua
+Integrations\Nexus.lua
 Minimap.lua
-PreviewBootstrap.lua
-PreviewUI.lua
+UI\Dashboard.lua
+Core\Commands.lua

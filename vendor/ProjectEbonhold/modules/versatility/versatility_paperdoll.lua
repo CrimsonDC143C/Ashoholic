@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Defense Rating is Versatility -- character sheet.
 --
 -- The "Defense" row of the Defenses stat category (PaperDollFrame_SetDefense, 3.3.5 FrameXML)
@@ -20,9 +21,8 @@ hooksecurefunc("PaperDollFrame_SetDefense", function(statFrame, unit)
   local rating = GetCombatRating(CR_DEFENSE_SKILL or 2) or 0
   local pct = VersatilityPct(rating)
 
-  if label then label:SetText(format(STAT_FORMAT or "%s:", "Versatility")) end
+  if label then label:SetText(format(STAT_FORMAT or "%s:", L["Versatility"])) end
   if text then text:SetText(HIGHLIGHT_FONT_COLOR_CODE .. rating .. FONT_COLOR_CODE_CLOSE) end
-  statFrame.tooltip = HIGHLIGHT_FONT_COLOR_CODE .. "Versatility " .. rating .. FONT_COLOR_CODE_CLOSE
-  statFrame.tooltip2 = format("Versatility rating %d: +%.2f%% damage and healing done, -%.2f%% damage taken.",
-                              rating, pct, pct / 2)
+  statFrame.tooltip = T("{HIGHLIGHTFONTCOLORCODE}Versatility {rating}{FONTCOLORCODECLOSE}", { HIGHLIGHTFONTCOLORCODE = HIGHLIGHT_FONT_COLOR_CODE, rating = rating, FONTCOLORCODECLOSE = FONT_COLOR_CODE_CLOSE })
+  statFrame.tooltip2 = T("Versatility rating {rating}: +{pct}% damage and healing done, -{pct2}% damage taken.", { rating = string.format("%d", rating), pct = string.format("%.2f", pct), pct2 = string.format("%.2f", pct / 2) })
 end)

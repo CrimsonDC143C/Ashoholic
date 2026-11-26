@@ -10,8 +10,6 @@ local defaultSettings = {
     autoPlaceSpells = true,
     showFloatingText = true,
     -- Perk Selection UI options
-    noPerkFadeAnimations = false,
-    noRerollConfirm = false,
     rerollAutoRepopulate = true,
     -- One-time stamp for rerollAutoRepopulate, see Initialize below.
     rerollAutoRepopulateMigrated = false,
@@ -20,7 +18,6 @@ local defaultSettings = {
     echoesLevelUpOptionMigrated = false,
     autoShowEchoes = false,
     autoAcceptLoadoutEchoes = false,
-    perkDirectBanish = false,
     perkShowSelectCount = false,
     hideTomeLearnedAlert = false,
     perkUIScale = 1.0,
@@ -31,24 +28,8 @@ local defaultSettings = {
     classVisualsMode = 0,
     -- Dragonflight-style quest tracker (modules/questTracker)
     dfQuestTracker = true,
-    -- WoW-style nameplate reskin (modules/nameplates). Off by default while the
-    -- in-combat freeze reports are being worked through -- note the module also
-    -- carries its own MODULE_DISABLED kill switch, which is what actually takes
-    -- effect on accounts that already have this persisted as true.
-    nameplatesEnabled = false,
-    nameplatesClassColor = true,
-    nameplatesShowLevel = false,
-    nameplatesCastBar = true,
-    nameplatesHealthFormat = "BOTH",   -- OFF | VALUE | PERCENT | BOTH
-    nameplatesBarWidth = 130,
-    nameplatesBarHeight = 14,
-    nameplatesFontSize = 12,
-    -- The player's own debuffs above enemy nameplates (modules/nameplates/nameplate_dots.lua)
-    nameplateDotsEnabled = true,
     -- Skip the "Looting X will bind it to you" confirmation (modules/lootBind)
     autoConfirmLootBind = false,
-    -- All the bags in one window (modules/combinedBags)
-    combinedBags = false,
     -- Merchant / junk selling options
     autoSellJunk = false,
     -- Toolbelt / Vendor: run the sale / the repair when combat ends
@@ -69,8 +50,16 @@ local defaultSettings = {
     sellTypeGlyph = false,
     sellTypeMisc = false,
     -- Tracks whether we've performed the one-time CVar defaults application
-    -- (Font Rendering enabled, Stance Patch enabled). See cvar_options.lua.
+    -- (Font Rendering enabled). See cvar_options.lua.
     cvarInitialDefaultsApplied = false,
+}
+
+-- Settings nothing reads anymore (their options were removed from the panel):
+-- cleared from the saved profile on load so they stop piling up.
+local retiredSettings = {
+    "hideLevelUpFrame", "noPerkFadeAnimations", "noRerollConfirm", "perkDirectBanish",
+    "nameplatesEnabled", "nameplatesClassColor", "nameplatesShowLevel", "nameplatesCastBar",
+    "nameplatesHealthFormat", "nameplatesBarWidth", "nameplatesBarHeight", "nameplatesFontSize",
 }
 
 function OptionsService:Initialize()
@@ -108,6 +97,10 @@ function OptionsService:Initialize()
     if not ProjectEbonholdDB.settings.rerollAutoRepopulateMigrated then
         ProjectEbonholdDB.settings.rerollAutoRepopulate = true
         ProjectEbonholdDB.settings.rerollAutoRepopulateMigrated = true
+    end
+
+    for _, key in ipairs(retiredSettings) do
+        ProjectEbonholdDB.settings[key] = nil
     end
 
     return ProjectEbonholdDB.settings

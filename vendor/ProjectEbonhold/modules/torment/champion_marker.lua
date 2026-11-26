@@ -53,7 +53,8 @@ local function MarkerOf(plate)
     return m
 end
 
--- nameplate_dots.lua puts its debuff row above this icon on a champion's plate.
+-- Whether a plate shows the champion icon (was read by nameplate_dots.lua, removed 2026-11-12
+-- when DragonUI's nameplates replaced ours; kept as a cheap query).
 ProjectEbonhold = ProjectEbonhold or {}
 function ProjectEbonhold.IsChampionPlate(plate)
     local m = markers[plate]

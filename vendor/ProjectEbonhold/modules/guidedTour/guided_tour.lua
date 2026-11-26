@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Guided tour factory: zone-by-zone walkthrough (next/next/got-it) built on
 -- GlowBoxTemplate. Extracted from the Echo Journal's merged-Echoes-tab tour so
 -- any UI (perk prompt, Run HUD, ...) can declare one from a step list.
@@ -84,7 +85,7 @@ function Tour:EnsureFrames()
     box.StepText = box:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     box.StepText:SetPoint("BOTTOMLEFT", 16, 16)
 
-    box.NextBtn = ShrinkButtonFont(utils.CreateSimpleCustomButton(box, "Next", nil, 70, 20))
+    box.NextBtn = ShrinkButtonFont(utils.CreateSimpleCustomButton(box, L["Next"], nil, 70, 20))
     box.NextBtn:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -12, 12)
 
     -- X = skip the rest; like finishing, it never comes back
@@ -132,7 +133,7 @@ function Tour:ShowStep(i)
     -- a one-step tip (the Run HUD's) needs no "1/1"
     box.StepText:SetText(#steps > 1 and (i .. "/" .. #steps) or "")
     local last = (i == #steps)
-    box.NextBtn:SetText(last and "Got it" or "Next")
+    box.NextBtn:SetText(last and L["Got it"] or L["Next"])
     box.NextBtn:SetScript("OnClick", function()
         if last then self:Stop(true) else self:ShowStep(i + 1) end
     end)

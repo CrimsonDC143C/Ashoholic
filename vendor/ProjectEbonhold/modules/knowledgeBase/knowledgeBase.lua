@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local ADDON_NAME = "ProjectEbonhold"
 
 
@@ -7,9 +8,9 @@ local itemRecoveryFrame
 
 StaticPopupDialogs["CONFIRM_GM_TICKET"] = {
     text =
-    "|cFFFF0000WARNING:|r If you encountered a bug, please report it on our Discord or website.\n\nDo you really want to contact a GM?",
-    button1 = "Yes, contact a GM",
-    button2 = "Cancel",
+    L["|cFFFF0000WARNING:|r If you encountered a bug, please report it on our Discord or website.\n\nDo you really want to contact a GM?"],
+    button1 = L["Yes, contact a GM"],
+    button2 = CANCEL,
     OnAccept = function()
         if HelpFrame_ShowFrame then
             HelpFrame_ShowFrame("OpenTicket")
@@ -131,7 +132,7 @@ local function CreateCustomKnowledgeBase()
 
     local title = customKBFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", customKBFrame, "TOP", 0, -24)
-    title:SetText("Help & Support")
+    title:SetText(L["Help & Support"])
     title:SetTextColor(1, 0.82, 0)
 
 
@@ -146,7 +147,7 @@ local function CreateCustomKnowledgeBase()
     instructionText:SetJustifyH("CENTER")
     instructionText:SetSpacing(5)
     instructionText:SetText(
-        "If you are experiencing any issue in-game, such as bugs, problems with classes or spells, or items not working properly, please visit our website and report it through the bug tracker.\n\nOnly use the button below if you specifically need to speak with a GM.")
+        L["If you are experiencing any issue in-game, such as bugs, problems with classes or spells, or items not working properly, please visit our website and report it through the bug tracker.\n\nOnly use the button below if you specifically need to speak with a GM."])
     instructionText:SetTextColor(1, 1, 1, 1)
 
 
@@ -156,7 +157,7 @@ local function CreateCustomKnowledgeBase()
     customKBFrame.buttonContainer = buttonContainer
 
 
-    local openTicketButton = utils.CreateSimpleCustomButton(buttonContainer, "Open GM Ticket", function()
+    local openTicketButton = utils.CreateSimpleCustomButton(buttonContainer, L["Open GM Ticket"], function()
         if haveResponse then
             customKBFrame:Hide()
             StaticPopup_Show("GM_RESPONSE_MUST_RESOLVE_RESPONSE")
@@ -171,7 +172,7 @@ local function CreateCustomKnowledgeBase()
     customKBFrame.openTicketButton = openTicketButton
 
 
-    local editTicketButton = utils.CreateSimpleCustomButton(buttonContainer, "Edit Ticket", function()
+    local editTicketButton = utils.CreateSimpleCustomButton(buttonContainer, L["Edit Ticket"], function()
         customKBFrame:Hide()
         if HelpFrame_ShowFrame then
             HelpFrame_ShowFrame("OpenTicket")
@@ -187,7 +188,7 @@ local function CreateCustomKnowledgeBase()
     customKBFrame.editTicketButton = editTicketButton
 
 
-    local abandonTicketButton = utils.CreateSimpleCustomButton(buttonContainer, "Abandon Ticket", function()
+    local abandonTicketButton = utils.CreateSimpleCustomButton(buttonContainer, L["Abandon Ticket"], function()
         StaticPopup_Show("HELP_TICKET_ABANDON_CONFIRM")
         customKBFrame:Hide()
     end, 240, 45)
@@ -196,7 +197,7 @@ local function CreateCustomKnowledgeBase()
     customKBFrame.abandonTicketButton = abandonTicketButton
 
 
-    local viewResponseButton = utils.CreateSimpleCustomButton(buttonContainer, "View GM Response", function()
+    local viewResponseButton = utils.CreateSimpleCustomButton(buttonContainer, L["View GM Response"], function()
         customKBFrame:Hide()
         if HelpFrame_ShowFrame then
             HelpFrame_ShowFrame("GMResponse")
@@ -209,7 +210,7 @@ local function CreateCustomKnowledgeBase()
     customKBFrame.viewResponseButton = viewResponseButton
 
 
-    local itemRecoveryButton = utils.CreateSimpleCustomButton(buttonContainer, "Item Recovery", function()
+    local itemRecoveryButton = utils.CreateSimpleCustomButton(buttonContainer, L["Item Recovery"], function()
         ShowItemRecoveryFrame()
     end, 240, 45)
     itemRecoveryButton:SetPoint("BOTTOM", buttonContainer, "BOTTOM", 0, 55)
@@ -234,9 +235,9 @@ local function CreateCustomKnowledgeBase()
 
     unlockButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Unstuck", 1, 1, 1)
-        GameTooltip:AddLine("Click to unstuck your character.", 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine("Only works if you are stuck below the map or as a ghost.", 1, 0.5, 0, true)
+        GameTooltip:SetText(L["Unstuck"], 1, 1, 1)
+        GameTooltip:AddLine(L["Click to unstuck your character."], 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L["Only works if you are stuck below the map or as a ghost."], 1, 0.5, 0, true)
         GameTooltip:Show()
     end)
 
@@ -285,11 +286,11 @@ local function CreateItemRecoveryFrame()
 
     local title = itemRecoveryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", itemRecoveryFrame, "TOP", 0, -24)
-    title:SetText("Item Recovery")
+    title:SetText(L["Item Recovery"])
     title:SetTextColor(1, 0.82, 0)
 
 
-    local backButton = utils.CreateSimpleCustomButton(itemRecoveryFrame, "Back", function()
+    local backButton = utils.CreateSimpleCustomButton(itemRecoveryFrame, L["Back"], function()
         itemRecoveryFrame:Hide()
         ShowCustomKnowledgeBase()
     end, 100, 32)
@@ -313,12 +314,13 @@ local function CreateItemRecoveryFrame()
     local searchLabel = itemRecoveryFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     searchLabel:SetPoint("BOTTOM", searchBox, "TOP", 0, 5)
     searchLabel:SetText(
-    "View and recover up to 100 items you've previously deleted or sold. Use the search box to filter items by name.")
+    L["View and recover up to 100 items you've previously deleted or sold. Use the search box to filter items by name."])
     searchLabel:SetWidth(400)
     searchLabel:SetTextColor(0.7, 0.7, 0.7)
 
     local scrollFrame = CreateFrame("ScrollFrame", "ItemRecoveryScrollFrame", itemRecoveryFrame,
         "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scrollFrame)  -- DragonUI's scroll bar (utils.lua)
     scrollFrame:SetPoint("TOPLEFT", searchBox, "BOTTOMLEFT", -90, -20)
     scrollFrame:SetPoint("BOTTOMRIGHT", itemRecoveryFrame, "BOTTOMRIGHT", -30, 20)
 
@@ -392,7 +394,7 @@ function UpdateItemList(items)
             row.costText:SetWidth(60)
 
 
-            row.recoveryButton = utils.CreateSimpleCustomButton(row, "Recover", nil, 90, 28)
+            row.recoveryButton = utils.CreateSimpleCustomButton(row, L["Recover"], nil, 90, 28)
             row.recoveryButton:SetPoint("RIGHT", row, "RIGHT", -5, 0)
 
             table.insert(itemRows, row)

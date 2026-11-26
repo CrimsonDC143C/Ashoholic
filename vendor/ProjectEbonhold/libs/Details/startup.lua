@@ -715,7 +715,16 @@ function _G._detalhes:Start()
 	end
 
 	--> open profiler
-	_detalhes:OpenProfiler()
+	--> Ashendor: no "select an existing profile" popup on a new character; it simply gets its own
+	--> profile. /run _detalhes:OpenProfiler() is still there, the options' Profiles tab too.
+	--_detalhes:OpenProfiler()
+
+	--> Ashendor: Details! starts hidden. Only on the character's first run with Details (its own
+	--> fresh profile): the closed state is then saved on logout like any window the player closes,
+	--> so a player who opens it (minimap button, /details show) keeps it open.
+	if (_detalhes.character_first_run) then
+		_detalhes:ShutDownAllInstances()
+	end
 
 	--> start announcers
 	_detalhes:StartAnnouncers()

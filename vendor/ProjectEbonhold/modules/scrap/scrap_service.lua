@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 local CHAT_PREFIX = "|cff00ff00[Project Ebonhold]|r "
@@ -189,7 +190,7 @@ local function BuildSellRulesBody()
     table.sort(never)
     table.sort(always)
 
-    return string.format("q:%d|t:%d|all:%d|never:%s|always:%s",
+    return string.format(L["q:%d|t:%d|all:%d|never:%s|always:%s"],
         q, t, GetSetting("sellEverything") and 1 or 0,
         table.concat(never, ","), table.concat(always, ","))
 end
@@ -212,23 +213,23 @@ local function ToggleItemRule(link)
         db.neverSell[itemID] = not db.neverSell[itemID] or nil
         if DEFAULT_CHAT_FRAME then
             if db.neverSell[itemID] then
-                DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. link .. " is now |cff00ff00protected|r and will never be sold.")
+                DEFAULT_CHAT_FRAME:AddMessage(T("{CHATPREFIX}{link} is now |cff00ff00protected|r and will never be sold.", { CHATPREFIX = CHAT_PREFIX, link = link }))
             else
-                DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. link .. " is no longer protected.")
+                DEFAULT_CHAT_FRAME:AddMessage(T("{CHATPREFIX}{link} is no longer protected.", { CHATPREFIX = CHAT_PREFIX, link = link }))
             end
         end
     elseif quality <= 3 then
         db.alwaysSell[itemID] = not db.alwaysSell[itemID] or nil
         if DEFAULT_CHAT_FRAME then
             if db.alwaysSell[itemID] then
-                DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. link .. " will now |cffff5555always be sold|r with your junk.")
+                DEFAULT_CHAT_FRAME:AddMessage(T("{CHATPREFIX}{link} will now |cffff5555always be sold|r with your junk.", { CHATPREFIX = CHAT_PREFIX, link = link }))
             else
-                DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. link .. " removed from the always-sell list.")
+                DEFAULT_CHAT_FRAME:AddMessage(T("{CHATPREFIX}{link} removed from the always-sell list.", { CHATPREFIX = CHAT_PREFIX, link = link }))
             end
         end
     else
         if DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. "Epic and higher quality items cannot be marked for automatic sale.")
+            DEFAULT_CHAT_FRAME:AddMessage(T("{CHATPREFIX}Epic and higher quality items cannot be marked for automatic sale.", { CHATPREFIX = CHAT_PREFIX }))
         end
     end
 
@@ -257,10 +258,10 @@ GameTooltip:HookScript("OnTooltipSetItem", function(self)
 
     local db = GetScrapDB()
     if db.neverSell[itemID] then
-        self:AddLine("Protected: never sold as junk (Alt-click to unmark)", 0.1, 1, 0.1)
+        self:AddLine(L["Protected: never sold as junk (Alt-click to unmark)"], 0.1, 1, 0.1)
         self:Show()
     elseif db.alwaysSell[itemID] then
-        self:AddLine("Always sold with junk (Alt-click to unmark)", 1, 0.35, 0.35)
+        self:AddLine(L["Always sold with junk (Alt-click to unmark)"], 1, 0.35, 0.35)
         self:Show()
     end
 end)

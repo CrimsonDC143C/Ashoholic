@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 --[[
 Item Purchase Popup - Custom popup with affix selection
 --]]
@@ -10,7 +11,7 @@ local Addon = select(2, ...)
 
 -- Liste des affixes disponibles (exemple - à adapter selon votre serveur)
 local AVAILABLE_AFFIXES = {
-    { id = 1, name = "Plague Blessing", description = "Your attacks have a chance to infect the target, dealing Shadow damage every 3 sec for 15 sec. If the target dies before the effect expires, the infection spreads to a nearby enemy, retaining its remaining duration.", color = "|cffFF4500" },
+    { id = 1, name = L["Plague Blessing"], description = L["Your attacks have a chance to infect the target, dealing Shadow damage every 3 sec for 15 sec. If the target dies before the effect expires, the infection spreads to a nearby enemy, retaining its remaining duration."], color = "|cffFF4500" },
 }
 
 ------------------------------------------------------------
@@ -43,7 +44,7 @@ PurchasePopup:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
 -- Title (simple)
 local title = PurchasePopup:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 title:SetPoint("TOP", PurchasePopup, "TOP", 0, -12)
-title:SetText("Confirm Purchase")
+title:SetText(L["Confirm Purchase"])
 
 -- Item Icon avec bordure simple et tooltip
 local iconBorder = CreateFrame("Button", nil, PurchasePopup)
@@ -98,7 +99,7 @@ separator:SetPoint("TOPLEFT", iconBorder, "BOTTOMLEFT", 0, -20)
 -- Affix Selection Label
 local affixLabel = PurchasePopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 affixLabel:SetPoint("TOPLEFT", separator, "BOTTOMLEFT", 0, -15)
-affixLabel:SetText("Select Affix:")
+affixLabel:SetText(L["Select Affix:"])
 
 -- Dropdown pour les affixes
 local affixDropdown = CreateFrame("Frame", "ItemPurchaseAffixDropdown", PurchasePopup, "UIDropDownMenuTemplate")
@@ -111,7 +112,7 @@ affixDescription:SetPoint("TOPLEFT", affixLabel, "BOTTOMLEFT", 0, -15)
 affixDescription:SetJustifyH("LEFT")
 affixDescription:SetWidth(360)
 affixDescription:SetTextColor(0.7, 0.7, 0.7, 1)
-affixDescription:SetText("No additional effects")
+affixDescription:SetText(L["No additional effects"])
 PurchasePopup.affixDescription = affixDescription
 
 -- Variable pour stocker l'affixe sélectionné
@@ -156,7 +157,7 @@ PurchasePopup.selectedAffix = 0 -- S'assurer que la valeur par défaut est bien 
 local confirmBtn = CreateFrame("Button", nil, PurchasePopup, "UIPanelButtonTemplate")
 confirmBtn:SetSize(120, 25)
 confirmBtn:SetPoint("BOTTOM", PurchasePopup, "BOTTOM", -65, 15)
-confirmBtn:SetText("Confirm")
+confirmBtn:SetText(L["Confirm"])
 confirmBtn:SetScript("OnClick", function()
     -- Appeler la fonction d'achat avec l'affixe sélectionné
     if PurchasePopup.onConfirm then
@@ -169,7 +170,7 @@ end)
 local cancelBtn = CreateFrame("Button", nil, PurchasePopup, "UIPanelButtonTemplate")
 cancelBtn:SetSize(120, 25)
 cancelBtn:SetPoint("BOTTOM", PurchasePopup, "BOTTOM", 65, 15)
-cancelBtn:SetText("Cancel")
+cancelBtn:SetText(CANCEL)
 cancelBtn:SetScript("OnClick", function()
     PurchasePopup:Hide()
 end)
@@ -207,7 +208,7 @@ function PurchasePopup:ShowPurchase(itemButton, quantity)
 
     -- Afficher l'icône et le nom
     self.itemIcon:SetTexture(itemTexture)
-    self.itemName:SetText(format("|c%02x%02x%02x%02x%s|r", 255, r * 255, g * 255, b * 255, itemNameText or "Unknown Item"))
+    self.itemName:SetText(format("|c%02x%02x%02x%02x%s|r", 255, r * 255, g * 255, b * 255, itemNameText or L["Unknown Item"]))
 
     -- Colorer la bordure de l'icône selon la qualité
     self.iconBorder:SetBackdropBorderColor(r, g, b, 1)
@@ -221,13 +222,13 @@ function PurchasePopup:ShowPurchase(itemButton, quantity)
 
     if honorPoints and honorPoints > 0 then
         costString = costString ..
-        format("|TInterface\\PVPFrame\\PVP-Currency-Alliance:0:0:0:-1|t %d Honor", honorPoints * quantity)
+        format(L["|TInterface\\PVPFrame\\PVP-Currency-Alliance:0:0:0:-1|t %d Honor"], honorPoints * quantity)
     end
 
     if arenaPoints and arenaPoints > 0 then
         if costString ~= "" then costString = costString .. "\n" end
         costString = costString ..
-        format("|TInterface\\PVPFrame\\PVP-ArenaPoints-Icon:0:0:0:-1|t %d Arena Points", arenaPoints * quantity)
+        format(L["|TInterface\\PVPFrame\\PVP-ArenaPoints-Icon:0:0:0:-1|t %d Arena Points"], arenaPoints * quantity)
     end
 
     -- Items requis
@@ -240,7 +241,7 @@ function PurchasePopup:ShowPurchase(itemButton, quantity)
     end
 
     if quantity > 1 then
-        costString = "Quantity: " .. quantity .. "\n" .. costString
+        costString = T("Quantity: {quantity}\n{costString}", { quantity = quantity, costString = costString })
     end
 
     self.costInfo:SetText(costString)
@@ -309,4 +310,4 @@ function MerchantFrame_ConfirmExtendedItemCost(itemButton, quantity)
     PurchasePopup:ShowPurchase(itemButton, quantity)
 end
 
-print("|cff00FF00[ProjectEbonhold]|r Item Purchase with Affix Selection loaded.")
+print(L["|cff00FF00[ProjectEbonhold]|r Item Purchase with Affix Selection loaded."])

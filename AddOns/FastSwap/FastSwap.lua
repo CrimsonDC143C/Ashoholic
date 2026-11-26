@@ -102,6 +102,12 @@ local function Print(msg)
     end
 end
 
+function FastSwap_IsHookReady()
+    if not GetCVar then return false end
+    local ok, revision = pcall(GetCVar, "fastSwapGlueRevision")
+    return ok and revision == "2"
+end
+
 local function Trim(str)
     if type(str) ~= "string" then
         return ""
@@ -254,6 +260,13 @@ local function PerformSwap(target)
             displayTarget = charName
             break
         end
+    end
+
+    -- The hook registers this revision CVar at the character-select screen. If it
+    -- is missing, warn but still swap: the game can hide glue-registered CVars,
+    -- so the check alone is not proof that selection will fail.
+    if not FastSwap_IsHookReady() then
+        Print("|cffffd100Character-selection hook not detected. If you stay on character selection, run Sync-FastSwapGlue.ps1 from the installed FastSwap folder with WoW closed.|r")
     end
 
     -- 1. Allocate a fresh RegisterCVar slot whose defaultValue is displayTarget

@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addon, Addon = ...
 
 
@@ -62,7 +63,7 @@ local function CreateDeathFrame()
     local title = deathFrame:CreateFontString(nil, "OVERLAY",
         "GameFontNormalLarge")
     title:SetPoint("TOP", deathFrame, "TOP", 0, -50)
-    title:SetText("You are dead")
+    title:SetText(ProjectEbonhold.L["You are dead"])
     title:SetTextColor(1, 0.2, 0.2)
     deathFrame.title = title
 
@@ -75,9 +76,9 @@ local function CreateDeathFrame()
 
     deathFrame.buttons = {}
 
-    -- The recap panel rides along with the death frame. Every confirmation popup and the item
-    -- selection frame hide and re-show the death frame, so hooking visibility keeps the two in
-    -- sync without touching each of those call sites.
+    -- The recap panel rides along with the death frame. Every confirmation popup hides and
+    -- re-shows the death frame, so hooking visibility keeps the two in sync without touching
+    -- each of those call sites.
     deathFrame:SetScript("OnShow", function()
         if ProjectEbonhold.DeathRecap then
             ProjectEbonhold.DeathRecap.ShowForDeathFrame()
@@ -148,7 +149,7 @@ local function ShowConfirmationPopup(title, message, onConfirm)
     local yesButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
     yesButton:SetSize(100, 30)
     yesButton:SetPoint("BOTTOM", popup, "BOTTOM", -60, 25)
-    yesButton:SetText("Yes")
+    yesButton:SetText(YES)
     yesButton:SetFrameStrata("FULLSCREEN_DIALOG")
     yesButton:SetFrameLevel(1100)
     yesButton:SetScript("OnClick", function()
@@ -162,7 +163,7 @@ local function ShowConfirmationPopup(title, message, onConfirm)
     local noButton = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
     noButton:SetSize(100, 30)
     noButton:SetPoint("BOTTOM", popup, "BOTTOM", 60, 25)
-    noButton:SetText("No")
+    noButton:SetText(NO)
     noButton:SetFrameStrata("FULLSCREEN_DIALOG")
     noButton:SetFrameLevel(1100)
     noButton:SetScript("OnClick", function()
@@ -175,459 +176,10 @@ local function ShowConfirmationPopup(title, message, onConfirm)
 end
 
 
-local function GetAllPlayerItems()
-    local items = {}
-
-    local slotNames = {
-        [1] = "Head",
-        [2] = "Neck",
-        [3] = "Shoulder",
-        [5] = "Chest",
-        [6] = "Waist",
-        [7] = "Legs",
-        [8] = "Feet",
-        [9] = "Wrist",
-        [10] = "Hands",
-        [11] = "Finger 1",
-        [12] = "Finger 2",
-        [13] = "Trinket 1",
-        [14] = "Trinket 2",
-        [15] = "Back",
-        [16] = "Main Hand",
-        [17] = "Off Hand",
-        [18] = "Ranged",
-        [19] = "Tabard"
-    }
-
-    for slot = 0, 19 do
-        local itemLink = GetInventoryItemLink("player", slot)
-        if itemLink then
-            local itemTexture = GetInventoryItemTexture("player", slot)
-            local itemName, _, itemRarity, _, _, _, _, _, _, _, sellPrice = GetItemInfo(itemLink)
-
-
-            local itemEntry = itemLink:match("item:(%d+)")
-            itemEntry = tonumber(itemEntry) or 0
-
-            if itemName and itemEntry > 0 then
-                local isLowQuality = (itemRarity or 0) <= 1
-                local hasNoSellValue = (sellPrice or 0) == 1
-
-                if not (isLowQuality and hasNoSellValue) then
-                    table.insert(items, {
-                        link = itemLink,
-                        name = itemName,
-                        count = 1,
-                        texture = itemTexture,
-                        rarity = itemRarity or 0,
-                        slot = slot,
-                        slotName = slotNames[slot] or "Slot " .. slot,
-                        itemEntry = itemEntry
-                    })
-                end
-            end
-        end
-    end
-    return items
-end
-
-
-local function HasEnoughInventorySpace()
-    local freeSlots = 0
-    for bag = 0, 4 do
-        local numFreeSlots = GetContainerNumFreeSlots(bag)
-        freeSlots = freeSlots + (numFreeSlots or 0)
-    end
-
-    -- Compter le nombre d'items équipés qui vont être récupérés
-    local equippedItems = GetAllPlayerItems()
-    local neededSlots = #equippedItems
-
-    -- On a assez d'espace si le nombre de slots libres >= nombre d'items équipés
-    local hasSpace = freeSlots >= neededSlots
-
-    return freeSlots, hasSpace
-end
-
-
 local function ResetEchoesDisplay()
     if ProjectEbonhold.PlayerRunUI and ProjectEbonhold.PlayerRunUI.UpdateGrantedPerks then
         ProjectEbonhold.PlayerRunUI.UpdateGrantedPerks(true)
     end
-end
-
-
-local itemSelectionFrame = nil
-
-
-local function CreateItemSelectionFrame()
-    if itemSelectionFrame then return itemSelectionFrame end
-
-    local frame = CreateFrame("Frame", "ProjectEbonholdItemSelectionFrame", UIParent)
-    frame:SetSize(320, 450)
-    frame:SetPoint("CENTER", 0, 0)
-    frame:SetFrameStrata("DIALOG")
-    frame:SetFrameLevel(101)
-    frame:EnableMouse(true)
-    frame:SetMovable(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-
-
-    local dynamicBg = utils.CreateDeathFrameBackground(frame, 320, 450)
-    dynamicBg:SetPoint("CENTER", frame, "CENTER", 0, 0)
-    frame.dynamicBackground = dynamicBg
-
-
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", frame, "TOP", 0, -50)
-    title:SetText("You don't have enough space")
-    title:SetTextColor(1, 0.2, 0.2)
-    frame.title = title
-
-
-    local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    subtitle:SetPoint("TOP", title, "BOTTOM", 0, -10)
-    subtitle:SetText("Please select which item you want to keep,\nor make space in your bag")
-    subtitle:SetTextColor(1, 1, 1, 0.7)
-    subtitle:SetJustifyH("CENTER")
-    frame.subtitle = subtitle
-
-
-    local scrollFrame = CreateFrame("ScrollFrame", "ProjectEbonholdItemScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 20, -110)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -40, 120)
-
-    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(400, 1)
-    scrollFrame:SetScrollChild(scrollChild)
-    frame.scrollChild = scrollChild
-
-
-    local buttonFrame = CreateFrame("Frame", nil, frame)
-    buttonFrame:SetSize(300, 100)
-    buttonFrame:SetPoint("BOTTOM", 0, 10)
-
-
-    local confirmBtn = utils.CreateSimpleCustomButton(buttonFrame, "Confirm Selection", nil, 250, 45)
-    confirmBtn:SetPoint("TOP", 0, 0)
-    frame.confirmButton = confirmBtn
-
-
-    local cancelBtn = utils.CreateSimpleCustomButton(buttonFrame, "Cancel", function()
-        frame:Hide()
-        if deathFrame then deathFrame:Show() end
-    end, 250, 45)
-    cancelBtn:SetPoint("TOP", confirmBtn, "BOTTOM", 0, -5)
-
-    frame.itemRows = {}
-
-
-    for i = 1, 20 do
-        local row = CreateFrame("Frame", nil, scrollChild)
-        row:SetSize(420, 30)
-
-
-        local checkbox = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
-        checkbox:SetSize(24, 24)
-        checkbox:SetPoint("LEFT", 5, 0)
-        row.checkbox = checkbox
-
-
-        local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(24, 24)
-        icon:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
-        row.icon = icon
-
-
-        local name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        name:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-        row.name = name
-
-
-        row:SetScript("OnEnter", function(self)
-            if self.itemLink then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetHyperlink(self.itemLink)
-                GameTooltip:Show()
-            end
-        end)
-        row:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-
-
-        row:EnableMouse(true)
-        row:SetScript("OnMouseDown", function(self)
-            self.checkbox:SetChecked(not self.checkbox:GetChecked())
-        end)
-
-        row:Hide()
-        table.insert(frame.itemRows, row)
-    end
-
-    -- A dead player cannot reach a vendor: this opens the list of bag items he can sell from here.
-    local sellBtn = utils.CreateSimpleCustomButton(frame, "Sell bag items", function()
-        if ProjectEbonhold.DeathSellFrame then ProjectEbonhold.DeathSellFrame.Toggle(frame) end
-    end, 150, 26)
-    sellBtn:SetPoint("TOP", frame, "TOP", 0, -18)
-    frame.sellButton = sellBtn
-
-    frame:SetScript("OnHide", function()
-        if ProjectEbonhold.DeathSellFrame then ProjectEbonhold.DeathSellFrame.Hide() end
-    end)
-
-    frame:Hide()
-    itemSelectionFrame = frame
-    return frame
-end
-
-
--- Selling while dead (owner, 2026-10-22): at accept death the worn gear goes to the bags, and a
--- full bag means losing pieces. The player is a corpse and cannot walk to a vendor, so the bag
--- items with a vendor price are listed here and sold one click at a time (server:
--- ItemsManager::SellBagItemWhileDead, dead players only). Selling only, no buying or repair.
-do
-    local ROW_HEIGHT = 26
-    local sellFrame
-
-    local function CollectSellableItems()
-        local list = {}
-        for bag = 0, 4 do
-            for slot = 1, (GetContainerNumSlots(bag) or 0) do
-                local link = GetContainerItemLink(bag, slot)
-                if link then
-                    local texture, count, locked = GetContainerItemInfo(bag, slot)
-                    local name, _, rarity, _, _, _, _, _, _, _, sellPrice = GetItemInfo(link)
-                    local entry = tonumber(link:match("item:(%d+)")) or 0
-                    if name and entry > 0 and (sellPrice or 0) > 0 and not locked then
-                        table.insert(list, {
-                            bag = bag, slot = slot, entry = entry, link = link, name = name,
-                            texture = texture, count = count or 1, rarity = rarity or 1,
-                            price = sellPrice * (count or 1),
-                        })
-                    end
-                end
-            end
-        end
-        table.sort(list, function(a, b) return a.price < b.price end)
-        return list
-    end
-
-    local function CreateRow(parent, index)
-        local row = CreateFrame("Button", nil, parent)
-        row:SetSize(250, ROW_HEIGHT)
-        row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_HEIGHT)
-        row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-
-        row.icon = row:CreateTexture(nil, "ARTWORK")
-        row.icon:SetSize(22, 22)
-        row.icon:SetPoint("LEFT", 2, 0)
-
-        row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        row.name:SetPoint("LEFT", row.icon, "RIGHT", 5, 0)
-        row.name:SetWidth(120)
-        row.name:SetJustifyH("LEFT")
-
-        row.price = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        row.price:SetPoint("RIGHT", -2, 0)
-        row.price:SetJustifyH("RIGHT")
-
-        row:SetScript("OnEnter", function(self)
-            if self.item then
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:SetHyperlink(self.item.link)
-                GameTooltip:AddLine("Click to sell.", 0.4, 1, 0.4)
-                GameTooltip:Show()
-            end
-        end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        row:SetScript("OnClick", function(self)
-            local item = self.item
-            if not item or not UnitIsDeadOrGhost("player") then return end
-            ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_DEATH_SELL_ITEM,
-                item.bag .. "," .. item.slot .. "," .. item.entry)
-            self:Disable()
-            self:SetAlpha(0.4)
-        end)
-        return row
-    end
-
-    local function Refresh()
-        if not sellFrame or not sellFrame:IsShown() then return end
-        local items = CollectSellableItems()
-        for i, item in ipairs(items) do
-            local row = sellFrame.rows[i] or CreateRow(sellFrame.scrollChild, i)
-            sellFrame.rows[i] = row
-            row.item = item
-            row.icon:SetTexture(item.texture)
-            local label = item.count > 1 and (item.name .. " x" .. item.count) or item.name
-            row.name:SetText(label)
-            local r, g, b = GetItemQualityColor(item.rarity)
-            row.name:SetTextColor(r, g, b)
-            row.price:SetText(GetCoinTextureString(item.price))
-            row:Enable()
-            row:SetAlpha(1)
-            row:Show()
-        end
-        for i = #items + 1, #sellFrame.rows do
-            sellFrame.rows[i].item = nil
-            sellFrame.rows[i]:Hide()
-        end
-        sellFrame.scrollChild:SetHeight(math.max(1, #items * ROW_HEIGHT))
-        if #items == 0 then sellFrame.empty:Show() else sellFrame.empty:Hide() end
-    end
-
-    local function Create()
-        local f = CreateFrame("Frame", "ProjectEbonholdDeathSellFrame", UIParent)
-        f:SetSize(300, 450)
-        f:SetFrameStrata("DIALOG")
-        f:SetFrameLevel(101)
-        f:EnableMouse(true)
-
-        local bg = utils.CreateDeathFrameBackground(f, 300, 450)
-        bg:SetPoint("CENTER", f, "CENTER", 0, 0)
-
-        local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        title:SetPoint("TOP", f, "TOP", 0, -50)
-        title:SetText("Sell bag items")
-
-        local hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        hint:SetPoint("TOP", title, "BOTTOM", 0, -8)
-        hint:SetWidth(240)
-        hint:SetText("Click an item to sell it at its vendor price.")
-        hint:SetTextColor(1, 1, 1, 0.7)
-
-        local scroll = CreateFrame("ScrollFrame", "ProjectEbonholdDeathSellScroll", f, "UIPanelScrollFrameTemplate")
-        scroll:SetPoint("TOPLEFT", 20, -100)
-        scroll:SetPoint("BOTTOMRIGHT", -40, 70)
-        local child = CreateFrame("Frame", nil, scroll)
-        child:SetSize(250, 1)
-        scroll:SetScrollChild(child)
-        f.scrollChild = child
-        f.rows = {}
-
-        f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-        f.empty:SetPoint("TOP", scroll, "TOP", 0, -20)
-        f.empty:SetText("Nothing to sell.")
-
-        local close = utils.CreateSimpleCustomButton(f, "Close", function() f:Hide() end, 200, 40)
-        close:SetPoint("BOTTOM", 0, 20)
-
-        f:RegisterEvent("BAG_UPDATE")
-        f:SetScript("OnEvent", Refresh)
-        f:SetScript("OnShow", Refresh)
-        f:Hide()
-        return f
-    end
-
-    ProjectEbonhold.DeathSellFrame = {
-        Toggle = function(anchor)
-            sellFrame = sellFrame or Create()
-            if sellFrame:IsShown() then
-                sellFrame:Hide()
-                return
-            end
-            sellFrame:ClearAllPoints()
-            sellFrame:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 4, 0)
-            sellFrame:Show()
-        end,
-        Hide = function()
-            if sellFrame then sellFrame:Hide() end
-        end,
-    }
-end
-
-
-local function ShowItemSelectionFrame(items, freeSlots, onConfirm)
-    local frame = CreateItemSelectionFrame()
-
-
-    local function UpdateConfirmButton()
-        local currentFreeSlots = 0
-        for i = 0, 4 do
-            currentFreeSlots = currentFreeSlots + (GetContainerNumFreeSlots(i) or 0)
-        end
-
-        local selectedCount = 0
-        for i = 1, #items do
-            local row = frame.itemRows[i]
-            if row and row:IsShown() and row.checkbox:GetChecked() then
-                selectedCount = selectedCount + 1
-            end
-        end
-
-
-        if selectedCount > currentFreeSlots then
-            frame.confirmButton:Disable()
-            frame.confirmButton:SetAlpha(0.5)
-        else
-            frame.confirmButton:Enable()
-            frame.confirmButton:SetAlpha(1.0)
-        end
-    end
-
-
-    frame:SetScript("OnUpdate", function(self, elapsed)
-        if ProjectEbonhold_IsClosing then return end
-        elapsed = math.min(elapsed, 0.1) -- Cap elapsed to prevent freeze after alt-tab
-        self.timeSinceLastUpdate = (self.timeSinceLastUpdate or 0) + elapsed
-        if self.timeSinceLastUpdate >= 0.5 then
-            self.timeSinceLastUpdate = 0
-            UpdateConfirmButton()
-        end
-    end)
-
-
-    for _, row in ipairs(frame.itemRows) do
-        row:Hide()
-    end
-
-    local yOffset = -10
-    for i, item in ipairs(items) do
-        local row = frame.itemRows[i]
-        if row then
-            row:SetPoint("TOPLEFT", 5, yOffset)
-            row.checkbox:SetChecked(true)
-            row.icon:SetTexture(item.texture)
-            row.name:SetText("[" .. item.slotName .. "] " .. item.name)
-
-
-            local r, g, b = GetItemQualityColor(item.rarity)
-            row.name:SetTextColor(r, g, b)
-
-
-            row.checkbox:SetScript("OnClick", UpdateConfirmButton)
-
-            row.item = item
-            row.itemLink = item.link
-            row:Show()
-            yOffset = yOffset - 32
-        end
-    end
-
-
-    frame.scrollChild:SetHeight(math.max(1, #items * 32 + 20))
-
-
-    UpdateConfirmButton()
-
-
-    frame.confirmButton:SetScript("OnClick", function()
-        local selectedItems = {}
-        for i = 1, #items do
-            local row = frame.itemRows[i]
-            if row and row:IsShown() and row.checkbox:GetChecked() then
-                table.insert(selectedItems, row.item)
-            end
-        end
-        frame:Hide()
-        onConfirm(selectedItems)
-    end)
-
-    frame:Show()
-    if deathFrame then deathFrame:Hide() end
 end
 
 
@@ -680,10 +232,10 @@ function UpdateDeathFrameButtons()
 
     -- Blocked / stuck state: replace all options with a single Unstuck button
     if isPlayerBlocked then
-        deathFrame.title:SetText("|cFFFF4500You are stuck!|r")
+        deathFrame.title:SetText(L["|cFFFF4500You are stuck!|r"])
 
         local unstuckButton = CreateDeathButton("unstuck", deathFrame.buttonContainer,
-            "Unstuck", function()
+            L["Unstuck"], function()
                 ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_UNLOCK_PLAYER, "")
                 deathFrame:Hide()
             end)
@@ -716,7 +268,7 @@ function UpdateDeathFrameButtons()
             deathFrame.title:SetText(DeathTexts.frame.arenaTitle)
         else
             deathFrame.title:SetText(DeathTexts.frame.battlegroundTitle or
-                "You are dead")
+                ProjectEbonhold.L["You are dead"])
         end
 
         local releaseButton = CreateDeathButton("pvp_release",
@@ -748,48 +300,16 @@ function UpdateDeathFrameButtons()
             .acceptDeath(
                 soulPointsGain, soulShardsGain),
             function()
-                local freeSlots, hasSpace = HasEnoughInventorySpace()
-
-                if not hasSpace then
-                    local playerItems = GetAllPlayerItems()
-
-                    if #playerItems == 0 then
-                        ShowConfirmationPopup(DeathTexts.confirmations.acceptDeath.title,
-                            DeathTexts.confirmations.acceptDeath.message(soulPointsGain, soulShardsGain),
-                            function()
-                                ProjectEbonhold.PlayerRunService.AcceptDeath("")
-                                ResetEchoesDisplay()
-                                deathFrame:Hide()
-                            end)
-                    else
-                        ShowItemSelectionFrame(playerItems, freeSlots, function(selectedItems)
-                            local itemEntries = {}
-                            for _, item in ipairs(selectedItems) do
-                                if item.itemEntry then
-                                    table.insert(itemEntries, tostring(item.itemEntry))
-                                end
-                            end
-
-                            local itemData = table.concat(itemEntries, ",")
-
-                            ShowConfirmationPopup(DeathTexts.confirmations.acceptDeath.title,
-                                DeathTexts.confirmations.acceptDeath.message(soulPointsGain, soulShardsGain),
-                                function()
-                                    ProjectEbonhold.PlayerRunService.AcceptDeath(itemData)
-                                    ResetEchoesDisplay()
-                                    deathFrame:Hide()
-                                end)
-                        end)
-                    end
-                else
-                    ShowConfirmationPopup(DeathTexts.confirmations.acceptDeath.title,
-                        DeathTexts.confirmations.acceptDeath.message(soulPointsGain, soulShardsGain),
-                        function()
-                            ProjectEbonhold.PlayerRunService.AcceptDeath("")
-                            ResetEchoesDisplay()
-                            deathFrame:Hide()
-                        end)
-                end
+                -- Bug 4596 (owner, "mail overflow"): no bag-space check and no keep selection any
+                -- more. The server moves what the level-1 character cannot wear to the bags and
+                -- mails what does not fit; nothing is destroyed. The keep-list stays empty.
+                ShowConfirmationPopup(DeathTexts.confirmations.acceptDeath.title,
+                    DeathTexts.confirmations.acceptDeath.message(soulPointsGain, soulShardsGain),
+                    function()
+                        ProjectEbonhold.PlayerRunService.AcceptDeath("")
+                        ResetEchoesDisplay()
+                        deathFrame:Hide()
+                    end)
             end)
 
 

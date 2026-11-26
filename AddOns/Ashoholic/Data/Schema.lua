@@ -37,7 +37,7 @@
  Text in <angle brackets> below is an example, not a real key.
 
  AshoholicDB = {
-     schemaVersion = 3,              -- which version of this blueprint the data uses
+     schemaVersion = 7,              -- which version of this blueprint the data uses
      myAccountId   = "<random ID>",  -- the account this copy of the file belongs to
 
      accounts = {
@@ -45,6 +45,8 @@
              name       = "<alias>", -- the name shown in the UI; you can rename it
              currencies = { ... },   -- GROUP: account-wide currencies
              prestige   = { ... },   -- GROUP: account-wide Prestige progress
+             torment    = { ... },   -- GROUP: account-wide unlock evidence
+             warband    = { ... },   -- GROUP: account-wide Warband bank gold
              realms = {
                  ["<realm name>"] = {
                      ["<character name>"] = {
@@ -52,7 +54,7 @@
                          run        = { ... },   -- GROUP
                          contracts  = { ... },   -- GROUP: offerings and Soul Anchor
                          echoBuild  = { ... },   -- GROUP: active live Echo loadout
-                         torment    = { ... },   -- GROUP
+                         torment    = { ... },   -- GROUP: character-selected tier
                          raids      = { ... },   -- GROUP
                          activities = { ... },   -- GROUP
                          trials = {
@@ -91,9 +93,14 @@
 
  Rule 3 - When merging, the newer group wins, one group at a time.
    When data from another account or an imported file arrives, compare each
-   group's updatedAt. Keep whichever is newer. Never replace a whole character
-   at once. A copied group keeps its original updatedAt, so the UI always shows
-   how old the information really is.
+   group's updatedAt. Keep whichever is newer. Do not replace a whole character
+   at once, except when a newer basics group proves it is a different GUID.
+   A copied group keeps its original updatedAt, so the UI always shows how old
+   the information really is. Delayed local observations also cannot overwrite
+   a group with a newer observation time.
+   Exception: account Torment unlock evidence is a union of observed true
+   unlocks, with the newest observation time. Observing another character's
+   smaller achievement set must not erase the account's higher access.
 
  Rule 4 - Only Data/ writes AshoholicDB.
    Everything else hands values to Data/. This keeps all saving in one place.
@@ -152,7 +159,8 @@
  ------------------------------------------------------------------------------
 
  currencies
-   Stage 5's second slice collects this group, except warbandGold.
+   Stage 5's second slice collects this group. Warband bank gold has its own
+   group (warband, below) because it arrives from a different source.
    The server sends no balances at login (confirmed in-game). They reach
    Ashoholic in three ways:
      1) A server balance update after a balance changes (banking a run,
@@ -194,9 +202,6 @@
      essenceBanked     number  Soul Essence banked
      artisanSpendable  number  Artisan Soul you can spend
      artisanBanked     number  Artisan Soul banked
-     warbandGold       copper  Warband bank gold. ALWAYS nil for now:
-                               ProjectEbonhold keeps it in a private variable
-                               that other addons cannot read.
      updatedAt         time    when the balance update was observed
 
  prestige
@@ -221,6 +226,32 @@
    They are not saved. The UI shows currency requirements, not a promise that
    a Prestige is allowed while dead, in combat, or under other server rules.
 
+ warband   (Warband bank gold)
+   Source: the companion's extended-bank packets. ebonhold.dll delivers every
+           bank update to the companion's global function
+           ExtBank_OnPacket(hex); Ashoholic reads the same packet after it
+           with hooksecurefunc (Rule 5 c). The companion keeps the gold in a
+           private variable, so the packet is the only readable source.
+   Packets arrive only while the bank is used (opening it, moving items,
+   depositing or withdrawing gold), never at login, so the group stays nil
+   until this account's bank has been used with Ashoholic installed. One
+   Warband bank and its gold are shared by every character of the account.
+   Only the packet's tail is read: the gold (8 bytes) and the optional "open"
+   byte after it. A packet from an older server without the gold, or with
+   any unexpected layout, is ignored. Collectors/Currencies.lua starts
+   watching when Ashoholic loads; an older companion without the extended
+   bank leaves the group nil.
+   Every bank packet repeats the gold. When gold and unlocked are unchanged,
+   only updatedAt moves forward (a fresher confirmation) and the roster is not
+   redrawn; a new value replaces the whole group.
+     gold              copper  gold stored in the account's Warband bank
+     unlocked          boolean true when the server reports the Warband bank
+                               unlocked for this account, false when it reports
+                               it locked; nil when the packet had no open byte
+     updatedAt         time    when the latest bank packet was observed
+   Older saved data and synced accounts without this group stay valid: absent
+   means unknown, never 0 copper.
+
  ------------------------------------------------------------------------------
  CHARACTER GROUPS (one set per character)
  ------------------------------------------------------------------------------
@@ -234,9 +265,6 @@
      level             number  UnitLevel("player")
      gold              copper  GetMoney()
      location          string  GetRealZoneText()
-     itemLevel         number  equipped item level. The source is decided later:
-                               the Call Board's equipped item level or a
-                               calculation from worn gear. nil until then.
      updatedAt         time    also the roster's "Last seen", because basics
                                are only collected while the character is online
 
@@ -296,38 +324,49 @@
 
  torment
    Source: ProjectEbonhold.HardmodeService.
-   ProjectEbonhold checks Torment unlocks PER CHARACTER (through achievements).
    Wait for IsDifficultyKnown, and for the committed pool if any tier has an
    Ash gate. Observe HardmodeUI.Refresh and ACHIEVEMENT_EARNED. Repainting
    unchanged cached values does not advance the timestamp.
      currentTier       number  selected Torment difficulty
                                (GetCurrentDifficulty), NOT a party's temporary
                                instance difficulty. 1 = Normal; 2 = Torment I.
-     unlockedTiers     table   { [tier] = true } for each IsTierUnlocked result
      updatedAt         time
-   The highest unlocked tier is calculated for display. Keep the actual set:
-   one unlocked tier does not prove that every lower achievement was earned.
-   The progression view groups characters by account without claiming that
-   their unlocks are shared. Its ladder follows TormentLadderTop; higher,
-   instance-only tiers still retain their real names and selected values.
+   Only the selected difficulty belongs to the character. Unlock access is
+   shared by the account, even when the companion exposes achievement evidence
+   on individual characters. The same collector also saves account.torment:
+     unlockedTiers     table   union of observed { [tier] = true } results
+     updatedAt         time   newest contributing observation
+   Highest access is calculated from this shared set for every character.
+   Do not invent lower unlocks from a higher tier. The Progression ladder
+   follows TormentLadderTop; instance-only tiers retain their real names.
+   Migration 5 -> 6 moves existing unlock evidence to the owning account,
+   retaining each character's selected tier and original timestamp.
 
  raids
-   Source: ProjectEbonhold.RaidLockout.IsLooted(bossId), asked for every boss
-           in ProjectEbonhold.RaidLockoutData.
-     looted            table   { [bossId] = true } for bosses looted this week
-     resetAt           time    the weekly reset (Tuesday 03:00 UTC); after it,
-                               every boss is available again
+   Source: a complete SEND_RAID_LOOT_LOCKOUTS reply, also read by the
+           companion's RaidLockout service. The reply lists each looted boss
+           and its remaining lock time. Ashoholic observes it without
+           replacing the companion's handler or requesting data itself.
+     lockedUntil       table   { [bossId] = time } for each reported lock
      updatedAt         time
-   Dungeon lockouts have no source, so they are not saved and the UI shows
-   them as Unknown.
+   The group is nil until a complete reply arrives. Only then does an absent
+   or expired lock mean Available in that snapshot. Individual end times are
+   retained instead of assuming every server-provided timer is identical.
+   Dungeon names are a watchlist only; dungeon status remains Unknown.
 
  activities   (Hero's Call Board)
    Source: ProjectEbonhold.Callboard.OnChanged("board") and Callboard.board.
-           Only arrives after ProjectEbonhold receives the board (when the Call
-           Board is opened). Whether Ashoholic asks for it is decided in Stage 6.
+           Arrives after the companion receives the board, normally when the
+           Call Board is opened. Ashoholic observes it without a request.
+   The companion turns a missing number into 0. Ashoholic therefore leaves
+   category, cost and weeklyClaims out (nil) unless the server reported them,
+   and skips only an activity it cannot identify (no ID, an unknown cadence
+   or a repeated ID, keeping the first copy) instead of the whole board.
      cacheProgress     number  cache bar progress
      cacheRequired     number  progress needed for the next cache
      cachesOpened      number  caches opened
+     equippedItemLevel number  equipped item level from the Call Board header,
+                               nil if its field is missing or reports 0
      quests            table   { [questId] = {
                                    title       = string,
                                    cadence     = "daily", "weekly" or "once",
@@ -336,10 +375,46 @@
                                    state       = number (ProjectEbonhold's
                                                  Callboard.STATE value),
                                    accountWide = true or false,
+                                   category    = number or nil: the Call Board
+                                                 category ID (1 Dungeons,
+                                                 2 Raids, 3 Open World,
+                                                 4 Profession, 6 Other,
+                                                 7 Torment, 8 Frostveil =
+                                                 seasonal winter-event dailies,
+                                                 posted only while the event
+                                                 runs); nil when not reported,
+                                   cost        = copper or nil: what claiming
+                                                 the reward TAKES; nil means
+                                                 the board reported no cost
+                                                 (a free claim),
+                                   rewards     = { ash, shards, copper, artisan,
+                                                   orbs } (server amounts),
                                } }
      dailyResetAt      time    when daily quests reset
      weeklyResetAt     time    when weekly quests reset
+     weeklyClaims      number  contracts claimed this board week; nil unless
+                               a rail was saved (older servers send neither)
+     rail              table   the weekly reward rail, nil when the server sent
+                               none or it could not be stored completely:
+                               1 to 10 steps in climbing order,
+                               { { count = claims needed,
+                                   items = { { id = itemId,
+                                               name = string or nil }, ...
+                                             up to 4 } }, ... }
+                               Names are resolved when the board is observed
+                               (the UI may not call game APIs), at most
+                               64 bytes; nil when the game did not know it.
      updatedAt         time
+   Each character keeps its own board. The cache bar (cacheProgress,
+   cacheRequired, cachesOpened), weeklyClaims and rail are PER CHARACTER: the
+   cache bar is relative to that character's item level, so one character's
+   board never stands in for another's. Shared (accountWide) quests are
+   displayed once per account using the newest observation.
+   A quest with a cost is not "ready to claim" for free: claiming takes that
+   copper, so the companion does not count it as claimable.
+   The roster's item level uses this board's timestamp, not basics/last seen;
+   it can therefore be stale until the Call Board is opened again.
+   After a reset, old quest progress is shown as needing a fresh observation.
 
  trials.champion   (Trial of the Champion, damage, ranked per class)
    Source: ProjectEbonhold.Trials.OnChanged("board" or "result"). Only arrives
@@ -367,12 +442,43 @@
  ------------------------------------------------------------------------------
 
  settings
-   Stage 4 starts with the live roster window's saved position. More settings
-   are added only when their controls become part of the live UI. The PreviewUI
-   settings remain sample-only and are not copied into these saved settings.
+   The live dashboard saves its customization through Data, separately from
+   all character snapshots.
      ui.roster.position { point, x, y }
        point             string  anchor on the screen, e.g. "CENTER"
        x, y              number  offsets from the matching UIParent anchor
+     ui.raids.watched    table   { [stable encounter key] = true }
+                               raid keys use real encounter IDs; dungeon keys
+                               use their names, not invented server IDs
+     ui.minimap          table   { angle = number, hidden = boolean }
+                               local icon placement and visibility
+     ui.accounts.hidden  table   account IDs hidden from live views and totals
+     ui.defaultTab       string  initial live page, e.g. "Roster" or "Trials"
+                               legacy preference; dashboard uses state.openTab
+     ui.dashboard        table   state, columnOrder, appearance, customThemes,
+                               nextThemeId, raidView, accountConfig by account ID
+                               (colors, collapsed state, original alias)
+     ui.dashboard.state.window
+                         table   window options, all booleans:
+                               { openLogin  = open the window at login,
+                                 combatHide = hide it when combat starts,
+                                 lockWindow = lock its position,
+                                 escClose   = Escape closes it }
+                               Schema version 7 renamed it from state.mock.
+     ui.profiles         table   saved appearance/view presets by name,
+                               account default and character GUID assignments;
+                               a preset's options.window has the same shape
+                               as state.window (renamed from options.mock)
+   Dashboard state includes columns/sorting, tabs, window options and alert
+   preferences. Alerts use saved lock end times, never a hardcoded reset day.
+   Profiles and theme presets are local; manual theme strings share only
+   appearance, not account identities or character observations.
+     sync.peers          table   { [lowercase character-realm] = whisper name }
+                               trusted character names, local settings only
+     sync.ashoholicOfflineExport
+                         string  encoded copy of this account for offline import
+   Account aliases, including any initial WoW login name, are not exported.
+   Newly imported accounts receive a neutral alias that can be renamed locally.
    If this position is absent, the roster opens in the center of the screen.
 
 ================================================================================
@@ -400,11 +506,11 @@ addon.Schema = Schema
 
 -- Which version of the blueprint this code expects.
 -- Raise it by 1 whenever the saved layout changes (see section 4 above).
-Schema.VERSION = 3
+Schema.VERSION = 7
 
 -- The group names, so Data/ and Sync/ can loop over them instead of repeating
 -- the lists. A "group" is a small table with its own updatedAt (Rule 2).
-Schema.ACCOUNT_GROUPS = { "currencies", "prestige" }
+Schema.ACCOUNT_GROUPS = { "currencies", "prestige", "torment", "warband" }
 Schema.CHARACTER_GROUPS = { "basics", "run", "contracts", "echoBuild", "torment", "raids", "activities" }
 -- These two groups live one level deeper, inside character.trials.
 Schema.TRIAL_GROUPS = { "champion", "crusader" }
@@ -447,8 +553,154 @@ function Schema.NewCharacter()
     return {}
 end
 
+-- Version 3 documented a single weekly reset even though the feature had no
+-- live writer yet. If a database already contains that documented shape,
+-- preserve each lock using its former shared reset time.
+local function MigrateRaidSnapshots(database)
+    if database.accounts == nil then
+        return
+    end
+    if type(database.accounts) ~= "table" then
+        error("Ashoholic cannot migrate invalid accounts.")
+    end
+    local migrations = {}
+    for _, account in pairs(database.accounts) do
+        if type(account) ~= "table" then
+            error("Ashoholic cannot migrate an invalid account.")
+        end
+        if account.realms ~= nil then
+            if type(account.realms) ~= "table" then
+                error("Ashoholic cannot migrate invalid realms.")
+            end
+            for _, realm in pairs(account.realms) do
+                if type(realm) ~= "table" then
+                    error("Ashoholic cannot migrate invalid character records.")
+                end
+                for _, character in pairs(realm) do
+                    if type(character) ~= "table" then
+                        error("Ashoholic cannot migrate an invalid character.")
+                    end
+                    local raids = character.raids
+                    if raids ~= nil then
+                        if type(raids) ~= "table" then
+                            error("Ashoholic cannot migrate invalid raid data.")
+                        end
+                        if raids.looted ~= nil then
+                            if type(raids.looted) ~= "table" or raids.lockedUntil ~= nil
+                                or type(raids.resetAt) ~= "number"
+                                or raids.resetAt <= 0 or raids.resetAt >= math.huge
+                                or raids.resetAt ~= math.floor(raids.resetAt) then
+                                error("Ashoholic cannot migrate an invalid raid snapshot.")
+                            end
+                            local lockedUntil = {}
+                            for bossId, looted in pairs(raids.looted) do
+                                if type(bossId) ~= "number" or bossId <= 0
+                                    or bossId >= math.huge or bossId ~= math.floor(bossId)
+                                    or looted ~= true then
+                                    error("Ashoholic cannot migrate an invalid raid encounter.")
+                                end
+                                lockedUntil[bossId] = raids.resetAt
+                            end
+                            migrations[#migrations + 1] = { raids = raids, lockedUntil = lockedUntil }
+                        end
+                    end
+                    for _, migration in ipairs(migrations) do
+                        migration.raids.lockedUntil = migration.lockedUntil
+                        migration.raids.looted = nil
+                        migration.raids.resetAt = nil
+                    end
+                end
+            end
+        end
+    end
+end
+
 -- Convert older saved databases one version at a time, keeping characters,
 -- currencies and settings. Optional groups remain nil until observed.
+local function MigrateTormentAccess(database)
+    local migrations = {}
+    for _, account in pairs(database.accounts or {}) do
+        if type(account) ~= "table" or type(account.realms) ~= "table" then
+            error("Ashoholic cannot migrate invalid Torment accounts.")
+        end
+        local access, selections = nil, {}
+        for _, realm in pairs(account.realms) do
+            if type(realm) ~= "table" then error("Ashoholic cannot migrate invalid Torment realms.") end
+            for _, character in pairs(realm) do
+                if type(character) ~= "table" then error("Ashoholic cannot migrate invalid Torment characters.") end
+                local old = character.torment
+                if old then
+                    if type(old) ~= "table" or type(old.unlockedTiers) ~= "table"
+                        or type(old.updatedAt) ~= "number" or old.updatedAt <= 0
+                        or old.updatedAt >= math.huge or old.updatedAt ~= math.floor(old.updatedAt)
+                        or type(old.currentTier) ~= "number" or old.currentTier < 1
+                        or old.currentTier >= math.huge or old.currentTier ~= math.floor(old.currentTier) then
+                        error("Ashoholic cannot migrate invalid Torment observations.")
+                    end
+                    if not access then access = { unlockedTiers = {}, updatedAt = old.updatedAt } end
+                    access.updatedAt = math.max(access.updatedAt, old.updatedAt)
+                    for tier, unlocked in pairs(old.unlockedTiers) do
+                        if type(tier) ~= "number" or tier < 1 or tier >= math.huge
+                            or tier ~= math.floor(tier) or unlocked ~= true then
+                            error("Ashoholic cannot migrate invalid Torment unlocks.")
+                        end
+                        access.unlockedTiers[tier] = true
+                    end
+                    selections[#selections + 1] = {
+                        character = character, currentTier = old.currentTier, updatedAt = old.updatedAt,
+                    }
+                end
+            end
+        end
+        migrations[#migrations + 1] = { account = account, access = access, selections = selections }
+    end
+    -- Validate every old observation before moving anything.
+    for _, migration in ipairs(migrations) do
+        migration.account.torment = migration.access
+        for _, selection in ipairs(migration.selections) do
+            selection.character.torment = { currentTier = selection.currentTier, updatedAt = selection.updatedAt }
+        end
+    end
+end
+
+-- Version 7 renames the dashboard's window options from "mock" (a name left
+-- over from the preview) to "window", both in the dashboard's own state and
+-- in every saved profile. These are local UI preferences, not observations:
+-- an unexpected value is dropped instead of stopping the addon from loading.
+local function MoveWindowOptions(options)
+    -- A "window" value that is not a table is malformed: drop it.
+    if options.window ~= nil and type(options.window) ~= "table" then
+        options.window = nil
+    end
+    -- Keep an existing "window" table; otherwise move a valid "mock" table.
+    if type(options.mock) == "table" and options.window == nil then
+        options.window = options.mock
+    end
+    options.mock = nil
+end
+
+local function MigrateWindowOptions(database)
+    -- Any missing or unexpected table on the way simply means there is
+    -- nothing to rename there.
+    local settings = database.settings
+    local ui = type(settings) == "table" and settings.ui
+    if type(ui) ~= "table" then
+        return
+    end
+    local dashboard = ui.dashboard
+    if type(dashboard) == "table" and type(dashboard.state) == "table" then
+        MoveWindowOptions(dashboard.state)
+    end
+    local profiles = ui.profiles
+    if type(profiles) == "table" and type(profiles.saved) == "table" then
+        for _, profile in pairs(profiles.saved) do
+            if type(profile) == "table" and type(profile.options) == "table" then
+                MoveWindowOptions(profile.options)
+            end
+        end
+    end
+end
+
 function Schema.Migrate(database)
     local version = database.schemaVersion
     if type(version) ~= "number" then
@@ -475,6 +727,24 @@ function Schema.Migrate(database)
             -- Version 3 gives the new sources independent groups and saves
             -- actual tier unlocks. No existing observations need moving.
             version = 3
+        elseif version == 3 then
+            MigrateRaidSnapshots(database)
+            -- Missing raid groups and watchlists remain missing until used.
+            version = 4
+        elseif version == 4 then
+            -- Activities gain optional fields; sync and UI preferences are
+            -- local and absent until used. Existing
+            -- observations remain unchanged.
+            version = 5
+        elseif version == 5 then
+            MigrateTormentAccess(database)
+            version = 6
+        elseif version == 6 then
+            MigrateWindowOptions(database)
+            -- Version 7 also adds optional Call Board fields (quest category
+            -- and cost, weeklyClaims, rail) and the account warband group.
+            -- Absent means unknown, so no saved observation needs converting.
+            version = 7
         else
             error("Ashoholic has no migration for saved schema version " .. tostring(version) .. ".")
         end

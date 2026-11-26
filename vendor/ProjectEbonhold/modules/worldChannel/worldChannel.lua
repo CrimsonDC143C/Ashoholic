@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 ProjectEbonhold = ProjectEbonhold or {}
@@ -32,14 +33,14 @@ popup.border:SetBackdrop({
 -- Title
 popup.title = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 popup.title:SetPoint("TOP", popup, "TOP", 0, -20)
-popup.title:SetText("|cff00ff00Join Community Channels|r")
+popup.title:SetText(L["|cff00ff00Join Community Channels|r"])
 
 -- Message
 popup.message = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 popup.message:SetPoint("TOP", popup.title, "BOTTOM", 0, -14)
 popup.message:SetWidth(390)
 popup.message:SetJustifyH("CENTER")
-popup.message:SetText("Choose the chat channel(s) you would like to join to talk with the community")
+popup.message:SetText(L["Choose the chat channel(s) you would like to join to talk with the community"])
 
 -- Support note: support is English-only and handled through the GM ticket
 -- system, not these chat channels.
@@ -47,7 +48,7 @@ popup.note = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 popup.note:SetPoint("TOP", popup.message, "BOTTOM", 0, -10)
 popup.note:SetWidth(390)
 popup.note:SetJustifyH("CENTER")
-popup.note:SetText("|cffffd100Note:|r Staff help is available in English only, via the in-game GM ticket system, not through these channels.")
+popup.note:SetText(L["|cffffd100Note:|r Staff help is available in English only, via the in-game GM ticket system, not through these channels."])
 
 -- One checkbox per channel. Create them first so we can measure the widest
 -- row, then lay them out as a left-aligned column that is centered as a block
@@ -80,7 +81,7 @@ end
 -- Apply Button: joins checked channels and leaves unchecked ones.
 popup.joinButton = utils.CreateSimpleCustomButton(
     popup,
-    "Apply",
+    APPLY,
     function()
         PlaySound("igMainMenuOption")
         local selected = {}
@@ -102,7 +103,7 @@ popup.joinButton:SetPoint("BOTTOM", popup, "BOTTOM", -80, 20)
 
 popup.joinButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Join the channels you checked and leave the ones you unchecked", 1, 1, 1)
+    GameTooltip:SetText(L["Join the channels you checked and leave the ones you unchecked"], 1, 1, 1)
     GameTooltip:Show()
 end)
 popup.joinButton:SetScript("OnLeave", function(self)
@@ -112,7 +113,7 @@ end)
 -- Close Button
 popup.closeButton = utils.CreateSimpleCustomButton(
     popup,
-    "Close",
+    CLOSE,
     function()
         PlaySound("igMainMenuOptionCheckBoxOn")
         if ProjectEbonhold.WorldChannelService then
@@ -127,7 +128,7 @@ popup.closeButton:SetPoint("BOTTOM", popup, "BOTTOM", 80, 20)
 
 popup.closeButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("You can always join later with /join <channel> (e.g. /join world)", 1, 1, 1)
+    GameTooltip:SetText(L["You can always join later with /join <channel> (e.g. /join world)"], 1, 1, 1)
     GameTooltip:Show()
 end)
 popup.closeButton:SetScript("OnLeave", function(self)
@@ -139,7 +140,7 @@ popup.hint = popup:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 popup.hint:SetPoint("BOTTOM", popup, "BOTTOM", 0, 62)
 popup.hint:SetWidth(390)
 popup.hint:SetJustifyH("CENTER")
-popup.hint:SetText("Reopen this window anytime with |cff00ff00/worldchannel|r to join or leave.")
+popup.hint:SetText(L["Reopen this window anytime with |cff00ff00/worldchannel|r to join or leave."])
 
 -- The footer (hint + buttons) is anchored to the popup's bottom edge, so the
 -- fixed height leaves a gap between the last checkbox and the footer. On show,

@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 ------------------------------------------------------------
@@ -248,15 +249,15 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_HARDMODE_SET_RESULT,
       difficultyKnown = true
 
       if newTier == 1 then
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00[Hardmode] Returned to Normal difficulty.|r")
+        DEFAULT_CHAT_FRAME:AddMessage(L["|cff00FF00[Hardmode] Returned to Normal difficulty.|r"])
       else
         DEFAULT_CHAT_FRAME:AddMessage(
-          "|cff00FF00[Hardmode] Difficulty set to Tier " .. newTier .. ".|r"
+          T("|cff00FF00[Hardmode] Difficulty set to Tier {newTier}.|r", { newTier = newTier })
         )
       end
     else
       DEFAULT_CHAT_FRAME:AddMessage(
-        "|cffFF0000[Hardmode] Failed to change difficulty: " .. tostring(payload) .. "|r"
+        T("|cffFF0000[Hardmode] Failed to change difficulty: {payload}|r", { payload = tostring(payload) })
       )
     end
 
@@ -296,9 +297,9 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_HARDCORE_TIER_UNLOCKED,
 
 --- Full name of a tier: "Normal", or "Torment <roman>".
 local function TierFullName(tier)
-  if not tier or tier <= 1 then return "Normal" end
+  if not tier or tier <= 1 then return L["Normal"] end
   local ts = ProjectEbonhold.TierSelector
-  return "Torment " .. ((ts and ts.ShortName and ts.ShortName(tier)) or tostring(tier - 1))
+  return T("Torment {tier}", { tier = ((ts and ts.ShortName and ts.ShortName(tier)) or tostring(tier - 1)) })
 end
 
 -- Last mismatch already announced, so zoning inside the same run (a raid wing, a ship) does
@@ -311,14 +312,13 @@ local announcedInstanceTier = nil
 local function AnnounceForeignTier(tier)
   local own = TierFullName(currentDifficulty)
   local here = TierFullName(tier)
-  local line = "This instance runs at " .. here .. " - your own Torment is " .. own .. "."
+  local line = T("This instance runs at {here} - your own Torment is {own}.", { here = here, own = own })
 
   if RaidNotice_AddMessage and RaidBossEmoteFrame and ChatTypeInfo then
     RaidNotice_AddMessage(RaidBossEmoteFrame, line, ChatTypeInfo["RAID_WARNING"])
   end
   if DEFAULT_CHAT_FRAME then
-    DEFAULT_CHAT_FRAME:AddMessage("|cffFF4444[Torment]|r " .. line
-      .. " Its difficulty and its rewards are the ones of " .. here .. " until you leave.", 1, 1, 1)
+    DEFAULT_CHAT_FRAME:AddMessage(T("|cffFF4444[Torment]|r {line} Its difficulty and its rewards are the ones of {here} until you leave.", { line = line, here = here }), 1, 1, 1)
   end
 end
 

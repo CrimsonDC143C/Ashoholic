@@ -37,7 +37,7 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_ITEMS_SAVED, func
                     guid = guid,
                     entry = entry,
                     count = count,
-                    name = itemName or ("Item #" .. entry),
+                    name = itemName or (ProjectEbonhold.T("Item #{entry}", { entry = entry })),
                     icon = itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark",
                     sellPrice = sellPrice or 0
                 })

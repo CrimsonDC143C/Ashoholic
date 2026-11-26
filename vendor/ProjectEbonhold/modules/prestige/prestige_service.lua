@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ============================================================================
 -- Prestige service: client state + server communication.
 --
@@ -212,9 +213,9 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PRESTIGE_DATA,
 
 -- Failure codes sent by the server (see PrestigeHandler::HandleDoPrestige)
 local FAIL_REASONS = {
-  gate   = "You have not reached the final Soul Ashes milestone.",
-  combat = "You cannot prestige while in combat.",
-  dead   = "You cannot prestige while dead.",
+  gate   = L["You have not reached the final Soul Ashes milestone."],
+  combat = L["You cannot prestige while in combat."],
+  dead   = L["You cannot prestige while dead."],
 }
 
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PRESTIGE_RESULT,
@@ -225,12 +226,10 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PRESTIGE_RESULT,
     if status == "OK" then
       totalPrestiges = tonumber(payload) or totalPrestiges
       DEFAULT_CHAT_FRAME:AddMessage(
-        "|cff00FF00[Prestige] Prestige complete! Total prestiges: " ..
-        totalPrestiges .. ".|r")
+        T("|cff00FF00[Prestige] Prestige complete! Total prestiges: {totalPrestiges}.|r", { totalPrestiges = totalPrestiges }))
     else
       DEFAULT_CHAT_FRAME:AddMessage(
-        "|cffFF0000[Prestige] Prestige failed: " ..
-        (FAIL_REASONS[payload] or tostring(payload)) .. "|r")
+        T("|cffFF0000[Prestige] Prestige failed: {payload}|r", { payload = (FAIL_REASONS[payload] or tostring(payload)) }))
     end
 
     NotifyUI()

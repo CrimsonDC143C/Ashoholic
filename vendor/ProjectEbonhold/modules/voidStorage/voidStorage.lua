@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local Addon = select(2, ...)
 
 -- Wait for BankFrame to be available
@@ -70,7 +71,7 @@ VoidStorageFrame:SetBackdrop({
 -- Title
 VoidStorageFrame.title = VoidStorageFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 VoidStorageFrame.title:SetPoint("TOP", 0, 30)
-VoidStorageFrame.title:SetText("The Void Storage")
+VoidStorageFrame.title:SetText(L["The Void Storage"])
 
 -- Header texture
 VoidStorageFrame.header = VoidStorageFrame:CreateTexture(nil, "BACKGROUND")
@@ -140,7 +141,7 @@ function VoidStorageFrame:SwitchTab(tabIndex)
     
     -- Check if this tab has been loaded before
     if not self.loadedTabs[tabIndex] then
-        print("Requesting tab", tabIndex, "data from server...")
+        print(L["Requesting tab"], tabIndex, L["data from server..."])
         -- Request tab data from server
         ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_RETRIEVE_ITEMS_FROM_TAB, tostring(tabIndex))
         -- Mark as loaded (will be populated when SEND_CONTENT_VOID_STORAGE arrives)
@@ -237,7 +238,7 @@ for i = 1, 72 do
             end
             
             if not hasSpace then
-                DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[Void Storage] No bag space available!|r")
+                DEFAULT_CHAT_FRAME:AddMessage(L["|cffff0000[Void Storage] No bag space available!|r"])
                 return
             end
             
@@ -247,7 +248,7 @@ for i = 1, 72 do
             -- Remove item from local storage (optimistic update)
             if VoidStorageService.voidStorageItems[tabIndex] then
                 VoidStorageService.voidStorageItems[tabIndex][self.slotIndex] = nil
-                print("Removed item from tab", tabIndex, "slot", slotIndex)
+                print(L["Removed item from tab"], tabIndex, "slot", slotIndex)
                 
                 -- Update display immediately
                 if VoidStorageFrame.UpdateDisplay then

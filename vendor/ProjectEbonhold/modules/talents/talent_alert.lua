@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- ── Unspent talent points: yellow alert bubble ───────────────────────────────
@@ -55,8 +56,7 @@ local function Refresh()
         return
     end
 
-    Alert.Text:SetText(string.format("You have %d unspent talent point%s! Open your Talents to spend %s.",
-        points, points == 1 and "" or "s", points == 1 and "it" or "them"))
+    Alert.Text:SetText(T("You have {points} unspent talent point{s}! Open your Talents to spend {them}.", { points = string.format("%d", points), s = points == 1 and "" or "s", them = points == 1 and "it" or "them" }))
     Alert:SetHeight(math.max(85, Alert.Text:GetStringHeight() + 40))
     Alert:Show()
 end

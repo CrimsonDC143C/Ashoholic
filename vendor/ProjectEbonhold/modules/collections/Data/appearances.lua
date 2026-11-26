@@ -16,6 +16,7 @@
 
     Load order: after core/stub.lua and data/appearances_data.lua.
 ------------------------------------------------------------------------------]]
+local L = ProjectEbonhold.L
 
 local ez = _G.ezCollections
 
@@ -76,38 +77,38 @@ local function meta(id, name, isWeapon, invType, mh, oh, ranged)
     M[id] = { name = name, isWeapon = isWeapon, invType = invType,
               canMainHand = mh, canOffHand = oh, canRanged = ranged }
 end
-meta(LE_TRANSMOG_COLLECTION_TYPE_HEAD,     "Head",      false, 1)
-meta(LE_TRANSMOG_COLLECTION_TYPE_SHOULDER, "Shoulders", false, 3)
-meta(LE_TRANSMOG_COLLECTION_TYPE_BACK,     "Back",      false, 16)
-meta(LE_TRANSMOG_COLLECTION_TYPE_CHEST,    "Chest",     false, 5)
-meta(LE_TRANSMOG_COLLECTION_TYPE_TABARD,   "Tabard",    false, 19)
-meta(LE_TRANSMOG_COLLECTION_TYPE_SHIRT,    "Shirt",     false, 4)
-meta(LE_TRANSMOG_COLLECTION_TYPE_WRIST,    "Wrist",     false, 9)
-meta(LE_TRANSMOG_COLLECTION_TYPE_HANDS,    "Hands",     false, 10)
-meta(LE_TRANSMOG_COLLECTION_TYPE_WAIST,    "Waist",     false, 6)
-meta(LE_TRANSMOG_COLLECTION_TYPE_LEGS,     "Legs",      false, 7)
-meta(LE_TRANSMOG_COLLECTION_TYPE_FEET,     "Feet",      false, 8)
-meta(LE_TRANSMOG_COLLECTION_TYPE_WAND,     "Wand",      true,  26, false, false, true)
-meta(LE_TRANSMOG_COLLECTION_TYPE_1H_AXE,   "One-Handed Axes",   true, 13, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_1H_SWORD, "One-Handed Swords", true, 13, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_1H_MACE,  "One-Handed Maces",  true, 13, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_DAGGER,   "Daggers",   true, 13, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_FIST,     "Fist Weapons", true, 13, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_SHIELD,   "Shields",   true, 14, false, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_HOLDABLE, "Held In Off-hand", true, 23, false, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_HEAD,     L["Head"],      false, 1)
+meta(LE_TRANSMOG_COLLECTION_TYPE_SHOULDER, L["Shoulders"], false, 3)
+meta(LE_TRANSMOG_COLLECTION_TYPE_BACK,     L["Back"],      false, 16)
+meta(LE_TRANSMOG_COLLECTION_TYPE_CHEST,    L["Chest"],     false, 5)
+meta(LE_TRANSMOG_COLLECTION_TYPE_TABARD,   L["Tabard"],    false, 19)
+meta(LE_TRANSMOG_COLLECTION_TYPE_SHIRT,    L["Shirt"],     false, 4)
+meta(LE_TRANSMOG_COLLECTION_TYPE_WRIST,    L["Wrist"],     false, 9)
+meta(LE_TRANSMOG_COLLECTION_TYPE_HANDS,    L["Hands"],     false, 10)
+meta(LE_TRANSMOG_COLLECTION_TYPE_WAIST,    L["Waist"],     false, 6)
+meta(LE_TRANSMOG_COLLECTION_TYPE_LEGS,     L["Legs"],      false, 7)
+meta(LE_TRANSMOG_COLLECTION_TYPE_FEET,     L["Feet"],      false, 8)
+meta(LE_TRANSMOG_COLLECTION_TYPE_WAND,     L["Wand"],      true,  26, false, false, true)
+meta(LE_TRANSMOG_COLLECTION_TYPE_1H_AXE,   L["One-Handed Axes"],   true, 13, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_1H_SWORD, L["One-Handed Swords"], true, 13, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_1H_MACE,  L["One-Handed Maces"],  true, 13, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_DAGGER,   L["Daggers"],   true, 13, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_FIST,     L["Fist Weapons"], true, 13, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_SHIELD,   L["Shields"],   true, 14, false, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_HOLDABLE, L["Held In Off-hand"], true, 23, false, true, false)
 -- Two-handers are off-hand capable here on purpose: the off-hand slot accepts any
 -- melee look (shield or weapon equipped, see IsCategoryValidForItem), and the client
 -- attaches a 2H display to the left hand exactly like Titan's Grip does.
-meta(LE_TRANSMOG_COLLECTION_TYPE_2H_AXE,   "Two-Handed Axes",   true, 17, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_2H_SWORD, "Two-Handed Swords", true, 17, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_2H_MACE,  "Two-Handed Maces",  true, 17, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_STAFF,    "Staves",    true, 17, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_POLEARM,  "Polearms",  true, 17, true, true, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_BOW,      "Bows",      true, 15, false, false, true)
-meta(LE_TRANSMOG_COLLECTION_TYPE_GUN,      "Guns",      true, 26, false, false, true)
-meta(LE_TRANSMOG_COLLECTION_TYPE_CROSSBOW, "Crossbows", true, 26, false, false, true)
-meta(LE_TRANSMOG_COLLECTION_TYPE_THROWN,   "Thrown",    true, 25, true, false, false)
-meta(LE_TRANSMOG_COLLECTION_TYPE_FISHING_POLE, "Fishing Poles", true, 17, true, false, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_2H_AXE,   L["Two-Handed Axes"],   true, 17, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_2H_SWORD, L["Two-Handed Swords"], true, 17, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_2H_MACE,  L["Two-Handed Maces"],  true, 17, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_STAFF,    L["Staves"],    true, 17, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_POLEARM,  L["Polearms"],  true, 17, true, true, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_BOW,      L["Bows"],      true, 15, false, false, true)
+meta(LE_TRANSMOG_COLLECTION_TYPE_GUN,      L["Guns"],      true, 26, false, false, true)
+meta(LE_TRANSMOG_COLLECTION_TYPE_CROSSBOW, L["Crossbows"], true, 26, false, false, true)
+meta(LE_TRANSMOG_COLLECTION_TYPE_THROWN,   L["Thrown"],    true, 25, true, false, false)
+meta(LE_TRANSMOG_COLLECTION_TYPE_FISHING_POLE, L["Fishing Poles"], true, 17, true, false, false)
 ez.AppearanceCategoryMeta = M
 
 --=============================================================================

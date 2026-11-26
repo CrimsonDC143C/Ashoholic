@@ -1,7 +1,8 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 ProjectEbonhold = ProjectEbonhold or {}
 
 -- Rewritten at runtime by modules/dungeonFinder (the orb count depends on the Torment picked).
-LFD_RANDOM_REWARD_EXPLANATION1 = "Every dungeon you complete through the Dungeon Finder earns Orbs of Lost Memories."
+LFD_RANDOM_REWARD_EXPLANATION1 = L["Every dungeon you complete through the Dungeon Finder earns Orbs of Lost Memories."]
 LFD_RANDOM_REWARD_EXPLANATION2 = LFD_RANDOM_REWARD_EXPLANATION1
     
 ProjectEbonhold.Constants = {
@@ -143,50 +144,49 @@ end
 ProjectEbonhold.UITexts = {
     tooltips = {
         soulPoints = {
-            title = function(sp) return "Soul Ashes: " .. ProjectEbonhold.FormatThousands(sp) end,
-            line = "Earned this run. Banked when you make an offering at a Spirit Healer or accept death.",
+            title = function(sp) return T("Soul Ashes: {sp}", { sp = ProjectEbonhold.FormatThousands(sp) }) end,
+            line = L["Earned this run. Banked when you make an offering at a Spirit Healer or accept death."],
         },
         soulShards = {
-            title = function(n) return "Soul Shards: " .. ProjectEbonhold.FormatThousands(n) end,
-            line = "Earned this run. Banked with your Soul Ashes.",
+            title = function(n) return T("Soul Shards: {n}", { n = ProjectEbonhold.FormatThousands(n) }) end,
+            line = L["Earned this run. Banked with your Soul Ashes."],
         },
         shardMultiplier = {
-            title = function(pct) return "Soul Shard Multiplier: +" .. pct .. "%" end,
+            title = function(pct) return T("Soul Shard Multiplier: +{pct}%", { pct = pct }) end,
             line =
-            "Raised by Endless Harvest."
+            L["Raised by Endless Harvest."]
         },
         multiplier = {
             title = function(mult)
-                return "Soul Ash Multiplier: +" ..
-                    string.format("%.0f", mult * 100) .. "%"
+                return T("Soul Ash Multiplier: +{mult}%", { mult = string.format("%.0f", mult * 100) })
             end,
             line =
-            "Raised by achievements and Endless Harvest."
+            L["Raised by achievements and Endless Harvest."]
         },
         survival = {
-            title = "Resurrections",
+            title = L["Resurrections"],
             paidRezs = function(used, ashes, shards, affordable)
                 if affordable then
-                    return "Soul Ash resurrection: |cffEB0000" .. ashes .. " Ashes, " .. shards .. " Shards|r (" .. used .. " used this run)"
+                    return T("Soul Ash resurrection: |cffEB0000{ashes} Ashes, {shards} Shards|r ({used} used this run)", { ashes = ashes, shards = shards, used = used })
                 end
-                return "Soul Ash resurrection: |cff888888not enough Soul Ashes|r (" .. used .. " used this run)"
+                return T("Soul Ash resurrection: |cff888888not enough Soul Ashes|r ({used} used this run)", { used = used })
             end,
             friendRezs = function(left, max)
-                return "Player resurrection: " .. left .. "/" .. max .. " this run"
+                return T("Player resurrection: {left}/{v} this run", { left = left, v = max })
             end,
-            hint = "Each Soul Ash resurrection costs more than the last. Counters reset on accept death.",
+            hint = L["Each Soul Ash resurrection costs more than the last. Counters reset on accept death."],
         },
         -- The Reaper's Gaze bar (player_run_ui.lua): the explanation lives in the run tour
         bracket = {
-            title = "The Reaper's Gaze",
+            title = L["The Reaper's Gaze"],
             rules =
-            "Dying loses the contracts in progress; the bonus stays. Accepting death ends the run: its ashes are banked without the bonus, and the bonus is gone.",
+            L["Dying loses the contract in progress and the bonus, unless you have the Reaper's Reprieve (2 hours after a won Wintergrasp siege). Accepting death ends the run: its ashes are banked without the bonus."],
         }
     },
     ui = {
-        echoes = function(count) return "Echoes (" .. count .. ")" end,
+        echoes = function(count) return T("Echoes ({count})", { count = count }) end,
         stack = function(current, max)
-            return "Stack: " .. current .. "/" .. max
+            return T("Stack: {current}/{v}", { current = current, v = max })
         end
     }
 }
@@ -205,76 +205,74 @@ local DEATH_SHARD_ICON = " |TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_fr
 
 ProjectEbonhold.DeathTexts = {
     frame = {
-        title = "You are dead",
-        description = "Choose an option:",
-        arenaTitle = "Spectator Mode",
-        arenaDescription = "You can spectate the arena:",
-        battlegroundTitle = "Battleground Death"
+        title = ProjectEbonhold.L["You are dead"],
+        description = L["Choose an option:"],
+        arenaTitle = L["Spectator Mode"],
+        arenaDescription = L["You can spectate the arena:"],
+        battlegroundTitle = L["Battleground Death"]
     },
 
     buttons = {
         acceptDeath = function(soulPointsGain, soulShardsGain)
-            local text = "Accept Death  |cff00FF00+" .. ShortNumber(soulPointsGain) .. "|r" .. DEATH_ASH_ICON
+            local text = ProjectEbonhold.T("Accept Death  |cff00FF00+{gain}|r{icon}",
+                { gain = ShortNumber(soulPointsGain), icon = DEATH_ASH_ICON })
             if (soulShardsGain or 0) > 0 then
                 text = text .. " |cff8080ff+" .. ShortNumber(soulShardsGain) .. "|r" .. DEATH_SHARD_ICON
             end
             return text
         end,
-        releaseSpirit = "Release Spirit",
+        releaseSpirit = L["Release Spirit"],
         useSoulstone = function(text)
-            return "Resurrect with " .. text
+            return T("Resurrect with {text}", { text = text })
         end,
         soulPointsAffordable = function(ashes, shards)
-            local text = "Resurrect  |cffEB0000-" .. ShortNumber(ashes) .. "|r" .. DEATH_ASH_ICON
+            local text = T("Resurrect  |cffEB0000-{ashes}|r{DEATHASHICON}", { ashes = ShortNumber(ashes), DEATHASHICON = DEATH_ASH_ICON })
             if (shards or 0) > 0 then
                 text = text .. " |cffEB0000-" .. ShortNumber(shards) .. "|r" .. DEATH_SHARD_ICON
             end
             return text
         end,
         acceptPlayerRez = function(left, max)
-            return "Player Resurrection  (" .. tostring(left) .. "/" .. tostring(max) .. ")"
+            return T("Player Resurrection  ({left}/{v})", { left = tostring(left), v = tostring(max) })
         end
     },
 
     confirmations = {
         acceptDeath = {
-            title = "Confirm Accept Death",
+            title = L["Confirm Accept Death"],
             message = function(soulPointsGain, soulShardsGain)
-                local gains = soulPointsGain .. " Soul Ashes"
+                local gains = T("{soulPointsGain} Soul Ashes", { soulPointsGain = soulPointsGain })
                 if (soulShardsGain or 0) > 0 then
-                    gains = gains .. " and " .. soulShardsGain .. " Soul Shards"
+                    gains = T("{gains} and {soulShardsGain} Soul Shards", { gains = gains, soulShardsGain = soulShardsGain })
                 end
                 -- What PlayerRunHandler::AcceptDeath really does (checked 2026-10-22): ResetPlayer
                 -- (level 1, quests, unlocked perks, start zone), CallboardMgr::OnAcceptDeath (board
                 -- contracts dropped), ComputeGearToKeepEquippedAtLevelOne + TransferAndDestroyEquippedItems
                 -- (wearable gear stays on, the rest to the bags), CommitAllSoulPoints (ashes + shards
                 -- banked), LearnAllTreeSkills / ApplyOwnedNodes (tree and class nodes re-applied).
-                return "|cffff4040You lose:|r your level, quests, contracts and unlocked echoes.\n\n" ..
-                    "|cff00ff00You keep:|r " .. gains .. ", your Skill Tree, locked echoes and gear.\n\n" ..
-                    "Are you sure?"
+                return L["|cffff4040You lose:|r your level, quests, contracts and unlocked echoes.\n\n"] ..
+                    T("|cff00ff00You keep:|r {gains}, your Skill Tree, locked echoes and gear.\n\n", { gains = gains }) ..
+                    L["Are you sure?"]
             end
         },
         soulPointsRez = {
-            title = "Confirm Soul Ashes Resurrection",
+            title = L["Confirm Soul Ashes Resurrection"],
             message = function(ashes, shards, ashesLeft, shardsLeft)
-                return "Pay " .. ashes .. " Soul Ashes and " .. shards ..
-                    " Soul Shards from your run to resurrect?\n\nYour run will keep " ..
-                    ashesLeft .. " Soul Ashes and " .. shardsLeft .. " Soul Shards. You will be resurrected at the nearest graveyard."
+                return T("Pay {ashes} Soul Ashes and {shards} Soul Shards from your run to resurrect?\n\nYour run will keep {ashesLeft} Soul Ashes and {shardsLeft} Soul Shards. You will be resurrected at the nearest graveyard.", { ashes = ashes, shards = shards, ashesLeft = ashesLeft, shardsLeft = shardsLeft })
             end
         },
         soulstone = {
             title = function(text)
-                return "Confirm " .. text .. " Usage"
+                return T("Confirm {text} Usage", { text = text })
             end,
             message = function(text)
-                return "Use your " ..
-                    text .. " to resurrect?\n\nYou will be resurrected at the nearest graveyard."
+                return T("Use your {text} to resurrect?\n\nYou will be resurrected at the nearest graveyard.", { text = text })
             end
         },
         acceptPlayerRez = {
-            title = "Confirm Player Resurrection",
+            title = L["Confirm Player Resurrection"],
             message = function()
-                return "Accept resurrection from another player?\n\nYou will be resurrected at your friend's location."
+                return L["Accept resurrection from another player?\n\nYou will be resurrected at your friend's location."]
             end
         }
     },
@@ -282,74 +280,74 @@ ProjectEbonhold.DeathTexts = {
 
     tooltips = {
         acceptDeath = {
-            title = "Accept Death",
+            title = L["Accept Death"],
             line1 = function(soulPointsGain, soulShardsGain)
                 if (soulShardsGain or 0) > 0 then
-                    return "You will gain " .. soulPointsGain .. " Soul Ashes and " .. soulShardsGain .. " Soul Shards."
+                    return T("You will gain {soulPointsGain} Soul Ashes and {soulShardsGain} Soul Shards.", { soulPointsGain = soulPointsGain, soulShardsGain = soulShardsGain })
                 end
-                return "You will gain " .. soulPointsGain .. " Soul Ashes."
+                return T("You will gain {soulPointsGain} Soul Ashes.", { soulPointsGain = soulPointsGain })
             end,
-            line2 = "Soul Ashes can be spent in the Skill Tree to unlock powerful abilities."
+            line2 = L["Soul Ashes can be spent in the Skill Tree to unlock powerful abilities."]
         },
         soulPointsRez = {
-            title = "Soul Ashes Resurrection",
+            title = L["Soul Ashes Resurrection"],
             line1 = function(ashes, shards)
-                return "Pay " .. ashes .. " Soul Ashes and " .. shards .. " Soul Shards from your run to resurrect."
+                return T("Pay {ashes} Soul Ashes and {shards} Soul Shards from your run to resurrect.", { ashes = ashes, shards = shards })
             end,
-            line2 = "Paid from your run, not your account. Each one costs more than the last.",
+            line2 = L["Paid from your run, not your account. Each one costs more than the last."],
             line3 = function(used)
-                return used .. " used this run."
+                return T("{used} used this run.", { used = used })
             end,
-            tooPoor = "Your run does not hold enough Soul Ashes."
+            tooPoor = L["Your run does not hold enough Soul Ashes."]
         },
         soulstone = {
-            title = function(text) return "Use " .. text end,
+            title = function(text) return T("Use {text}", { text = text }) end,
             line1 = function(text)
-                return "Use your " .. text .. " to resurrect."
+                return T("Use your {text} to resurrect.", { text = text })
             end,
-            line2 = "Unlimited uses, no penalty."
+            line2 = L["Unlimited uses, no penalty."]
         },
         acceptPlayerRez = {
-            title = "Accept Player Resurrection",
-            line1 = "Accept resurrection from another player.",
-            line2 = "Free. You can accept one player resurrection per run. Any player can bring you back."
+            title = L["Accept Player Resurrection"],
+            line1 = L["Accept resurrection from another player."],
+            line2 = L["Free. You can accept one player resurrection per run. Any player can bring you back."]
         }
     },
 
 
     messages = {
-        notEnoughSoulPoints = "|cffFF0000Not enough Soul Ashes to resurrect!|r",
+        notEnoughSoulPoints = L["|cffFF0000Not enough Soul Ashes to resurrect!|r"],
         arenaSpectator = function()
-            return ARENA_SPECTATOR or "You are now spectating."
+            return ARENA_SPECTATOR or L["You are now spectating."]
         end,
         confirmPrints = {
-            acceptDeath = "Accept Death confirmed - Custom call to implement",
-            selfRez = "Self resurrection confirmed - Custom call to implement",
-            soulPointsRez = "Soul Ashes resurrection confirmed - Custom call to implement",
-            acceptPlayerRez = "Accept Player Resurrection confirmed - Custom call to implement"
+            acceptDeath = L["Accept Death confirmed - Custom call to implement"],
+            selfRez = L["Self resurrection confirmed - Custom call to implement"],
+            soulPointsRez = L["Soul Ashes resurrection confirmed - Custom call to implement"],
+            acceptPlayerRez = L["Accept Player Resurrection confirmed - Custom call to implement"]
         }
     }
 }
 
 
 ProjectEbonhold.DeathRecapTexts = {
-    button = "Death Recap",
+    button = L["Death Recap"],
 
     frame = {
-        title = "Death Recap",
+        title = L["Death Recap"],
         killedBy = function(name)
-            return "Killed by |cffFF4500" .. name .. "|r"
+            return T("Killed by |cffFF4500{name}|r", { name = name })
         end,
-        killedByUnknown = "The killing blow was not recorded.",
-        empty = "No combat damage was recorded before this death."
+        killedByUnknown = L["The killing blow was not recorded."],
+        empty = L["No combat damage was recorded before this death."]
     },
 
     labels = {
-        melee = "Melee",
-        instakill = "Instant Kill",
-        unknownSource = "Unknown",
+        melee = L["Melee"],
+        instakill = L["Instant Kill"],
+        unknownSource = L["Unknown"],
         secondsBefore = function(seconds)
-            return string.format("%.1fs before death", seconds)
+            return string.format(L["%.1fs before death"], seconds)
         end,
         -- Row lines are narrow, so they use the short form and leave the full wording to tooltips.
         secondsShort = function(seconds)
@@ -362,34 +360,34 @@ ProjectEbonhold.DeathRecapTexts = {
 
     tooltip = {
         damageTaken = function(amount)
-            return "Damage taken: |cffFF4040" .. amount .. "|r"
+            return T("Damage taken: |cffFF4040{amount}|r", { amount = amount })
         end,
         healReceived = function(amount)
-            return "Healing received: |cff40FF40" .. amount .. "|r"
+            return T("Healing received: |cff40FF40{amount}|r", { amount = amount })
         end,
-        critical = "Critical",
+        critical = L["Critical"],
         overkill = function(amount)
-            return "Overkill: " .. amount
+            return T("Overkill: {amount}", { amount = amount })
         end,
         absorbed = function(amount)
-            return "Absorbed: " .. amount
+            return T("Absorbed: {amount}", { amount = amount })
         end,
         resisted = function(amount)
-            return "Resisted: " .. amount
+            return T("Resisted: {amount}", { amount = amount })
         end,
         blocked = function(amount)
-            return "Blocked: " .. amount
+            return T("Blocked: {amount}", { amount = amount })
         end,
         overhealing = function(amount)
-            return "Overhealing: " .. amount
+            return T("Overhealing: {amount}", { amount = amount })
         end,
         healthAfter = function(current, max, percent)
-            return string.format("Health: %s / %s (%d%%)", current, max, percent)
+            return string.format(L["Health: %s / %s (%d%%)"], current, max, percent)
         end,
-        healthNote = "Health is sampled when the event is received, so it can lag the log by a fraction of a second."
+        healthNote = L["Health is sampled when the event is received, so it can lag the log by a fraction of a second."]
     },
 
     slash = {
-        noRecap = "|cffFFFF00Project Ebonhold:|r no death recap recorded yet."
+        noRecap = L["|cffFFFF00Project Ebonhold:|r no death recap recorded yet."]
     }
 }

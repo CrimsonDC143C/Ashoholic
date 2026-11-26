@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- talent_frame.lua -- Three-tree talent window.
 --
 -- Replaces the stock PlayerTalentFrame for the player's own talents (validated on
@@ -91,7 +92,7 @@ local C_LINE_ON  = { 1.00, 0.82, 0.00 }
 local C_LINE_OFF = { 0.45, 0.45, 0.45 }
 local UNAVAILABLE_ALPHA = 0.7
 
-local DEFAULT_SPEC_LABELS = { "Primary", "Secondary", "Third", "Fourth", "Fifth" }
+local DEFAULT_SPEC_LABELS = { L["Primary"], L["Secondary"], L["Third"], L["Fourth"], L["Fifth"] }
 local TAB_TEXT_MAX_W = 90
 
 local mainFrame
@@ -293,14 +294,14 @@ end
 -- cast-time line ("Instant", "1.5 sec cast", "Channeled", "Next melee"...); a
 -- passive talent's never does. Read at rank 0 too, so unlearned talents get it.
 local CAST_EXACT = {}
-for _, s in ipairs({ SPELL_CAST_TIME_INSTANT or "Instant", SPELL_CAST_TIME_INSTANT_NO_MANA,
-        SPELL_CAST_CHANNELED or "Channeled", SPELL_ON_NEXT_SWING or "Next melee",
-        SPELL_ON_NEXT_RANGED or "Next ranged" }) do
+for _, s in ipairs({ SPELL_CAST_TIME_INSTANT or L["Instant"], SPELL_CAST_TIME_INSTANT_NO_MANA,
+        SPELL_CAST_CHANNELED or L["Channeled"], SPELL_ON_NEXT_SWING or L["Next melee"],
+        SPELL_ON_NEXT_RANGED or L["Next ranged"] }) do
     if s then CAST_EXACT[s] = true end
 end
 -- "%.3g sec cast" / "%.3g min cast": the plain text either side of the number
 local CAST_AROUND = {}
-for _, fmt in ipairs({ SPELL_CAST_TIME_SEC or "%.3g sec cast", SPELL_CAST_TIME_MIN or "%.3g min cast" }) do
+for _, fmt in ipairs({ SPELL_CAST_TIME_SEC or L["%.3g sec cast"], SPELL_CAST_TIME_MIN or L["%.3g min cast"] }) do
     local s, e = string.find(fmt, "%.3g", 1, true)
     if s then table.insert(CAST_AROUND, { string.sub(fmt, 1, s - 1), string.sub(fmt, e + 1) }) end
 end
@@ -323,8 +324,8 @@ end
 -- The client's requirement lines. Singular and plural come as separate strings
 -- (_PLURAL), so a line is recognised by its head ("Requires ") and what it ends
 -- on - "<tree> Talents" or the prerequisite's name - not by the whole format.
-local TIER_FMT   = TOOLTIP_TALENT_TIER_POINTS or "Requires %d points in %s Talents"
-local PREREQ_FMT = TOOLTIP_TALENT_PREREQ or "Requires %d points in %s"
+local TIER_FMT   = TOOLTIP_TALENT_TIER_POINTS or L["Requires %d points in %s Talents"]
+local PREREQ_FMT = TOOLTIP_TALENT_PREREQ or L["Requires %d points in %s"]
 local REQ_HEAD   = string.match(TIER_FMT, "^(.-)%%") or "Requires "
 local TIER_TAIL  = string.match(TIER_FMT, "%%s(.*)$") or " Talents"
 
@@ -443,14 +444,14 @@ local function OnTalentDragStart(self)
 end
 
 local PLAN_ERRORS = {
-    required = "Another talent requires this one.",
-    tier     = "A talent deeper in this tree needs this point.",
-    combat   = "You can't change applied talents in combat.",
-    points   = "Not enough talent points for this build.",
-    invalid  = "This build could not be applied.",
-    learn    = "Some talent points could not be applied; they are free again.",
-    missing  = "Some talent points could not be applied.",
-    noanswer = "The server did not answer: nothing was changed.",
+    required = L["Another talent requires this one."],
+    tier     = L["A talent deeper in this tree needs this point."],
+    combat   = L["You can't change applied talents in combat."],
+    points   = L["Not enough talent points for this build."],
+    invalid  = L["This build could not be applied."],
+    learn    = L["Some talent points could not be applied; they are free again."],
+    missing  = L["Some talent points could not be applied."],
+    noanswer = L["The server did not answer: nothing was changed."],
 }
 
 local function PlanError(reason)
@@ -1058,24 +1059,24 @@ function TF.Refresh()
         -- previewing another spec: Apply activates it, Cancel goes back to the active one
         mainFrame.applyBtn:Show()
         mainFrame.cancelBtn:Show()
-        SetButtonState(mainFrame.applyBtn, viewRanks ~= nil, "Activate " .. SpecLabel(viewSpec))
-        SetButtonState(mainFrame.cancelBtn, true, "Back")
+        SetButtonState(mainFrame.applyBtn, viewRanks ~= nil, T("Activate {viewSpec}", { viewSpec = SpecLabel(viewSpec) }))
+        SetButtonState(mainFrame.cancelBtn, true, L["Back"])
     else
         mainFrame.applyBtn:Show()
         mainFrame.cancelBtn:Show()
         local pending = PendingPoints()
         if applying then
-            SetButtonState(mainFrame.applyBtn, false, "Applying...")
-            SetButtonState(mainFrame.cancelBtn, false, "Cancel")
+            SetButtonState(mainFrame.applyBtn, false, L["Applying..."])
+            SetButtonState(mainFrame.cancelBtn, false, CANCEL)
         else
-            SetButtonState(mainFrame.applyBtn, pending > 0, pending > 0 and ("Apply Changes (" .. pending .. ")") or "Apply Changes")
-            SetButtonState(mainFrame.cancelBtn, pending > 0, "Cancel")
+            SetButtonState(mainFrame.applyBtn, pending > 0, pending > 0 and (T("Apply Changes ({pending})", { pending = pending })) or L["Apply Changes"])
+            SetButtonState(mainFrame.cancelBtn, pending > 0, CANCEL)
         end
     end
 
     -- Glyphs always available, at any level; pet talents only for a talented pet.
     mainFrame.glyphBtn:Show()
-    mainFrame.glyphBtn:SetText(glyphMode and (TALENTS or "Talents") or (GLYPHS or "Glyphs"))
+    mainFrame.glyphBtn:SetText(glyphMode and (TALENTS or L["Talents"]) or (GLYPHS or L["Glyphs"]))
     local _, isHunterPet = HasPetUI()
     if isHunterPet and (GetNumTalentGroups(false, true) or 0) > 0 then mainFrame.petBtn:Show() else mainFrame.petBtn:Hide() end
 
@@ -1152,11 +1153,21 @@ local function ReturnGlyphFrame()
     if onGlyphTab then GlyphFrame:Show() else GlyphFrame:Hide() end
 end
 
+local glyphGuardHooked = false
+
 local function SetGlyphMode(on)
     if on then
         TalentFrame_LoadUI()
         GlyphFrame_LoadUI()
         if not GlyphFrame then return end
+        -- PTR 4287: stock talent refreshes (learn, reset) re-show GlyphFrame; while it sits on
+        -- our board outside glyph mode it would cover the trees.
+        if not glyphGuardHooked then
+            glyphGuardHooked = true
+            GlyphFrame:HookScript("OnShow", function(self)
+                if not glyphMode and self:GetParent() == mainFrame.board then self:Hide() end
+            end)
+        end
         -- the glyph slots read their spec off PlayerTalentFrame, shown or not
         if PlayerTalentFrame and not PlayerTalentFrame:IsShown() then
             PlayerTalentFrame.talentGroup = TalentGroup()
@@ -1174,10 +1185,13 @@ local function SetGlyphMode(on)
             -(SOCKETS.x0 + SOCKETS.x1) / 2, (SOCKETS.y0 + SOCKETS.y1) / 2)
         GlyphFrame:SetFrameStrata(mainFrame:GetFrameStrata())
         GlyphFrame:SetFrameLevel(mainFrame.board:GetFrameLevel() + 10)
+        glyphMode = true  -- before Show: the OnShow guard above reads it
         GlyphFrame:Show()
         if GlyphFrame_Update then GlyphFrame_Update() end
     elseif GlyphFrame and GlyphFrame:GetParent() == mainFrame.board then
+        -- PTR 4287: hand the frame back to the stock window, not just hide it on our board
         GlyphFrame:Hide()
+        ReturnGlyphFrame()
     end
     glyphMode = on and true or false
     -- the parchment lies on the class art: talents and headers go, the art dims
@@ -1201,6 +1215,31 @@ end
 local function OnStockFrameShown()
     mainFrame:Hide()
     ReturnGlyphFrame()
+end
+
+-- PTR 4233: the stock frame (opened for pet talents) keeps its side tabs; clicking the
+-- character's tab turns it to the player's talents (PlayerTalentFrame.pet = false), which
+-- only this window should show. Checked on the next frame: PlayerTalentFrame_Open refreshes
+-- once before it sets .pet.
+local stockSwitch = CreateFrame("Frame")
+stockSwitch:Hide()
+stockSwitch:SetScript("OnUpdate", function(self)
+    self:Hide()
+    if not (PlayerTalentFrame and PlayerTalentFrame:IsShown()) or PlayerTalentFrame.pet then return end
+    local onGlyphTab = PanelTemplates_GetSelectedTab(PlayerTalentFrame) == (GLYPH_TALENT_TAB or 4)
+    HideUIPanel(PlayerTalentFrame)
+    if onGlyphTab then TF.ToggleGlyphs() else mainFrame:Show() end
+end)
+
+local stockRefreshHooked = false
+local function HookStockRefresh()
+    if stockRefreshHooked or not PlayerTalentFrame_Refresh then return end
+    stockRefreshHooked = true
+    hooksecurefunc("PlayerTalentFrame_Refresh", function()
+        if PlayerTalentFrame and PlayerTalentFrame:IsShown() and not PlayerTalentFrame.pet then
+            stockSwitch:Show()
+        end
+    end)
 end
 
 local function OpenPetTalents()
@@ -1230,12 +1269,13 @@ local function CreateChrome()
         return
     end
     chrome:SetAllPoints(mainFrame)
-    chrome.TitleText:SetText(TALENTS or "Talents")
+    chrome.TitleText:SetText(TALENTS or L["Talents"])
     SetPortraitTexture(chrome.portrait, "player")
     local ok2, inset = pcall(CreateFrame, "Frame", nil, chrome, "InsetFrameTemplate")
     if ok2 and inset then
         inset:SetPoint("TOPLEFT", mainFrame.board, "TOPLEFT", -3, 3)
         inset:SetPoint("BOTTOMRIGHT", mainFrame.board, "BOTTOMRIGHT", 3, -3)
+        mainFrame.inset = inset
     end
     local base = mainFrame:GetFrameLevel()
     chrome:SetFrameLevel(base)
@@ -1303,11 +1343,11 @@ local function CreateSpecTab(index)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(ProjectEbonhold.Spec and ProjectEbonhold.Spec.GetSpecName(index) or SpecLabel(index), 1, 1, 1)
         if index == SelectedSpec() then
-            GameTooltip:AddLine("Active specialization.", 0.1, 1, 0.1, true)
+            GameTooltip:AddLine(L["Active specialization."], 0.1, 1, 0.1, true)
         else
-            GameTooltip:AddLine("Left-click to preview it, then activate it from the bottom bar.", 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["Left-click to preview it, then activate it from the bottom bar."], 0.8, 0.8, 0.8, true)
         end
-        GameTooltip:AddLine("Right-click to rename it.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["Right-click to rename it."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     t:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1332,6 +1372,7 @@ local function CreateMainFrame()
     local closeBtn = CreateFrame("Button", nil, mainFrame, "UIPanelCloseButton")
     -- same place as the button of ezCollectionsPortraitFrameTemplate
     closeBtn:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", 4, 5)
+    mainFrame.closeBtn = closeBtn
 
     -- the search box is built on first show (CreateSearchBox): its template is
     -- defined by the collections module, which loads after this file
@@ -1357,7 +1398,7 @@ local function CreateMainFrame()
     local unspentLabel = unspentBox:CreateFontString(nil, "OVERLAY")
     unspentLabel:SetFont("Fonts\\FRIZQT__.TTF", 12)
     unspentLabel:SetPoint("LEFT", unspentBox, "LEFT", 0, 0)
-    unspentLabel:SetText("Unspent Talents")
+    unspentLabel:SetText(L["Unspent Talents"])
     unspentLabel:SetTextColor(0.9, 0.86, 0.75)
     local unspentBg = unspentBox:CreateTexture(nil, "ARTWORK")
     unspentBg:SetSize(36, 22)
@@ -1370,7 +1411,7 @@ local function CreateMainFrame()
     mainFrame.unspentBox = unspentBox
 
     -- bottom bar
-    local applyBtn = utils.CreateSimpleCustomButton(mainFrame, "Apply Changes", function()
+    local applyBtn = utils.CreateSimpleCustomButton(mainFrame, L["Apply Changes"], function()
         if viewSpec then
             ActivateViewedSpec()
         else
@@ -1379,7 +1420,7 @@ local function CreateMainFrame()
     end, 170, 30)
     mainFrame.applyBtn = applyBtn
 
-    local cancelBtn = utils.CreateSimpleCustomButton(mainFrame, "Cancel", function()
+    local cancelBtn = utils.CreateSimpleCustomButton(mainFrame, CANCEL, function()
         if viewSpec then
             ShowSpec(nil)
         elseif not applying then
@@ -1393,27 +1434,28 @@ local function CreateMainFrame()
     applyBtn:SetPoint("RIGHT", cancelBtn, "LEFT", -10, 0)
     mainFrame.cancelBtn = cancelBtn
 
-    local resetBtn = utils.CreateSimpleCustomButton(mainFrame, "Reset Talents", function()
+    local resetBtn = utils.CreateSimpleCustomButton(mainFrame, L["Reset Talents"], function()
         if ProjectEbonhold.Spec and ProjectEbonhold.Spec.ConfirmResetTalents then
             ProjectEbonhold.Spec.ConfirmResetTalents()
         end
     end, 110, 30)
     resetBtn:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMLEFT", 20, 8)
+    mainFrame.resetBtn = resetBtn
     resetBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Reset Talents", 1, 1, 1)
-        GameTooltip:AddLine("Refunds every talent point of the active specialization.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["Reset Talents"], 1, 1, 1)
+        GameTooltip:AddLine(L["Refunds every talent point of the active specialization."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     resetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    local glyphBtn = utils.CreateSimpleCustomButton(mainFrame, GLYPHS or "Glyphs", function()
+    local glyphBtn = utils.CreateSimpleCustomButton(mainFrame, GLYPHS or L["Glyphs"], function()
         SetGlyphMode(not glyphMode)
     end, 90, 30)
     glyphBtn:SetPoint("LEFT", resetBtn, "RIGHT", 8, 0)
     mainFrame.glyphBtn = glyphBtn
 
-    local petBtn = utils.CreateSimpleCustomButton(mainFrame, "Pet Talents", OpenPetTalents, 100, 30)
+    local petBtn = utils.CreateSimpleCustomButton(mainFrame, L["Pet Talents"], OpenPetTalents, 100, 30)
     petBtn:SetPoint("LEFT", glyphBtn, "RIGHT", 8, 0)
     mainFrame.petBtn = petBtn
 
@@ -1450,6 +1492,7 @@ local function CreateMainFrame()
             -- the stock frame (pet talents) and this one never show together
             if arg1 == "Blizzard_TalentUI" and PlayerTalentFrame then
                 PlayerTalentFrame:HookScript("OnShow", OnStockFrameShown)
+                HookStockRefresh()
             end
             return
         end
@@ -1486,6 +1529,7 @@ CreateMainFrame()
 -- Blizzard_TalentUI is load-on-demand; if something loaded it already, hook it now.
 if PlayerTalentFrame then
     PlayerTalentFrame:HookScript("OnShow", OnStockFrameShown)
+    HookStockRefresh()
 end
 
 if ProjectEbonhold.Spec and ProjectEbonhold.Spec.AddListener then

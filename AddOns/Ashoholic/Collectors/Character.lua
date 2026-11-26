@@ -52,6 +52,7 @@ function CharacterCollector.Collect()
         return
     end
 
+    Data.SetCurrentCharacter(realmName, characterName, guid)
     Data.SaveCharacterBasics(realmName, characterName, {
         guid = guid,
         class = classToken,

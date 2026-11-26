@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- GENERATED 2026-09-16 from the skill tree builder export (final_tree.json). Do not hand-edit:
 -- regenerate with gen_lua.py. Mirrors characters.skill_tree_node exactly (ids, spells, costs,
 -- currency, permanent, infinite, starts) plus the layout (x, y).
@@ -8,7 +9,7 @@ TalentDatabase = {
     [0] = {
         name = "Default Soul Tree",
         treeId = 0,
-        description = "Universal soul tree for all classes",
+        description = L["Universal soul tree for all classes"],
 nodes = {
     {
         id = 1,
@@ -3092,8 +3093,8 @@ nodes = {
     },
     {
         id = 617,
-        x = -570,
-        y = 1110,
+        x = -630,
+        y = 1050,
         spells = {110180},
         soulPointsCosts = {99000},
         currency = "ash",
@@ -6119,7 +6120,7 @@ nodes = {
         isStart = true,
         infinite = true,
         infiniteGrowth = 1.25,
-        gainsPerRank = { { amount = 5, label = "Stamina" } },
+        gainsPerRank = { { amount = 5, label = L["Stamina"] } },
         computedDesc = "Increases your Stamina by %s."
     },
     {
@@ -6134,7 +6135,7 @@ nodes = {
         isStart = true,
         infinite = true,
         infiniteGrowth = 1.25,
-        gainsPerRank = { { amount = 10, label = "Attack Power" }, { amount = 5, label = "Spell Power" } },
+        gainsPerRank = { { amount = 10, label = L["Attack Power"] }, { amount = 5, label = L["Spell Power"] } },
         gainsExclusive = true,
         computedDesc = "Increases your attack power by %s or your spell power by %s, whichever is higher."
     },
@@ -6150,8 +6151,9 @@ nodes = {
         isStart = true,
         infinite = true,
         infiniteGrowth = 1.25,
-        gainsPerRank = { { ramp = true, label = "Highest Attribute" } },
-        computedDesc = "Increases your Strength, Agility, Intellect or Spirit by %s, whichever is highest."
+        mainStat = true, -- skillTree.lua: the first %s is the class's stat (mainStatName)
+        gainsPerRank = { { ramp = true } },
+        computedDesc = "Increases your %s by %s. The attribute follows your class and talent specialization."
     },
     {
         id = 30000,
@@ -6165,7 +6167,7 @@ nodes = {
         isStart = true,
         infinite = true,
         infiniteGrowth = 1.25,
-        gainsPerRank = { { amount = 40, label = "Flat reduction" } },
+        gainsPerRank = { { amount = 40, label = L["Flat reduction"] } },
         computedDesc = "Reduces damage taken by %s from any hit that exceeds 9%% of your maximum health."
     },
     {
@@ -6711,8 +6713,8 @@ nodes = {
     },
     {
         id = 30057,
-        x = -930,
-        y = 990,
+        x = -870,
+        y = 930,
         spells = {120001},
         soulPointsCosts = {81},
         currency = "shard",
@@ -6720,8 +6722,8 @@ nodes = {
     },
     {
         id = 30058,
-        x = -990,
-        y = 900,
+        x = -930,
+        y = 930,
         spells = {120002},
         soulPointsCosts = {98},
         currency = "shard",
@@ -6729,8 +6731,8 @@ nodes = {
     },
     {
         id = 30059,
-        x = -1080,
-        y = 900,
+        x = -990,
+        y = 930,
         spells = {120003},
         soulPointsCosts = {118},
         currency = "shard",
@@ -6738,8 +6740,8 @@ nodes = {
     },
     {
         id = 30060,
-        x = -870,
-        y = 1170,
+        x = -990,
+        y = 1050,
         spells = {120004},
         soulPointsCosts = {693},
         currency = "shard",
@@ -6747,8 +6749,8 @@ nodes = {
     },
     {
         id = 30061,
-        x = -810,
-        y = 1290,
+        x = -1050,
+        y = 990,
         spells = {120005},
         soulPointsCosts = {832},
         currency = "shard",
@@ -6756,8 +6758,8 @@ nodes = {
     },
     {
         id = 30062,
-        x = -810,
-        y = 1410,
+        x = -1110,
+        y = 930,
         spells = {120006},
         soulPointsCosts = {998},
         currency = "shard",
@@ -6765,8 +6767,8 @@ nodes = {
     },
     {
         id = 30063,
-        x = -810,
-        y = 1470,
+        x = -1170,
+        y = 870,
         spells = {120007},
         soulPointsCosts = {1197},
         currency = "shard",
@@ -7233,7 +7235,7 @@ nodes = {
         isStart = true,
         infinite = true,
         infiniteGrowth = 1.15,
-        gainsPerRank = { { lin = 0.10, bump = 2, label = "Soul Ashes" }, { lin = 0.01, bump = 2, label = "Soul Shards" } },
+        gainsPerRank = { { lin = 0.10, bump = 2, label = L["Soul Ashes"] }, { lin = 0.01, bump = 2, label = L["Soul Shards"] } },
         computedDesc = "Increases Soul Ashes gained by %s and Soul Shards gained by %s (+10%% and +1%% per rank, doubled every 10 ranks)."
     },
     {

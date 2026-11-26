@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Module: Experience Bonuses switch
 -- One entry in the player portrait's right-click menu (PlayerFrame, "SELF" unit popup) that turns
 -- the aura experience bonuses off or back on: heirlooms, the skill tree and echoes. Made to level
@@ -13,8 +14,8 @@ local bonusesOff = false
 
 local function RefreshText()
     UnitPopupButtons[BUTTON].text = bonusesOff
-        and "Experience Bonuses: |cffFF4444Off|r"
-        or "Experience Bonuses: |cff00FF00On|r"
+        and L["Experience Bonuses: |cffFF4444Off|r"]
+        or L["Experience Bonuses: |cff00FF00On|r"]
 end
 
 -- ── Unit popup entry ─────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ if type(UnitPopupButtons) == "table" and type(UnitPopupMenus) == "table" and Uni
     -- Turning them back on costs the Death contracts' gauge (the server enforces it, 2026-10-29):
     -- ask first whenever there is a gauge to lose. The Pact keeps its gauge, so no question then.
     StaticPopupDialogs["EBONHOLD_XP_BONUS_ON"] = {
-        text = "Turning experience bonuses back on resets your contract bonus (%s) to zero.\n\nTurn them on?",
+        text = L["Turning experience bonuses back on resets your contract bonus (%s) to zero.\n\nTurn them on?"],
         button1 = YES,
         button2 = NO,
         OnAccept = function()
@@ -66,17 +67,17 @@ if type(UnitPopupButtons) == "table" and type(UnitPopupMenus) == "table" and Uni
     local function ShowTooltip(self)
         if self.value ~= BUTTON then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Experience Bonuses", 1, 1, 1)
-        GameTooltip:AddLine("Heirlooms, the skill tree and echoes increase the experience you gain from kills, gathering and quests.", nil, nil, nil, true)
-        GameTooltip:AddLine("Turn them off to level at the same pace as a friend. Your normal experience does not change.", nil, nil, nil, true)
-        GameTooltip:AddLine("Turning them back on resets your contract bonus to zero.", 1, 0.5, 0.25, true)
+        GameTooltip:SetText(L["Experience Bonuses"], 1, 1, 1)
+        GameTooltip:AddLine(L["Heirlooms, the skill tree and echoes increase the experience you gain from kills, gathering and quests."], nil, nil, nil, true)
+        GameTooltip:AddLine(L["Turn them off to level at the same pace as a friend. Your normal experience does not change."], nil, nil, nil, true)
+        GameTooltip:AddLine(L["Turning them back on resets your contract bonus to zero."], 1, 0.5, 0.25, true)
         GameTooltip:AddLine(" ")
         if bonusesOff then
-            GameTooltip:AddLine("Currently: |cffFF4444Off|r", 1, 1, 1)
-            GameTooltip:AddLine("Click to turn them back on.", 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine(L["Currently: |cffFF4444Off|r"], 1, 1, 1)
+            GameTooltip:AddLine(L["Click to turn them back on."], 0.6, 0.6, 0.6, true)
         else
-            GameTooltip:AddLine("Currently: |cff00FF00On|r", 1, 1, 1)
-            GameTooltip:AddLine("Click to turn them off.", 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine(L["Currently: |cff00FF00On|r"], 1, 1, 1)
+            GameTooltip:AddLine(L["Click to turn them off."], 0.6, 0.6, 0.6, true)
         end
         GameTooltip:Show()
     end

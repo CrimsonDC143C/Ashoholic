@@ -103,6 +103,7 @@ local CS = {
     REQUEST_CLEAR_TRANSMOG                    = 1113, -- body: slot ("" = all)    (phase 2 action)
     REQUEST_APPLY_ILLUSION                    = 1114, -- body: "slot:enchantId ..." (0 = remove; server writes PLAYER_VISIBLE_ITEM_x_ENCHANTMENT)
     REQUEST_FORM_LOOK_SET                     = 1115, -- body: "1" = show transmog in Shadowform / druid forms, "0" = form look
+    REQUEST_UNLOCK_APPEARANCE                 = 1116, -- body: itemID - unlock that look for Coins of Forgotten Appearances (answer: SEND_APPEARANCE_LEARNED)
 
     -- Transmog outfits (server-side, bridged to player->presetMap)
     REQUEST_OUTFITS                           = 1120, -- body: "" - request the outfit list
@@ -140,6 +141,8 @@ local CS = {
     REQUEST_ORB_REROLL                        = 1222, -- body: "" - spend one more orb to redraw an
                                                       -- offer an orb already paid for. Nothing to name:
                                                       -- the server holds the choice and the owed count.
+    REQUEST_ORB_UPGRADE                       = 1223, -- body: "<perkSpellId>" - spend orbs to turn one stack
+                                                      -- into its next quality (250 / 500).
 
     -- Class constellations of the skill tree (modules/skillTree/skillTree_classes.lua).
     REQUEST_CLASS_TREE_DATA                   = 1230, -- body: "" - owned class nodes + per-class progress
@@ -158,6 +161,8 @@ local CS = {
     REQUEST_CALLBOARD_DATA                    = 1240, -- body: ""
     REQUEST_CALLBOARD_ACCEPT                  = 1241, -- body: questId
     REQUEST_CALLBOARD_CLAIM                   = 1242, -- body: questId, "0" = every completed board quest
+    REQUEST_CALLBOARD_START_ZONE              = 1243, -- body: StartZone id 1-8, only inside a start valley
+    REQUEST_RAID_RENEWAL                      = 1244, -- body: map id - drink one Elixir of Renewal on that raid (answered by SEND_RAID_RENEWAL)
 
     -- Dungeon Finder (modules/dungeonFinder/dungeon_finder.lua): the Torment of the next run.
     REQUEST_LFG_TORMENT_DATA                  = 1250, -- body: "" - selected tier + highest queueable tier
@@ -172,6 +177,7 @@ local CS = {
     REQUEST_RAID_FINDER_LEAVE                 = 1257, -- body: ""
     REQUEST_RAID_FINDER_ANSWER                = 1266, -- body: "1" accept / "0" decline
     REQUEST_RAID_FINDER_SEARCH                = 1267, -- body: "1" start / "0" stop the search for replacements
+    REQUEST_RAID_FINDER_TELEPORT              = 1269, -- body: "1" into / "0" out of the raid (member of a Raid Finder raid)
 
     -- The Trials (modules/trials). Start is honoured next to the Trial Warden only.
     REQUEST_TRIAL_STATE                       = 1260, -- body: ""
@@ -192,6 +198,7 @@ local CS = {
     REQUEST_TOOLBELT_OPEN_AUCTION             = 1278, -- body: ""
     REQUEST_TOOLBELT_GUILD_BANK               = 1279, -- body: ""
     REQUEST_TOOLBELT_FORGE                    = 1281, -- body: "" (Portable Forge: set up a forge and an anvil here)
+    REQUEST_TOOLBELT_OPEN_MERCHANT            = 1282, -- body: "" (Vendor: open the merchant window, no creature)
 
     -- The soul anchor (modules/contracts): pay the run's Soul Ashes so death sends you back to
     -- this Spirit Healer, wherever you die. A Spirit Healer must be within reach.
@@ -199,6 +206,8 @@ local CS = {
 
     -- The instance tracker (modules/instanceTracker): resend after a /reload or a group change.
     REQUEST_INSTANCE_TRACKER                  = 1293, -- body: ""
+    -- Demonic Portals (modules/torment/portal_pins): which portals of my map are closed, after a /reload.
+    REQUEST_TORMENT_PORTALS                   = 1294, -- body: "" (answered by SEND_TORMENT_PORTALS)
 
     REQUEST_SPEC_TALENTS                      = 1300, -- body: specIndex (talent frame spec preview)
     REQUEST_APPLY_TALENT_PLAN                 = 1301, -- body: "talentId:rank,..." (talent frame Apply when points are taken back)
@@ -297,6 +306,10 @@ local SS = {
     -- spend, so the client never tracks the count itself.
     SEND_ORB_CHARGES                          = 1220,
 
+    -- Echoes banished this run on the ACTIVE loadout: "perkSpellId,perkSpellId,..." (empty = none).
+    -- Pushed on login, on every choice request, after a banish, a loadout switch and a run reset.
+    SEND_PERK_BANISHED                        = 1224,
+
     -- Class constellations. Progress = Soul Ashes earned while playing the class (cumulative).
     SEND_CLASS_TREE_DATA                      = 1230, -- "<ashes class1>,...,<ashes class11>|<owned nodeId>,..."
     SEND_CLASS_NODE_RESULT                    = 1231, -- "OK,<nodeId>,<new ash pool>" or "FAIL,<reason>,<nodeId>"
@@ -311,6 +324,9 @@ local SS = {
     -- RESULT: "OK~accept~id" / "FAIL~accept~reason~id" / "OK~claim~n~ashes~xp~copper~artisan~cacheItems" / "FAIL~claim~reason~id".
     SEND_CALLBOARD_DATA                       = 1240,
     SEND_CALLBOARD_RESULT                     = 1241,
+    -- Elixir of Renewal: "LIST|<mapId>~<name>~<looted>~<total>;..." (right-click on the elixir: open the raid picker),
+    -- "OK|<mapId>|<name>" (renewed, the elixir is spent), "FAIL|<reason>" (combat|inside|nothing|noitem).
+    SEND_RAID_RENEWAL                         = 1245,
 
     -- Dungeon Finder. DATA: "<selected>|<maxQueueable>|<maxTier>|<orbsPerTier>|<minGroupSize>" (login, level up, request).
     -- DATA ends with "|<release>|<mood>" (mood 0 = Fast, 1 = Slow).
@@ -318,6 +334,8 @@ local SS = {
     SEND_LFG_TORMENT_DATA                     = 1250,
     SEND_LFG_TORMENT_RESULT                   = 1251,
     SEND_LFG_QUEUE_STATE                      = 1252,
+    -- TIER_COUNTS: "<waiting at tier 1>|<tier 2>|...|<tier 11>" (Group mode only), after every DATA and every queue tick.
+    SEND_LFG_TIER_COUNTS                      = 1268,
 
     -- Raid Finder. DATA / STATE / RESULT: see the wire block at the top of modules/raidFinder/raid_finder.lua.
     SEND_RAID_FINDER_DATA                     = 1258,
@@ -342,6 +360,14 @@ local SS = {
     -- Instance tracker: "<name>|<raid>|<torment>|<cleared>|<shards>|<orbs>|<cache item>|<cache ilvl>|<name~dead~looted;...>",
     -- empty = not in a dungeon or raid (modules/instanceTracker).
     SEND_INSTANCE_TRACKER                     = 1293,
+
+    -- Demonic Portals (modules/torment/portal_pins). PORTALS: "<mapId>|<spawnId>:<seconds closed>,..." = the closed
+    -- portals of my map (map change, request). STATE: "<mapId>|<spawnId>:<seconds closed, 0 = open again>" (pushed).
+    -- SEEN: "<mapId>|<spawnId>" = I just came near it: pin it. USED: "<mapId>|<spawnId>" = I fought at it: unpin it.
+    SEND_TORMENT_PORTALS                      = 1294,
+    SEND_TORMENT_PORTAL_STATE                 = 1295,
+    SEND_TORMENT_PORTAL_SEEN                  = 1296,
+    SEND_TORMENT_PORTAL_USED                  = 1297,
 
     SEND_SPEC_TALENTS                         = 1300, -- body: "specIndex|talentId:rank,..." (rank 1-based)
     SEND_TALENT_PLAN_RESULT                   = 1301, -- body: "OK" or "FAIL,reason,talentId"
@@ -424,8 +450,7 @@ local function dispatch(prefix, payload, dist, sender)
                 local ok, err = pcall(handler, out, dist, sender, evt)
                 if not ok then
                     DEFAULT_CHAT_FRAME:AddMessage(
-                        "|cffff0000[ProjectEbonhold] handler error:|r " ..
-                        tostring(err))
+                        "|cffff0000[ProjectEbonhold] handler error:|r " .. tostring(err))
                 end
             end
         end

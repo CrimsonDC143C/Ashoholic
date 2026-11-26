@@ -12,6 +12,11 @@
  The server sends no balances at login. They arrive when a balance changes,
  when the Soul Ash tree first opens, after a successful Apply in the tree, or
  when the roster asks for them through RequestBalancesIfNeeded below.
+
+ Warband bank gold is also account-wide. The companion's extended bank
+ receives it with every bank update, so it is collected here too and saved in
+ its own "warband" group (see Data/Schema.lua). Nothing arrives until the bank
+ is used, and an older companion without the extended bank sends none.
 ]]
 
 local addonName = ...
@@ -28,6 +33,7 @@ addon.Collectors = addon.Collectors or {}
 addon.Collectors.Currencies = CurrencyCollector
 
 local pendingSnapshot
+local pendingWarband
 local databaseReady = false
 -- Becomes true when any balance message arrives in this UI session.
 local receivedThisSession = false
@@ -43,6 +49,17 @@ local function SavePendingSnapshot()
     Data.SaveAccountCurrencies(snapshot)
 end
 
+-- Same pattern for the Warband bank: only the newest bank packet matters.
+local function SavePendingWarband()
+    if not databaseReady or not pendingWarband then
+        return
+    end
+
+    local snapshot = pendingWarband
+    pendingWarband = nil
+    Data.SaveAccountWarband(snapshot)
+end
+
 -- ProjectEbonhold keeps these balances private and only passes them along when
 -- an update arrives, so start watching as soon as this file loads. Ashoholic
 -- depends on ProjectEbonhold, so the companion has already loaded by now.
@@ -51,6 +68,15 @@ Integration.WatchAccountCurrencies(function(snapshot)
     receivedThisSession = true
     pendingSnapshot = snapshot
     SavePendingSnapshot()
+end)
+
+-- Bank packets only arrive while the bank is used, normally long after login,
+-- but one could arrive before the database is ready; it then waits as pending.
+-- The watcher returns false and watches nothing when the companion has no
+-- extended bank; the warband group then simply stays unknown.
+Integration.WatchWarbandBank(function(snapshot)
+    pendingWarband = snapshot
+    SavePendingWarband()
 end)
 
 -- The roster calls this when it opens. If no balances have arrived in this UI
@@ -72,4 +98,5 @@ frame:SetScript("OnEvent", function()
     frame:UnregisterEvent("PLAYER_LOGIN")
     databaseReady = true
     SavePendingSnapshot()
+    SavePendingWarband()
 end)

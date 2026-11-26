@@ -1,14 +1,15 @@
 -- Placeholder Shop Data
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addon, Addon = ...
 
 local SHOP_PLACEHOLDER_DATA = {
     categories = {
-        { id = 1, name = "Convenience", icon = "Interface/Shop/categoryIcons/category-icon-services" },
-        { id = 2,  name = "Character Services", icon = "Interface/Shop/categoryIcons/category-icon-featured" },
-        { id = 4, name = "Appearance",         icon = "Interface/Shop/categoryIcons/category-icon-mounts" },
-        { id = 5,  name = "Mounts",             icon = "Interface/Shop/categoryIcons/category-icon-mounts" },
-        { id = 11, name = "Stones of Retreat",  icon = "Interface/Shop/categoryIcons/category-icon-enchantscroll" },
-        { id = 12,  name = "Miscellaneous",      icon = "Interface/Shop/categoryIcons/category-icon-free" },
+        { id = 1, name = L["Convenience"], icon = "Interface/Shop/categoryIcons/category-icon-services" },
+        { id = 2,  name = L["Character Services"], icon = "Interface/Shop/categoryIcons/category-icon-featured" },
+        { id = 4, name = L["Appearance"],         icon = "Interface/Shop/categoryIcons/category-icon-mounts" },
+        { id = 5,  name = L["Mounts"],             icon = "Interface/Shop/categoryIcons/category-icon-mounts" },
+        { id = 11, name = L["Stones of Retreat"],  icon = "Interface/Shop/categoryIcons/category-icon-enchantscroll" },
+        { id = 12,  name = L["Miscellaneous"],      icon = "Interface/Shop/categoryIcons/category-icon-free" },
         -- { id = 8,  name = "Transmogrification", icon = "Interface/Shop/categoryIcons/category-icon-clothes" },
     },
     -- entries = {
@@ -100,24 +101,24 @@ end
 -- Title
 if not ModernShopTitle then
     ModernShopTitle = ModernShopFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    ModernShopTitle:SetText("Shop")
+    ModernShopTitle:SetText(L["Shop"])
     ModernShopTitle:SetFont("Fonts\\FRIZQT__.TTF", 14)
     ModernShopTitle:SetPoint("TOP", ModernShopFrame, "TOP", 0, -5)
 end
 
 
 ModernShopDP = ModernShopFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-ModernShopDP:SetText("You have " .. 0 .. " DP(s)")
+ModernShopDP:SetText(T("You have {amount} DP(s)", { amount = 0 }))
 ModernShopDP:SetFont("Fonts\\FRIZQT__.TTF", 14)
 ModernShopDP:SetPoint("CENTER", ModernShopFrame, "LEFT", 100, -250)
 
 ModernShopDP.Link = ModernShopFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-ModernShopDP.Link:SetText("Get DPs at projectebonhold.com/shop")
+ModernShopDP.Link:SetText(L["Get DPs at projectebonhold.com/shop"])
 ModernShopDP.Link:SetFont("Fonts\\FRIZQT__.TTF", 10)
 ModernShopDP.Link:SetPoint("CENTER", ModernShopFrame, "LEFT", 100, -265)
 
 function ModernShopDPSetAmount(amount)
-    ModernShopDP:SetText("You have " .. tonumber(amount) .. "  DP(s)")
+    ModernShopDP:SetText(T("You have {amount} DP(s)", { amount = tonumber(amount) }))
 end
 
 -- Tilt Icon Top left
@@ -414,7 +415,7 @@ if not ModernShopBuyButton then
 
     -- Font label
     ModernShopBuyButton.label = ModernShopBuyButton:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    ModernShopBuyButton.label:SetText("|CFF9c9c9b Buy Now")
+    ModernShopBuyButton.label:SetText(L["|CFF9c9c9b Buy Now"])
     ModernShopBuyButton.label:SetPoint("CENTER", ModernShopBuyButton.middleTexture, "CENTER")
 
     -- texCoords for Highlights
@@ -489,9 +490,9 @@ function ModernShop_UpdateBuyButtonVisual(state)
 
     --Adjust label color
     if state == "disabled" then
-        ModernShopBuyButton.label:SetText("|CFF9c9c9b Buy Now")
+        ModernShopBuyButton.label:SetText(L["|CFF9c9c9b Buy Now"])
     else
-        ModernShopBuyButton.label:SetText("|CFFf7d219 Buy Now")
+        ModernShopBuyButton.label:SetText(L["|CFFf7d219 Buy Now"])
     end
 
     ModernShopBuyButton.leftTexture:SetTexCoord(unpack(coords.left))
@@ -718,7 +719,7 @@ ModernShopToastFrame.name:SetTextColor(1, 0.82, 0) -- golden
 -- Subtitle
 ModernShopToastFrame.message = ModernShopToastFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 ModernShopToastFrame.message:SetPoint("TOPLEFT", ModernShopToastFrame.name, "BOTTOMLEFT", -5, -4)
-ModernShopToastFrame.message:SetText("Your item has been delivered.")
+ModernShopToastFrame.message:SetText(L["Your item has been delivered."])
 
 
 function ModernShop_EnsureCategoryFrame()
@@ -825,7 +826,7 @@ function ModernShop_LoadEntriesTab(categoryID, subcategoryID)
 
             cost = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
             cost:SetPoint("BOTTOM", bg, "BOTTOM", 0, 10)
-            cost:SetText(entry.price .. " DP")
+            cost:SetText(T("{price} DP", { price = entry.price }))
         elseif categoryID == 8 then -- Transmog
             frame.TmogEntryModel = CreateFrame("DressUpModel", nil, frame)
             frame.TmogEntryModel:SetSize(100, 200)
@@ -923,7 +924,7 @@ function ModernShop_LoadEntriesTab(categoryID, subcategoryID)
 
             cost = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
             cost:SetPoint("TOP", name, "BOTTOM", 0, -6)
-            cost:SetText(entry.price .. " DP")
+            cost:SetText(T("{price} DP", { price = entry.price }))
         else -- Other (services etc)
             border = frame:CreateTexture(nil, "OVERLAY")
             border:SetTexture("Interface/Shop/store-main")
@@ -944,7 +945,7 @@ function ModernShop_LoadEntriesTab(categoryID, subcategoryID)
 
             cost = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
             cost:SetPoint("TOP", name, "BOTTOM", 0, -6)
-            cost:SetText(entry.price .. " DP")
+            cost:SetText(T("{price} DP", { price = entry.price }))
         end
 
         -- Hover Highlight
@@ -994,11 +995,11 @@ function ModernShop_LoadEntriesTab(categoryID, subcategoryID)
 
             -- Affichage des prix
             cost:SetPoint("TOP", name, "BOTTOM", -40, -6)
-            cost:SetText("|cFFFF5555" .. originalPrice .. " DP|r")  -- Prix original
+            cost:SetText("|cFFFF5555" .. T("{price} DP", { price = originalPrice }) .. "|r")  -- Prix original
             cost:SetFont("Fonts\\FRIZQT__.TTF", 9)
 
             discount = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-            discount:SetText("|cff00ff00" .. finalPrice .. " DP|r") -- Prix en promo
+            discount:SetText("|cff00ff00" .. T("{price} DP", { price = finalPrice }) .. "|r") -- Prix en promo
             discount:SetPoint("CENTER", cost, "CENTER", 50, 0)
         end
 
@@ -1147,7 +1148,7 @@ function ModernShop_LoadEntriesTab(categoryID, subcategoryID)
 
     -- PAGE CONTROLS
     if ModernShopTotalPages > 1 then
-        ModernShopPageText:SetText("Page " .. ModernShopCurrentPage .. " / " .. ModernShopTotalPages)
+        ModernShopPageText:SetText(T("Page {page} / {total}", { page = ModernShopCurrentPage, total = ModernShopTotalPages }))
         ModernShopPageText:Show()
         ModernShopPagePrev:Show()
         ModernShopPageNext:Show()
@@ -1194,26 +1195,26 @@ function ModernShop_LoadFeaturedTab()
     magnify:SetNormalTexture(icon)
 
     magnify:SetScript("OnClick", function()
-        DEFAULT_CHAT_FRAME:AddMessage("Previewing Guardian Pack...")
+        DEFAULT_CHAT_FRAME:AddMessage(L["Previewing Guardian Pack..."])
 
         PlaySound(852)
     end)
 
     -- Title
     local title = ModernShopFeaturedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetText("The Panda Pet")
+    title:SetText(L["The Panda Pet"])
     title:SetFont("Fonts\\FRIZQT__.TTF", 24)
     title:SetPoint("CENTER", ModernShopFeaturedFrame, "CENTER", 0, -50)
 
     -- Subtitle
     local subtitle = ModernShopFeaturedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    subtitle:SetText("Get this unique pet now !")
+    subtitle:SetText(L["Get this unique pet now !"])
     subtitle:SetFont("Fonts\\FRIZQT__.TTF", 16)
     subtitle:SetPoint("CENTER", title, "CENTER", 0, -40)
 
     -- Limited time text
     local limitedTimeText = ModernShopFeaturedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    limitedTimeText:SetText("|cFF00fff7 This pet will only be available from now till then !!")
+    limitedTimeText:SetText(L["|cFF00fff7 This pet will only be available from now till then !!"])
     limitedTimeText:SetFont("Fonts\\FRIZQT__.TTF", 12)
     limitedTimeText:SetPoint("CENTER", subtitle, "CENTER", 0, -60)
 
@@ -1264,7 +1265,7 @@ function ModernShop_LoadSpecialTab()
 
     -- Title
     local title = ModernShopSpecialFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetText("The WoW Token")
+    title:SetText(L["The WoW Token"])
     title:SetFont("Fonts\\FRIZQT__.TTF", 36)
     title:SetPoint("TOP", ModernShopSpecialFrame, "TOP", 0, -50)
 
@@ -1275,11 +1276,11 @@ function ModernShop_LoadSpecialTab()
     label:SetWordWrap(true)
     label:SetFont("Fonts\\FRIZQT__.TTF", 20)
     label:SetText(
-        "|CFFf3dba1 The WoW Token can be sold on the auction house for gold. The auction buyer can then redeem it for 30 days of game time. This Token may not be traded or redeemed; it may only be listed for sale on the Auction House.")
+        L["|CFFf3dba1 The WoW Token can be sold on the auction house for gold. The auction buyer can then redeem it for 30 days of game time. This Token may not be traded or redeemed; it may only be listed for sale on the Auction House."])
 
     -- Auction Value
     local auctionValue = ModernShopSpecialFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    auctionValue:SetText("|CFFd3b05b Current Auction Value:")
+    auctionValue:SetText(L["|CFFd3b05b Current Auction Value:"])
     auctionValue:SetFont("Fonts\\FRIZQT__.TTF", 18)
     auctionValue:SetPoint("CENTER", label, "CENTER", -50, -150)
 
@@ -1296,7 +1297,7 @@ function ModernShop_LoadSpecialTab()
 
     -- Subject to change
     local subjectToChange = ModernShopSpecialFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    subjectToChange:SetText("|CFFd3b05b (subject to change)")
+    subjectToChange:SetText(L["|CFFd3b05b (subject to change)"])
     subjectToChange:SetFont("Fonts\\FRIZQT__.TTF", 18)
     subjectToChange:SetPoint("CENTER", auctionValue, "CENTER", 50, -20)
 
@@ -1383,7 +1384,7 @@ function ModernShop_LoadPacksTab()
     -- Page controls
     ModernShopTotalPages = #SHOP_PLACEHOLDER_DATA.packs or 1
     if ModernShopTotalPages > 1 then
-        ModernShopPageText:SetText("Page " .. ModernShopCurrentPage .. " / " .. ModernShopTotalPages)
+        ModernShopPageText:SetText(T("Page {page} / {total}", { page = ModernShopCurrentPage, total = ModernShopTotalPages }))
         ModernShopPageText:Show()
         ModernShopPagePrev:Show()
         ModernShopPageNext:Show()
@@ -1430,8 +1431,8 @@ function ModernShop_ShowToast(entry)
         ModernShopToastFrame.icon:SetTexture(texturePath)
     end
 
-    ModernShopToastFrame.name:SetText(entry.name or "Unknown Item")
-    ModernShopToastFrame.message:SetText("Your item has been delivered.")
+    ModernShopToastFrame.name:SetText(entry.name or L["Unknown Item"])
+    ModernShopToastFrame.message:SetText(L["Your item has been delivered."])
 
     ModernShopToastFrame:Show()
     ModernShopToastFrame:SetAlpha(1)
@@ -1475,7 +1476,7 @@ function ModernShop_OpenPreview(entry)
             ModernShopPreviewFrame.PlayerModel:TryOn(itemID)
         end
     else
-        DEFAULT_CHAT_FRAME:AddMessage("No preview available for this item.")
+        DEFAULT_CHAT_FRAME:AddMessage(L["No preview available for this item."])
         ModernShopPreviewFrame:Hide()
         ModernShopFrame:Show() -- if error, reopen shop
     end

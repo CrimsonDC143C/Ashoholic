@@ -67,7 +67,7 @@ StaticPopupDialogs["CONFIRM_DELETE_TRANSMOG_OUTFIT"] = {
 }
 
 StaticPopupDialogs["CONFIRM_REVERT_TRANSMOG"] = {
-	text = "Revert all transmogrification? This removes every applied appearance (free).",
+	text = ProjectEbonhold.L["Revert all transmogrification? This removes every applied appearance (free)."],
 	button1 = YES,
 	button2 = NO,
 	OnAccept = function (self) C_Transmog.ClearAllTransmog(); end,

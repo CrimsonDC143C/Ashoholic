@@ -235,6 +235,10 @@ local cvars = {
     -- Wardrobe collected/uncollected filter defaults ON so everything shows.
     transmogrifyShowCollected   = 1,
     transmogrifyShowUncollected = 1,
+    -- "Collector's" filter: only the looks sold by the Warpweaver's Archive. Off by default.
+    transmogrifyShowCollectors  = 0,
+    -- "Torment" filter: only the Archive's Torment pieces. Off by default.
+    transmogrifyShowTorment     = 0,
 }
 function ez:GetCVar(name)            return cvars[name] end
 function ez:SetCVar(name, value)     cvars[name] = value end

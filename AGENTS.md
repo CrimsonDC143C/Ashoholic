@@ -8,15 +8,16 @@ Ashoholic is a World of Warcraft addon for Project Ebonhold on WotLK 3.3.5. Its 
 
 - `AddOns/` contains the active addon sources. `AddOns/Ashoholic/` is the main Ashoholic addon; implement new functionality there.
 - `AddOns/Ashoholic/Ashoholic.toc` is the active load manifest and shows the main Lua load order.
-- `AddOns/Ashoholic/PreviewUI.lua` contains the sample-data preview, opened with `/ash preview`; it is not live character tracking. `/ash` opens the live window in `UI/Roster.lua`, with `UI/CharacterDetails.lua` and `UI/Progression.lua` rendering their own views. `UI.lua` supplies shared live widgets and formatting.
-- `AddOns/Ashoholic/Data/Schema.lua` defines the approved saved-data contract; `Data/Store.lua` initializes, reads, and writes the new database. `Collectors/Character.lua` saves basics, `Collectors/Run.lua` saves run currencies, `Collectors/Currencies.lua` saves account currencies, and `Collectors/Ebonhold.lua` routes Prestige, Torment, contracts (offerings/Soul Anchor), and Echo-build snapshots. All companion access stays in `Integrations/ProjectEbonhold.lua`. Other feature modules remain scaffolding, not the archived addon's full behavior.
-- `Archive/` contains the old Ashoholic implementation, including tracking, raid metadata, widgets, Nexus integration, and the offline sync/merge scripts. Use it for reference or inspiration; it is not the active addon.
+- `UI/Widgets.lua`, `UI/Theme.lua`, `UI/Model.lua` and `UI/Window.lua` provide the live dashboard's shared widgets, appearance, data adapter and window. Each tab and Settings section has its own file. `UI/Dashboard.lua` coordinates lifecycle and updates.
+- `AddOns/Ashoholic/Data/Schema.lua` defines the approved saved-data contract; `Data/Store.lua` initializes, reads, writes, validates, and merges the database. `Data/Encounters.lua` provides dungeon names and expansion mappings. Collectors save basics, run and account currencies, Ebonhold progression and contracts, complete raid loot, Call Board observations, and Trials. All companion access stays in `Integrations/ProjectEbonhold.lua`.
+- `AddOns/Ashoholic/Sync/` holds the bounded data-only codec, trusted in-game sharing, and offline inbox. `AddOns/Ashoholic/OfflineMerge.ps1` backs up local account saves and prepares that inbox without editing the saved files; imports always go through `Data/Store.lua`. The generated inbox in a game installation may contain private account snapshots and must not be committed.
+- `Archive/` contains the old Ashoholic implementation and the design preview. They are references, not part of the active addon.
 - `AddOns/FastSwap/` is a separate addon and character-selection hook. Keep its installation helper separate from character-data syncing.
 - `AddOns/SharedMedia/` supplies the bundled media addon.
 
 ## Live Addon Architecture
 
-Build the live addon from the approved `PreviewUI.lua` design. Keep `AddOns/Ashoholic/` as one addon with one SavedVariables table, `AshoholicDB`; do not split it into DataStore-style addons.
+Build the live addon to match the approved design preview, but do not package or load preview Lua or sample data in the addon. Keep `AddOns/Ashoholic/` as one addon with one SavedVariables table, `AshoholicDB`; do not split it into DataStore-style addons.
 
 Use these internal layers as files are added or moved:
 
@@ -25,7 +26,6 @@ Use these internal layers as files are added or moved:
 - `Collectors/`: reads WoW and ProjectEbonhold data, then saves it through `Data/`.
 - `Sync/`: offline imports and in-game sharing; writes only through `Data/`.
 - `UI/`: main window, shared widgets, and one file per tab.
-- `Preview/`: the sample-data preview, kept separate from live data.
 
 Data flows Game -> Collectors -> Data -> UI. UI code must not read game data or `AshoholicDB` directly. Collectors and Sync must not write `AshoholicDB` except through `Data/`.
 
@@ -33,9 +33,11 @@ Store character records as Account -> Realm -> Character -> information plus las
 
 `AddOns/Ashoholic/Data/Schema.lua` is the approved data contract: saved layout, field sources, account vs character scope, and rules. Read it before changing saved data, and update it (raising `Schema.VERSION` with a migration when the layout changes) in the same change. Key rules: unknown values are `nil`, never 0; every data group has its own `updatedAt` from `time()` (never save `GetTime()`); merges keep the newer group, not the whole character.
 
-Run currencies, contracts and Echo builds have independent freshness. Torment stores actual per-character unlocks, not an account-wide tier or an assumption that all lower tiers are unlocked. Prestige stores complete server replies, never a mixture of a new result count and an old reward.
+Run currencies, contracts, Echo builds, and raid loot have independent freshness. Raid snapshots are saved only after a complete companion reply, including all chunks; each lock retains its server-reported end time. Dungeon entries show Tracked for catalogue/planning only, never a kill or loot claim. Torment access is account-wide: merge observed unlock evidence across its characters and imports without inventing lower tiers. Only selected Torment difficulty is character-specific. Prestige stores complete server replies, never a mixture of a new result count and an old reward.
 
-Split `PreviewUI.lua` gradually, one tab at a time as it becomes live. Update the `.toc` load order with each move.
+Call Board and Trials data are passive observations. The roster's equipped item level comes from the last Call Board reply and uses that reply's timestamp. Sync exports only the current account, never settings or the local account alias; imports validate the full packet and merge each group by timestamp while protecting character GUID changes.
+
+Keep live tab data adapters separate from the dashboard widgets. Update the `.toc` load order with each move. Local profiles/theme strings must not enter character-data sync. FastSwap may warn when its Glue hook is not detected, but must not block a swap on that check alone; launcher updates can overwrite `ebonhold_glue.lua`, so `Sync-FastSwapGlue.ps1` restores it.
 
 ## Working Style
 

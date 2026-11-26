@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 --
 -- Custom GM ticket creation channel (workaround for blocked Blizzard UI path).
 --
@@ -24,7 +25,7 @@ local MAX_TICKET_LEN = 1990
 
 local function chat(msg, r, g, b)
     if DEFAULT_CHAT_FRAME then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[GM Ticket]|r " .. tostring(msg), r or 1, g or 1, b or 1)
+        DEFAULT_CHAT_FRAME:AddMessage(T("|cffffd200[GM Ticket]|r {msg}", { msg = tostring(msg) }), r or 1, g or 1, b or 1)
     end
 end
 
@@ -36,7 +37,7 @@ end
 local function Submit(text)
     text = Trim(text or "")
     if text == "" then
-        chat("Cannot submit an empty ticket.", 1, 0.4, 0.4)
+        chat(L["Cannot submit an empty ticket."], 1, 0.4, 0.4)
         return false
     end
     if #text > MAX_TICKET_LEN then
@@ -44,12 +45,12 @@ local function Submit(text)
     end
 
     if not ProjectEbonhold or not ProjectEbonhold.sendToServer then
-        chat("Addon comms not ready yet, please retry in a moment.", 1, 0.4, 0.4)
+        chat(L["Addon comms not ready yet, please retry in a moment."], 1, 0.4, 0.4)
         return false
     end
 
     ProjectEbonhold.sendToServer(CS.REQUEST_CREATE_GM_TICKET, text)
-    chat("Ticket submitted. Waiting for server confirmation...")
+    chat(L["Ticket submitted. Waiting for server confirmation..."])
     return true
 end
 
@@ -63,12 +64,12 @@ ProjectEbonhold.onEventReceived(SS.SEND_GM_TICKET_CREATE_RESULT, function(body)
     status = status or ""
     if status == "OK" then
         local id = tonumber(detail) or 0
-        chat(string.format("Ticket #%d created. A GM will respond as soon as possible.", id), 0.4, 1, 0.4)
+        chat(string.format(L["Ticket #%d created. A GM will respond as soon as possible."], id), 0.4, 1, 0.4)
         -- Refresh Blizzard-side state if the standard frame happens to be open.
         if GetGMTicket then GetGMTicket() end
     else
         local reason = detail ~= "" and detail or status
-        chat("Ticket creation failed: " .. reason, 1, 0.4, 0.4)
+        chat(T("Ticket creation failed: {reason}", { reason = reason }), 1, 0.4, 0.4)
     end
 end)
 
@@ -163,7 +164,7 @@ local function InstallOn(buttonName)
     btn:SetScript("OnClick", function()
         local text = GetTicketText()
         if text == "" then
-            chat("Please type a message before submitting.", 1, 0.4, 0.4)
+            chat(L["Please type a message before submitting."], 1, 0.4, 0.4)
             return
         end
         if Submit(text) then

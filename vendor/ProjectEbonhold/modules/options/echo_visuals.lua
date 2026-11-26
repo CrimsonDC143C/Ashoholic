@@ -1,28 +1,31 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- File: echo_visuals.lua
 -- "Echoes" and "Class Spells" in Video > Effects, where "Death Effect" and "Projected Textures"
 -- were. Each one is Shown / Hide others / Hide all. Lowering Spell Detail hides spell effects but
 -- takes the boss telegraphs with them; these hide only players' echoes and class spells.
 --
 -- The server does the hiding (Player::GetHiddenSpellVisuals): it stops sending this client the
--- cast, missile and impact of those spells, and their ground effects. A creature's spell is never
--- filtered, so a telegraph always shows. "Hide all" on my own spell cast from the action bar keeps
+-- cast, missile and impact of those spells, and their ground effects. For echoes it is the whole
+-- chain (Ashendor::EchoVisuals): the spells an echo's script casts, its auras on other units, its
+-- summons and objects, its delayed effects. A world creature's spell is never filtered, so a
+-- telegraph always shows. "Hide all" on my own spell cast from the action bar keeps
 -- its cast bar and the animation on my character, only its projectile and impact go. The setting
 -- is account-wide here and the server forgets it at logout, so it is sent at every entering world
 -- and on every change.
 
-local MODE_LABELS = { [0] = "Shown", [1] = "Hide others", [2] = "Hide all" }
+local MODE_LABELS = { [0] = L["Shown"], [1] = L["Hide others"], [2] = L["Hide all"] }
 
 -- PlayerHiddenSpellVisuals: a kind is its "others" bit, its "mine" bit is the next one up.
 local KIND_BITS = { echo = 1, class = 4 }
 
 local OPTIONS = {
     {
-        key = "echoVisualsMode", kind = "echo", label = "Echoes",
-        tooltip = "Spell effects of echoes. Hide others: only other players' echoes. Hide all: yours too. Boss telegraphs always stay.",
+        key = "echoVisualsMode", kind = "echo", label = L["Echoes"],
+        tooltip = L["Spell effects of echoes. Hide others: only other players' echoes. Hide all: yours too. Boss telegraphs always stay."],
     },
     {
-        key = "classVisualsMode", kind = "class", label = "Class Spells",
-        tooltip = "Spell effects of class spells and procs. Hide others: only other players' spells. Hide all: yours too (your cast bar and casting animation stay). Boss telegraphs always stay.",
+        key = "classVisualsMode", kind = "class", label = L["Class Spells"],
+        tooltip = L["Spell effects of class spells and procs. Hide others: only other players' spells. Hide all: yours too (your cast bar and casting animation stay). Boss telegraphs always stay."],
     },
 }
 

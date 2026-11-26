@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ==============================================================================
 -- Raid loot lockout (2026-10-05): raids have no ID any more. Each character may loot each raid
 -- boss once a week, until Tuesday 03:00 UTC. The server pushes the bosses looted this week
@@ -53,7 +54,7 @@ local function FormatLeft(left)
         local ok, text = pcall(SecondsToTime, left, true, nil, 3)
         if ok and text then return text end
     end
-    return math.floor(left / 3600) .. " Hours"
+    return T("{left} Hours", { left = math.floor(left / 3600) })
 end
 
 -- ------------------------------------------------------------------ window content
@@ -71,6 +72,7 @@ local function BuildContent()
     content:SetPoint("BOTTOMRIGHT", RaidInfoFrame, "BOTTOMRIGHT", -16, 36)
 
     scroll = CreateFrame("ScrollFrame", "ProjectEbonholdRaidLockoutScroll", content, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scroll)  -- DragonUI's scroll bar (utils.lua)
     scroll:SetPoint("TOPLEFT", 0, 0)
     scroll:SetPoint("BOTTOMRIGHT", -24, 0)
     child = CreateFrame("Frame", nil, scroll)
@@ -82,13 +84,13 @@ local function BuildContent()
     empty:SetPoint("TOPLEFT", 4, -8)
     empty:SetPoint("RIGHT", -4, 0)
     empty:SetJustifyH("LEFT")
-    empty:SetText("You have not looted any raid boss this week.")
+    empty:SetText(L["You have not looted any raid boss this week."])
 
     note = child:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     note:SetPoint("TOPLEFT", child, "TOPLEFT", 2, -2)
     note:SetPoint("RIGHT", child, "RIGHT", -2, 0)
     note:SetJustifyH("LEFT")
-    note:SetText("Item level of the gear on Normal difficulty.")
+    note:SetText(L["Item level of the gear on Normal difficulty."])
 
     footer = RaidInfoFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     footer:SetPoint("BOTTOMLEFT", RaidInfoFrame, "BOTTOMLEFT", 18, 18)
@@ -130,10 +132,10 @@ local function SetRaidRow(row, raid, looted, y)
     row.map = raid.map
     Place(row, ROW_RAID, y, 2)
     row.name:SetFontObject(GameFontNormal)
-    row.name:SetText((expanded[raid.map] and "- " or "+ ") .. raid.name)
+    row.name:SetText((expanded[raid.map] and "- " or "+ ") .. L[raid.name])   -- display only
     row.state:SetFontObject(GameFontHighlight)
     local count = looted .. "/" .. #raid.bosses
-    row.state:SetText(raid.ilvl and ("|cffffd100ilvl " .. raid.ilvl .. "|r   " .. count) or count)
+    row.state:SetText(raid.ilvl and T("|cffffd100ilvl {ilvl}|r   {count}", { ilvl = raid.ilvl, count = count }) or count)
     row:EnableMouse(true)
     row:Show()
 end
@@ -144,11 +146,11 @@ local function SetBossRow(row, boss, y)
     row.name:SetFontObject(GameFontHighlightSmall)
     row.state:SetFontObject(GameFontHighlightSmall)
     if RL.IsLooted(boss.id) then
-        row.name:SetText("|cff808080" .. boss.name .. "|r")
-        row.state:SetText("|cffff4040Looted|r")
+        row.name:SetText("|cff808080" .. L[boss.name] .. "|r")   -- display only
+        row.state:SetText(L["|cffff4040Looted|r"])
     else
-        row.name:SetText(boss.name)
-        row.state:SetText("|cff1eff00Available|r")
+        row.name:SetText(L[boss.name])   -- display only
+        row.state:SetText(L["|cff1eff00Available|r"])
     end
     row:EnableMouse(false)
     row:Show()
@@ -195,9 +197,9 @@ function RL.Refresh()
     end
 
     if soonest then
-        footer:SetText("Each boss can be looted once a week. Resets in " .. FormatLeft(soonest) .. ".")
+        footer:SetText(T("Each boss can be looted once a week. Resets in {soonest}.", { soonest = FormatLeft(soonest) }))
     else
-        footer:SetText("Each boss can be looted once a week (Tuesday 03:00 UTC).")
+        footer:SetText(L["Each boss can be looted once a week (Tuesday 03:00 UTC)."])
     end
 end
 
@@ -207,8 +209,8 @@ local function OnRaidInfoShow()
         local frame = _G[name]
         if frame then frame:Hide() end
     end
-    if RaidInfoInstanceLabel and RaidInfoInstanceLabel.text then RaidInfoInstanceLabel.text:SetText("Raid") end
-    if RaidInfoIDLabel and RaidInfoIDLabel.text then RaidInfoIDLabel.text:SetText("Item level, looted") end
+    if RaidInfoInstanceLabel and RaidInfoInstanceLabel.text then RaidInfoInstanceLabel.text:SetText(L["Raid"]) end
+    if RaidInfoIDLabel and RaidInfoIDLabel.text then RaidInfoIDLabel.text:SetText(L["Item level, looted"]) end
     RL.Refresh()
     if RequestRaidInfo then RequestRaidInfo() end
     -- The answer carries the realm's release, which opens the raid list (raid_finder.lua calls Refresh).
@@ -240,11 +242,15 @@ local function SetUpNotInRaid()
     note:SetPoint("CENTER", RaidFrameNotInRaid, "CENTER", -15, -80)
     note:SetWidth(320)
     note:SetJustifyH("CENTER")
-    note:SetText("|cffFFCC00Raids have no ID: join any group, any time.\nEach boss can be looted once a week.\nRaid Info lists the bosses you looted.|r")
+    note:SetText(L["|cffFFCC00Raids have no ID: join any group, any time.\nEach boss can be looted once a week.\nRaid Info lists the bosses you looted.|r"])
 end
 
+-- A child frame's OnShow, not a hook on RaidInfoFrame's: ElvUI's Friends skin SetScript()s
+-- RaidInfoFrame's OnShow and threw our hook away, leaving the window blank (bug 4451). A child
+-- fires its own OnShow each time its parent is shown, whatever the parent's script is.
 if RaidInfoFrame then
-    RaidInfoFrame:HookScript("OnShow", OnRaidInfoShow)
+    local watcher = CreateFrame("Frame", nil, RaidInfoFrame)
+    watcher:SetScript("OnShow", OnRaidInfoShow)
 end
 if RaidFrame then
     RaidFrame:HookScript("OnShow", EnableRaidInfoButton)

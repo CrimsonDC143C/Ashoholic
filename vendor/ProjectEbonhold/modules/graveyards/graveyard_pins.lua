@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ==============================================================================
 -- Graveyard pins (2026-09-17): where a player can entrust the Soul Ashes of the run.
 --
@@ -42,20 +43,20 @@ local function OfferingsText()
     local max = data.banksMaxWeek or 0
     if max == 0 then return nil end
     local left = math.max(0, max - (data.banksUsedWeek or 0))
-    return left .. "/" .. max .. " offerings left this week"
+    return T("{left}/{v} offerings left this week", { left = left, v = max })
 end
 
 local function ShowTooltip(pin)
     tooltip:SetOwner(pin, "ANCHOR_CURSOR_RIGHT")
     tooltip:ClearLines()
-    tooltip:AddLine(pin.graveyardName or "Graveyard", 1, 0.82, 0)
-    tooltip:AddLine("Spirit Healer: entrust the Soul Ashes and Soul Shards of your run to your account here.", 1, 1, 1, true)
+    tooltip:AddLine(pin.graveyardName and L[pin.graveyardName] or L["Graveyard"], 1, 0.82, 0)   -- display only
+    tooltip:AddLine(L["Spirit Healer: entrust the Soul Ashes and Soul Shards of your run to your account here."], 1, 1, 1, true)
     local offerings = OfferingsText()
     if offerings then
         tooltip:AddLine(offerings, 0.6, 0.8, 1)
     end
     if pin.distance then
-        tooltip:AddLine(string.format("%d yards away", pin.distance), 0.7, 0.7, 0.7)
+        tooltip:AddLine(T("{distance} yards away", { distance = string.format("%d", pin.distance) }), 0.7, 0.7, 0.7)
     end
     tooltip:Show()
 end
@@ -97,6 +98,12 @@ end
 function GP.RefreshWorldMap()
     -- IsVisible: the detail frame stays "shown" with the map closed (see checkpoint.lua)
     if not WorldMapDetailFrame or not WorldMapDetailFrame:IsVisible() then
+        HideWorldPins(1)
+        return
+    end
+    -- The world map's filter button (modules\checkpoint\map_filters.lua)
+    local filters = ProjectEbonhold.MapFilters
+    if filters and not filters.IsShown("spiritHealers") then
         HideWorldPins(1)
         return
     end
@@ -148,4 +155,9 @@ if WorldMapDetailFrame then
         tooltip:Hide()
         HideWorldPins(1)
     end)
+end
+
+-- A filter switch redraws at once (modules\checkpoint\map_filters.lua).
+if ProjectEbonhold.MapFilters then
+    ProjectEbonhold.MapFilters.OnChanged(function() GP.RefreshWorldMap() end)
 end

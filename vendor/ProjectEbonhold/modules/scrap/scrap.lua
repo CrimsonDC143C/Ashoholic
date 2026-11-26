@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local Addon = select(2, ...)
 local ScrapButton = CreateFrame("Button", "ProjectEbonholdScrapButton", MerchantFrame)
 local function GetJunkValue()
@@ -84,7 +85,7 @@ local function CreateConfigPanel()
 
   local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
   title:SetPoint("LEFT", headerIcon, "RIGHT", 6, 0)
-  title:SetText("Junk Selling")
+  title:SetText(L["Junk Selling"])
 
   local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -2, -2)
@@ -94,66 +95,66 @@ local function CreateConfigPanel()
   AddDivider(-34)
 
   -- ── Auto-sell ──
-  local autoSell = MakeCheck("AutoSell", "Auto-sell when visiting a merchant", 12, -40, "autoSellJunk",
-    "Auto-sell", "Automatically sells everything matching your filters as soon as you open a merchant window.")
+  local autoSell = MakeCheck("AutoSell", L["Auto-sell when visiting a merchant"], 12, -40, "autoSellJunk",
+    "Auto-sell", L["Automatically sells everything matching your filters as soon as you open a merchant window."])
   panel.autoSell = autoSell
 
   AddDivider(-68)
 
   -- ── Qualities ──
-  AddSectionLabel("Qualities", -76)
+  AddSectionLabel(L["Qualities"], -76)
 
   local QUALITIES = {
-    { key = "sellQualityPoor",     label = "|cff9d9d9dPoor|r",
-      tip = "All poor quality (junk) items are sold, whatever their type." },
-    { key = "sellQualityCommon",   label = "|cffffffffCommon|r",
-      tip = "Common items are sold when their item type is also enabled." },
-    { key = "sellQualityUncommon", label = "|cff1eff00Uncommon|r",
-      tip = "Uncommon items are sold when their item type is also enabled." },
-    { key = "sellQualityRare",     label = "|cff0070ddRare|r",
-      tip = "Rare items are sold when their item type is also enabled." },
+    { key = "sellQualityPoor",     label = L["|cff9d9d9dPoor|r"],
+      tip = L["All poor quality (junk) items are sold, whatever their type."] },
+    { key = "sellQualityCommon",   label = L["|cffffffffCommon|r"],
+      tip = L["Common items are sold when their item type is also enabled."] },
+    { key = "sellQualityUncommon", label = L["|cff1eff00Uncommon|r"],
+      tip = L["Uncommon items are sold when their item type is also enabled."] },
+    { key = "sellQualityRare",     label = L["|cff0070ddRare|r"],
+      tip = L["Rare items are sold when their item type is also enabled."] },
   }
   panel.qualityChecks = {}
   for i, q in ipairs(QUALITIES) do
     local col = (i - 1) % 2
     local row = math.floor((i - 1) / 2)
     panel.qualityChecks[q.key] = MakeCheck("Quality" .. i, q.label,
-      12 + col * 128, -90 - row * 22, q.key, "Sell " .. q.label, q.tip)
+      12 + col * 128, -90 - row * 22, q.key, T("Sell {label}", { label = q.label }), q.tip)
   end
 
   -- ── Item types ──
-  AddSectionLabel("Item Types", -140)
+  AddSectionLabel(L["Item Types"], -140)
 
   local weapon, armor, _, consumable, glyph, tradeGoods, _, _, recipe, gem, misc = GetAuctionItemClasses()
   local ITEM_TYPES = {
-    { key = "sellTypeWeapon",     label = weapon or "Weapon" },
-    { key = "sellTypeArmor",      label = armor or "Armor" },
-    { key = "sellTypeConsumable", label = consumable or "Consumable" },
-    { key = "sellTypeTradeGoods", label = tradeGoods or "Trade Goods" },
-    { key = "sellTypeRecipe",     label = recipe or "Recipe" },
-    { key = "sellTypeGem",        label = gem or "Gem" },
-    { key = "sellTypeGlyph",      label = glyph or "Glyph" },
-    { key = "sellTypeMisc",       label = misc or "Miscellaneous" },
+    { key = "sellTypeWeapon",     label = weapon or L["Weapon"] },
+    { key = "sellTypeArmor",      label = armor or L["Armor"] },
+    { key = "sellTypeConsumable", label = consumable or L["Consumable"] },
+    { key = "sellTypeTradeGoods", label = tradeGoods or L["Trade Goods"] },
+    { key = "sellTypeRecipe",     label = recipe or L["Recipe"] },
+    { key = "sellTypeGem",        label = gem or L["Gem"] },
+    { key = "sellTypeGlyph",      label = glyph or L["Glyph"] },
+    { key = "sellTypeMisc",       label = misc or L["Miscellaneous"] },
   }
   panel.typeChecks = {}
   for i, t in ipairs(ITEM_TYPES) do
     local col = (i - 1) % 2
     local row = math.floor((i - 1) / 2)
     panel.typeChecks[t.key] = MakeCheck("Type" .. i, t.label,
-      12 + col * 128, -154 - row * 22, t.key, "Sell " .. t.label,
-      "Applies to Common, Uncommon and Rare items of this type.")
+      12 + col * 128, -154 - row * 22, t.key, T("Sell {label}", { label = t.label }),
+      L["Applies to Common, Uncommon and Rare items of this type."])
   end
 
   AddDivider(-248)
 
   -- ── Sell everything ──
-  local sellAll = MakeCheck("SellAll", "|cffff3333Sell EVERYTHING|r", 12, -254, "sellEverything",
-    "|cffff3333Sell EVERYTHING|r",
-    "Sells every sellable item in your bags, ignoring the quality and type filters. Legendary items and items protected with Alt-click are never sold.")
+  local sellAll = MakeCheck("SellAll", L["|cffff3333Sell EVERYTHING|r"], 12, -254, "sellEverything",
+    L["|cffff3333Sell EVERYTHING|r"],
+    L["Sells every sellable item in your bags, ignoring the quality and type filters. Legendary items and items protected with Alt-click are never sold."])
   sellAll:SetScript("OnClick", function(self)
     if self:GetChecked() == 1 then
       StaticPopupDialogs["PROJECTEBONHOLD_SELL_EVERYTHING"] = {
-        text = "|cffff2020Warning:|r this will sell EVERY sellable item in your bags, ignoring the quality and type filters. Only legendary items and items protected with Alt-click are kept.\n\nEnable anyway?",
+        text = L["|cffff2020Warning:|r this will sell EVERY sellable item in your bags, ignoring the quality and type filters. Only legendary items and items protected with Alt-click are kept.\n\nEnable anyway?"],
         button1 = YES,
         button2 = NO,
         OnAccept = function()
@@ -233,9 +234,9 @@ function ConfigButton:CreateButton()
 
   self:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Junk selling options", 1, 1, 1)
-    GameTooltip:AddLine("Configure auto-sell and selling rules.", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("|cFF888888Alt-click a bag item:|r protect it / always sell it", 0.8, 0.8, 0.8)
+    GameTooltip:SetText(L["Junk selling options"], 1, 1, 1)
+    GameTooltip:AddLine(L["Configure auto-sell and selling rules."], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["|cFF888888Alt-click a bag item:|r protect it / always sell it"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
   end)
   self:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -291,7 +292,47 @@ function ScrapButton:CreateButton()
   end)
 end
 
+-- ── DragonUI's sell button runs our selling (owner, 2026-11-15) ─────────────
+-- With DragonUI's merchant window, its "sell all junk" button replaces ours: our button stays
+-- hidden (its frame still carries the events and the auto-sell), and DragonUI's runs our sale
+-- (ScrapService rules: qualities, types, Alt-click protection; no confirmation popup), our
+-- tooltip, our junk estimate on the icon, and carries the options gear. DragonUI places it
+-- with its repair buttons (merchant_frame.lua), so ours no longer moves them.
+local adopted
+
+local function AdoptDragonButton()
+  if adopted then return adopted end
+  local dui = _G.DragonUI_MerchantSellAllJunkButton
+  if not dui then return nil end
+  adopted = dui
+
+  dui:UnregisterAllEvents()
+  dui:SetScript("OnEvent", nil)
+  dui:RegisterForClicks("LeftButtonUp")
+  dui:SetScript("OnClick", function(b, button)
+    if button == "LeftButton" then
+      GameTooltip:Hide()
+      SellJunk()
+      ScrapButton:UpdateState()
+    end
+  end)
+  dui:SetScript("OnEnter", function(b) ScrapButton.OnEnter(b) end)
+  dui:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  dui:SetScript("OnShow", function() ScrapButton.scanSoon:Show() end)
+
+  ConfigButton:SetParent(dui)
+  ConfigButton:ClearAllPoints()
+  ConfigButton:SetPoint("TOPRIGHT", dui, "TOPRIGHT", 3, 3)
+  ConfigButton:SetFrameLevel(dui:GetFrameLevel() + 2)
+
+  ScrapButton:Hide()
+  -- DragonUI may still have its own junk check queued for this frame: ours paints after it.
+  C_Timer.After(0.05, function() ScrapButton.scanSoon:Show() end)
+  return dui
+end
+
 function ScrapButton:UpdatePosition()
+  if AdoptDragonButton() then return end
   self:ClearAllPoints()
 
   if CanMerchantRepair() then
@@ -323,7 +364,7 @@ function ScrapButton:UpdateState()
       ConfigPanel:Hide()
     end
     return
-  else
+  elseif not AdoptDragonButton() then
     self:Show()
   end
 
@@ -338,16 +379,18 @@ function ScrapButton:RefreshJunkIcon()
 
   -- The server decides what actually sells, so the button stays clickable
   -- even when the client-side estimate is empty; the icon only hints at it.
-  self.icon:SetDesaturated(not hasJunk)
-  self.icon:SetAlpha(hasJunk and 1 or 0.5)
-  self:Enable()
+  local button = adopted or self
+  local icon = adopted and adopted.Icon or self.icon
+  icon:SetDesaturated(not hasJunk)
+  icon:SetAlpha(hasJunk and 1 or 0.5)
+  button:Enable()
 end
 
 ScrapButton.scanSoon = CreateFrame("Frame")
 ScrapButton.scanSoon:Hide()
 ScrapButton.scanSoon:SetScript("OnUpdate", function(self)
   self:Hide()
-  if ScrapButton:IsShown() then ScrapButton:RefreshJunkIcon() end
+  if (adopted or ScrapButton):IsVisible() then ScrapButton:RefreshJunkIcon() end
 end)
 
 function ScrapButton:OnClick(button)
@@ -363,7 +406,7 @@ function ScrapButton:OnEnter()
   GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
   
   if value > 0 then
-    GameTooltip:SetText("|cFFFFD700Sell Junk|r", 1, 1, 1)
+    GameTooltip:SetText(L["|cFFFFD700Sell Junk|r"], 1, 1, 1)
     
     
     local gold = floor(value / 10000)
@@ -379,13 +422,13 @@ function ScrapButton:OnEnter()
     end
     moneyString = moneyString .. format("%d|cFFEDA55Fc|r", copper)
     
-    GameTooltip:AddLine("Value: " .. moneyString, 1, 1, 1)
+    GameTooltip:AddLine(T("Value: {moneyString}", { moneyString = moneyString }), 1, 1, 1)
     GameTooltip:AddLine(" ", 1, 1, 1)
-    GameTooltip:AddLine("|cFF888888Left-click:|r Sell all junk", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("|cFF888888Alt-click a bag item:|r protect it / always sell it", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["|cFF888888Left-click:|r Sell all junk"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["|cFF888888Alt-click a bag item:|r protect it / always sell it"], 0.8, 0.8, 0.8)
   else
-    GameTooltip:SetText("|cFF888888No junk to sell|r", 1, 1, 1)
-    GameTooltip:AddLine("|cFF888888Alt-click a bag item:|r protect it / always sell it", 0.8, 0.8, 0.8)
+    GameTooltip:SetText(L["|cFF888888No junk to sell|r"], 1, 1, 1)
+    GameTooltip:AddLine(L["|cFF888888Alt-click a bag item:|r protect it / always sell it"], 0.8, 0.8, 0.8)
   end
   
   GameTooltip:Show()
@@ -403,14 +446,19 @@ ScrapButton:RegisterEvent("MERCHANT_SHOW")
 ScrapButton:RegisterEvent("MERCHANT_CLOSED")
 ScrapButton:RegisterEvent("BAG_UPDATE")
 
+-- A list sent again to an open window fires MERCHANT_SHOW again: auto-sell only once per visit,
+-- or every refresh wrote to the server (anti-flood kick).
+local merchantVisitOpen = false
+
 ScrapButton:SetScript("OnEvent", function(self, event, ...)
   if event == "MERCHANT_SHOW" then
-    self:Show()
+    if not AdoptDragonButton() then self:Show() end
     self:UpdatePosition()
     self:UpdateState()
-    
-    
-    if ProjectEbonholdOptionsService and ProjectEbonholdOptionsService:GetSetting("autoSellJunk") then
+
+    local firstShow = not merchantVisitOpen
+    merchantVisitOpen = true
+    if firstShow and ProjectEbonholdOptionsService and ProjectEbonholdOptionsService:GetSetting("autoSellJunk") then
 
       C_Timer.After(0.2, function()
         if MerchantFrame:IsShown() then
@@ -421,6 +469,7 @@ ScrapButton:SetScript("OnEvent", function(self, event, ...)
     end
     
   elseif event == "MERCHANT_CLOSED" then
+    merchantVisitOpen = false
     self:Hide()
     
   elseif event == "BAG_UPDATE" then

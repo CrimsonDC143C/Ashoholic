@@ -5,6 +5,8 @@ if not addon.OverflowHealth then
 end
 
 local OH = addon.OverflowHealth
+-- Global handle: DragonUI (its own namespace) draws its own health texts and reads the pool here.
+ProjectEbonhold.OverflowHealth = OH
 
 -- The server caps a creature's visible max health at VISIBLE_HEALTH_CAP (the
 -- 3.3.5 client reads it as a signed int32) and keeps the rest in a hidden pool.
@@ -86,6 +88,9 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_RAID_BOSS_OVERFLOW_HEALT
         end
     end
     if OH.Refresh then OH.Refresh() end
+    -- DragonUI's own unit-frame texts only repaint on a health change: repaint them once now.
+    local dui = DragonUI and DragonUI.TextSystem
+    if dui and dui.RefreshFrameTexts then dui.RefreshFrameTexts() end
 end)
 
 SLASH_OVERFLOWHP1 = "/overflowhp"
@@ -105,6 +110,6 @@ SlashCmdList["OVERFLOWHP"] = function(msg)
             " pool=" .. tostring(key and OH.cache[key] or nil) ..
             " none=" .. tostring(key and none[key] or nil))
     else
-        print("|cff00ffff[OverflowHP]|r /overflowhp dump|target")
+        print(ProjectEbonhold.L["|cff00ffff[OverflowHP]|r /overflowhp dump|target"])
     end
 end

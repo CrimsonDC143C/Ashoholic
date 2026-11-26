@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 ProjectEbonhold = ProjectEbonhold or {}
@@ -222,22 +223,22 @@ local function AcquirePin(index, parentFrame)
     pin:SetScript("OnEnter", function(self)
         checkpointTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
         checkpointTooltip:ClearLines()
-        checkpointTooltip:AddLine(self.nodeName or "Waystone", 1, 0.82, 0)
+        checkpointTooltip:AddLine(self.nodeName and L[self.nodeName] or L["Waystone"], 1, 0.82, 0)   -- display only
         -- Discovery is account-wide (taximask / account_meetingstone_checkpoints): the undiscovered
         -- side says so (2026-10-22); the discovered side stays one line (owner, 2026-10-26).
         if self.isUnlocked then
-            checkpointTooltip:AddLine("Click to travel to this waystone.", 1, 1, 1, true)
+            checkpointTooltip:AddLine(L["Click to travel to this waystone."], 1, 1, 1, true)
             if self.viaGroup then
-                checkpointTooltip:AddLine("Opened by a member of your group.", 0.6, 0.8, 1, true)
+                checkpointTooltip:AddLine(L["Opened by a member of your group."], 0.6, 0.8, 1, true)
             end
         elseif self.kind == "MEETINGSTONE" or self.kind == "MEETINGSTONE_RAID" then
-            checkpointTooltip:AddLine("Undiscovered. Walk onto this waystone to discover it.", 1, 0.35, 0.35,
+            checkpointTooltip:AddLine(L["Undiscovered. Walk onto this waystone to discover it."], 1, 0.35, 0.35,
                 true)
-            checkpointTooltip:AddLine("Once discovered, it opens for all your characters.", 0.6, 0.8, 1, true)
+            checkpointTooltip:AddLine(L["Once discovered, it opens for all your characters."], 0.6, 0.8, 1, true)
         else
-            checkpointTooltip:AddLine("Undiscovered. Walk onto this waystone to discover it.", 1, 0.35, 0.35,
+            checkpointTooltip:AddLine(L["Undiscovered. Walk onto this waystone to discover it."], 1, 0.35, 0.35,
                 true)
-            checkpointTooltip:AddLine("Once discovered, it opens for all your characters.", 0.6, 0.8, 1, true)
+            checkpointTooltip:AddLine(L["Once discovered, it opens for all your characters."], 0.6, 0.8, 1, true)
         end
         checkpointTooltip:Show()
     end)
@@ -295,9 +296,15 @@ function CheckpointUI.RefreshPins()
     local height = mapFrame:GetHeight()
     local visiblePinCount = 0
     local checkpoints = ProjectEbonhold.CheckpointService.GetCheckpoints()
+    -- The world map's filter button (map_filters.lua); a flight master's travel map shows them all.
+    local filters = ProjectEbonhold.MapFilters
+    local showWaystones = not filters or filters.IsShown("waystones")
+    local showStones = not filters or filters.IsShown("meetingStones")
 
     for _, checkpoint in ipairs(checkpoints) do
-        if checkpoint.mapId == currentMapId then
+        local wanted
+        if IsMeetingStone(checkpoint.kind) then wanted = showStones else wanted = showWaystones end
+        if wanted and checkpoint.mapId == currentMapId then
             local absX, absY = ConvertToContinentCoords(checkpoint.mapId, checkpoint.x, checkpoint.y)
             if absX and absY and IsInsideRect(currentMapId, absX, absY) then
                 local relX, relY = ConvertToMapRelativeCoords(currentMapId, absX, absY)
@@ -364,6 +371,8 @@ eventFrame:SetScript("OnEvent", function(self, event)
             CheckpointUI.RefreshPins()
         end)
     elseif event == "TAXIMAP_OPENED" then
+        -- The travel window: every checkpoint shows until the map closes, whatever the filter says.
+        if ProjectEbonhold.MapFilters then ProjectEbonhold.MapFilters.travelOpen = true end
         if TaxiFrame and TaxiFrame:IsShown() then
             HideUIPanel(TaxiFrame)
         end
@@ -384,8 +393,14 @@ if WorldMapDetailFrame then
     end)
 
     WorldMapDetailFrame:HookScript("OnHide", function()
+        if ProjectEbonhold.MapFilters then ProjectEbonhold.MapFilters.travelOpen = false end
         WorldMapDetailFrame:EnableMouse(true)
         checkpointTooltip:Hide()
         HideUnusedPins(1)
     end)
+end
+
+-- A filter switch redraws at once (map_filters.lua).
+if ProjectEbonhold.MapFilters then
+    ProjectEbonhold.MapFilters.OnChanged(function() CheckpointUI.RefreshPins() end)
 end

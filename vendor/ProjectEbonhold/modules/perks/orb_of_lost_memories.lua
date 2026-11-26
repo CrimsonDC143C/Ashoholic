@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 
 ------------------------------------------------------------
 -- ORB OF LOST MEMORIES
@@ -21,6 +22,8 @@ local addonName, addon = ...
 -- Protocol:
 --   CS.REQUEST_ORB_CHARGES         (1220)  body: ""
 --   CS.REQUEST_ORB_CONSUME         (1221)  body: "<orbCount>|<perkSpellId>[,<perkSpellId>...]"
+--   CS.REQUEST_ORB_REROLL          (1222)  body: "<orbCount>" (empty = 1)
+--   CS.REQUEST_ORB_UPGRADE         (1223)  body: "<perkSpellId>" - one stack to its next quality
 --   SS.SEND_ORB_CHARGES            (1220)  body: "<charges>,<appliedDelta>,<pendingOffers>"
 
 ProjectEbonhold = ProjectEbonhold or {}
@@ -32,7 +35,7 @@ local ORB_ICON = "Interface\\Icons\\inv_112_arcane_orb"
 local BUBBLE_SIZE = 30
 -- Display only. The real ceiling is PerksHandler::ORB_MAX_CHARGES, enforced server-side in
 -- ModifyOrbCharges; the two must be retuned together.
-local MAX_CHARGES = 1000
+local MAX_CHARGES = 5000
 
 -- nil until the server answers. 0 and "unknown" must stay distinguishable: the bubble is
 -- hidden in both cases, but only a known 0 may disarm a selection.
@@ -93,7 +96,7 @@ function OrbService.ToggleMark(perkSpellId)
   else
     -- One orb per marked echo, so the batch can never exceed what the player holds.
     if #markedOrder >= (charges or 0) then
-      UIErrorsFrame:AddMessage("You only have " .. (charges or 0) .. " Orb(s) of Lost Memories.", 1, 0.1, 0.1)
+      UIErrorsFrame:AddMessage(T("You only have {count} Orb(s) of Lost Memories.", { count = charges or 0 }), 1, 0.1, 0.1)
       return false
     end
     marked[perkSpellId] = true
@@ -139,24 +142,63 @@ function OrbService.CanRerollOffer()
   return OrbService.IsOfferPending() and (charges or 0) > 0
 end
 
---- Spends ONE more orb to redraw the offer on the table. Nothing is forgotten and nothing extra
---- is owed - the stack is already gone and the draw is already owed, this only re-rolls what it
---- produced - so `pendingOffers` is deliberately left alone and the redraw stays orb-final.
+-- Orbs spent on EACH reroll click of an orb offer, set by the player (the small button next to
+-- Reroll). Above one orb, each orb adds one point of chance at the best quality, exactly like
+-- the forget dialog's slider (PerksHandler::OnOrbRerollRequested -> ApplyOrbQualityBoost), so a
+-- boosted session no longer drops back to plain 1-orb redraws after its first draw. Saved
+-- account-wide; the server clamps it to [1, ORB_BOOST_MAX_ORBS] and to what the player holds.
+local REROLL_SPEND_MAX = 100 -- = ORB_BOOST_MAX_ORBS, declared below for the spend dialog
+
+local function ClampRerollSpend(n)
+  n = math.floor(tonumber(n) or 1)
+  if n < 1 then n = 1 end
+  if n > REROLL_SPEND_MAX then n = REROLL_SPEND_MAX end
+  return n
+end
+
+function OrbService.GetRerollSpend()
+  local db = ProjectEbonholdDB
+  return ClampRerollSpend(db and db.orbRerollSpend or 1)
+end
+
+function OrbService.SetRerollSpend(n)
+  ProjectEbonholdDB = ProjectEbonholdDB or {}
+  ProjectEbonholdDB.orbRerollSpend = ClampRerollSpend(n)
+  if OrbService.refreshSpendPopup then OrbService.refreshSpendPopup() end
+  if OrbService.onRerollSpendChanged then OrbService.onRerollSpendChanged() end
+end
+
+--- What the next reroll click actually costs: the setting, cut to what is held (never below 1).
+--- Cutting rather than refusing keeps the one-click promise when the stock runs low.
+function OrbService.GetEffectiveRerollSpend()
+  local n = OrbService.GetRerollSpend()
+  local held = charges or 0
+  if held < n then n = held end
+  if n < 1 then n = 1 end
+  return n
+end
+
+--- Spends the player's per-reroll orb count to redraw the offer on the table. Nothing is
+--- forgotten and nothing extra is owed - the stack is already gone and the draw is already owed,
+--- this only re-rolls what it produced - so `pendingOffers` is deliberately left alone and the
+--- redraw stays orb-final.
 ---
 --- No confirmation popup: the whole point is that a player who likes none of the three can say so
 --- in one click. The button carries the cost in its own label instead.
 function OrbService.RerollOffer()
   if not OrbService.CanRerollOffer() then return end
 
+  local spend = OrbService.GetEffectiveRerollSpend()
+
   if ProjectEbonhold.PerkService and ProjectEbonhold.PerkService.MarkOrbReroll then
     ProjectEbonhold.PerkService.MarkOrbReroll()
   end
-  ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_ORB_REROLL, "")
+  ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_ORB_REROLL, tostring(spend))
 
   -- Optimistic, same reason as SendSpend: the count is only ever written from SEND_ORB_CHARGES,
   -- and until that push lands the button would keep offering a charge that is already gone.
   if charges then
-    charges = math.max(0, charges - 1)
+    charges = math.max(0, charges - spend)
     OrbService.EnsureUI()
   end
 
@@ -173,26 +215,68 @@ end
 -- is about to go: "Rend the Weak" alone reads the same whether it takes the common or the rare.
 -- Hexes mirror echo_journal's qualityColors.
 local QUALITY_LABELS = {
-  [0] = "|cffFFFFFFCommon|r",
-  [1] = "|cff1AFF1AUncommon|r",
-  [2] = "|cff0066FFRare|r",
-  [3] = "|cffCC66FFEpic|r",
-  [4] = "|cffFF8000Legendary|r",
+  [0] = L["|cffFFFFFFCommon|r"],
+  [1] = L["|cff1AFF1AUncommon|r"],
+  [2] = L["|cff0066FFRare|r"],
+  [3] = L["|cffCC66FFEpic|r"],
+  [4] = L["|cffFF8000Legendary|r"],
 }
 
 local function QualityLabel(perkSpellId)
   local db = ProjectEbonhold.PerkDatabase
   local data = db and db[perkSpellId]
-  return (data and QUALITY_LABELS[data.quality or 0]) or "this rarity"
+  return (data and QUALITY_LABELS[data.quality or 0]) or L["this rarity"]
+end
+
+------------------------------------------------------------
+-- UPGRADE (one stack to its next quality)
+------------------------------------------------------------
+-- Every quality of an echo is its own spell, tied to the others by groupId. Only the stat echoes
+-- exist in Common / Uncommon / Rare; class echoes and Epics have one quality and no upgrade.
+-- Prices keyed by the TARGET quality; they mirror PerksHandler::ORB_UPGRADE_COST_TO_*.
+local UPGRADE_COST = { [1] = 250, [2] = 500 }
+
+--- The next-quality version of @p perkSpellId usable by this character, or nil.
+local function GetUpgradeTarget(perkSpellId)
+  local db = ProjectEbonhold.PerkDatabase
+  local data = db and db[perkSpellId]
+  if not data or not data.groupId then return nil end
+  local quality = data.quality or 0
+  if quality >= 2 then return nil end -- Rare is the top of a stat echo
+
+  local playerClassMask = 2 ^ ((select(3, UnitClass("player")) or 1) - 1)
+  local level = UnitLevel("player") or 1
+  for spellId, other in pairs(db) do
+    if other.groupId == data.groupId and (other.quality or 0) == quality + 1 then
+      local mask = other.classMask or 0
+      if bit.band(mask, playerClassMask) ~= 0 and level >= (other.minLevel or 1) then
+        return spellId, other
+      end
+    end
+  end
+  return nil
+end
+
+--- Stacks of @p spellId the character holds this run, and whether it is a locked (permanent) one.
+local function HeldStacks(spellId)
+  local perks = addon and addon.Perks
+  if not perks then return 0, false end
+  for _, entry in ipairs(perks.lockedPerks or {}) do
+    if entry.spellId == spellId then return entry.stack or 0, true end
+  end
+  local n = 0
+  for _, list in pairs(perks.grantedPerks or {}) do
+    for _, entry in ipairs(list) do
+      if entry.spellId == spellId then n = n + (entry.stack or 1) end
+    end
+  end
+  return n, false
 end
 
 StaticPopupDialogs["EBONHOLD_ORB_CONFIRM_MULTI"] = {
-  text = "Forget one stack of |cffFFD100%d Echoes|r?" .. "\n\n" ..
-    "Each one is removed and a new Echo choice is offered in its place. Your run's reroll, " ..
-    "freeze and banish do not apply to those draws; one more Orb redraws them." .. "\n\n" ..
-    "This spends |cffFFD100%d Orbs of Lost Memories|r.",
-  button1 = YES or "Yes",
-  button2 = NO or "No",
+  text = L["Forget one stack of |cffFFD100%d Echoes|r?\n\nEach one is removed and a new Echo choice is offered in its place. You can banish or freeze its cards; your run's reroll does not apply, one more Orb redraws them.\n\nThis spends |cffFFD100%d Orbs of Lost Memories|r."],
+  button1 = YES or L["Yes"],
+  button2 = NO or L["No"],
   timeout = 0,
   whileDead = 1,
   hideOnEscape = 1,
@@ -258,15 +342,56 @@ local function RefreshSpendDialog()
   -- specifically, which is why the wording is "higher quality": on a pool that tops out at Rare
   -- the orbs promote Rare. The count IS the bonus, so nothing is computed and nothing is fetched.
   if IsChoiceOnTable() then
-    spendDialog.effect:SetText("|cffFF8080Claim your current Echo choice first to spend more.|r")
+    spendDialog.effect:SetText(L["|cffFF8080Claim your current Echo choice first to spend more.|r"])
   elseif orbCount >= ORB_BOOST_MAX_ORBS then
-    spendDialog.effect:SetText("|cffCC66FFGuaranteed higher quality|r")
+    spendDialog.effect:SetText(L["|cffCC66FFGuaranteed higher quality|r"])
   else
-    spendDialog.effect:SetText(string.format(
-      "Chance of a higher quality |cffCC66FF+%d%%|r", orbCount))
+    spendDialog.effect:SetText(T("Chance of a higher quality |cffCC66FF+{bonus}%|r", { bonus = orbCount }))
   end
 
-  spendDialog.costText:SetText(string.format("Leaves you |cffFFD100%d|r", math.max(0, held - orbCount)))
+  spendDialog.costText:SetText(T("Leaves you |cffFFD100{count}|r", { count = math.max(0, held - orbCount) }))
+end
+
+-- Repaints a plate for its state: dim at rest, bright and lifted under the mouse, grey disabled.
+local function PaintOrbPlate(btn, hot)
+  local c = btn._plateColor
+  if not btn:IsEnabled() then
+    btn._plateStock:SetVertexColor(0.30, 0.30, 0.30)
+    btn._plateRim:SetVertexColor(0.42, 0.42, 0.42, 0.8)
+    btn:GetFontString():SetTextColor(0.5, 0.5, 0.5)
+    return
+  end
+  local k, w = hot and 1 or 0.72, hot and 0.45 or 0.25
+  btn._plateStock:SetVertexColor(c[1] * k, c[2] * k, c[3] * k)
+  -- The rim is the colour pulled towards white, or it melts into the stone
+  btn._plateRim:SetVertexColor(c[1] + (1 - c[1]) * w, c[2] + (1 - c[2]) * w, c[3] + (1 - c[3]) * w, hot and 1 or 0.85)
+  btn:GetFontString():SetTextColor(1, 1, 1)
+end
+
+-- A UIPanelButtonTemplate button dressed as an echo plate (same art as perks.lua MakePlate).
+local function DressOrbPlate(btn, color, height)
+  for _, t in ipairs({ btn:GetNormalTexture(), btn:GetPushedTexture(),
+                       btn:GetHighlightTexture(), btn:GetDisabledTexture() }) do
+    if t then t:Hide(); t:SetTexture(nil) end
+  end
+  btn:SetHeight(height)
+  local ART = "Interface\\AddOns\\ProjectEbonhold\\assets\\echo_plate_"
+  local stock = btn:CreateTexture(nil, "BORDER")
+  stock:SetTexture(ART .. "stock")
+  stock:SetAllPoints(btn)
+  local rim = btn:CreateTexture(nil, "ARTWORK")
+  rim:SetTexture(ART .. "rim")
+  rim:SetAllPoints(btn)
+  btn._plateStock, btn._plateRim, btn._plateColor = stock, rim, color
+  local fs = btn:GetFontString()
+  fs:SetFont("Fonts\\FRIZQT__.TTF", 11)
+  fs:SetShadowColor(0, 0, 0, 1)
+  fs:SetShadowOffset(1, -1)
+  btn:HookScript("OnEnter", function(self) PaintOrbPlate(self, true) end)
+  btn:HookScript("OnLeave", function(self) PaintOrbPlate(self, false) end)
+  hooksecurefunc(btn, "Enable", function(self) PaintOrbPlate(self, GetMouseFocus() == self) end)
+  hooksecurefunc(btn, "Disable", function(self) PaintOrbPlate(self, false) end)
+  PaintOrbPlate(btn, false)
 end
 
 local function CreateSpendDialog()
@@ -277,24 +402,25 @@ local function CreateSpendDialog()
   f:SetToplevel(true)
   f:SetSize(340, 200)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
-  f:SetBackdrop({
-    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 16, edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 },
-  })
-  f:SetBackdropColor(0.05, 0.04, 0.07, 1)
-  f:SetBackdropBorderColor(1, 1, 1, 1)
 
-  -- Flat opaque plate UNDER the backdrop art. The journal grid sits right behind this popup and
-  -- was reading straight through it: a backdrop alone is not enough, since a UI skin (ElvUI here)
-  -- restyles backdrops on frames it recognises and can hand back a translucent one. A plain
-  -- texture the addon owns cannot be restyled away.
-  local plate = f:CreateTexture(nil, "BACKGROUND", nil, -8)
-  plate:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -4)
-  plate:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 4)
-  plate:SetTexture("Interface\\Buttons\\WHITE8X8")
-  plate:SetVertexColor(0.05, 0.04, 0.07, 1)
+  -- Dressed like an echo card, in the orb's mauve: the card's dark stone with cut corners and its
+  -- frame (assets/echo_dialog_*, tools/perks/gen_echo_card_art.py panel()), a soft glow behind.
+  -- Opaque textures the addon owns and no backdrop: the journal grid sits right behind and a UI
+  -- skin (ElvUI) restyles backdrops it recognises into translucent ones.
+  local ART = "Interface\\AddOns\\ProjectEbonhold\\assets\\"
+  local glow = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+  glow:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
+  glow:SetBlendMode("ADD")
+  glow:SetPoint("TOPLEFT", f, "TOPLEFT", -45, 40)
+  glow:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 45, -40)
+  glow:SetVertexColor(0.58, 0.28, 0.92, 0.35)
+  local stock = f:CreateTexture(nil, "BACKGROUND", nil, -7)
+  stock:SetTexture(ART .. "echo_dialog_stock")
+  stock:SetAllPoints(f)
+  local rim = f:CreateTexture(nil, "BORDER")
+  rim:SetTexture(ART .. "echo_dialog_rim")
+  rim:SetAllPoints(f)
+  rim:SetVertexColor(0.72, 0.36, 1, 1)
   f:EnableMouse(true)
   f:SetMovable(true)
   f:RegisterForDrag("LeftButton")
@@ -304,7 +430,7 @@ local function CreateSpendDialog()
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetPoint("TOP", f, "TOP", 0, -18)
-  title:SetText("Orb of Lost Memories")
+  title:SetText(L["Orb of Lost Memories"])
 
   local icon = f:CreateTexture(nil, "ARTWORK")
   icon:SetSize(ICON_SIZE, ICON_SIZE)
@@ -351,7 +477,7 @@ local function CreateSpendDialog()
   local confirm = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   confirm:SetSize(120, 22)
   confirm:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -5, 18)
-  confirm:SetText("Forget")
+  confirm:SetText(L["Forget"])
   confirm:SetScript("OnClick", function()
     local perkSpellId, orbCount = f.perkSpellId, f.orbCount or 1
     f:Hide()
@@ -361,11 +487,80 @@ local function CreateSpendDialog()
   local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   cancel:SetSize(120, 22)
   cancel:SetPoint("BOTTOMLEFT", f, "BOTTOM", 5, 18)
-  cancel:SetText(CANCEL or "Cancel")
+  cancel:SetText(CANCEL or L["Cancel"])
   cancel:SetScript("OnClick", function() f:Hide() end)
+
+  -- Upgrade one stack to its next quality. Shown only on an echo that has one (stat echoes,
+  -- Common and Uncommon); the dialog grows by one row for it.
+  local upgrade = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  upgrade:SetSize(250, 22)
+  upgrade:SetPoint("BOTTOM", f, "BOTTOM", 0, 46)
+  if upgrade.SetMotionScriptsWhileDisabled then upgrade:SetMotionScriptsWhileDisabled(true) end
+  upgrade:SetScript("OnClick", function()
+    local perkSpellId = f.perkSpellId
+    f:Hide()
+    OrbService.ConfirmUpgrade(perkSpellId)
+  end)
+  upgrade:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(L["Turns one stack of this Echo into one stack of its next quality. No new choice is offered."], 1, 1, 1, true)
+    if self.reason then GameTooltip:AddLine(self.reason, 1, 0.5, 0.5, true) end
+    GameTooltip:Show()
+  end)
+  upgrade:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  upgrade:Hide()
+  f.upgrade = upgrade
+
+  -- The red panel buttons become the echo screen's stone plates (assets/echo_plate_*, the art of
+  -- the Reroll / Use Orbs button), Forget and Upgrade in the orb's mauve, Cancel in grey.
+  local PLATE_MAUVE, PLATE_GREY = { 0.58, 0.28, 0.92 }, { 0.50, 0.47, 0.43 }
+  DressOrbPlate(confirm, PLATE_MAUVE, 26)
+  DressOrbPlate(cancel, PLATE_GREY, 26)
+  DressOrbPlate(upgrade, PLATE_MAUVE, 26)
+  upgrade:SetPoint("BOTTOM", f, "BOTTOM", 0, 50)
 
   spendDialog = f
   return f
+end
+
+--- Shows (or hides) the upgrade row of the spend dialog for @p perkSpellId.
+local function RefreshUpgradeButton(f, perkSpellId)
+  local targetId, target = GetUpgradeTarget(perkSpellId)
+  local cost = target and UPGRADE_COST[target.quality or 0]
+  if not targetId or not cost then
+    f.upgrade:Hide()
+    f:SetHeight(200)
+    return
+  end
+
+  f:SetHeight(240)
+  f.upgrade:SetText(T("Upgrade to {quality} - {cost} orbs", { quality = QUALITY_LABELS[target.quality], cost = cost }))
+  local held, targetLocked = HeldStacks(targetId)
+  local reason = nil
+  if (charges or 0) < cost then
+    reason = T("You need {cost} Orbs of Lost Memories.", { cost = cost })
+  elseif targetLocked or (target.maxStack and target.maxStack > 0 and held >= target.maxStack) then
+    reason = L["That version is already at its maximum stacks."]
+  end
+  f.upgrade.reason = reason
+  if reason then f.upgrade:Disable() else f.upgrade:Enable() end
+  f.upgrade:Show()
+end
+
+--- Spends the upgrade price to turn one stack of @p perkSpellId into its next quality. No draw
+--- follows, so the journal stays open and the orb stays armed for the next one.
+function OrbService.ConfirmUpgrade(perkSpellId)
+  local _, target = GetUpgradeTarget(perkSpellId)
+  local cost = target and UPGRADE_COST[target.quality or 0]
+  if not cost then return end
+
+  ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_ORB_UPGRADE, tostring(perkSpellId))
+  -- Optimistic, like a forget: the SEND_ORB_CHARGES push overwrites it, a refusal included.
+  if charges then
+    charges = math.max(0, charges - cost)
+    OrbService.EnsureUI()
+  end
+  OrbService.RequestCharges()
 end
 
 --- Ask before spending: the actual send happens in ConfirmSpend.
@@ -378,7 +573,7 @@ function OrbService.SpendOn(perkSpellId)
   f.perkSpellId = perkSpellId
   f.orbCount = 1
   f.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-  f.echoName:SetText((name or "this Echo") .. "  " .. QualityLabel(perkSpellId))
+  f.echoName:SetText(T("{name}  {quality}", { name = name or L["this Echo"], quality = QualityLabel(perkSpellId) }))
   LayoutHeader(f)
 
   local maxOrbs = MaxSpendableOrbs()
@@ -392,8 +587,131 @@ function OrbService.SpendOn(perkSpellId)
   -- nothing when the value does not change, so the label would still read the last spend's count.
   _G[f.slider:GetName() .. "Text"]:SetText("1 orb")
 
+  RefreshUpgradeButton(f, perkSpellId)
   f:Show()
   RefreshSpendDialog()
+end
+
+------------------------------------------------------------
+-- PER-REROLL SPEND POPUP
+------------------------------------------------------------
+-- Opened by the small button next to Reroll on an orb offer. A slider and a number box set how
+-- many orbs EACH reroll click spends (OrbService.SetRerollSpend); the change is saved at once,
+-- there is no confirm button. Slider and box drive each other; `syncing` stops the echo.
+local spendPopup = nil
+
+local function RefreshSpendPopup()
+  local f = spendPopup
+  if not f then return end
+  local n = OrbService.GetRerollSpend()
+  f.syncing = true
+  f.slider:SetValue(n)
+  _G[f.slider:GetName() .. "Text"]:SetText(n .. (n > 1 and " orbs" or " orb"))
+  if not f.box:HasFocus() then f.box:SetText(tostring(n)) end
+  f.syncing = false
+  if n >= ORB_BOOST_MAX_ORBS then
+    f.effect:SetText(L["|cffCC66FFGuaranteed higher quality|r"])
+  elseif n > 1 then
+    f.effect:SetText(T("Chance of a higher quality |cffCC66FF+{bonus}%|r", { bonus = n }))
+  else
+    f.effect:SetText(L["No quality bonus"])
+  end
+end
+OrbService.refreshSpendPopup = RefreshSpendPopup
+
+local function CreateSpendPopup()
+  if spendPopup then return spendPopup end
+
+  local f = CreateFrame("Frame", "ProjectEbonholdOrbRerollSpendPopup", UIParent)
+  f:SetFrameStrata("FULLSCREEN_DIALOG")
+  f:SetToplevel(true)
+  f:SetSize(270, 112)
+  -- Dressed like an echo card, in the orb's mauve: the card's dark stone with cut corners and
+  -- its frame (assets/echo_panel_*, tools/perks/gen_echo_card_art.py panel()), a soft glow
+  -- behind. Textures the addon owns, no backdrop, so a UI skin cannot restyle it.
+  local ART = "Interface\\AddOns\\ProjectEbonhold\\assets\\"
+  local glow = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+  glow:SetTexture("Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64")
+  glow:SetBlendMode("ADD")
+  glow:SetPoint("CENTER", f, "CENTER", 0, 0)
+  glow:SetSize(270 + 90, 112 + 80)
+  glow:SetVertexColor(0.58, 0.28, 0.92, 0.35)
+  local stock = f:CreateTexture(nil, "BACKGROUND", nil, -7)
+  stock:SetTexture(ART .. "echo_panel_stock")
+  stock:SetAllPoints(f)
+  local rim = f:CreateTexture(nil, "BORDER")
+  rim:SetTexture(ART .. "echo_panel_rim")
+  rim:SetAllPoints(f)
+  rim:SetVertexColor(0.72, 0.36, 1, 1)
+  f:EnableMouse(true)
+  f:Hide()
+
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  title:SetPoint("TOP", f, "TOP", 0, -14)
+  title:SetShadowColor(0, 0, 0, 1)
+  title:SetShadowOffset(1, -1)
+  title:SetText(L["Orbs per reroll"])
+
+  local slider = CreateFrame("Slider", "$parentSlider", f, "OptionsSliderTemplate")
+  slider:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -46)
+  slider:SetWidth(166)
+  slider:SetMinMaxValues(1, ORB_BOOST_MAX_ORBS)
+  slider:SetValueStep(1)
+  _G[slider:GetName() .. "Low"]:SetText("1")
+  _G[slider:GetName() .. "High"]:SetText(tostring(ORB_BOOST_MAX_ORBS))
+  f.slider = slider
+  slider:SetScript("OnValueChanged", function(_, value)
+    if f.syncing then return end
+    OrbService.SetRerollSpend(math.floor(value + 0.5))
+  end)
+
+  local box = CreateFrame("EditBox", "$parentBox", f, "InputBoxTemplate")
+  box:SetSize(44, 20)
+  box:SetPoint("LEFT", slider, "RIGHT", 16, 0)
+  box:SetAutoFocus(false)
+  box:SetNumeric(true)
+  box:SetMaxLetters(3)
+  f.box = box
+  local function commit(self)
+    OrbService.SetRerollSpend(self:GetNumber())
+    self:ClearFocus()
+    RefreshSpendPopup()
+  end
+  box:SetScript("OnEnterPressed", commit)
+  box:SetScript("OnEditFocusLost", function(self) OrbService.SetRerollSpend(self:GetNumber()); RefreshSpendPopup() end)
+  box:SetScript("OnEscapePressed", function(self) self:ClearFocus(); RefreshSpendPopup() end)
+
+  local effect = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  effect:SetPoint("BOTTOM", f, "BOTTOM", 0, 12)
+  effect:SetWidth(250)
+  effect:SetJustifyH("CENTER")
+  f.effect = effect
+
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetScale(0.8)
+  -- Inside the frame's inner hairline, not over the rim
+  close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
+
+  spendPopup = f
+  return f
+end
+
+--- Opens (or closes) the per-reroll spend popup above @p anchor.
+function OrbService.ToggleRerollSpendPopup(anchor)
+  local f = CreateSpendPopup()
+  if f:IsShown() then f:Hide() return end
+  f:ClearAllPoints()
+  if anchor then
+    f:SetPoint("BOTTOM", anchor, "TOP", 0, 10)
+  else
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+  end
+  f:Show()
+  RefreshSpendPopup()
+end
+
+function OrbService.HideRerollSpendPopup()
+  if spendPopup then spendPopup:Hide() end
 end
 
 -- Sends one spend request. Covers both shapes the player can build: a single echo carrying any
@@ -460,7 +778,7 @@ function OrbService.SpendMarked()
 
   local dialog = StaticPopup_Show("EBONHOLD_ORB_CONFIRM_MULTI", count, count)
   if not dialog then
-    DEFAULT_CHAT_FRAME:AddMessage("|cffFF0000[Orb]|r Close another dialog first.")
+    DEFAULT_CHAT_FRAME:AddMessage(L["|cffFF0000[Orb]|r Close another dialog first."])
   end
 end
 
@@ -481,8 +799,7 @@ function OrbService.RefreshAlert()
     alert.confirm:Hide()
     alert:SetHeight(alert.baseHeight or 110)
   else
-    alert.confirm.text:SetText("Forget " .. count .. " Echo" .. (count > 1 and "es" or "")
-      .. " (" .. count .. " orb" .. (count > 1 and "s" or "") .. ")")
+    alert.confirm.text:SetText(T("Forget {count} Echo{es} ({count} orb{s})", { count = count, es = (count > 1 and "es" or ""), s = (count > 1 and "s" or "") }))
     alert.confirm:Show()
     -- Room for the button plus its own margin, below the text the base height already covers.
     alert:SetHeight((alert.baseHeight or 110) + 48)
@@ -603,11 +920,7 @@ local function CreateAlert(anchor)
   -- guided tour: by the time this alert is up the orb is already armed, so advice on WHEN to
   -- spend arrives too late and only pushes the box down over the grid.
   text:SetText(
-    "|cffFFD100Orb of Lost Memories|r\n\n" ..
-    "|cffFFD100Left-click|r an Echo to forget a stack, or |cffFFD100right-click|r several " ..
-    "to forget them together, one Orb each." .. "\n\n" ..
-    "Each draws a new Echo choice. Your |cffFF8080reroll, freeze and banish|r do not apply " ..
-    "to those draws; |cffFFD100another Orb|r redraws them.")
+    L["|cffFFD100Orb of Lost Memories|r\n\n|cffFFD100Left-click|r an Echo to forget a stack, or |cffFFD100right-click|r several to forget them together, one Orb each.\n\nEach draws a new Echo choice. You can |cffFFD100banish|r or |cffFFD100freeze|r its cards; your |cffFF8080reroll|r does not apply, |cffFFD100another Orb|r redraws them."])
 
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", 6, 6)
@@ -615,7 +928,7 @@ local function CreateAlert(anchor)
 
   -- Only shown once the right-click batch has something in it: with an empty selection there
   -- is nothing to confirm, and an always-present dead button reads as a broken one.
-  local confirm = utils.CreateSimpleCustomButton(f, "Forget", nil, 200, 36)
+  local confirm = utils.CreateSimpleCustomButton(f, L["Forget"], nil, 200, 36)
   confirm:SetPoint("BOTTOM", f, "BOTTOM", 0, 12)
   confirm:SetScript("OnClick", function() OrbService.SpendMarked() end)
   confirm:Hide()
@@ -677,19 +990,19 @@ local function CreateBubble()
 
   f:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Orb of Lost Memories", 1, 0.82, 0)
+    GameTooltip:SetText(L["Orb of Lost Memories"], 1, 0.82, 0)
     -- Mirrors PerksHandler::ORB_MAX_CHARGES: the count is server-sent and already clamped,
     -- this only tells the player where the ceiling is before they bank into it.
-    GameTooltip:AddDoubleLine("Orbs", tostring(charges or 0) .. " / " .. tostring(MAX_CHARGES),
+    GameTooltip:AddDoubleLine(L["Orbs"], tostring(charges or 0) .. " / " .. tostring(MAX_CHARGES),
       0.9, 0.9, 0.9, 1, 0.85, 0.2)
     GameTooltip:AddLine(" ")
     -- Kept to one short sentence per idea, with no blank rows between them: the bubble is a
     -- 20px icon sitting over the echo bar, and a tall wide box hides the very echoes the
     -- player is about to pick from (and the journal's guided tour box beside it).
-    GameTooltip:AddLine("Forget one stack of an Echo, and draw a new choice in its place.",
+    GameTooltip:AddLine(L["Forget one stack of an Echo, and draw a new choice in its place."],
       1, 1, 1, true)
     -- Where to get more, in one line: the full list lives in the journal's guided tour.
-    GameTooltip:AddLine("More from the |cffFFD100Hero's Call Board|r and the |cffFFD100Dungeon Finder|r.", 0.6, 0.6, 0.6, true)
+    GameTooltip:AddLine(L["More from the |cffFFD100Hero's Call Board|r and the |cffFFD100Dungeon Finder|r."], 0.6, 0.6, 0.6, true)
     GameTooltip:AddLine(" ")
     -- No "what these are worth at 80" paragraph here: that is teaching, and it belongs to the
     -- journal's guided tour (echo_journal's echoesTour, "Orb of Lost Memories" step), which the
@@ -697,11 +1010,11 @@ local function CreateBubble()
     -- it does, where more come from - and the advice pushed all of that down the box.
     -- At 0 the bubble is still on screen, so the tooltip has to say why clicking does nothing.
     if (charges or 0) <= 0 then
-      GameTooltip:AddLine("You have no Orb to spend.", 1, 0.4, 0.4, true)
+      GameTooltip:AddLine(L["You have no Orb to spend."], 1, 0.4, 0.4, true)
     elseif armed then
-      GameTooltip:AddLine("Click an Echo below, or click again to cancel.", 0.1, 1, 0.1, true)
+      GameTooltip:AddLine(L["Click an Echo below, or click again to cancel."], 0.1, 1, 0.1, true)
     else
-      GameTooltip:AddLine("Click to choose an Echo to forget.", 0.1, 1, 0.1, true)
+      GameTooltip:AddLine(L["Click to choose an Echo to forget."], 0.1, 1, 0.1, true)
     end
     GameTooltip:Show()
   end)

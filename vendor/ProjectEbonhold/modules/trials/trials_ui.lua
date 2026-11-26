@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- trials_ui.lua -- The Trials: the arena HUD, the result card, the standings.
 --
 -- Three frames, all driven by trials_service.lua events:
@@ -80,8 +81,8 @@ end
 
 local function TeamText(teamSize)
     teamSize = tonumber(teamSize) or 0
-    if teamSize <= 1 then return "Solo" end
-    return "Team of " .. teamSize
+    if teamSize <= 1 then return L["Solo"] end
+    return T("Team of {teamSize}", { teamSize = teamSize })
 end
 
 -- ======================================================================= HUD
@@ -112,7 +113,7 @@ hud.team:SetPoint("TOP", hud.sub, "BOTTOM", 0, -3)
 hud.down = Text(hud, nil, 15, "OUTLINE")
 hud.down:SetPoint("TOP", hud.team, "BOTTOM", 0, -6)
 hud.down:SetTextColor(1.0, 0.30, 0.25)
-hud.down:SetText("You are down")
+hud.down:SetText(L["You are down"])
 hud.down:Hide()
 
 hud.downSub = Text(hud, nil, 12, "OUTLINE")
@@ -154,7 +155,7 @@ local function ShowDowned(downed, wave)
     if downed then
         -- The next boss wave (every 5th): the one being fought when it is a boss wave.
         local nextBoss = math.max(5, math.ceil((wave or 0) / 5) * 5)
-        hud.downSub:SetText("You come back when the next boss falls (wave " .. nextBoss .. ").")
+        hud.downSub:SetText(T("You come back when the next boss falls (wave {nextBoss}).", { nextBoss = nextBoss }))
         hud.down:Show()
         hud.downSub:Show()
     else
@@ -170,13 +171,13 @@ local function RefreshChampionHUD(st)
     if st.phase == Trials.PHASE.PREP then
         hud.clock:SetTextColor(0.55, 0.80, 1.0)
         hud.clock:SetText(Trials.FormatClock(remaining))
-        hud.sub:SetText("Prepare yourself. The trial begins soon.")
+        hud.sub:SetText(L["Prepare yourself. The trial begins soon."])
         LayoutPips(0, 0)
     else
         local warn = remaining <= 10000
         hud.clock:SetTextColor(1.0, warn and 0.35 or 0.92, warn and 0.30 or 0.70)
         hud.clock:SetText(Trials.FormatClock(remaining))
-        hud.sub:SetText("Damage: " .. Trials.FormatNumber(st.score))
+        hud.sub:SetText(T("Damage: {score}", { score = Trials.FormatNumber(st.score) }))
         LayoutPips(st.maxErrors or 0, st.errors or 0)
     end
 end
@@ -188,9 +189,9 @@ local function RefreshCrusaderHUD(st)
         hud.clock:SetTextColor(0.55, 0.80, 1.0)
         hud.clock:SetText(Trials.FormatClock(Trials.GetRemainingMs()))
         if team > 1 then
-            hud.sub:SetText("Your team of " .. team .. " stands ready. The trial begins soon.")
+            hud.sub:SetText(T("Your team of {team} stands ready. The trial begins soon.", { team = team }))
         else
-            hud.sub:SetText("Prepare yourself. The trial begins soon.")
+            hud.sub:SetText(L["Prepare yourself. The trial begins soon."])
         end
         hud.team:SetText("")
         ShowDowned(false)
@@ -208,17 +209,17 @@ local function RefreshCrusaderHUD(st)
     local start = st.startWave or 1
     local waveText
     if wave > 0 then
-        waveText = "Wave " .. wave .. (wave % 5 == 0 and " |cffff8040(boss)|r" or "")
+        waveText = T("Wave {wave}{r}", { wave = wave, r = (wave % 5 == 0 and " |cffff8040(boss)|r" or "") })
     elseif start > 1 then
-        waveText = "Wave " .. start .. " approaches"
+        waveText = T("Wave {start} approaches", { start = start })
     else
-        waveText = "The first wave approaches"
+        waveText = L["The first wave approaches"]
     end
     if start > 1 then
         -- A practice run from a checkpoint: not ranked.
         waveText = "|cff80c0ffPractice|r  " .. waveText
     end
-    hud.sub:SetText(waveText .. "   |cffaaaaaaCleared: " .. (st.wavesCleared or 0) .. "|r")
+    hud.sub:SetText(T("{waveText}   |cffaaaaaaCleared: {wavesCleared}|r", { waveText = waveText, wavesCleared = (st.wavesCleared or 0) }))
 
     local alive = math.max(st.alive or 0, 0)
     if alive < team then
@@ -226,7 +227,7 @@ local function RefreshCrusaderHUD(st)
     else
         hud.team:SetTextColor(0.55, 0.95, 0.55)
     end
-    hud.team:SetText("Standing: " .. alive .. " / " .. team)
+    hud.team:SetText(T("Standing: {alive} / {team}", { alive = alive, team = team }))
 
     ShowDowned(st.downed, wave)
 end
@@ -238,7 +239,7 @@ local function RefreshHUD()
         return
     end
     hud:Show()
-    hud.title:SetText(Trials.NAMES[st.trial] or "Trial")
+    hud.title:SetText(Trials.NAMES[st.trial] or L["Trial"])
     if st.trial == Trials.TYPE.CRUSADER then
         RefreshCrusaderHUD(st)
     else
@@ -267,7 +268,7 @@ card:SetScript("OnDragStop", card.StopMovingOrSizing)
 Backdrop(card)
 card:Hide()
 
-card.title = Header(card, "Trial")
+card.title = Header(card, L["Trial"])
 
 card.reason = Text(card, nil, 11)
 card.reason:SetPoint("TOP", card, "TOP", 0, -34)
@@ -288,21 +289,21 @@ card.rank:SetTextColor(0.90, 0.88, 0.84)
 card.pb = Text(card, nil, 12)
 card.pb:SetPoint("TOP", card.rank, "BOTTOM", 0, -4)
 
-card.retry = Button(card, "Try again", 110, function() card:Hide(); Trials.Retry() end)
+card.retry = Button(card, L["Try again"], 110, function() card:Hide(); Trials.Retry() end)
 card.retry:SetPoint("BOTTOMLEFT", card, "BOTTOM", -118, 18)
-card.leave = Button(card, "Leave the arena", 120, function() card:Hide(); Trials.Leave() end)
+card.leave = Button(card, L["Leave the arena"], 120, function() card:Hide(); Trials.Leave() end)
 card.leave:SetPoint("BOTTOMLEFT", card, "BOTTOM", 4, 18)
 
 local function ReasonText(trial, reason, teamSize)
     if reason == Trials.REASON.DEATH then
         if trial == Trials.TYPE.CRUSADER and (teamSize or 0) > 1 then
-            return "Your whole team fell."
+            return L["Your whole team fell."]
         end
-        return "You fell."
+        return L["You fell."]
     elseif reason == Trials.REASON.ABANDON then
-        return "Attempt abandoned."
+        return L["Attempt abandoned."]
     end
-    return "Time is up."
+    return L["Time is up."]
 end
 
 -- Crusader headline + detail from a score (waves cleared, run time) and a team size.
@@ -311,26 +312,26 @@ local function CrusaderLines(score, wavesCleared, teamSize)
     if wavesCleared and wavesCleared > waves then waves = wavesCleared end
     local detail = TeamText(teamSize)
     if waves > 0 then
-        detail = "Time " .. Trials.FormatTenths(ds) .. "  -  " .. detail
+        detail = T("Time {ds}  -  {detail}", { ds = Trials.FormatTenths(ds), detail = detail })
     end
-    return Trials.FormatWaves(waves) .. " cleared", detail
+    return T("{waves} cleared", { waves = Trials.FormatWaves(waves) }), detail
 end
 
 -- Crusader practice run (from a checkpoint, not ranked): the waves it covered.
 local function PracticeLines(startWave, wavesCleared, teamSize)
     local headline
     if (wavesCleared or 0) >= startWave then
-        headline = "Waves " .. startWave .. " to " .. wavesCleared .. " cleared"
+        headline = T("Waves {startWave} to {wavesCleared} cleared", { startWave = startWave, wavesCleared = wavesCleared })
     else
-        headline = "Wave " .. startWave .. " not cleared"
+        headline = T("Wave {startWave} not cleared", { startWave = startWave })
     end
-    return headline, "Practice  -  " .. TeamText(teamSize)
+    return headline, T("Practice  -  {teamSize}", { teamSize = TeamText(teamSize) })
 end
 
 local function ShowResult(r)
     if not r or r.trial == 0 then return end
-    card.title:SetText(Trials.NAMES[r.trial] or "Trial")
-    card.reason:SetText("Complete. " .. ReasonText(r.trial, r.reason, r.teamSize))
+    card.title:SetText(Trials.NAMES[r.trial] or L["Trial"])
+    card.reason:SetText(T("Complete. {teamSize}", { teamSize = ReasonText(r.trial, r.reason, r.teamSize) }))
     card.score:SetTextColor(1.0, 0.92, 0.70)
 
     if r.trial == Trials.TYPE.CRUSADER and (r.startWave or 1) > 1 then
@@ -344,24 +345,24 @@ local function ShowResult(r)
     else
         card.score:SetText(Trials.FormatNumber(r.score))
         local className = Trials.CLASS_NAME[r.classId]
-        card.detail:SetText(className and ClassText(r.classId, className .. " standings") or "")
+        card.detail:SetText(className and ClassText(r.classId, T("{className} standings", { className = className })) or "")
     end
 
     if r.rank > 0 and r.total > 0 then
-        card.rank:SetText(string.format("Rank #%d of %d  -  Top %.2f%%", r.rank, r.total, r.topPct))
+        card.rank:SetText(T("Rank #{rank} of {total}  -  Top {topPct}%", { rank = string.format("%d", r.rank), total = string.format("%d", r.total), topPct = string.format("%.2f", r.topPct) }))
     elseif (r.startWave or 1) > 1 then
-        card.rank:SetText("Practice run - not ranked")
+        card.rank:SetText(L["Practice run - not ranked"])
     else
         card.rank:SetText("")
     end
 
     if r.personalBest then
         card.pb:SetTextColor(0.40, 1.0, 0.45)
-        card.pb:SetText("New personal best!")
+        card.pb:SetText(L["New personal best!"])
         PlaySound("LEVELUPSOUND")
     elseif r.previousBest > 0 then
         card.pb:SetTextColor(0.70, 0.66, 0.60)
-        card.pb:SetText("Personal best: " .. Trials.FormatScore(r.trial, r.previousBest))
+        card.pb:SetText(T("Personal best: {previousBest}", { previousBest = Trials.FormatScore(r.trial, r.previousBest) }))
     else
         card.pb:SetText("")
     end
@@ -387,10 +388,10 @@ local LIST_W = BOARD_W - 44
 -- Season 1 rewards of the top 1% (docs/tournament/CONTRACT.md section 3, not on the wire):
 -- title 229 / 230 (shown as the Unrivaled / the Undying), one Argent Laurel by mail, traded at Lady Isolde for the season mount.
 local REWARD = {
-    [1] = { title = "the Unrivaled", scope = "each class board" },
-    [3] = { title = "the Undying", scope = "the board" },
-    laurel = 690000, laurelName = "Argent Laurel",
-    mount = 681200, mountName = "Ashen Charger", mountFull = "Reins of the Ashen Charger",
+    [1] = { title = L["the Unrivaled"], scope = L["each class board"] },
+    [3] = { title = L["the Undying"], scope = L["the board"] },
+    laurel = 690000, laurelName = L["Argent Laurel"],
+    mount = 681200, mountName = L["Ashen Charger"], mountFull = L["Reins of the Ashen Charger"],
 }
 
 local TOOLTIP_EDGE = "Interface\\Tooltips\\UI-Tooltip-Border"
@@ -426,7 +427,7 @@ end
 
 local function SmallTeam(teamSize)
     teamSize = tonumber(teamSize) or 0
-    return teamSize <= 1 and "solo" or ("team of " .. teamSize)
+    return teamSize <= 1 and "solo" or (T("team of {teamSize}", { teamSize = teamSize }))
 end
 
 local function SetClassIcon(tex, classId)
@@ -490,8 +491,8 @@ board.championClass = nil
 board.tabs = {}
 do
     local TABS = {
-        { trial = Trials.TYPE.CHAMPION, label = "Champion" },
-        { trial = Trials.TYPE.CRUSADER, label = "Crusader" },
+        { trial = Trials.TYPE.CHAMPION, label = L["Champion"] },
+        { trial = Trials.TYPE.CRUSADER, label = L["Crusader"] },
     }
     for i, tab in ipairs(TABS) do
         local t = CreateFrame("Button", "ProjectEbonholdTrialBoardTab" .. i, board, "OptionsFrameTabButtonTemplate")
@@ -531,7 +532,7 @@ end
 
 -- Only the current season exists on the wire (no season history request): "Season N" is always
 -- the one shown, "All seasons" stays greyed with a tooltip saying so.
-board.seasonBtn = SmallButton("Season 1", 84)
+board.seasonBtn = SmallButton(L["Season 1"], 84)
 board.seasonBtn:SetPoint("TOPRIGHT", board, "TOP", -3, -42)
 board.seasonBtn:SetBackdropBorderColor(1, 0.82, 0)
 board.seasonBtn.text:SetTextColor(1, 0.82, 0)
@@ -539,20 +540,20 @@ board.seasonBtn:SetScript("OnEnter", function(self)
     local b = board.data
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText((b and b.seasonName ~= "" and b.seasonName) or self.text:GetText(), 1, 0.82, 0)
-    GameTooltip:AddLine("The season being played.", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine(L["The season being played."], 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end)
 board.seasonBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-board.allBtn = SmallButton("All seasons", 92)
+board.allBtn = SmallButton(L["All seasons"], 92)
 board.allBtn:SetPoint("TOPLEFT", board, "TOP", 3, -42)
 board.allBtn:SetBackdropBorderColor(0.45, 0.45, 0.45)
 board.allBtn.text:SetTextColor(0.5, 0.5, 0.5)
 board.allBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("All seasons", 1, 0.82, 0)
-    GameTooltip:AddLine("Best attempt of every season together.", 1, 1, 1, true)
-    GameTooltip:AddLine("Only the current season so far.", 0.7, 0.7, 0.7, true)
+    GameTooltip:SetText(L["All seasons"], 1, 0.82, 0)
+    GameTooltip:AddLine(L["Best attempt of every season together."], 1, 1, 1, true)
+    GameTooltip:AddLine(L["Only the current season so far."], 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
 end)
 board.allBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -587,9 +588,9 @@ do
             GameTooltip:SetText(Trials.CLASS_NAME[self.classId] or "", ClassColor(self.classId))
             local d = board.data
             if d and d.classFilter == self.classId then
-                GameTooltip:AddLine(d.total > 0 and (d.total .. " ranked") or "No attempt recorded yet.", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine(d.total > 0 and (T("{total} ranked", { total = d.total })) or L["No attempt recorded yet."], 0.7, 0.7, 0.7)
             else
-                GameTooltip:AddLine("Click to see its standings.", 0.7, 0.7, 0.7)
+                GameTooltip:AddLine(L["Click to see its standings."], 0.7, 0.7, 0.7)
             end
             GameTooltip:Show()
         end)
@@ -652,6 +653,8 @@ board.scroll:SetValueStep(1)
 board.scroll:SetMinMaxValues(0, 0)
 board.scroll:SetValue(0)
 board.scroll:Hide()
+-- DragonUI's scroll bar (utils.UseDragonSlider); the slider steps by row, LIST_ROWS rows show.
+utils.UseDragonSlider(board.scroll, function() return LIST_ROWS end)
 
 local function OnWheel(_, delta)
     if not board.scroll:IsShown() then return end
@@ -667,23 +670,23 @@ local function RowOnEnter(self)
     if not entry or entry.sep or not b then return end
     local e = entry.row
     local crusader = b.trial == Trials.TYPE.CRUSADER
-    local className = Trials.CLASS_NAME[e.class] or "Unknown"
+    local className = Trials.CLASS_NAME[e.class] or L["Unknown"]
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(e.name .. (entry.mine and " (you)" or ""), ClassColor(e.class))
-    GameTooltip:AddLine(crusader and (className .. ", team leader") or className, 0.7, 0.7, 0.7)
-    GameTooltip:AddDoubleLine("Rank", string.format("#%d of %d  (top %s%%)", e.rank, b.total, Percent(e.rank, b.total)),
+    GameTooltip:AddLine(e.name .. (entry.mine and L[" (you)"] or ""), ClassColor(e.class))
+    GameTooltip:AddLine(crusader and (T("{className}, team leader", { className = className })) or className, 0.7, 0.7, 0.7)
+    GameTooltip:AddDoubleLine(L["Rank"], T("#{rank} of {total}  (top {total2}%)", { rank = string.format("%d", e.rank), total = string.format("%d", b.total), total2 = Percent(e.rank, b.total) }),
         0.7, 0.7, 0.7, 1, 1, 1)
     if crusader then
         local waves, ds = Trials.DecodeCrusader(e.score)
-        GameTooltip:AddDoubleLine("Waves cleared", tostring(waves), 0.7, 0.7, 0.7, 1, 1, 1)
-        GameTooltip:AddDoubleLine("Time", Trials.FormatTenths(ds), 0.7, 0.7, 0.7, 1, 1, 1)
-        GameTooltip:AddDoubleLine("Team", SmallTeam(e.teamSize), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Waves cleared"], tostring(waves), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Time"], Trials.FormatTenths(ds), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Team"], SmallTeam(e.teamSize), 0.7, 0.7, 0.7, 1, 1, 1)
     else
-        GameTooltip:AddDoubleLine("Damage", Trials.FormatNumber(e.score), 0.7, 0.7, 0.7, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Damage"], Trials.FormatNumber(e.score), 0.7, 0.7, 0.7, 1, 1, 1)
     end
     local reward = REWARD[b.trial]
     if reward and e.rank <= TopCut(b.total) then
-        GameTooltip:AddLine("Top 1%: " .. reward.title .. " when the season ends.", 0.12, 1, 0)
+        GameTooltip:AddLine(T("Top 1%: {title} when the season ends.", { title = reward.title }), 0.12, 1, 0)
     end
     GameTooltip:Show()
 end
@@ -806,7 +809,7 @@ local function RenderList()
             row:Hide()
         elseif entry.sep then
             SetRowParts(row, false)
-            row.sepText:SetText(entry.count .. " more")
+            row.sepText:SetText(T("{count} more", { count = entry.count }))
             row.stripe:Hide(); row.mineBg:Hide(); row.mineEdge:Hide()
             row:Show()
         else
@@ -831,7 +834,7 @@ local function RenderList()
             else
                 row.bar:SetValue(board.best > 0 and math.max(0.02, e.score / board.best) or 0.02)
                 row.val:SetText(ShortNumber(e.score))
-                row.sub:SetText("top " .. Percent(e.rank, b.total) .. "%")
+                row.sub:SetText(T("top {total}%", { total = Percent(e.rank, b.total) }))
             end
             if entry.mine then
                 row.stripe:Hide(); row.mineBg:Show(); row.mineEdge:Show()
@@ -883,27 +886,27 @@ board.mountText = Text(board, nil, 10)
 board.mountText:SetTextColor(0.64, 0.21, 0.93)
 board.mountText:SetText(REWARD.mountName)
 board.mountIcon = RewardIcon("Interface\\Icons\\Ability_Mount_Charger", function(self)
-    ItemTooltip(self, REWARD.mount, REWARD.mountFull, "The season mount, traded for one Argent Laurel.")
+    ItemTooltip(self, REWARD.mount, REWARD.mountFull, L["The season mount, traded for one Argent Laurel."])
 end)
 board.arrow = Text(board, nil, 10)
 board.arrow:SetTextColor(1, 0.82, 0)
 board.arrow:SetText("»")
 board.laurelIcon = RewardIcon("Interface\\Icons\\Achievement_Reputation_ArgentChampion", function(self)
     ItemTooltip(self, REWARD.laurel, REWARD.laurelName,
-        "Mailed to each winner. Lady Isolde Brightlance trades it for the season mount.")
+        L["Mailed to each winner. Lady Isolde Brightlance trades it for the season mount."])
 end)
 board.titleText = Text(board, nil, 10)
 board.titleText:SetTextColor(0.79, 0.76, 0.69)
 board.titleIcon = RewardIcon("Interface\\Icons\\INV_Scroll_03", function(self)
     local reward = REWARD[board.data and board.data.trial or 1] or REWARD[1]
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Title: " .. (UnitName("player") or "") .. " " .. reward.title, 1, 0.82, 0)
-    GameTooltip:AddLine("For the top 1% of " .. reward.scope .. " when the season ends.", 1, 1, 1, true)
+    GameTooltip:SetText(T("Title: {player} {title}", { player = (UnitName("player") or ""), title = reward.title }), 1, 0.82, 0)
+    GameTooltip:AddLine(T("For the top 1% of {scope} when the season ends.", { scope = reward.scope }), 1, 1, 1, true)
     GameTooltip:Show()
 end)
 board.topLabel = Text(board, nil, 10)
 board.topLabel:SetTextColor(1, 0.82, 0)
-board.topLabel:SetText("Top 1%:")
+board.topLabel:SetText(L["Top 1%:"])
 
 -- Right-to-left chain, anchored once; only its vertical place moves (LayoutBoard).
 board.mountIcon:SetPoint("RIGHT", board.mountText, "LEFT", -4, 0)
@@ -949,8 +952,8 @@ local function ShowBoard(b)
     local myClass = Trials.MyClassId()
 
     PanelTemplates_SetTab(board, crusader and 2 or 1)
-    board.title:SetText(string.upper(Trials.NAMES[b.trial] or "Trial"))
-    board.seasonBtn.text:SetText(b.season > 0 and ("Season " .. b.season) or "Season")
+    board.title:SetText(ProjectEbonhold.Upper(Trials.NAMES[b.trial] or L["Trial"]))
+    board.seasonBtn.text:SetText(b.season > 0 and (T("Season {season}", { season = b.season })) or L["Season"])
     if champion then board.championClass = b.classFilter end
     for _, cb in ipairs(board.classButtons) do
         if champion then board.PaintClassButton(cb); cb:Show() else cb:Hide() end
@@ -959,11 +962,11 @@ local function ShowBoard(b)
     LayoutColumns(crusader)
 
     if champion then
-        board.sect:SetText(string.upper(Trials.CLASS_NAME[b.classFilter] or "Standings"))
-        board.sectInfo:SetText(b.total .. " ranked")
+        board.sect:SetText(ProjectEbonhold.Upper(Trials.CLASS_NAME[b.classFilter] or L["Standings"]))
+        board.sectInfo:SetText(T("{total} ranked", { total = b.total }))
     else
-        board.sect:SetText("TEAMS")
-        board.sectInfo:SetText(b.total .. " ranked · solo to five")
+        board.sect:SetText(L["TEAMS"])
+        board.sectInfo:SetText(T("{total} ranked · solo to five", { total = b.total }))
     end
 
     -- Entries: the rows, with a separator wherever ranks jump (the player's own row, sent after
@@ -984,7 +987,7 @@ local function ShowBoard(b)
         if value > best then best = value end
     end
     board.best = best
-    board.empty:SetText(#b.rows == 0 and "No attempt recorded yet this season." or "")
+    board.empty:SetText(#b.rows == 0 and L["No attempt recorded yet this season."] or "")
 
     -- Scroll range; open with the player's row in view.
     local maxOffset = math.max(0, #entries - LIST_ROWS)
@@ -999,14 +1002,13 @@ local function ShowBoard(b)
 
     -- Footer.
     if b.myRank > 0 then
-        board.you:SetText(string.format("You |cffffffff#%d|r/%d · top |cffffffff%s%%|r",
-            b.myRank, b.total, Percent(b.myRank, b.total)))
+        board.you:SetText(T("You |cffffffff#{myRank}|r/{total} · top |cffffffff{total2}%|r", { myRank = string.format("%d", b.myRank), total = string.format("%d", b.total), total2 = Percent(b.myRank, b.total) }))
     elseif champion and b.classFilter ~= myClass and Trials.CLASS_NAME[myClass] then
-        board.you:SetText("You play a " .. ClassText(myClass, Trials.CLASS_NAME[myClass]))
+        board.you:SetText(T("You play a {myClass}", { myClass = ClassText(myClass, Trials.CLASS_NAME[myClass]) }))
     elseif b.myBest > 0 then
-        board.you:SetText("Your best: |cffffffff" .. Trials.FormatScore(b.trial, b.myBest) .. "|r")
+        board.you:SetText(T("Your best: |cffffffff{myBest}|r", { myBest = Trials.FormatScore(b.trial, b.myBest) }))
     else
-        board.you:SetText("No attempt of yours yet")
+        board.you:SetText(L["No attempt of yours yet"])
     end
     board.titleText:SetText((REWARD[b.trial] or REWARD[1]).title)
 
@@ -1020,8 +1022,8 @@ end
 -- The rank is not in the state; the full card comes only with SEND_TRIAL_RESULT.
 local function ShowResultFromState(st)
     if card:IsShown() then return end
-    card.title:SetText(Trials.NAMES[st.trial] or "Trial")
-    card.reason:SetText("Complete.")
+    card.title:SetText(Trials.NAMES[st.trial] or L["Trial"])
+    card.reason:SetText(L["Complete."])
     card.score:SetTextColor(1.0, 0.92, 0.70)
     if st.trial == Trials.TYPE.CRUSADER and (st.startWave or 1) > 1 then
         local headline, detail = PracticeLines(st.startWave, st.wavesCleared, st.teamSize)

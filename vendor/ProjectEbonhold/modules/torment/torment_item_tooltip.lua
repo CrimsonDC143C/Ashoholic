@@ -9,8 +9,12 @@
 -- description (a description that was only the marker disappears entirely).
 --
 -- Real heroic items (no marker in their description) are left alone.
+--
+-- The marker is not always at the start of its line: an item that teaches a spell (spellid_2 trigger 6,
+-- Endless potions, Flask of the North) shows its description as the "Use:" text, so the line reads
+-- "Use: @Tormented@Teaches you ...". Anything before the marker is kept (2026-11-23, player report).
 
-local MARKER_PATTERN = "^(\"?)@([^@]+)@(.-)(\"?)$"   -- the description line is quoted by the client
+local MARKER_PATTERN = "^(.-)@([^@]+)@(.-)(\"?)$"   -- prefix: the client's opening quote, or "Use: "
 
 local function RelabelTormentItem(tooltip)
   local name = tooltip:GetName()
@@ -24,7 +28,7 @@ local function RelabelTormentItem(tooltip)
       if inner then
         label, descLine = inner, left
         rest = rest:gsub("^%s+", "")
-        if rest == "" then
+        if rest == "" and q1:match("^%s*\"?%s*$") then
           -- Nothing but the marker: drop the line. Blanking keeps the line count stable
           -- for the other tooltip hooks; the empty line is collapsed at the next Show.
           left:SetText("")

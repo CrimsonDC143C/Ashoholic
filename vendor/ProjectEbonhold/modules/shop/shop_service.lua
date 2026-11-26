@@ -1,4 +1,5 @@
 local addon, Addon = ...
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 
 Addon.ShopEntries = {}
 
@@ -121,8 +122,8 @@ local function getLocalizedItemData(itemId, language)
     end
     
     return itemData or {
-        name = "Unknown Item #" .. tostring(itemId),
-        description = "No description available for this item.",
+        name = T("Unknown Item #{id}", { id = tostring(itemId) }),
+        description = L["No description available for this item."],
         icon = "INV_Misc_QuestionMark"
     }
 end

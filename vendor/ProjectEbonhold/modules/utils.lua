@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 local base64_lookup = {}
 for i = 1, #base64_chars do
@@ -20,6 +21,48 @@ function utils.IsDevRealm()
     local upperRealmName = string.upper(realmName)
     return string.find(upperRealmName, "(PTR)", 1, true) ~= nil
 end
+
+-- DragonUI's scroll bar on one of our scroll frames (owner, 2026-11-12: every scroll bar of our own
+-- interfaces looks like DragonUI's). `scroll` is a NAMED scroll frame built on
+-- UIPanelScrollFrameTemplate / FauxScrollFrameTemplate / HybridScrollFrameTemplate (the bar is
+-- <name>ScrollBar). By default the slim bar takes the column the stock one sat in, right of the
+-- frame, top to bottom (no arrows); host / insets as in DragonUI.PanelChrome.ReskinScrollBar
+-- (DragonUI\utils\panel_chrome.lua) to place it otherwise. DragonUI loads after the modules (end
+-- of the toc): a frame built before that is skinned at PLAYER_LOGIN.
+local pendingScrollBars = {}
+local function ApplyDragonScrollBar(job)
+    local chrome = DragonUI and DragonUI.PanelChrome
+    if not chrome or not chrome.ReskinScrollBar then return false end
+    if DragonUI.playerOff then return true end   -- the whole interface on Old: the stock bar stays
+    if job.slider then
+        chrome.SkinSlider(job.slider, job.viewport)
+    else
+        chrome.ReskinScrollBar(job[1], job[2] or job[1], job[3] or -7, job[4] or 18, job[5] or -7)
+    end
+    return true
+end
+
+function utils.UseDragonScrollBar(scroll, host, topInset, xInset, bottomInset)
+    if not scroll or not scroll.GetName or not scroll:GetName() then return end
+    local job = { scroll, host, topInset, xInset, bottomInset }
+    if not ApplyDragonScrollBar(job) then pendingScrollBars[#pendingScrollBars + 1] = job end
+end
+
+-- The same bar on a bare vertical Slider that scrolls a list itself; viewport() = how much of the
+-- list shows, in the slider's units (DragonUI.PanelChrome.SkinSlider).
+function utils.UseDragonSlider(slider, viewport)
+    if not slider then return end
+    local job = { slider = slider, viewport = viewport }
+    if not ApplyDragonScrollBar(job) then pendingScrollBars[#pendingScrollBars + 1] = job end
+end
+
+local scrollBarLogin = CreateFrame("Frame")
+scrollBarLogin:RegisterEvent("PLAYER_LOGIN")
+scrollBarLogin:SetScript("OnEvent", function(self)
+    self:UnregisterAllEvents()
+    for _, job in ipairs(pendingScrollBars) do ApplyDragonScrollBar(job) end
+    pendingScrollBars = {}
+end)
 
 local logoutFrame = CreateFrame("Frame")
 logoutFrame:RegisterEvent("PLAYER_LOGOUT")
@@ -593,10 +636,10 @@ end
 local breakdownNames = {
     sp = "SP",
     ap = "AP",
-    critrating = "Crit",
-    wep = "Weapon",
+    critrating = L["Crit"],
+    wep = L["Weapon"],
     owep = "Off-hand",
-    rwep = "Ranged",
+    rwep = L["Ranged"],
 }
 local function BreakdownName(key)
     return breakdownNames[key] or (key:sub(1, 1):upper() .. key:sub(2))
@@ -636,11 +679,11 @@ local function CalculateStatFormula(formula, stacks)
             local val1 = EvalStatTerm(stats, stat1, mult1, stacks)
             local val2 = EvalStatTerm(stats, stat2, mult2, stacks)
             local val = math.min(val1, val2)
-            table.insert(parts, { label = string.format("min(%s, %s)", BreakdownName(statAliases[string.lower(stat1)] or string.lower(stat1)), BreakdownName(statAliases[string.lower(stat2)] or string.lower(stat2))), value = val })
+            table.insert(parts, { label = T("min({stat1}, {stat2})", { stat1 = BreakdownName(statAliases[string.lower(stat1)] or string.lower(stat1)), stat2 = BreakdownName(statAliases[string.lower(stat2)] or string.lower(stat2)) }), value = val })
         elseif component:match("^[%d%.]+$") then
             -- @2+flat1@: a bare number is a constant added once, whatever the
             -- number of copies (2 + 1 per copy)
-            table.insert(parts, { label = "fixed", value = tonumber(component) or 0, key = "fixed", once = true })
+            table.insert(parts, { label = L["fixed"], value = tonumber(component) or 0, key = "fixed", once = true })
         else
             local statName, multiplier = component:match("^(%a+)([%d%.]+)$")
             if statName and multiplier then
@@ -651,7 +694,7 @@ local function CalculateStatFormula(formula, stacks)
                 if key == "flat" then
                     label = key
                 elseif key == "base" then
-                    label = "minimum"
+                    label = L["minimum"]
                 else
                     label = BreakdownName(key)
                 end
@@ -710,7 +753,7 @@ local function RenderFormulaToken(formula, stacks, override)
     local ppm = formula:match("^%s*[Pp][Pp][Mm]%s*([%d%.]+)%s*$")
     if ppm then
         if IsShiftKeyDown() then
-            return "|cff2cfe32" .. ppm .. " PPM|r"
+            return T("|cff2cfe32{ppm} PPM|r", { ppm = ppm })
         end
         return ""
     end
@@ -739,6 +782,67 @@ end
 local function TidyHiddenTokens(text)
     return (text:gsub("%s+([,%.;:])", "%1"))
 end
+
+-- The class's main stat name (Strength / Agility / Intellect, client-localized). Must mirror the
+-- server's SkillTreeMainStatFor (spell_skilltree_general_endless_growth::MainStatFor): pure classes by
+-- class, hybrids by the talent tree with the most points (a tie goes to the left-most tree),
+-- untalented hybrids by the higher of their two stats (tie: paladin Strength, shaman / druid
+-- Intellect). Used by Endless Growth (skillTree.lua) and the Battle Conditioning echo.
+function utils.MainStatName()
+    local function mainStatIndex()
+        local _, class = UnitClass("player")
+        if class == "WARRIOR" or class == "DEATHKNIGHT" then return 1 end
+        if class == "ROGUE" or class == "HUNTER" then return 2 end
+        if class ~= "PALADIN" and class ~= "SHAMAN" and class ~= "DRUID" then return 4 end
+
+        local group = GetActiveTalentGroup and GetActiveTalentGroup() or 1
+        local best, bestPoints = 1, 0
+        for tab = 1, (GetNumTalentTabs() or 0) do
+            local _, _, points = GetTalentTabInfo(tab, false, false, group)
+            points = points or 0
+            if points > bestPoints then best, bestPoints = tab, points end
+        end
+
+        if class == "PALADIN" then
+            if bestPoints > 0 then return best == 1 and 4 or 1 end
+            return UnitStat("player", 4) > UnitStat("player", 1) and 4 or 1
+        end
+        if bestPoints > 0 then return best == 2 and 2 or 4 end
+        return UnitStat("player", 2) > UnitStat("player", 4) and 2 or 4
+    end
+
+    return _G["SPELL_STAT" .. mainStatIndex() .. "_NAME"] or ""
+end
+
+-- Battle Conditioning (echo pass 2026-11-24): the one main-stat echo of every class. The spell text
+-- says "your primary attribute"; the server gives the main stat above (spell_echoes_battle_conditioning).
+local BATTLE_CONDITIONING = { [200001] = true, [200452] = true, [200493] = true }
+local function PersonalizeEchoText(spellId, text)
+    if not BATTLE_CONDITIONING[spellId] then return text end
+    local statName = utils.MainStatName()
+    local phrase = L["your primary attribute"]
+    local s, e = text:find(phrase, 1, true)
+    if not s then return text end
+    return text:sub(1, s - 1) .. statName .. text:sub(e + 1)
+end
+utils.PersonalizeEchoText = PersonalizeEchoText
+
+-- Native spell tooltips (spellbook echo tab, chat links) show the raw text: rewrite the line there too.
+local function PersonalizeNativeTooltip(tooltip)
+    local _, _, spellId = tooltip:GetSpell()
+    if not spellId or not BATTLE_CONDITIONING[spellId] then return end
+    local name = tooltip:GetName()
+    for i = 2, tooltip:NumLines() do
+        local line = _G[name .. "TextLeft" .. i]
+        local text = line and line:GetText()
+        if text then
+            local changed = PersonalizeEchoText(spellId, text)
+            if changed ~= text then line:SetText(changed) end
+        end
+    end
+end
+GameTooltip:HookScript("OnTooltipSetSpell", PersonalizeNativeTooltip)
+ItemRefTooltip:HookScript("OnTooltipSetSpell", PersonalizeNativeTooltip)
 
 
 local function ExtractSpellFormulas(spellId)
@@ -803,7 +907,7 @@ function utils.GetSpellDescription(spellId, maxLength, stacks)
     
     local spellName = GetSpellInfo(spellId)
     if not spellName then
-        return "Click for details"
+        return L["Click for details"]
     end
 
     
@@ -822,7 +926,7 @@ function utils.GetSpellDescription(spellId, maxLength, stacks)
                         return RenderFormulaToken(formula, stacks)
                     end)
 
-                    description = description .. TidyHiddenTokens(text) .. " "
+                    description = description .. PersonalizeEchoText(spellId, TidyHiddenTokens(text)) .. " "
                 end
             end
         end
@@ -831,7 +935,7 @@ function utils.GetSpellDescription(spellId, maxLength, stacks)
     
     description = description:gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1") 
     if description == "" then
-        description = "Click for details"
+        description = L["Click for details"]
     elseif string.len(description) > maxLength then
         description = string.sub(description, 1, maxLength - 3) .. "..."
     end
@@ -839,7 +943,24 @@ function utils.GetSpellDescription(spellId, maxLength, stacks)
     return description
 end
 
-
+-- "Hold Shift to see all the details", the last line of an echo tooltip.
+-- Only on echoes whose text Shift changes (a @formula@ or @ppm@ token), and
+-- hidden while Shift is held: the details are on screen then. The shift
+-- watcher below redraws the tooltip, so the line comes and goes by itself.
+local shiftDetailCache = {}
+function utils.AddShiftHint(tooltip, spellId)
+    if not tooltip or not spellId or IsShiftKeyDown() then return end
+    local hasDetails = shiftDetailCache[spellId]
+    if hasDetails == nil then
+        local formulas = ExtractSpellFormulas(spellId)
+        hasDetails = formulas ~= nil and #formulas > 0
+        shiftDetailCache[spellId] = hasDetails
+    end
+    if hasDetails then
+        tooltip:AddLine(" ")
+        tooltip:AddLine(L["Hold Shift to see all the details"], 0.5, 0.5, 0.5)
+    end
+end
 
 
 -- Echo descriptions change with Shift (PPM + formula breakdown), so re-run the
@@ -924,7 +1045,7 @@ function utils.FormatPerkFamilies(families, size)
         if tex then
             table.insert(parts, "|T" .. tex .. ":" .. size .. ":" .. size .. ":0:-1|t")
         else
-            table.insert(parts, family)
+            table.insert(parts, L[family])   -- display only: no icon, show the name translated
         end
     end
     return table.concat(parts, " ")
@@ -934,14 +1055,14 @@ function utils.GetStackedSpellDescription(spellInstances, maxLength)
     maxLength = maxLength or 100
     
     if not spellInstances or #spellInstances == 0 then
-        return "Click for details"
+        return L["Click for details"]
     end
 
     
     local firstSpellId = spellInstances[1].spellId
     local spellName = GetSpellInfo(firstSpellId)
     if not spellName then
-        return "Click for details"
+        return L["Click for details"]
     end
 
     
@@ -1004,7 +1125,7 @@ function utils.GetStackedSpellDescription(spellInstances, maxLength)
                         return RenderFormulaToken(formula, 1, agg)
                     end)
 
-                    description = description .. TidyHiddenTokens(text) .. " "
+                    description = description .. PersonalizeEchoText(firstSpellId, TidyHiddenTokens(text)) .. " "
                 end
             end
         end
@@ -1013,7 +1134,7 @@ function utils.GetStackedSpellDescription(spellInstances, maxLength)
     
     description = description:gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1")
     if description == "" then
-        description = "Click for details"
+        description = L["Click for details"]
     elseif string.len(description) > maxLength then
         description = string.sub(description, 1, maxLength - 3) .. "..."
     end

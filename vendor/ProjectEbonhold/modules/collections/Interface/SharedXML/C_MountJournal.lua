@@ -25,13 +25,13 @@ StaticPopupDialogs["EZCOLLECTIONS_ERROR"] = {
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 };
 StaticPopupDialogs["EZCOLLECTIONS_MOUNT_MACRO_CREATE"] = {
-    text = "Dragging this button creates a macro that summons a random favorite mount. Create it?",
+    text = ProjectEbonhold.L["Dragging this button creates a macro that summons a random favorite mount. Create it?"],
     button1 = ACCEPT, button2 = CANCEL,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
     -- OnAccept is (re)assigned by ShowMacroPopup at call time
 };
 StaticPopupDialogs["EZCOLLECTIONS_MOUNT_MACRO_PERCHARACTER"] = {
-    text = "No account-wide macro slots are free. Create it as a character-specific macro instead?",
+    text = ProjectEbonhold.L["No account-wide macro slots are free. Create it as a character-specific macro instead?"],
     button1 = ACCEPT, button2 = CANCEL,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 };
@@ -440,7 +440,9 @@ function C_MountJournal.GetMountInfoExtraByID(mountID)
     if companionIndex then
         creatureDisplayInfoID = GetCompanionInfo("MOUNT", companionIndex);
     end
-    return creatureDisplayInfoID, description or "", source or "", isSelfMount;
+    -- display only: description and source are English data rows (Data/mounts_data.lua), French by English
+    local L = ProjectEbonhold.L
+    return creatureDisplayInfoID, L[description or ""], L[source or ""], isSelfMount;
 end
 
 function C_MountJournal.GetNumDisplayedMounts()

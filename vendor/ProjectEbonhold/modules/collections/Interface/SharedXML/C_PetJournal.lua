@@ -19,13 +19,13 @@ local _macroBody = "/click PetJournalSummonRandomFavoritePetButton";
 -- out. EZCOLLECTIONS_ERROR is defined in C_MountJournal.lua, which the TOC
 -- loads first.
 StaticPopupDialogs["EZCOLLECTIONS_PET_MACRO_CREATE"] = {
-    text = "Dragging this button creates a macro that summons a random favorite pet. Create it?",
+    text = ProjectEbonhold.L["Dragging this button creates a macro that summons a random favorite pet. Create it?"],
     button1 = ACCEPT, button2 = CANCEL,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
     -- OnAccept is (re)assigned by ShowMacroPopup at call time
 };
 StaticPopupDialogs["EZCOLLECTIONS_PET_MACRO_PERCHARACTER"] = {
-    text = "No account-wide macro slots are free. Create it as a character-specific macro instead?",
+    text = ProjectEbonhold.L["No account-wide macro slots are free. Create it as a character-specific macro instead?"],
     button1 = ACCEPT, button2 = CANCEL,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 };
@@ -295,6 +295,8 @@ function C_PetJournal.GetPetInfoBySpeciesID(speciesID)
     local _, sourceType, sourceText;
 
     creatureID, petType, _, name, description, sourceType, sourceText = ezCollections:GetPetInfo(petID);
+    -- display only: English data rows (Data/pets_data.lua), French by English
+    description, sourceText = ProjectEbonhold.L[description or ""], ProjectEbonhold.L[sourceText or ""];
 
     obtainable = sourceType ~= -1;
     local companionIndex = _petIDToCompanionIndex[petID];

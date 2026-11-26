@@ -28,11 +28,8 @@ local function ConfirmPermanentNode(onConfirm)
     end
 
     StaticPopupDialogs["SKILLTREE_PERMANENT_INTRO"] = StaticPopupDialogs["SKILLTREE_PERMANENT_INTRO"] or {
-        text = "|cffFFD700Permanent node|r\n\n" ..
-            "Every rank you apply in the Skill Tree is |cffFF0000permanent|r: it can never be unlearned or refunded. A |cffFF4444Prestige|r is the only thing that clears the tree, and it wipes almost all of it.\n\n" ..
-            "The node you are about to take wears an |cffFFD700octagon|r frame: it is one of the few that SURVIVE a Prestige, keeping its ranks for free forever.\n\n" ..
-            "Choose those points carefully!",
-        button1 = "Confirm",
+        text = ProjectEbonhold.L["|cffFFD700Permanent node|r\n\nEvery rank you apply in the Skill Tree is |cffFF0000permanent|r: it can never be unlearned or refunded. A |cffFF4444Prestige|r is the only thing that clears the tree, and it wipes almost all of it.\n\nThe node you are about to take wears an |cffFFD700octagon|r frame: it is one of the few that SURVIVE a Prestige, keeping its ranks for free forever.\n\nChoose those points carefully!"],
+        button1 = ProjectEbonhold.L["Confirm"],
         button2 = CANCEL,
         OnAccept = function(self, data)
             ProjectEbonholdDB = ProjectEbonholdDB or {}
@@ -70,23 +67,23 @@ local CURRENCY_POOLS = {
 -- Display data per currency. The tooltip keeps ONE colour for every cost line (green when
 -- affordable, red otherwise); only the icon and the name change with the currency.
 local CURRENCY_INFO = {
-    ash     = { name = "Soul Ashes",   icon = "Interface\\Icons\\inv_soulash" },
-    shard   = { name = "Soul Shards",  icon = "Interface\\Icons\\inv_10_jewelcrafting3_soulcage_frost" },
-    essence = { name = "Soul Essence", icon = "Interface\\Icons\\inv_misc_supersoulash" },
-    artisan = { name = "Artisan Soul", icon = "Interface\\Icons\\ability_argus_soulbombdebufflarge" },
+    ash     = { name = ProjectEbonhold.L["Soul Ashes"],   icon = "Interface\\Icons\\inv_soulash" },
+    shard   = { name = ProjectEbonhold.L["Soul Shards"],  icon = "Interface\\Icons\\inv_10_jewelcrafting3_soulcage_frost" },
+    essence = { name = ProjectEbonhold.L["Soul Essence"], icon = "Interface\\Icons\\inv_misc_supersoulash" },
+    artisan = { name = ProjectEbonhold.L["Artisan Soul"], icon = "Interface\\Icons\\ability_argus_soulbombdebufflarge" },
 }
 local CURRENCY_ORDER = { "ash", "shard", "essence", "artisan" }
 -- What each currency buys and where it comes from, for the bar's tooltip. Shared with the
 -- Call Board's reward tooltips (ProjectEbonhold.CurrencyHelp) so both say the same thing.
 local CURRENCY_HELP = {
-    ash     = { buys = "The currency of the Soul Ash Tree: every ordinary node, the flat stats, the mechanics and the infinite wells.",
-                earn = "Every point of experience you gain during a run turns into Soul Ashes. When the run ends, they are banked on your account for good." },
-    shard   = { buys = "The Milestones of the tree: the percentage bonuses on the stats of your gear.",
-                earn = "Paid when every boss of a dungeon or raid in your bracket is dead, by dungeon champions in Torment, and by some Hero's Call Board contracts. Like Soul Ashes, they accumulate during the run and are banked at an offering or when it ends. Consumed by a Prestige." },
-    essence = { buys = "The Prestige sector of the tree: talents, echoes, resurrections, experience.",
-                earn = "Minted when you Prestige: 50 Soul Shards consumed become 1 Soul Essence on your first Prestige, 50 Shards more each time, up to 750. Your first Prestige mints at most 50, the next 100, up to 750 on the 15th, then no limit; Shards above the limit stay banked. Never reset." },
-    artisan = { buys = "The Professions sector of the tree: gathering, crafting and the Torment recipes.",
-                earn = "Earned at the Hero's Call Board: every crafting contract you claim pays one. Never reset." },
+    ash     = { buys = ProjectEbonhold.L["The currency of the Soul Ash Tree: every ordinary node, the flat stats, the mechanics and the infinite wells."],
+                earn = ProjectEbonhold.L["Every point of experience you gain during a run turns into Soul Ashes. When the run ends, they are banked on your account for good."] },
+    shard   = { buys = ProjectEbonhold.L["The Milestones of the tree: the percentage bonuses on the stats of your gear."],
+                earn = ProjectEbonhold.L["Paid when every boss of a dungeon or raid in your bracket is dead, by Champion's Standards held in Torment, and by some Hero's Call Board contracts. Like Soul Ashes, they accumulate during the run and are banked at an offering or when it ends. Consumed by a Prestige."] },
+    essence = { buys = ProjectEbonhold.L["The Prestige sector of the tree: talents, echoes, resurrections, experience."],
+                earn = ProjectEbonhold.L["Minted when you Prestige: 50 Soul Shards consumed become 1 Soul Essence on your first Prestige, 50 Shards more each time, up to 750. Your first Prestige mints at most 50, the next 100, up to 750 on the 15th, then no limit; Shards above the limit stay banked. Never reset."] },
+    artisan = { buys = ProjectEbonhold.L["The Professions sector of the tree: gathering, crafting and the Torment recipes."],
+                earn = ProjectEbonhold.L["Earned at the Hero's Call Board: every crafting contract you claim pays one. Never reset."] },
 }
 ProjectEbonhold.CurrencyHelp = CURRENCY_HELP
 local function getNodeCurrency(btn)
@@ -525,6 +522,13 @@ local function infiniteRampTotal(rank)
 end
 
 
+-- Endless Growth's stat: the shared main-stat rule (utils.MainStatName mirrors the server's
+-- MainStatFor; the Battle Conditioning echo uses the same rule).
+local function mainStatName()
+    return utils.MainStatName()
+end
+
+
 -- Infinite nodes only: spell name + description computed from the current rank
 -- (rank 0 previews what the first stack grants). Replaces SetHyperlink, whose
 -- static DBC text cannot scale with the rank. computedDesc/gainsPerRank come
@@ -550,6 +554,9 @@ local function addInfiniteSpellTooltip(tooltip, btn, spellName, rank)
     end
     local effRank = math.max(rank, 1)
     local values = {}
+    -- btn.mainStat (Endless Growth): the first %s is the class's stat name.
+    local statName = btn.mainStat and mainStatName() or nil
+    if statName then table.insert(values, statName) end
     for _, gain in ipairs(btn.gainsPerRank) do
         local value
         if gain.lin or gain.geo then value = pctText(gain, effRank)
@@ -558,7 +565,7 @@ local function addInfiniteSpellTooltip(tooltip, btn, spellName, rank)
         table.insert(values, "|cff00FF00" .. value .. "|r")
     end
 
-    tooltip:AddLine(string.format(btn.computedDesc, unpack(values)), 1, 1, 1, true)
+    tooltip:AddLine(string.format(ProjectEbonhold.L[btn.computedDesc], unpack(values)), 1, 1, 1, true)   -- translated template, same %s slots
 
     -- What the next stack grants — only for RAMPING gains, where it actually varies
     -- (fixed-gain nodes would just repeat their per-rank value). At rank 0 the
@@ -570,12 +577,12 @@ local function addInfiniteSpellTooltip(tooltip, btn, spellName, rank)
                 table.insert(deltas, "|cff00FF00" .. pctText(gain, rank + 1) .. "|r " .. (gain.label or ""))
             elseif gain.ramp then
                 local delta = infiniteRampTotal(rank + 1) - infiniteRampTotal(rank)
-                table.insert(deltas, "|cff00FF00+" .. delta .. "|r " .. (gain.label or ""))
+                table.insert(deltas, "|cff00FF00+" .. delta .. "|r " .. (statName or gain.label or ""))
             end
         end
         if #deltas > 0 then
             local sep = btn.gainsExclusive and " or " or ", "
-            tooltip:AddLine("Next rank: " .. table.concat(deltas, sep), 0.8, 0.8, 0.8, true)
+            tooltip:AddLine(ProjectEbonhold.T("Next rank: {sep}", { sep = table.concat(deltas, sep) }), 0.8, 0.8, 0.8, true)
         end
     end
 end
@@ -624,7 +631,7 @@ end
 -- blind (a choice node or a second apex on the way).
 local function computeUnlockPath(nodeId)
     local target = nodesById[nodeId]
-    if not target or target.classId then return nil, "not an ash node" end
+    if not target or target.classId then return nil, ProjectEbonhold.L["not an ash node"] end
     local order, seen, cost, count = {}, {}, {}, 0
     local function add(btn, fromRank, toRank)
         local cur = getNodeCurrency(btn)
@@ -646,12 +653,12 @@ local function computeUnlockPath(nodeId)
         local rank, maxRank = getNodeRank(id), getMaxRank(id)
         if btn.isMultipleChoice then
             -- a choice cannot be made for the player: it has to be picked by hand first
-            if not isNodeActive(id) then return false, "choose an option on the way first" end
+            if not isNodeActive(id) then return false, ProjectEbonhold.L["choose an option on the way first"] end
         elseif btn.infinite then
             if rank < 1 then add(btn, 0, 1) end
         elseif rank < maxRank then
             if btn.isApex and activeApexNodeId and activeApexNodeId ~= id then
-                return false, "another Apex talent is already active"
+                return false, ProjectEbonhold.L["another Apex talent is already active"]
             end
             add(btn, rank, maxRank)
         end
@@ -662,9 +669,9 @@ local function computeUnlockPath(nodeId)
         if not ok then return nil, why end
     end
     -- the node itself: one rank, like a normal click
-    if target.isMultipleChoice then return nil, "choose an option first" end
+    if target.isMultipleChoice then return nil, ProjectEbonhold.L["choose an option first"] end
     if target.isApex and activeApexNodeId and activeApexNodeId ~= nodeId then
-        return nil, "another Apex talent is already active"
+        return nil, ProjectEbonhold.L["another Apex talent is already active"]
     end
     add(target, getNodeRank(nodeId), getNodeRank(nodeId) + 1)
     return { nodes = order, cost = cost, count = count }
@@ -693,7 +700,7 @@ local function addPrereqLines(tooltip, nodeId)
         end
     end
     if #parts > 0 then
-        tooltip:AddLine("Requires " .. table.concat(parts, ", "), 1, 0.3, 0.3)
+        tooltip:AddLine(ProjectEbonhold.T("Requires {parts}", { parts = table.concat(parts, ", ") }), 1, 0.3, 0.3)
     end
 end
 
@@ -702,7 +709,7 @@ end
 local function addUnlockPathLines(tooltip, nodeId)
     local path, why = computeUnlockPath(nodeId)
     if not path then
-        if why then tooltip:AddLine("Path: " .. why, 0.6, 0.6, 0.6, false) end
+        if why then tooltip:AddLine(ProjectEbonhold.T("Path: {why}", { why = why }), 0.6, 0.6, 0.6, false) end
         return
     end
     local parts = {}
@@ -713,9 +720,9 @@ local function addUnlockPathLines(tooltip, nodeId)
         end
     end
     -- no wrapping: the tooltip widens instead of breaking the price onto its own line
-    tooltip:AddLine("Unlock path (" .. path.count .. (path.count > 1 and " ranks" or " rank") .. "): " .. table.concat(parts, "  "), 1, 1, 1, false)
+    tooltip:AddLine(ProjectEbonhold.T("Unlock path ({count}{rank}): {parts}", { count = path.count, rank = (path.count > 1 and ProjectEbonhold.L[" ranks"] or ProjectEbonhold.L[" rank"]), parts = table.concat(parts, "  ") }), 1, 1, 1, false)
     if canAffordPath(path) then
-        tooltip:AddLine("|cff00FF00Left-click to unlock the whole path|r", 1, 1, 1, false)
+        tooltip:AddLine(ProjectEbonhold.L["|cff00FF00Left-click to unlock the whole path|r"], 1, 1, 1, false)
     end
 end
 
@@ -895,7 +902,7 @@ local function RevertToValidatedState()
 
     if lastValidatedState.class and lastValidatedState.class ~= currentClass then
         DebugPrint(
-            "|cffFFFF00Warning: Validated state is for a different class!|r")
+            ProjectEbonhold.L["|cffFFFF00Warning: Validated state is for a different class!|r"])
     end
 
 
@@ -949,7 +956,7 @@ end
 
 local TreeNodes = {}
 local Links = {}
-currentClass = "Mage"
+currentClass = ProjectEbonhold.L["Mage"]
 
 
 local function DetectPlayerClass()
@@ -957,18 +964,18 @@ local function DetectPlayerClass()
 
 
     local classMapping = {
-        ["WARRIOR"] = "Warrior",
-        ["PALADIN"] = "Paladin",
-        ["HUNTER"] = "Hunter",
-        ["ROGUE"] = "Rogue",
-        ["PRIEST"] = "Priest",
-        ["DEATHKNIGHT"] = "Death Knight",
-        ["SHAMAN"] = "Shaman",
-        ["MAGE"] = "Mage",
-        ["WARLOCK"] = "Warlock",
-        ["DRUID"] = "Druid"
+        ["WARRIOR"] = ProjectEbonhold.L["Warrior"],
+        ["PALADIN"] = ProjectEbonhold.L["Paladin"],
+        ["HUNTER"] = ProjectEbonhold.L["Hunter"],
+        ["ROGUE"] = ProjectEbonhold.L["Rogue"],
+        ["PRIEST"] = ProjectEbonhold.L["Priest"],
+        ["DEATHKNIGHT"] = ProjectEbonhold.L["Death Knight"],
+        ["SHAMAN"] = ProjectEbonhold.L["Shaman"],
+        ["MAGE"] = ProjectEbonhold.L["Mage"],
+        ["WARLOCK"] = ProjectEbonhold.L["Warlock"],
+        ["DRUID"] = ProjectEbonhold.L["Druid"]
     }
-    local detectedClass = classMapping[playerClass] or "Mage"
+    local detectedClass = classMapping[playerClass] or ProjectEbonhold.L["Mage"]
     DebugPrint("Player class detected: %s (API: %s)", detectedClass,
         playerClass or "unknown")
     return detectedClass
@@ -1004,7 +1011,7 @@ local InfoTooltip = nil
 local function SendCreateLoadoutToServer(name, nodeRanks)
     if not ProjectEbonhold or not ProjectEbonhold.sendToServer then
         DebugPrint(
-            "|cffFF0000Cannot send create loadout request: ProjectEbonhold not available|r")
+            ProjectEbonhold.L["|cffFF0000Cannot send create loadout request: ProjectEbonhold not available|r"])
         return false
     end
 
@@ -1125,7 +1132,7 @@ end
 
 local function CreateLoadoutPackage()
     local loadoutId = 0
-    local loadoutName = currentLoadoutName or "Unnamed"
+    local loadoutName = currentLoadoutName or ProjectEbonhold.L["Unnamed"]
 
     if currentLoadoutName and currentLoadoutName ~= "" and
         savedLoadouts[currentLoadoutName] then
@@ -1268,9 +1275,7 @@ local function ApplyImportedLoadout(nodes)
 
     if totalPointsRequired > TALENT_POINTS_TOTAL then
         return false,
-            "You tried to import a build without enough Soul Ashes (Required: " ..
-            FormatThousands(totalPointsRequired) .. ", Available: " ..
-            FormatThousands(TALENT_POINTS_TOTAL) .. ")"
+            ProjectEbonhold.T("You tried to import a build without enough Soul Ashes (Required: {totalPointsRequired}, Available: {TALENTPOINTSTOTAL})", { totalPointsRequired = FormatThousands(totalPointsRequired), TALENTPOINTSTOTAL = FormatThousands(TALENT_POINTS_TOTAL) })
     end
 
 
@@ -1303,6 +1308,13 @@ end
 function ValidateAndSendLoadout()
     DebugPrint("Validating current loadout...")
 
+    -- Every Apply makes the server learn the new nodes; repeated clicks only queued more work.
+    -- A second Apply waits for the answer to the first, or 5 s if that answer was lost.
+    -- (A global like the function itself, not a file local: this chunk sits near Lua's 200-locals cap.)
+    if isWaitingForValidation and GetTime() - (ValidateAndSendLoadoutSentAt or 0) < 5 then
+        return false
+    end
+
     -- Class constellations first: the server debits them one node at a time, so the loadout
     -- that follows is validated against the pool they leave behind - exactly the budget the
     -- player was shown while selecting.
@@ -1331,6 +1343,8 @@ function ValidateAndSendLoadout()
 
     if SendLoadoutToServer(loadoutData) then
         DebugPrint("|cffFFFF00Loadout sent to server...|r")
+        isWaitingForValidation = true
+        ValidateAndSendLoadoutSentAt = GetTime()
         return true
     else
         DebugPrint("|cffFF0000Failed to send loadout to server|r")
@@ -1338,8 +1352,17 @@ function ValidateAndSendLoadout()
     end
 end
 
-function OnApplyChangesResult(spellId, success)
+function OnApplyChangesResult(spellId, success, reason)
+    -- PTR 4286: say it when an Apply did not go through (interrupted cast, refused cast), once per Apply.
+    local wasWaiting = isWaitingForValidation
     isWaitingForValidation = false
+    if not success and wasWaiting then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffFF4040[Skill Tree]|r " ..
+            (reason or ProjectEbonhold.L["Your changes were not applied."]) .. " " .. ProjectEbonhold.L["Nothing was spent: press Apply again."])
+        if UIErrorsFrame then
+            UIErrorsFrame:AddMessage(ProjectEbonhold.L["Skill tree changes not applied"], 1.0, 0.25, 0.25, 1.0)
+        end
+    end
 
     if success then
         MarkAsValidated()
@@ -1348,7 +1371,7 @@ function OnApplyChangesResult(spellId, success)
         --     "|cff00FF00[ProjectEbonhold] Skill tree changes applied successfully!|r")
 
         if applyButton then
-            applyButton:SetText("Apply Changes")
+            applyButton:SetText(ProjectEbonhold.L["Apply Changes"])
 
 
             isGlowEnabled = false
@@ -1536,7 +1559,7 @@ end
 function RefreshLoadoutDropdown()
     if not loadoutDropdown then
         DebugPrint(
-            "|cffFFFF00RefreshLoadoutDropdown: dropdown not initialized yet, will update on creation|r")
+            ProjectEbonhold.L["|cffFFFF00RefreshLoadoutDropdown: dropdown not initialized yet, will update on creation|r"])
         return
     end
 
@@ -1550,14 +1573,14 @@ function RefreshLoadoutDropdown()
         DebugPrint("|cff00FF00Dropdown text set to: " .. currentLoadoutName ..
             "|r")
     else
-        UIDropDownMenu_SetText(loadoutDropdown, "Select Build")
+        UIDropDownMenu_SetText(loadoutDropdown, ProjectEbonhold.L["Select Build"])
         DebugPrint("|cffFFFF00Dropdown text set to: Select Build|r")
     end
 end
 
 function Addon.ApplyLoadoutFromServer(loadoutData)
     DebugPrint(
-        "|cffFFFF00Warning: Using deprecated ApplyLoadoutFromServer function|r")
+        ProjectEbonhold.L["|cffFFFF00Warning: Using deprecated ApplyLoadoutFromServer function|r"])
     return false
 end
 
@@ -1589,6 +1612,10 @@ end
 local SKILLTREE_EXTRA_WIDTH = 200  -- 100px more on each side than the original standalone VIEW_W
 local skillTreeFrame = CreateFrame("Frame", "skillTreeFrame", CollectionsJournal)
 skillTreeFrame:SetSize(VIEW_W + SKILLTREE_EXTRA_WIDTH, VIEW_H)
+-- The normal size. The maximize button (character_progression.lua) grows the frame to
+-- the screen and back to this; every child is anchored, the bottom bar re-tiles itself
+-- and the viewport keeps its centre (Scroll OnSizeChanged).
+skillTreeFrame.normalW, skillTreeFrame.normalH = VIEW_W + SKILLTREE_EXTRA_WIDTH, VIEW_H
 skillTreeFrame:SetPoint("TOP", CollectionsJournal, "TOP", 0, -8)
 skillTreeFrame:SetFrameStrata("HIGH")  -- matches CollectionsJournal's own strata (not FULLSCREEN_DIALOG,
                                         -- which would always render above CollectionsJournal's tab row
@@ -1660,21 +1687,31 @@ local function CreateBottomBar()
     bottomBar:SetFrameLevel(skillTreeFrame:GetFrameLevel() + 10)
 
 
-    local bottomBarWidth = bottomBar:GetWidth() or (VIEW_W - 16)
+    -- Tiled again whenever the bar changes width (the maximize button resizes the frame).
     local textureWidth = 126 * 0.664062
-    local numTextures = math.ceil(bottomBarWidth / textureWidth)
-
-
-    local adjustedTextureWidth = bottomBarWidth / numTextures
-
-
-    for i = 1, numTextures do
-        local tex = bottomBar:CreateTexture(nil, "BACKGROUND")
-        tex:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_bottom")
-        tex:SetTexCoord(0.000000, 0.664062, 0.000000, 0.242188)
-        tex:SetSize(adjustedTextureWidth, 40)
-        tex:SetPoint("LEFT", bottomBar, "LEFT", (i - 1) * adjustedTextureWidth, 0)
+    bottomBar.tiles = {}
+    local function TileBottomBar(self)
+        local bottomBarWidth = self:GetWidth() or 0
+        if bottomBarWidth < 1 then bottomBarWidth = (skillTreeFrame:GetWidth() or VIEW_W) - 16 end
+        local numTextures = math.ceil(bottomBarWidth / textureWidth)
+        local adjustedTextureWidth = bottomBarWidth / numTextures
+        for i = 1, numTextures do
+            local tex = self.tiles[i]
+            if not tex then
+                tex = self:CreateTexture(nil, "BACKGROUND")
+                tex:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\texture_bottom")
+                tex:SetTexCoord(0.000000, 0.664062, 0.000000, 0.242188)
+                self.tiles[i] = tex
+            end
+            tex:SetSize(adjustedTextureWidth, 40)
+            tex:ClearAllPoints()
+            tex:SetPoint("LEFT", self, "LEFT", (i - 1) * adjustedTextureWidth, 0)
+            tex:Show()
+        end
+        for i = numTextures + 1, #self.tiles do self.tiles[i]:Hide() end
     end
+    TileBottomBar(bottomBar)
+    bottomBar:SetScript("OnSizeChanged", TileBottomBar)
 
 
     -- The four pools in one line, POOL_GAP apart (icon + amount), each with its own
@@ -1720,12 +1757,12 @@ local function CreateBottomBar()
         local info = UIDropDownMenu_CreateInfo()
 
 
-        info.text = "|cff00FF00+ New Build...|r"
+        info.text = ProjectEbonhold.L["|cff00FF00+ New Build...|r"]
         info.func = function()
             StaticPopupDialogs["SKILLTREE_NEW_BUILD"] = {
-                text = "Enter build name:",
-                button1 = "Create",
-                button2 = "Cancel",
+                text = ProjectEbonhold.L["Enter build name:"],
+                button1 = ProjectEbonhold.L["Create"],
+                button2 = CANCEL,
                 hasEditBox = true,
                 timeout = 0,
                 whileDead = true,
@@ -1775,7 +1812,7 @@ local function CreateBottomBar()
             end
         else
             info = UIDropDownMenu_CreateInfo()
-            info.text = "|cff888888No saved builds|r"
+            info.text = ProjectEbonhold.L["|cff888888No saved builds|r"]
             info.disabled = true
             info.notCheckable = true
             UIDropDownMenu_AddButton(info)
@@ -1788,7 +1825,7 @@ local function CreateBottomBar()
         DebugPrint("|cff00FF00Dropdown initialized with loadout: " ..
             currentLoadoutName .. "|r")
     else
-        UIDropDownMenu_SetText(dropdown, "Select Build")
+        UIDropDownMenu_SetText(dropdown, ProjectEbonhold.L["Select Build"])
     end
 
     loadoutDropdown = dropdown
@@ -1798,7 +1835,7 @@ local function CreateBottomBar()
     -- glued to the search box on the right of the bar. The custom button exposes
     -- SetText/SetTextColor but no GetFontString: aliased so the existing enable /
     -- disable code keeps working unchanged.
-    applyButton = utils.CreateSimpleCustomButton(bottomBar, "Apply Changes", nil, 130, 26)
+    applyButton = utils.CreateSimpleCustomButton(bottomBar, ProjectEbonhold.L["Apply Changes"], nil, 130, 26)
     applyButton.GetFontString = function(self) return self.text end
     applyButton:SetPoint("RIGHT", treeSearchBox or pointsText, treeSearchBox and "LEFT" or "RIGHT", treeSearchBox and -20 or 22, 0)
     applyButton.__anchorToSearch = true
@@ -1807,11 +1844,8 @@ local function CreateBottomBar()
     -- Soul Ashes for good (nothing can be unlearned afterwards), so the very
     -- first Apply asks for an explicit confirmation before proceeding.
     StaticPopupDialogs["EBONHOLD_SKILLTREE_FIRST_SPEND"] = {
-        text = "You are about to spend Soul Ashes on your Skill Tree.\n\n" ..
-            "This is |cffFF0000final|r: once applied, a rank can never be unlearned and its " ..
-            "Soul Ashes are never refunded. Only a |cffFF4444Prestige|r resets the tree, and " ..
-            "the octagon-framed nodes survive even that.",
-        button1 = "Apply",
+        text = ProjectEbonhold.L["You are about to spend Soul Ashes on your Skill Tree.\n\nThis is |cffFF0000final|r: once applied, a rank can never be unlearned and its Soul Ashes are never refunded. Only a |cffFF4444Prestige|r resets the tree, and the octagon-framed nodes survive even that."],
+        button1 = APPLY,
         button2 = CANCEL,
         OnAccept = function()
             ValidateAndSendLoadout()
@@ -2060,27 +2094,27 @@ local function CreateBottomBar()
         local currentMilestoneIndex = self.currentMilestoneIndex or 0
 
         InfoTooltip:SetOwner(self, "ANCHOR_TOP")
-        InfoTooltip:SetText("Soul Ashes Progression", 1, 0.82, 0)
+        InfoTooltip:SetText(ProjectEbonhold.L["Soul Ashes Progression"], 1, 0.82, 0)
 
 
         -- Afficher la progression du milestone seulement si on n'a pas atteint le dernier
         if currentMilestoneIndex < #milestones then
-            InfoTooltip:AddLine("Earn Soul Ashes to advance toward your next milestone.", 0.9, 0.9, 0.9, true)
+            InfoTooltip:AddLine(ProjectEbonhold.L["Earn Soul Ashes to advance toward your next milestone."], 0.9, 0.9, 0.9, true)
             InfoTooltip:AddLine(" ", 1, 1, 1)
 
             InfoTooltip:AddLine(
-                "Current Milestone: " .. FormatThousands(currentTotal) .. " / " .. FormatThousands(nextMilestone),
+                ProjectEbonhold.T("Current Milestone: {currentTotal} / {nextMilestone}", { currentTotal = FormatThousands(currentTotal), nextMilestone = FormatThousands(nextMilestone) }),
                 1, 1, 1
             )
             InfoTooltip:AddLine(" ", 1, 1, 1)
         else
-            InfoTooltip:AddLine("All milestones completed!", 0, 1, 0, true)
+            InfoTooltip:AddLine(ProjectEbonhold.L["All milestones completed!"], 0, 1, 0, true)
             InfoTooltip:AddLine(" ", 1, 1, 1)
         end
 
 
         InfoTooltip:AddLine(
-            "Soul Ashes have no cap: keep committing them to push your infinite nodes ever further.",
+            ProjectEbonhold.L["Soul Ashes have no cap: keep committing them to push your infinite nodes ever further."],
             0.7, 0.7, 0.7, true
         )
 
@@ -2106,8 +2140,15 @@ local function CreateBottomBar()
     castMonitorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
     castMonitorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
 
-    castMonitorFrame:SetScript("OnEvent", function(self, event, unit)
+    castMonitorFrame:SetScript("OnEvent", function(self, event, unit, spellName)
         if unit ~= "player" or not applyButton then return end
+
+        -- PTR 4286: the Apply is a cast (Modify Skill Tree); moving, a teleport or damage cancels it
+        -- and the server says nothing, so revert here and tell the player.
+        if isWaitingForValidation and (event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED")
+           and spellName and spellName == GetSpellInfo(95008) then
+            OnApplyChangesResult(nil, false, ProjectEbonhold.L["The cast was interrupted, your changes were not applied."])
+        end
 
         local isCasting = UnitCastingInfo("player") or UnitChannelInfo("player")
 
@@ -2137,22 +2178,22 @@ local function CreateBottomBar()
         InfoTooltip:SetOwner(self, "ANCHOR_TOP")
 
         if remainingPoints < 0 then
-            InfoTooltip:SetText("Apply Changes", 1, 1, 1)
+            InfoTooltip:SetText(ProjectEbonhold.L["Apply Changes"], 1, 1, 1)
             InfoTooltip:AddLine(
-                "You don't have enough Soul Ashes to apply this build", 1, 0.3,
+                ProjectEbonhold.L["You don't have enough Soul Ashes to apply this build"], 1, 0.3,
                 0.3, true)
-            InfoTooltip:AddLine("Overspent by: " .. math.abs(remainingPoints),
+            InfoTooltip:AddLine(ProjectEbonhold.T("Overspent by: {remainingPoints}", { remainingPoints = math.abs(remainingPoints) }),
                 0.8, 0.8, 0.8)
         else
             if hasUnsavedChanges then
-                InfoTooltip:SetText("Apply Changes", 1, 1, 1)
-                InfoTooltip:AddLine("Send your soul build to the server", 0.8,
+                InfoTooltip:SetText(ProjectEbonhold.L["Apply Changes"], 1, 1, 1)
+                InfoTooltip:AddLine(ProjectEbonhold.L["Send your soul build to the server"], 0.8,
                     0.8, 0.8, true)
                 InfoTooltip:AddLine(
-                    "Remaining Soul Ashes: " .. FormatThousands(remainingPoints), 0.8, 0.8, 0.8)
+                    ProjectEbonhold.T("Remaining Soul Ashes: {remainingPoints}", { remainingPoints = FormatThousands(remainingPoints) }), 0.8, 0.8, 0.8)
             else
-                InfoTooltip:SetText("Apply Changes", 0.5, 0.5, 0.5)
-                InfoTooltip:AddLine("No changes to apply", 0.6, 0.6, 0.6, true)
+                InfoTooltip:SetText(ProjectEbonhold.L["Apply Changes"], 0.5, 0.5, 0.5)
+                InfoTooltip:AddLine(ProjectEbonhold.L["No changes to apply"], 0.6, 0.6, 0.6, true)
             end
         end
 
@@ -2174,13 +2215,13 @@ local function CreateBottomBar()
         "UIPanelButtonTemplate")
     exportBtn:SetSize(80, 25)
     exportBtn:SetPoint("LEFT", applyButton, "RIGHT", 5, 0)
-    exportBtn:SetText("Export")
+    exportBtn:SetText(ProjectEbonhold.L["Export"])
     exportBtn:Hide()
     exportBtn:SetScript("OnClick", function()
         if not HasAnyTalents() then
             StaticPopupDialogs["SKILLTREE_EXPORT_EMPTY"] = {
-                text = "No talents selected to export!",
-                button1 = "OK",
+                text = ProjectEbonhold.L["No talents selected to export!"],
+                button1 = ProjectEbonhold.L["OK"],
                 timeout = 0,
                 whileDead = true,
                 hideOnEscape = true
@@ -2194,8 +2235,8 @@ local function CreateBottomBar()
 
 
         StaticPopupDialogs["SKILLTREE_EXPORT_CODE"] = {
-            text = "Build Export Code:\n\n|cffFFD700Copy the code below:|r",
-            button1 = "Close",
+            text = ProjectEbonhold.L["Build Export Code:\n\n|cffFFD700Copy the code below:|r"],
+            button1 = CLOSE,
             hasEditBox = true,
             timeout = 0,
             whileDead = true,
@@ -2221,13 +2262,13 @@ local function CreateBottomBar()
         "UIPanelButtonTemplate")
     importBtn:SetSize(80, 25)
     importBtn:SetPoint("LEFT", exportBtn, "RIGHT", 5, 0)
-    importBtn:SetText("Import")
+    importBtn:SetText(ProjectEbonhold.L["Import"])
     importBtn:Hide()
     importBtn:SetScript("OnClick", function()
         StaticPopupDialogs["SKILLTREE_IMPORT_CODE"] = {
-            text = "Import Build Code:\n\n|cffFFD700Paste your build code below:|r",
-            button1 = "Import",
-            button2 = "Cancel",
+            text = ProjectEbonhold.L["Import Build Code:\n\n|cffFFD700Paste your build code below:|r"],
+            button1 = ProjectEbonhold.L["Import"],
+            button2 = CANCEL,
             hasEditBox = true,
             timeout = 0,
             whileDead = true,
@@ -2241,14 +2282,11 @@ local function CreateBottomBar()
                         local success, applyError = ApplyImportedLoadout(nodes)
                         if success then
                             DebugPrint(
-                                "|cff00FF00Build imported successfully! (" ..
-                                #nodes .. " talents)|r")
+                                ProjectEbonhold.T("|cff00FF00Build imported successfully! ({nodes} talents)|r", { nodes = #nodes }))
                         else
                             StaticPopupDialogs["SKILLTREE_IMPORT_ERROR"] = {
-                                text = "Import failed:\n\n|cffFF0000" ..
-                                    (applyError or "Failed to apply build") ..
-                                    "|r",
-                                button1 = "OK",
+                                text = ProjectEbonhold.T("Import failed:\n\n|cffFF0000{build}|r", { build = (applyError or ProjectEbonhold.L["Failed to apply build"]) }),
+                                button1 = ProjectEbonhold.L["OK"],
                                 timeout = 0,
                                 whileDead = true,
                                 hideOnEscape = true
@@ -2257,9 +2295,8 @@ local function CreateBottomBar()
                         end
                     else
                         StaticPopupDialogs["SKILLTREE_IMPORT_ERROR"] = {
-                            text = "Import failed:\n\n|cffFF0000" ..
-                                (error or "Unknown error") .. "|r",
-                            button1 = "OK",
+                            text = ProjectEbonhold.T("Import failed:\n\n|cffFF0000{error}|r", { error = (error or ProjectEbonhold.L["Unknown error"]) }),
+                            button1 = ProjectEbonhold.L["OK"],
                             timeout = 0,
                             whileDead = true,
                             hideOnEscape = true
@@ -2276,14 +2313,11 @@ local function CreateBottomBar()
                         local success, applyError = ApplyImportedLoadout(nodes)
                         if success then
                             DebugPrint(
-                                "|cff00FF00Build imported successfully! (" ..
-                                #nodes .. " talents)|r")
+                                ProjectEbonhold.T("|cff00FF00Build imported successfully! ({nodes} talents)|r", { nodes = #nodes }))
                         else
                             StaticPopupDialogs["SKILLTREE_IMPORT_ERROR"] = {
-                                text = "Import failed:\n\n|cffFF0000" ..
-                                    (applyError or "Failed to apply build") ..
-                                    "|r",
-                                button1 = "OK",
+                                text = ProjectEbonhold.T("Import failed:\n\n|cffFF0000{build}|r", { build = (applyError or ProjectEbonhold.L["Failed to apply build"]) }),
+                                button1 = ProjectEbonhold.L["OK"],
                                 timeout = 0,
                                 whileDead = true,
                                 hideOnEscape = true
@@ -2292,9 +2326,8 @@ local function CreateBottomBar()
                         end
                     else
                         StaticPopupDialogs["SKILLTREE_IMPORT_ERROR"] = {
-                            text = "Import failed:\n\n|cffFF0000" ..
-                                (error or "Unknown error") .. "|r",
-                            button1 = "OK",
+                            text = ProjectEbonhold.T("Import failed:\n\n|cffFF0000{error}|r", { error = (error or ProjectEbonhold.L["Unknown error"]) }),
+                            button1 = ProjectEbonhold.L["OK"],
                             timeout = 0,
                             whileDead = true,
                             hideOnEscape = true
@@ -2333,8 +2366,8 @@ local function CreateBottomBar()
 
     revertBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Revert Changes", 1, 1, 1)
-        GameTooltip:AddLine("Undo all changes since last validation", 0.8, 0.8,
+        GameTooltip:SetText(ProjectEbonhold.L["Revert Changes"], 1, 1, 1)
+        GameTooltip:AddLine(ProjectEbonhold.L["Undo all changes since last validation"], 0.8, 0.8,
             0.8, true)
         GameTooltip:Show()
     end)
@@ -2360,7 +2393,7 @@ local function CreateBottomBar()
 
     local levelRestrictionText = levelRestrictionFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     levelRestrictionText:SetPoint("CENTER", levelRestrictionFrame, "CENTER", 0, 0)
-    levelRestrictionText:SetText("|cffFF0000You cannot modify your skill tree while in combat|r")
+    levelRestrictionText:SetText(ProjectEbonhold.L["|cffFF0000You cannot modify your skill tree while in combat|r"])
 
 
     local function UpdateCombatRestriction()
@@ -2626,18 +2659,28 @@ local function SetScrollClamped(h, v)
     pendingScroll:Show()
 end
 
+-- The maximize button resizes the viewport: the canvas point at its centre stays at
+-- its centre, and the culling grows to the new view.
+Scroll:SetScript("OnSizeChanged", function(self, w, h)
+    local oldW, oldH = self._w, self._h
+    self._w, self._h = w, h
+    if not cullEnabled or not oldW or oldW < 1 then return end
+    local sh, sv = GetScrollCanvas()
+    SetScrollClamped(sh + (oldW - w) / (2 * zoomLevel), sv + (oldH - h) / (2 * zoomLevel))
+end)
+
 -- /stcam : dumps the camera state to the chat (diagnostic, harmless to leave in).
 SLASH_EBONHOLDSTCAM1 = "/stcam"
 SlashCmdList["EBONHOLDSTCAM"] = function()
     Scroll:UpdateScrollChildRect()
     local es, ce = Scroll:GetEffectiveScale(), Canvas:GetEffectiveScale()
     local function p(fmt, ...) DEFAULT_CHAT_FRAME:AddMessage("|cff88ccff[stcam]|r " .. string.format(fmt, ...)) end
-    p("zoom=%.3f pad=%s", zoomLevel, tostring(layoutPad))
-    p("scroll frame: %.0fx%.0f effscale=%.3f left=%.0f top=%.0f", Scroll:GetWidth() or -1, Scroll:GetHeight() or -1, es, Scroll:GetLeft() or -1, Scroll:GetTop() or -1)
-    p("canvas: %.0fx%.0f scale=%.3f effscale=%.3f left=%.0f top=%.0f", Canvas:GetWidth() or -1, Canvas:GetHeight() or -1, Canvas:GetScale(), ce, Canvas:GetLeft() or -1, Canvas:GetTop() or -1)
-    p("scroll: h=%.0f v=%.0f range h=%.0f v=%.0f", Scroll:GetHorizontalScroll(), Scroll:GetVerticalScroll(), Scroll:GetHorizontalScrollRange(), Scroll:GetVerticalScrollRange())
+    p(ProjectEbonhold.L["zoom=%.3f pad=%s"], zoomLevel, tostring(layoutPad))
+    p(ProjectEbonhold.L["scroll frame: %.0fx%.0f effscale=%.3f left=%.0f top=%.0f"], Scroll:GetWidth() or -1, Scroll:GetHeight() or -1, es, Scroll:GetLeft() or -1, Scroll:GetTop() or -1)
+    p(ProjectEbonhold.L["canvas: %.0fx%.0f scale=%.3f effscale=%.3f left=%.0f top=%.0f"], Canvas:GetWidth() or -1, Canvas:GetHeight() or -1, Canvas:GetScale(), ce, Canvas:GetLeft() or -1, Canvas:GetTop() or -1)
+    p(ProjectEbonhold.L["scroll: h=%.0f v=%.0f range h=%.0f v=%.0f"], Scroll:GetHorizontalScroll(), Scroll:GetVerticalScroll(), Scroll:GetHorizontalScrollRange(), Scroll:GetVerticalScrollRange())
     local n = 0
-    for _, nd in ipairs(TreeNodes) do if nd.isStart and not nd.classId then n = n + 1 if n <= 2 then p("start %d ox=%.0f oy=%.0f", nd.id, nd._ox or -1, nd._oy or -1) end end end
+    for _, nd in ipairs(TreeNodes) do if nd.isStart and not nd.classId then n = n + 1 if n <= 2 then p(ProjectEbonhold.L["start %d ox=%.0f oy=%.0f"], nd.id, nd._ox or -1, nd._oy or -1) end end end
 end
 
 local zoomTextTimer = CreateFrame("Frame")
@@ -2688,7 +2731,7 @@ local function ApplyZoom(scale, ax, ay)
         skillTreeFrame.zoomText = skillTreeFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         skillTreeFrame.zoomText:SetPoint("TOP", skillTreeFrame, "TOP", 0, -10)
     end
-    skillTreeFrame.zoomText:SetText(string.format("Zoom: %d%%", zoomLevel * 100))
+    skillTreeFrame.zoomText:SetText(ProjectEbonhold.T("Zoom: {zoomLevel}%", { zoomLevel = string.format("%d", zoomLevel * 100) }))
 
     -- Cleared one second after the LAST step. One reused frame: C_Timer.After makes a
     -- new permanent Frame per call, one per wheel notch.
@@ -2737,6 +2780,11 @@ ComputeLayout = function(keepScroll)
         local vw, vh = Scroll:GetWidth() or 0, Scroll:GetHeight() or 0
         if vw < 10 then vw = 1200 end
         if vh < 10 then vh = 800 end
+        -- The maximize button can grow the viewport up to the whole screen later on:
+        -- pad for the largest it can get, so edge nodes still centre once maximized.
+        local s = (UIParent:GetEffectiveScale() or 1) / (Scroll:GetEffectiveScale() or 1)
+        vw = math.max(vw, (UIParent:GetWidth() or 0) * s)
+        vh = math.max(vh, (UIParent:GetHeight() or 0) * s)
         -- Half a viewport at the smallest zoom is exactly what centring an edge node needs.
         layoutPad = math.max(vw, vh) / (2 * MIN_ZOOM)
     end
@@ -3253,7 +3301,7 @@ local function upgradeNodeRank(nodeId)
     if btn.isApex then
         if activeApexNodeId and activeApexNodeId ~= nodeId then
             DebugPrint(
-                "|cffFF0000You can only have one APEX talent active at a time!|r")
+                ProjectEbonhold.L["|cffFF0000You can only have one APEX talent active at a time!|r"])
             DebugPrint("|cffFFFF00Deactivate your current APEX talent first.|r")
             return false
         end
@@ -3366,8 +3414,8 @@ end
 -- { nodes = { {id, toRank}, ... }, refund = { [currency] = n } } or nil, reason. Read only.
 local function computeRevertLine(nodeId)
     local root = nodesById[nodeId]
-    if not root or root.classId then return nil, "not an ash node" end
-    if pendingRanks(root) == 0 then return nil, "nothing to take back since the last Apply" end
+    if not root or root.classId then return nil, ProjectEbonhold.L["not an ash node"] end
+    if pendingRanks(root) == 0 then return nil, ProjectEbonhold.L["nothing to take back since the last Apply"] end
 
     local children = {}
     for id in pairs(nodesById) do
@@ -3404,7 +3452,7 @@ local function computeRevertLine(nodeId)
                 end
                 if not ok then
                     if getValidatedRank(childId) > 0 then
-                        return nil, "an applied talent depends on it"
+                        return nil, ProjectEbonhold.L["an applied talent depends on it"]
                     end
                     newRank[childId] = 0
                     table.insert(order, childId)
@@ -3469,16 +3517,15 @@ local function ConfirmRevertLine(btn, onDone)
     end
     local name = btn.spells and btn.spells[1] and GetSpellInfo(btn.spells[1]) or ("node " .. btn.id)
     local others = #plan.nodes - 1
-    local text = "Take back |cffFFD700" .. name .. "|r"
+    local text = ProjectEbonhold.T("Take back |cffFFD700{name}|r", { name = name })
     if others > 0 then
-        text = text .. " and the " .. others .. (others > 1 and " talents" or " talent") .. " after it"
+        text = ProjectEbonhold.T("{text} and the {others}{talent} after it", { text = text, others = others, talent = (others > 1 and ProjectEbonhold.L[" talents"] or ProjectEbonhold.L[" talent"]) })
     end
-    text = text .. "?\n\nOnly what was added since the last Apply is undone.\nRefund: " ..
-        (#parts > 0 and table.concat(parts, "  ") or "nothing")
+    text = ProjectEbonhold.T("{text}?\n\nOnly what was added since the last Apply is undone.\nRefund: {nothing}", { text = text, nothing = (#parts > 0 and table.concat(parts, "  ") or "nothing") })
 
     StaticPopupDialogs["SKILLTREE_REVERT_LINE"] = StaticPopupDialogs["SKILLTREE_REVERT_LINE"] or {
         text = "%s",
-        button1 = "Take back",
+        button1 = ProjectEbonhold.L["Take back"],
         button2 = CANCEL,
         OnAccept = function(self, data)
             if data and not UnitAffectingCombat("player") and revertLine(data.id) then
@@ -3603,11 +3650,11 @@ local function ShowChoiceButtons(btn)
             GameTooltip:SetHyperlink('spell:' .. spellID)
 
             if btn.state == "locked" then
-                GameTooltip:AddLine("|cffFF0000Node is locked|r", 1, 1, 1)
+                GameTooltip:AddLine(ProjectEbonhold.L["|cffFF0000Node is locked|r"], 1, 1, 1)
             elseif i == btn.selectedSpell then
-                GameTooltip:AddLine("|cff00FF00Currently Selected|r", 1, 1, 1)
+                GameTooltip:AddLine(ProjectEbonhold.L["|cff00FF00Currently Selected|r"], 1, 1, 1)
             else
-                GameTooltip:AddLine("|cffFFFFFFClick to select this option|r",
+                GameTooltip:AddLine(ProjectEbonhold.L["|cffFFFFFFClick to select this option|r"],
                     1, 1, 1)
             end
             GameTooltip:Show()
@@ -3657,16 +3704,16 @@ local function ShowChoiceButtons(btn)
 
                 local spellName = GetSpellInfo(spellID)
                 if not spellName then
-                    spellName = "Invalid Spell (" .. spellID .. ")"
+                    spellName = ProjectEbonhold.T("Invalid Spell ({spellID})", { spellID = spellID })
                 end
                 DebugPrint("|cff00FF00Choice selected: " ..
-                    (spellName or "Unknown") .. "|r")
+                    (spellName or ProjectEbonhold.L["Unknown"]) .. "|r")
 
 
                 HideChoiceButtons(btn)
             elseif btn.state == "locked" then
                 DebugPrint(
-                    "|cffFF0000Prerequisites not met! You cannot select this option yet.|r")
+                    ProjectEbonhold.L["|cffFF0000Prerequisites not met! You cannot select this option yet.|r"])
             elseif not canAffordTalent(btn.id) then
                 DebugPrint("|cffFF0000Not enough Soul Ashes!|r")
             end
@@ -3894,6 +3941,7 @@ local function CreateNodes()
         btn.gainsPerRank = n.gainsPerRank
         btn.gainsExclusive = n.gainsExclusive
         btn.computedDesc = n.computedDesc
+        btn.mainStat = n.mainStat
 
         btn.soulPointsCosts = n.soulPointsCosts
         btn.sector = n.sector
@@ -3986,8 +4034,8 @@ local function CreateNodes()
 
                             CurrentRankTooltip:AddLine(
                                 node.infinite
-                                and ("\n|cff00FF00Stacks: " .. currentRank .. "|r")
-                                or ("\n|cff00FF00Rank: " .. currentRank .. "/" .. maxRank .. "|r"),
+                                and (ProjectEbonhold.T("\n|cff00FF00Stacks: {currentRank}|r", { currentRank = currentRank }))
+                                or (ProjectEbonhold.T("\n|cff00FF00Rank: {currentRank}/{maxRank}|r", { currentRank = currentRank, maxRank = maxRank })),
                                 1, 1, 1)
 
                             if currentRank < maxRank then
@@ -4016,8 +4064,8 @@ local function CreateNodes()
 
                             CurrentRankTooltip:AddLine(
                                 node.infinite
-                                and "\n|cffFFFFFFStacks: 0|r"
-                                or ("\n|cffFFFFFFRank: 0/" .. maxRank .. "|r"),
+                                and ProjectEbonhold.L["\n|cffFFFFFFStacks: 0|r"]
+                                or (ProjectEbonhold.T("\n|cffFFFFFFRank: 0/{maxRank}|r", { maxRank = maxRank })),
                                 1, 1, 1)
 
                             local soulCost = getNodeCost(node, 1)
@@ -4035,24 +4083,24 @@ local function CreateNodes()
                         -- Infinite nodes: no unlearn hint, but say they survive a Prestige
                         -- (SkillTreeHandler::RemoveAllExceptInfiniteAndPermanent keeps every rank).
                         CurrentRankTooltip:AddLine(
-                            "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
+                            ProjectEbonhold.L["|cffFFD700Kept through Prestige, with every rank.|r"], 1, 1, 1, true)
                     elseif (getNodeRank(node.id) or 0) <= getValidatedRank(node.id) then
                         -- Every rank held is applied: locked in for good, so no
                         -- unlearn hint (and no need to state the obvious)
                     else
                         CurrentRankTooltip:AddLine(
-                            "|cffAAAAAARight-click to unlearn|r", 1, 1, 1, true)
+                            ProjectEbonhold.L["|cffAAAAAARight-click to unlearn|r"], 1, 1, 1, true)
                         CurrentRankTooltip:AddLine(
-                            "|cffAAAAAAShift + right-click to take back the whole line|r", 1, 1, 1, true)
+                            ProjectEbonhold.L["|cffAAAAAAShift + right-click to take back the whole line|r"], 1, 1, 1, true)
                     end
                     CurrentRankTooltip:Show();
                 elseif node.state == "ready" then
                     if node.infinite then
                         CurrentRankTooltip:AddLine(
-                            "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
+                            ProjectEbonhold.L["|cffFFD700Kept through Prestige, with every rank.|r"], 1, 1, 1, true)
                     end
                     CurrentRankTooltip:AddLine(
-                        "|cff00FF00Left-click to learn|r", 1, 1, 1, true)
+                        ProjectEbonhold.L["|cff00FF00Left-click to learn|r"], 1, 1, 1, true)
                     CurrentRankTooltip:Show();
                 elseif node.state == "locked" then
                     addUnlockPathLines(CurrentRankTooltip, node.id)
@@ -4067,7 +4115,7 @@ local function CreateNodes()
                 local owned = CT.Has(self.id) and 1 or 0
                 CurrentRankTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 CurrentRankTooltip:SetHyperlink('spell:' .. self.spells[1])
-                CurrentRankTooltip:AddLine((owned > 0 and "\n|cff00FF00Rank: 1/1|r" or "\n|cffFFFFFFRank: 0/1|r"), 1, 1, 1)
+                CurrentRankTooltip:AddLine((owned > 0 and ProjectEbonhold.L["\n|cff00FF00Rank: 1/1|r"] or ProjectEbonhold.L["\n|cffFFFFFFRank: 0/1|r"]), 1, 1, 1)
                 if owned == 0 then
                     local soulCost = self.soulPointsCosts and self.soulPointsCosts[1] or 0
                     addCostToTooltip(CurrentRankTooltip, "", soulCost, poolGet("ash") >= soulCost, "ash")
@@ -4094,13 +4142,13 @@ local function CreateNodes()
                     end
                     local needed = math.max(depth + 1, (count >= level) and (count + 1) or 0)
                     if needed > level then
-                        table.insert(reqs, CT.ClassName(self.classId) .. " class level " .. needed)
+                        table.insert(reqs, ProjectEbonhold.T("{classId} class level {needed}", { classId = CT.ClassName(self.classId), needed = needed }))
                     end
                     if #reqs > 0 then
-                        CurrentRankTooltip:AddLine("Requires " .. table.concat(reqs, ", "), 1, 0.3, 0.3)
+                        CurrentRankTooltip:AddLine(ProjectEbonhold.T("Requires {reqs}", { reqs = table.concat(reqs, ", ") }), 1, 0.3, 0.3)
                     end
                     if self.state == "ready" then
-                        CurrentRankTooltip:AddLine("|cff00FF00Left-click to learn|r", 1, 1, 1, true)
+                        CurrentRankTooltip:AddLine(ProjectEbonhold.L["|cff00FF00Left-click to learn|r"], 1, 1, 1, true)
                     end
                 end
                 CurrentRankTooltip:Show()
@@ -4133,8 +4181,8 @@ local function CreateNodes()
 
                                 CurrentRankTooltip:AddLine(
                                     self.infinite
-                                    and ("\n|cff00FF00Stacks: " .. currentRank .. "|r")
-                                    or ("\n|cff00FF00Rank: " .. currentRank .. "/" .. maxRank .. "|r"),
+                                    and (ProjectEbonhold.T("\n|cff00FF00Stacks: {currentRank}|r", { currentRank = currentRank }))
+                                    or (ProjectEbonhold.T("\n|cff00FF00Rank: {currentRank}/{maxRank}|r", { currentRank = currentRank, maxRank = maxRank })),
                                     1, 1, 1)
 
                                 if maxRank > 1 and currentRank < maxRank then
@@ -4167,8 +4215,8 @@ local function CreateNodes()
 
                                 CurrentRankTooltip:AddLine(
                                     self.infinite
-                                    and "\n|cffFFFFFFStacks: 0|r"
-                                    or ("\n|cffFFFFFFRank: 0/" .. maxRank .. "|r"),
+                                    and ProjectEbonhold.L["\n|cffFFFFFFStacks: 0|r"]
+                                    or (ProjectEbonhold.T("\n|cffFFFFFFRank: 0/{maxRank}|r", { maxRank = maxRank })),
                                     1, 1, 1)
 
                                 local soulCost = getNodeCost(self, 1)
@@ -4188,29 +4236,29 @@ local function CreateNodes()
                             -- Infinite nodes: no unlearn hint, but say they survive a Prestige
                             -- (SkillTreeHandler::RemoveAllExceptInfiniteAndPermanent keeps every rank).
                             CurrentRankTooltip:AddLine(
-                                "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
+                                ProjectEbonhold.L["|cffFFD700Kept through Prestige, with every rank.|r"], 1, 1, 1, true)
                             CurrentRankTooltip:AddLine(
-                                "|cff00FF00Shift-click to learn 10 stacks|r", 1, 1, 1, true)
+                                ProjectEbonhold.L["|cff00FF00Shift-click to learn 10 stacks|r"], 1, 1, 1, true)
                         elseif (getNodeRank(self.id) or 0) <= getValidatedRank(self.id) then
                             -- Every rank held is applied: locked in for good, so
                             -- no unlearn hint (and no need to state the obvious)
                         else
                             CurrentRankTooltip:AddLine(
-                                "|cffAAAAAARight-click to unlearn|r", 1, 1, 1, true)
+                                ProjectEbonhold.L["|cffAAAAAARight-click to unlearn|r"], 1, 1, 1, true)
                             CurrentRankTooltip:AddLine(
-                                "|cffAAAAAAShift + right-click to take back the whole line|r", 1, 1, 1, true)
+                                ProjectEbonhold.L["|cffAAAAAAShift + right-click to take back the whole line|r"], 1, 1, 1, true)
                         end
                         CurrentRankTooltip:Show();
                     elseif self.state == "ready" then
                         if self.infinite then
                             CurrentRankTooltip:AddLine(
-                                "|cffFFD700Kept through Prestige, with every rank.|r", 1, 1, 1, true)
+                                ProjectEbonhold.L["|cffFFD700Kept through Prestige, with every rank.|r"], 1, 1, 1, true)
                         end
                         CurrentRankTooltip:AddLine(
-                            "|cff00FF00Left-click to learn|r", 1, 1, 1, true)
+                            ProjectEbonhold.L["|cff00FF00Left-click to learn|r"], 1, 1, 1, true)
                         if self.infinite then
                             CurrentRankTooltip:AddLine(
-                                "|cff00FF00Shift-click to learn 10 stacks|r", 1, 1, 1, true)
+                                ProjectEbonhold.L["|cff00FF00Shift-click to learn 10 stacks|r"], 1, 1, 1, true)
                         end
                         CurrentRankTooltip:Show();
                     elseif self.state == "locked" then
@@ -4221,7 +4269,7 @@ local function CreateNodes()
 
                 if self.isApex then
                     CurrentRankTooltip:AddLine(
-                        "|cffFFAAAAOnly one Apex Talent can be active at a time.|r",
+                        ProjectEbonhold.L["|cffFFAAAAOnly one Apex Talent can be active at a time.|r"],
                         1, 1, 1, true)
                     CurrentRankTooltip:Show()
                 end
@@ -4291,7 +4339,7 @@ local function CreateNodes()
                 if self.isMultipleChoice then
                     if #self.choiceButtons == 0 then
                         DebugPrint(
-                            "|cffFFFF00Hover over this node to see available choices|r")
+                            ProjectEbonhold.L["|cffFFFF00Hover over this node to see available choices|r"])
                     end
                     return
                 end
@@ -4325,8 +4373,7 @@ local function CreateNodes()
 
                         if currentRank >= maxRank then
                             DebugPrint(
-                                "|cffFF0000Talent is already at maximum rank (" ..
-                                maxRank .. ")!|r")
+                                ProjectEbonhold.T("|cffFF0000Talent is already at maximum rank ({maxRank})!|r", { maxRank = maxRank }))
                         elseif btnSelf.state == "locked" then
                             -- deep node: buy everything leading to it, if the pools allow it
                             if unlockPath(nodeId) then
@@ -4386,8 +4433,13 @@ local function CreateNodes()
                         if currentRank <= 0 then
                             DebugPrint("|cffFF0000Talent is not learned yet!|r")
                         else
-                            DebugPrint(
-                                "|cffFF0000Cannot downgrade: Other talents depend on this one!|r")
+                            -- PTR 4342: pending talents depend on this one; offer to take back the
+                            -- whole line (as Shift + right-click) instead of refusing silently.
+                            local btnSelf = self
+                            ConfirmRevertLine(self, function()
+                                refreshAccessibility()
+                                refreshNodeTooltip(btnSelf)
+                            end)
                         end
                     end
                 end
@@ -4611,10 +4663,8 @@ local treeTour = ProjectEbonhold.GuidedTour.Create({
     dbKey = "seenSkillTreeTour",
     steps = {
         {
-            title = "Your Skill Tree",
-            text = "The tree spends the |cffffd700Soul Ashes|r kept on your account. They arrive " ..
-                "when you make an |cffffd700offering|r at a Spirit Healer, or when a run ends. " ..
-                "This is what you have to spend; hover it to see what it buys.",
+            title = ProjectEbonhold.L["Your Skill Tree"],
+            text = ProjectEbonhold.L["The tree spends the |cffffd700Soul Ashes|r kept on your account. They arrive when you make an |cffffd700offering|r at a Spirit Healer, or when a run ends. This is what you have to spend; hover it to see what it buys."],
             zone = function()
                 local t = skillTreeFrame.poolTexts and skillTreeFrame.poolTexts[1]
                 return t and t.hover
@@ -4622,10 +4672,8 @@ local treeTour = ProjectEbonhold.GuidedTour.Create({
             boxAnchor = { "BOTTOMLEFT", "TOPLEFT", 0, 14 },
         },
         {
-            title = "Every rank is for good",
-            text = "Click a node to take a rank, then |cffffd700Apply Changes|r. Once applied, a " ..
-                "rank is |cffff4040permanent|r: it can never be unlearned or refunded. Only a " ..
-                "|cffff4444Prestige|r clears the tree.",
+            title = ProjectEbonhold.L["Every rank is for good"],
+            text = ProjectEbonhold.L["Click a node to take a rank, then |cffffd700Apply Changes|r. Once applied, a rank is |cffff4040permanent|r: it can never be unlearned or refunded. Only a |cffff4444Prestige|r clears the tree."],
             zone = function() return Scroll end,
             boxAnchor = { "TOPRIGHT", "TOPRIGHT", -20, -20 },
         },
@@ -4706,3 +4754,99 @@ ProjectEbonhold.SkillTree.UpdateTotalSoulPoints =
         -- the points can land after the window opened
         if skillTreeFrame and skillTreeFrame:IsShown() then MaybeStartTreeTour() end
     end
+
+
+-- /fullskilltree (test aid, 2026-11-15): submits ONE ordinary loadout update in which every
+-- node of the common tree sits at its client-side max rank, to check that the tree as the
+-- add-on draws it is also accepted by the server. It goes through the very same message as
+-- the Apply button (REQUEST_LOADOUT_UPDATE), so the server validates it exactly like a
+-- player's Apply: cost, currency, prerequisites, rank caps. It grants nothing on its own.
+--   * base = the ranks the server last validated, so nothing pending in the window is mixed in
+--   * infinite nodes are left at their applied rank (never raised, never lowered)
+--   * class constellation nodes (classId) are a separate purchase flow: not included
+--   * the UI state is not touched: the server's answer refreshes the tree as after an Apply
+local function BuildFullTreePackage()
+    local package = { id = 0, name = currentLoadoutName ~= "" and currentLoadoutName or ProjectEbonhold.L["Unnamed"], nodeRanks = {} }
+    if currentLoadoutName ~= "" and savedLoadouts[currentLoadoutName] then
+        package.id = savedLoadouts[currentLoadoutName].id or 0
+    end
+
+    local stats = { maxed = 0, infiniteKept = 0, ranksAdded = 0, cost = {} }
+    for _, node in ipairs(TreeNodes) do
+        if not node.classId and node.spells then
+            local applied = getValidatedRank(node.id)
+            local target
+            if node.infinite then
+                target = applied
+                stats.infiniteKept = stats.infiniteKept + 1
+            elseif node.isMultipleChoice then
+                target = math.max(applied, 1)
+                stats.maxed = stats.maxed + 1
+            else
+                target = math.max(applied, #node.spells)
+                stats.maxed = stats.maxed + 1
+            end
+            if target > applied then
+                local currency = getNodeCurrency(node)
+                local sum = stats.cost[currency] or 0
+                for r = applied + 1, target do sum = sum + getNodeCost(node, r) end
+                stats.cost[currency] = sum
+                stats.ranksAdded = stats.ranksAdded + (target - applied)
+            end
+            if target > 0 then package.nodeRanks[node.id] = target end
+        end
+    end
+    return package, stats
+end
+
+local function fullTreeChat(msg)
+    DEFAULT_CHAT_FRAME:AddMessage("|cff88ccff[fullskilltree]|r " .. msg)
+end
+
+local function SendFullTree(package)
+    if isWaitingForValidation then
+        fullTreeChat(ProjectEbonhold.L["An Apply is already waiting for the server, try again in a moment."])
+        return
+    end
+    if SendLoadoutToServer(package) then
+        isWaitingForValidation = true
+        fullTreeChat(ProjectEbonhold.L["Full tree sent to the server; its answer follows like an Apply."])
+    else
+        fullTreeChat(ProjectEbonhold.L["Could not send the full tree to the server."])
+    end
+end
+
+SLASH_EBONHOLDFULLSKILLTREE1 = "/fullskilltree"
+SlashCmdList["EBONHOLDFULLSKILLTREE"] = function()
+    local package, stats = BuildFullTreePackage()
+
+    local costParts = {}
+    for _, c in ipairs({ "ash", "shard", "essence", "artisan" }) do
+        if stats.cost[c] and stats.cost[c] > 0 then
+            table.insert(costParts, FormatThousands(stats.cost[c]) .. " " .. currencyName(c))
+        end
+    end
+    local costText = #costParts > 0 and table.concat(costParts, ", ") or ProjectEbonhold.L["nothing"]
+
+    fullTreeChat(ProjectEbonhold.T("{maxed} nodes at max rank (+{ranks} ranks), {inf} infinite nodes left as applied. Cost shown by the add-on: {cost}.",
+        { maxed = stats.maxed, ranks = stats.ranksAdded, inf = stats.infiniteKept, cost = costText }))
+
+    if stats.ranksAdded == 0 then
+        fullTreeChat(ProjectEbonhold.L["Every node is already at its max rank: nothing to send."])
+        return
+    end
+
+    StaticPopupDialogs["SKILLTREE_FULL_TREE_CONFIRM"] = StaticPopupDialogs["SKILLTREE_FULL_TREE_CONFIRM"] or {
+        text = "%s",
+        button1 = ProjectEbonhold.L["Confirm"],
+        button2 = CANCEL,
+        OnAccept = function(self, data) if data then SendFullTree(data) end end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        showAlert = true,
+    }
+    StaticPopup_Show("SKILLTREE_FULL_TREE_CONFIRM",
+        ProjectEbonhold.T("|cffFFD700Full skill tree|r\n\nSend every node at its max rank ({ranks} ranks, {cost})?\n\nIf the server accepts it, these ranks are |cffFF0000permanent|r and the currencies are spent, exactly like an Apply.",
+            { ranks = stats.ranksAdded, cost = costText }), nil, package)
+end

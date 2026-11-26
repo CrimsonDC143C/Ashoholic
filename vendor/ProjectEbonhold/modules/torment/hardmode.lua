@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addon, Addon         = ...
 
 ------------------------------------------------------------
@@ -50,37 +51,37 @@ local ICON_EXTRA_ITEM      = "Interface\\Icons\\INV_Misc_Bag_10"
 --        open-world hp, open-world melee, open-world spell, dungeon trash hp }  (own curves)
 --        -- item affixes V2, tools/affixes/catalog.py
 local TORMENT_ROWS = {
-  { "Normal", 1.0, 1.0, 0, 0, 1.0, 1.0, 1.0, 1.0, 5.0, { 40, 25, 18, 11, 6 }, 0.0, 0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 },
-  { "Torment I", 3.6227, 1.2058, 1, 20, 1.3, 1.3, 1.25, 1.35, 10.0, { 40, 25, 18, 11, 6 }, 30.0, 0, 1.2058, 4.8, 2.5455, 2.1, 5.6788, 43.472 },
-  { "Torment II", 3.6227, 1.4541, 2, 26, 1.6, 1.6, 1.5, 1.7, 15.0, { 40, 25, 18, 11, 6 }, 60.0, 0, 1.4541, 8.4, 2.8594, 2.359, 7.3392, 43.472 },
-  { "Torment III", 3.6227, 1.7534, 2, 32, 1.9, 1.9, 1.75, 2.05, 20.0, { 40, 25, 18, 11, 6 }, 90.0, 0, 1.7534, 12.0, 3.2121, 2.65, 9.4851, 43.472 },
-  { "Torment IV", 4.2939, 2.1143, 3, 38, 2.2, 2.2, 2.0, 2.4, 25.0, { 40, 25, 18, 11, 6 }, 20.0, 1, 2.1143, 15.6, 4.4805, 3.7994, 12.2585, 51.5272 },
-  { "Torment V", 4.2939, 2.5495, 3, 44, 2.5, 2.5, 2.25, 2.75, 30.0, { 40, 25, 18, 11, 6 }, 50.0, 1, 2.5495, 19.2, 6.2496, 5.4473, 15.8428, 51.5272 },
-  { "Torment VI", 4.2939, 3.0743, 4, 50, 2.8, 2.8, 2.5, 3.1, 35.0, { 40, 25, 18, 11, 6 }, 80.0, 1, 3.0743, 22.8, 8.7174, 7.8099, 20.4751, 51.5272 },
-  { "Torment VII", 4.2939, 3.7071, 4, 56, 3.1, 3.1, 2.75, 3.45, 40.0, { 40, 25, 18, 11, 6 }, 10.0, 2, 3.7071, 26.4, 12.1596, 11.1973, 26.4619, 51.5272 },
-  { "Torment VIII", 5.0896, 4.4702, 5, 62, 3.4, 3.4, 3.0, 3.8, 45.0, { 40, 25, 18, 11, 6 }, 40.0, 2, 4.4702, 30.0, 16.961, 16.0539, 34.1991, 61.0751 },
-  { "Torment IX", 5.0896, 5.3904, 5, 68, 3.7, 3.7, 3.25, 4.15, 50.0, { 40, 25, 18, 11, 6 }, 70.0, 2, 5.3904, 33.6, 23.6582, 23.0169, 44.1987, 61.0751 },
-  { "Torment X", 6.0327, 6.5, 6, 74, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 6.5, 37.2, 33.0, 33.0, 57.122, 72.3921 },
-  { "Torment XI", 6.9376, 7.475, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 7.475, 42.78, 37.95, 37.95, 65.6903, 83.2509 },
-  { "Torment XII", 7.9782, 8.5962, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 8.5962, 49.197, 43.6425, 43.6425, 75.5438, 95.7385 },
-  { "Torment XIII", 9.1749, 9.8857, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 9.8857, 56.5765, 50.1889, 50.1889, 86.8754, 110.0993 },
-  { "Torment XIV", 10.5512, 11.3685, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 11.3685, 65.063, 57.7172, 57.7172, 99.9067, 126.6142 },
-  { "Torment XV", 12.1339, 13.0738, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 13.0738, 74.8225, 66.3748, 66.3748, 114.8927, 145.6063 },
-  { "Torment XVI", 13.9539, 15.0349, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 15.0349, 86.0459, 76.331, 76.331, 132.1267, 167.4472 },
-  { "Torment XVII", 16.047, 17.2901, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 17.2901, 98.9527, 87.7807, 87.7807, 151.9457, 192.5643 },
-  { "Torment XVIII", 18.4541, 19.8836, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 19.8836, 113.7957, 100.9478, 100.9478, 174.7375, 221.449 },
-  { "Torment XIX", 21.2222, 22.8662, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 22.8662, 130.865, 116.0899, 116.0899, 200.9481, 254.6663 },
-  { "Torment XX", 24.4055, 26.2961, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 26.2961, 150.4947, 133.5034, 133.5034, 231.0903, 292.8663 },
-  { "Torment XXI", 28.0664, 30.2405, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 30.2405, 173.069, 153.5289, 153.5289, 265.7539, 336.7962 },
-  { "Torment XXII", 32.2763, 34.7766, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 34.7766, 199.0293, 176.5583, 176.5583, 305.617, 387.3157 },
-  { "Torment XXIII", 37.1178, 39.9931, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 39.9931, 228.8837, 203.042, 203.042, 351.4595, 445.413 },
-  { "Torment XXIV", 42.6854, 45.9921, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 45.9921, 263.2163, 233.4983, 233.4983, 404.1785, 512.225 },
-  { "Torment XXV", 49.0882, 52.8909, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 52.8909, 302.6987, 268.523, 268.523, 464.8052, 589.0587 },
-  { "Torment XXVI", 56.4515, 60.8245, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 60.8245, 348.1035, 308.8015, 308.8015, 534.526, 677.4175 },
-  { "Torment XXVII", 64.9192, 69.9482, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 69.9482, 400.319, 355.1217, 355.1217, 614.7049, 779.0301 },
-  { "Torment XXVIII", 74.6571, 80.4404, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 80.4404, 460.3669, 408.39, 408.39, 706.9107, 895.8846 },
-  { "Torment XXIX", 85.8556, 92.5065, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 92.5065, 529.4219, 469.6485, 469.6485, 812.9473, 1030.2673 },
-  { "Torment XXX", 98.734, 106.3825, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 106.3825, 608.8352, 540.0957, 540.0957, 934.8893, 1184.8074 },
+  { L["Normal"], 1.0, 1.0, 0, 0, 1.0, 1.0, 1.0, 1.0, 5.0, { 40, 25, 18, 11, 6 }, 0.0, 0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 },
+  { L["Torment I"], 3.6227, 1.2058, 1, 20, 1.3, 1.3, 1.25, 1.35, 10.0, { 40, 25, 18, 11, 6 }, 30.0, 0, 1.2058, 4.8, 2.5455, 2.1, 5.6788, 7.1968 },
+  { L["Torment II"], 3.6227, 1.4541, 2, 26, 1.6, 1.6, 1.5, 1.7, 15.0, { 40, 25, 18, 11, 6 }, 60.0, 0, 1.4541, 8.4, 2.8594, 2.359, 7.3392, 9.3011 },
+  { L["Torment III"], 3.6227, 1.7534, 2, 32, 1.9, 1.9, 1.75, 2.05, 20.0, { 40, 25, 18, 11, 6 }, 90.0, 0, 1.7534, 12.0, 3.2121, 2.65, 9.4851, 12.0207 },
+  { L["Torment IV"], 4.2939, 2.1143, 3, 38, 2.2, 2.2, 2.0, 2.4, 25.0, { 40, 25, 18, 11, 6 }, 20.0, 1, 2.1143, 15.6, 4.4805, 3.7994, 12.2585, 15.5355 },
+  { L["Torment V"], 4.2939, 2.5495, 3, 44, 2.5, 2.5, 2.25, 2.75, 30.0, { 40, 25, 18, 11, 6 }, 50.0, 1, 2.5495, 19.2, 6.2496, 5.4473, 15.8428, 20.0779 },
+  { L["Torment VI"], 4.2939, 3.0743, 4, 50, 2.8, 2.8, 2.5, 3.1, 35.0, { 40, 25, 18, 11, 6 }, 80.0, 1, 3.0743, 22.8, 8.7174, 7.8099, 20.4751, 25.9486 },
+  { L["Torment VII"], 4.2939, 3.7071, 4, 56, 3.1, 3.1, 2.75, 3.45, 40.0, { 40, 25, 18, 11, 6 }, 10.0, 2, 3.7071, 26.4, 12.1596, 11.1973, 26.4619, 33.5357 },
+  { L["Torment VIII"], 5.0896, 4.4702, 5, 62, 3.4, 3.4, 3.0, 3.8, 45.0, { 40, 25, 18, 11, 6 }, 40.0, 2, 4.4702, 30.0, 16.961, 16.0539, 34.1991, 43.3413 },
+  { L["Torment IX"], 5.0896, 5.3904, 5, 68, 3.7, 3.7, 3.25, 4.15, 50.0, { 40, 25, 18, 11, 6 }, 70.0, 2, 5.3904, 33.6, 23.6582, 23.0169, 44.1987, 56.014 },
+  { L["Torment X"], 6.0327, 6.5, 6, 74, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 6.5, 37.2, 33.0, 33.0, 57.122, 72.3921 },
+  { L["Torment XI"], 6.9376, 7.475, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 7.475, 42.78, 37.95, 37.95, 65.6903, 83.2509 },
+  { L["Torment XII"], 7.9782, 8.5962, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 8.5962, 49.197, 43.6425, 43.6425, 75.5438, 95.7385 },
+  { L["Torment XIII"], 9.1749, 9.8857, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 9.8857, 56.5765, 50.1889, 50.1889, 86.8754, 110.0993 },
+  { L["Torment XIV"], 10.5512, 11.3685, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 11.3685, 65.063, 57.7172, 57.7172, 99.9067, 126.6142 },
+  { L["Torment XV"], 12.1339, 13.0738, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 13.0738, 74.8225, 66.3748, 66.3748, 114.8927, 145.6063 },
+  { L["Torment XVI"], 13.9539, 15.0349, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 15.0349, 86.0459, 76.331, 76.331, 132.1267, 167.4472 },
+  { L["Torment XVII"], 16.047, 17.2901, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 17.2901, 98.9527, 87.7807, 87.7807, 151.9457, 192.5643 },
+  { L["Torment XVIII"], 18.4541, 19.8836, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 19.8836, 113.7957, 100.9478, 100.9478, 174.7375, 221.449 },
+  { L["Torment XIX"], 21.2222, 22.8662, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 22.8662, 130.865, 116.0899, 116.0899, 200.9481, 254.6663 },
+  { L["Torment XX"], 24.4055, 26.2961, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 26.2961, 150.4947, 133.5034, 133.5034, 231.0903, 292.8663 },
+  { L["Torment XXI"], 28.0664, 30.2405, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 30.2405, 173.069, 153.5289, 153.5289, 265.7539, 336.7962 },
+  { L["Torment XXII"], 32.2763, 34.7766, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 34.7766, 199.0293, 176.5583, 176.5583, 305.617, 387.3157 },
+  { L["Torment XXIII"], 37.1178, 39.9931, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 39.9931, 228.8837, 203.042, 203.042, 351.4595, 445.413 },
+  { L["Torment XXIV"], 42.6854, 45.9921, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 45.9921, 263.2163, 233.4983, 233.4983, 404.1785, 512.225 },
+  { L["Torment XXV"], 49.0882, 52.8909, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 52.8909, 302.6987, 268.523, 268.523, 464.8052, 589.0587 },
+  { L["Torment XXVI"], 56.4515, 60.8245, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 60.8245, 348.1035, 308.8015, 308.8015, 534.526, 677.4175 },
+  { L["Torment XXVII"], 64.9192, 69.9482, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 69.9482, 400.319, 355.1217, 355.1217, 614.7049, 779.0301 },
+  { L["Torment XXVIII"], 74.6571, 80.4404, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 80.4404, 460.3669, 408.39, 408.39, 706.9107, 895.8846 },
+  { L["Torment XXIX"], 85.8556, 92.5065, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 92.5065, 529.4219, 469.6485, 469.6485, 812.9473, 1030.2673 },
+  { L["Torment XXX"], 98.734, 106.3825, 6, 80, 4.0, 4.0, 3.5, 4.5, 55.0, { 40, 25, 18, 11, 6 }, 0.0, 3, 106.3825, 608.8352, 540.0957, 540.0957, 934.8893, 1184.8074 },
 }
 
 -- Per-context ratios: health to the flat line; damage to the trash curve (adds) or to the
@@ -169,11 +170,17 @@ do
 end
 -- <<< GENERATED BY tools/torment/emit_torment_addon.py <<<
 
--- Champions (src/server/game/Ashendor/DifficultyScaling/TormentChampionMgr.h): one bonus enemy per
--- zone and raid (none in 5-man dungeons since 2026-10-25), on every difficulty, that brings a horde. Hand-copied from the server
--- constants - keep the two in step.
-local CHAMPION_ASHES_PER_LEVEL = 50
-local CHAMPION_SHARDS_PER_LEVEL = 1
+-- Champion's Standards (src/server/game/Ashendor/DifficultyScaling/TormentChampionMgr.h): since 2026-11-10 one
+-- standard to hold per champion tour (up to 4 per zone and raid, none in 5-man dungeons), on every difficulty, that brings
+-- a horde. Hand-copied from the server constants - keep the two in step.
+local STANDARD_HOLD_S = 45              -- CAPTURE_HOLD_MS
+local STANDARD_RADIUS = 40              -- CAPTURE_RADIUS
+local STANDARD_EMPTY_S = 5              -- CAPTURE_EMPTY_MS
+local STANDARD_RETRY_S = 30             -- CAPTURE_RETRY_S
+local STANDARD_PORTAL_MIN = 3           -- PORTAL_LIFE_S
+local STANDARD_DRAIN_MIN = 15           -- SPELL_RIFT_DRAINED (902052) duration: no other portal meanwhile
+local CHAMPION_ASHES_PER_LEVEL = 250    -- ASHES_PER_LEVEL (x5 on 2026-11-21)
+local CHAMPION_SHARDS_PER_LEVEL = 2     -- SHARDS_PER_LEVEL (x2 on 2026-11-21)
 local CHAMPION_REWARD_GROWTH = 1.1314   -- per Torment, up to Torment X (the raids' shard curve)
 local CHAMPION_RESPAWN_OPEN_MIN = 2     -- RESPAWN_OPEN_WORLD_S; never again in the same dungeon or raid run
 local CHAMPION_HORDE_BONUS_PCT = 5      -- HORDE_KILL_BONUS, per horde monster slain
@@ -254,8 +261,8 @@ for tier = 2, #TIER_DATA do
   -- so a cosmetic tier shows what Torment X asked for rather than a feat that does not exist.
   local rung = math.min(tier, LADDER_TOP_TIER)
   ACHIEVEMENT_HINTS[tier] = {
-    name       = "Unlocking " .. TIER_DATA[rung].name,
-    task       = "Defeat any raid boss, or clear 10 Northrend dungeons at level 80.",
+    name       = T("Unlocking {name}", { name = TIER_DATA[rung].name }),
+    task       = L["Defeat any raid boss, or clear 10 Northrend dungeons at level 80."],
     difficulty = TIER_DATA[rung - 1].name,
   }
 end
@@ -307,7 +314,7 @@ local function GetPlayerLockReason(tier)
   local data = _G["EbonholdPlayerRunData"]
   local hasMax = data and data.hasReachedMaxLevel == true
   if not hasMax then
-    return "Reach the level 80 to activate"
+    return L["Reach the level 80 to activate"]
   end
 
   local svc = ProjectEbonhold.HardmodeService
@@ -327,9 +334,9 @@ local function GetPlayerLockReason(tier)
     end
 
     if label == "" then
-      return "Requires this tier's Torment achievement", tier
+      return L["Requires this tier's Torment achievement"], tier
     end
-    return "Requires " .. label, tier
+    return T("Requires {label}", { label = label }), tier
   end
 
   -- Torment 1 is the only tier that still has a Soul Ash floor; every tier above it stops at
@@ -341,7 +348,7 @@ local function GetPlayerLockReason(tier)
   -- /reload leaves it at 0 until the server's next push. Fail closed rather than advertise the
   -- tier as available on a value we do not have yet.
   if not svc.IsCommittedSoulAshesKnown() then
-    return "Loading Torment requirements..."
+    return L["Loading Torment requirements..."]
   end
 
   if not svc.IsTierUnlocked(tier) then
@@ -365,9 +372,9 @@ local function GetHardmodeLockReason(tier)
   local reason, achievementTier = GetPlayerLockReason(tier)
   if not reason then return nil end
   if gm == 2 then
-    return reason .. "\n|cff3FC7EBGM (.gm on): you may step in|r", achievementTier, true
+    return T("{reason}\n|cff3FC7EBGM (.gm on): you may step in|r", { reason = reason }), achievementTier, true
   elseif gm == 1 then
-    reason = reason .. "\n|cff3FC7EBGM: type .gm on to step in|r"
+    reason = T("{reason}\n|cff3FC7EBGM: type .gm on to step in|r", { reason = reason })
   end
   return reason, achievementTier, false
 end
@@ -390,7 +397,7 @@ local function RefreshApplyState(selTier, curTier)
   if lockReason then
     -- Grey "Locked" button; the reason sits under the ladder, where the eye already is.
     if not gmPass then
-      applyBtn:SetText("Locked")
+      applyBtn:SetText(L["Locked"])
       applyBtn:Disable()
       if applyHint then applyHint:Hide() end
     end
@@ -411,11 +418,11 @@ local function RefreshApplyState(selTier, curTier)
   local instanceKind = InstanceLockKind()
   if instanceKind then
     -- Same wording as the overlay, kept under the ladder for when the overlay is dismissed.
-    applyBtn:SetText("Locked")
+    applyBtn:SetText(L["Locked"])
     applyBtn:Disable()
     if applyHint then applyHint:Hide() end
     if applyLockText then
-      applyLockText:SetText("You cannot change your Torment while inside a " .. instanceKind .. ".")
+      applyLockText:SetText(T("You cannot change your Torment while inside a {instanceKind}.", { instanceKind = instanceKind }))
       applyLockText:Show()
     end
     if applyLockHover then applyLockHover:Hide() end
@@ -425,15 +432,15 @@ local function RefreshApplyState(selTier, curTier)
   if not gmPass then hideLock() end
 
   if not CanApply() then
-    applyBtn:SetText("Apply")
+    applyBtn:SetText(APPLY)
     applyBtn:Disable()
     if applyHint then applyHint:Show() end
     -- A disabled button takes no click, so the reason has to be on the panel, not in chat.
     if applyLockText then
       local inCombat = UnitAffectingCombat and UnitAffectingCombat("player")
       applyLockText:SetText(inCombat
-        and "You cannot change your Torment while in combat."
-        or "Go to an inn or a capital city to change your Torment.")
+        and L["You cannot change your Torment while in combat."]
+        or L["Go to an inn or a capital city to change your Torment."])
       applyLockText:Show()
     end
     if applyLockHover then applyLockHover:Hide() end
@@ -442,10 +449,10 @@ local function RefreshApplyState(selTier, curTier)
 
   if applyHint then applyHint:Hide() end
   if selTier == curTier then
-    applyBtn:SetText("Current difficulty")
+    applyBtn:SetText(L["Current difficulty"])
     applyBtn:Disable()
   else
-    applyBtn:SetText("Apply")
+    applyBtn:SetText(APPLY)
     applyBtn:Enable()
   end
 end
@@ -508,7 +515,7 @@ local function CreateTierSelector(parent)
     GetMax   = function() return maxTier end,
     GetName  = function(tier)
       local td = TIER_DATA[tier] or TIER_DATA[1]
-      local label = tier == 1 and "Normal" or td.name
+      local label = tier == 1 and L["Normal"] or td.name
       -- 16 px padlock, nudged 1 px down so its centre sits on the capitals' mid-height.
       if IsTierLocked(tier) then
         label = label .. " |TInterface\\AddOns\\ProjectEbonhold\\assets\\lock:16:16:0:-1|t"
@@ -525,11 +532,11 @@ local function CreateTierSelector(parent)
       local td = TIER_DATA[tier] or TIER_DATA[1]
       GameTooltip:SetText(td.name, GetTierColor(tier))
       if btn.isCosmetic then
-        GameTooltip:AddLine("Torment XI-XXX: health and damage only, instance-only. Step through them with the arrows or the mouse wheel.", 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L["Torment XI-XXX: health and damage only, instance-only. Step through them with the arrows or the mouse wheel."], 0.7, 0.7, 0.7, true)
       elseif tier == CurrentTier() then
-        GameTooltip:AddLine("Your current difficulty", 0.1, 1, 0.1)
+        GameTooltip:AddLine(L["Your current difficulty"], 0.1, 1, 0.1)
       elseif IsTierLocked(tier) then
-        GameTooltip:AddLine("Locked", 1, 0.3, 0.3)
+        GameTooltip:AddLine(L["Locked"], 1, 0.3, 0.3)
       end
       GameTooltip:Show()
     end,
@@ -568,7 +575,7 @@ BuildInfoSections = function(canvas, displayData, startY)
   local W = ProjectEbonhold.TormentWidgets
 
   local y = startY
-  local isNormal = displayData.name == "Normal"
+  local isNormal = displayData.name == L["Normal"]
   local s = displayData.scaling or {}
   local rw = displayData.rewards or {}
 
@@ -625,29 +632,29 @@ BuildInfoSections = function(canvas, displayData, startY)
   -- server (HardmodeMgr::MAX_OPEN_WORLD_TORMENT), so its row reads the Torment X figure.
   local isCosmetic = (displayData.tier or 1) > LADDER_TOP_TIER
   local sOpen = isCosmetic and (TIER_DATA[LADDER_TOP_TIER] or {}).scaling or s
-  local openLabel = isCosmetic and "Open world (capped at Torment X)" or "Open world"
+  local openLabel = isCosmetic and L["Open world (capped at Torment X)"] or L["Open world"]
 
   --------------------------------------------------------
   -- Creature modifiers
   --------------------------------------------------------
-  Section("Creature Modifiers", isCosmetic and "instances only" or "instances and open world")
+  Section(L["Creature Modifiers"], isCosmetic and L["instances only"] or L["instances and open world"])
   Row({
-    icon = "Interface\\Icons\\PetBattle_Health", label = "Health", value = Pct(s.hp_multiplier or 1), active = not isNormal,
-    tooltipTitle = "Health",
-    tooltipRows = { { openLabel, X(sOpen.hp_multiplier) }, { "Dungeon boss", X(s.dungeon_boss_hp_mul) }, { "Raid boss", X(s.raid_boss_hp_mul) },
-                    { "Dungeon adds", X(s.dungeon_add_hp_mul) }, { "Raid adds", X(s.raid_add_hp_mul) } },
+    icon = "Interface\\Icons\\PetBattle_Health", label = L["Health"], value = Pct(s.hp_multiplier or 1), active = not isNormal,
+    tooltipTitle = L["Health"],
+    tooltipRows = { { openLabel, X(sOpen.hp_multiplier) }, { L["Dungeon boss"], X(s.dungeon_boss_hp_mul) }, { L["Raid boss"], X(s.raid_boss_hp_mul) },
+                    { L["Dungeon adds"], X(s.dungeon_add_hp_mul) }, { L["Raid adds"], X(s.raid_add_hp_mul) } },
   })
   Row({
-    icon = "Interface\\Icons\\Ability_MeleeDamage", label = "Melee damage", value = Pct(s.melee_multiplier or 1), active = not isNormal,
-    tooltipTitle = "Melee damage",
-    tooltipRows = { { openLabel, X(sOpen.melee_multiplier) }, { "Dungeon boss", X(s.dungeon_boss_melee_mul) }, { "Raid boss", X(s.raid_boss_melee_mul) },
-                    { "Dungeon adds", X(s.dungeon_add_melee_mul) }, { "Raid adds", X(s.raid_add_melee_mul) } },
+    icon = "Interface\\Icons\\Ability_MeleeDamage", label = L["Melee damage"], value = Pct(s.melee_multiplier or 1), active = not isNormal,
+    tooltipTitle = L["Melee damage"],
+    tooltipRows = { { openLabel, X(sOpen.melee_multiplier) }, { L["Dungeon boss"], X(s.dungeon_boss_melee_mul) }, { L["Raid boss"], X(s.raid_boss_melee_mul) },
+                    { L["Dungeon adds"], X(s.dungeon_add_melee_mul) }, { L["Raid adds"], X(s.raid_add_melee_mul) } },
   })
   Row({
-    icon = "Interface\\Icons\\Spell_Ice_MagicDamage", label = "Spell damage", value = Pct(s.spell_multiplier or 1), active = not isNormal,
-    tooltipTitle = "Spell damage",
-    tooltipRows = { { openLabel, X(sOpen.spell_multiplier) }, { "Dungeon boss", X(s.dungeon_boss_spell_mul) }, { "Raid boss", X(s.raid_boss_spell_mul) },
-                    { "Dungeon adds", X(s.dungeon_add_spell_mul) }, { "Raid adds", X(s.raid_add_spell_mul) } },
+    icon = "Interface\\Icons\\Spell_Ice_MagicDamage", label = L["Spell damage"], value = Pct(s.spell_multiplier or 1), active = not isNormal,
+    tooltipTitle = L["Spell damage"],
+    tooltipRows = { { openLabel, X(sOpen.spell_multiplier) }, { L["Dungeon boss"], X(s.dungeon_boss_spell_mul) }, { L["Raid boss"], X(s.raid_boss_spell_mul) },
+                    { L["Dungeon adds"], X(s.dungeon_add_spell_mul) }, { L["Raid adds"], X(s.raid_add_spell_mul) } },
   })
   EndSection()
 
@@ -667,7 +674,7 @@ BuildInfoSections = function(canvas, displayData, startY)
     local share = total > 0 and (100 * (weights[r] or 0) / total) or 0
     if share > 0 then
       topRank = r
-      rankRows[#rankRows + 1] = { "Rank " .. ROMANS[r], PctText(share) }
+      rankRows[#rankRows + 1] = { T("Rank {r}", { r = ROMANS[r] }), PctText(share) }
     end
   end
   -- Only the chance climbs with the Torment; the rank spread is the same on every tier
@@ -676,22 +683,22 @@ BuildInfoSections = function(canvas, displayData, startY)
   local normalChance = (TIER_DATA[1] and TIER_DATA[1].rewards.affix_chance) or 0
   local topChance    = (TIER_DATA[LADDER_TOP_TIER] and TIER_DATA[LADDER_TOP_TIER].rewards.affix_chance) or chance
   local affixRows = {
-    { "Chance per item on this Torment", PctText(chance) },
-    { "Climbs with the Torment", PctText(normalChance) .. " (Normal) to " .. PctText(topChance) .. " (" .. ((TIER_DATA[LADDER_TOP_TIER] and TIER_DATA[LADDER_TOP_TIER].name) or "Torment X") .. ")" },
+    { L["Chance per item on this Torment"], PctText(chance) },
+    { L["Climbs with the Torment"], T("{normal} (Normal) to {top} (", { normal = PctText(normalChance), top = PctText(topChance) }) .. ((TIER_DATA[LADDER_TOP_TIER] and TIER_DATA[LADDER_TOP_TIER].name) or L["Torment X"]) .. ")" },
     { " ", " " },
-    { "Rank of the affix - same odds on every Torment", " " },
+    { L["Rank of the affix - same odds on every Torment"], " " },
   }
   for _, row in ipairs(rankRows) do affixRows[#affixRows + 1] = row end
 
-  Section("Rewards")
-  Row({ icon = ICON_GOLD, label = "Gold", value = Pct(rw.gold_multiplier or 1), active = (rw.gold_multiplier or 1) > 1,
-    tooltipTitle = "Gold", tooltipRows = { { "Looted gold", Pct(rw.gold_multiplier or 1) } } })
-  Row({ icon = "Interface\\AddOns\\ProjectEbonhold\\assets\\xp_icon", label = "Experience", sub = "quest / kill",
+  Section(L["Rewards"])
+  Row({ icon = ICON_GOLD, label = L["Gold"], value = Pct(rw.gold_multiplier or 1), active = (rw.gold_multiplier or 1) > 1,
+    tooltipTitle = L["Gold"], tooltipRows = { { L["Looted gold"], Pct(rw.gold_multiplier or 1) } } })
+  Row({ icon = "Interface\\AddOns\\ProjectEbonhold\\assets\\xp_icon", label = L["Experience"], sub = L["quest / kill"],
     value = Pct(rw.quest_xp_multiplier or 1) .. " / " .. Pct(rw.creature_xp_multiplier or 1),
     active = (rw.quest_xp_multiplier or 1) > 1 or (rw.creature_xp_multiplier or 1) > 1,
-    tooltipTitle = "Experience", tooltipRows = { { "Quest XP", Pct(rw.quest_xp_multiplier or 1) }, { "Kill XP", Pct(rw.creature_xp_multiplier or 1) } } })
-  Row({ icon = ICON_REAGENT, label = "Reagents", value = Pct(rw.reagent_multiplier or 1), active = (rw.reagent_multiplier or 1) > 1,
-    tooltipTitle = "Reagents", tooltipRows = { { "Crafting materials", Pct(rw.reagent_multiplier or 1) } } })
+    tooltipTitle = L["Experience"], tooltipRows = { { L["Quest XP"], Pct(rw.quest_xp_multiplier or 1) }, { L["Kill XP"], Pct(rw.creature_xp_multiplier or 1) } } })
+  Row({ icon = ICON_REAGENT, label = L["Reagents"], value = Pct(rw.reagent_multiplier or 1), active = (rw.reagent_multiplier or 1) > 1,
+    tooltipTitle = L["Reagents"], tooltipRows = { { L["Crafting materials"], Pct(rw.reagent_multiplier or 1) } } })
   -- Extra items: extra_item_count sure, plus extra_item_chance % of one more. The row shows the
   -- average ("+1.5"), the tooltip splits it.
   local function ExtraAvg(r)
@@ -705,41 +712,54 @@ BuildInfoSections = function(canvas, displayData, startY)
   local extraAvg    = ExtraAvg(rw)
   local topData     = TIER_DATA[LADDER_TOP_TIER]
   local extraRows   = {
-    { "Sure extra items", tostring(extraCount) },
-    { "Chance of one more", PctText(extraChance) },
-    { "Climbs with the Torment", "+0 (Normal) to " .. ExtraText(ExtraAvg(topData and topData.rewards)) .. " (" .. ((topData and topData.name) or "Torment X") .. ")" },
+    { L["Sure extra items"], tostring(extraCount) },
+    { L["Chance of one more"], PctText(extraChance) },
+    { L["Climbs with the Torment"], "+0 (Normal) to " .. ExtraText(ExtraAvg(topData and topData.rewards)) .. " (" .. ((topData and topData.name) or L["Torment X"]) .. ")" },
   }
-  Row({ icon = ICON_EXTRA_ITEM, label = "Extra items", sub = "kills and boss chests",
+  Row({ icon = ICON_EXTRA_ITEM, label = L["Extra items"], sub = L["kills and boss chests"],
     value = ExtraText(extraAvg), active = extraAvg > 0,
-    tooltipTitle = "Extra Items", tooltipRows = extraRows,
-    tooltipFoot = "Each extra item is one more roll on the loot table of the creature or boss chest; the best item it gives is added to the loot.  Not on open-world chests or gathering." })
-  Row({ icon = "Interface\\Icons\\Inv_enchant_formulasuperior_01", label = "Item affix chance", sub = "ranks I-" .. ROMANS[topRank],
+    tooltipTitle = L["Extra Items"], tooltipRows = extraRows,
+    tooltipFoot = L["Each extra item is one more roll on the loot table of the creature or boss chest; the best item it gives is added to the loot.  Not on open-world chests or gathering."] })
+  Row({ icon = "Interface\\Icons\\Inv_enchant_formulasuperior_01", label = L["Item affix chance"], sub = T("ranks I-{topRank}", { topRank = ROMANS[topRank] }),
     value = string.format("%d%%", chance), active = chance > 0,
-    tooltipTitle = "Item Affixes", tooltipRows = affixRows,
-    tooltipFoot = "Any rank can drop on any Torment, Normal included: the Torment only changes how often an item carries one.  Below level 80: rank I only.  Two-handed: affix doubled." })
+    tooltipTitle = L["Item Affixes"], tooltipRows = affixRows,
+    tooltipFoot = L["Any rank can drop on any Torment, Normal included: the Torment only changes how often an item carries one.  Below level 80: rank I only.  Two-handed: affix doubled."] })
   EndSection()
 
   --------------------------------------------------------
-  -- Torment champions
+  -- Champion's Standards (were the Torment champions until 2026-11-10)
   --------------------------------------------------------
   do
-    -- Champions: one bonus enemy per tour, up to 4 per zone and raid (none in 5-man dungeons, 2026-10-25), on every difficulty, that
-    -- brings a horde (TormentChampionMgr, 2026-10-08; one per tour and x3 horde on 2026-10-12). Torment adds its modifiers and its reward; ordinary monsters
-    -- and bosses carry no modifier. The figures below are CHAMPION_* above, mirrored from the server.
+    -- One standard to hold per champion tour, up to 4 per zone and raid (none in 5-man dungeons), on every difficulty: raised, it
+    -- brings the horde (TormentChampionMgr). Torment adds the holders' reward. The figures are CHAMPION_* / STANDARD_* above,
+    -- mirrored from the server.
     local torment = math.max(0, (displayData.tier or 1) - 1)
     local rung = math.min(torment, LADDER_TOP_TIER - 1)
-    local affixes = isNormal and 0 or ChampionAffixCount(torment)
     local growth = CHAMPION_REWARD_GROWTH ^ rung
     local ashes80 = math.floor(80 * CHAMPION_ASHES_PER_LEVEL * growth + 0.5)
     local shards80 = math.floor(80 * CHAMPION_SHARDS_PER_LEVEL * growth + 0.5)
 
-    -- No tooltips on these rows: the label and the value say enough (owner, 13/10).
-    Section("Champions", "every difficulty")
-    Row({ icon = "Interface\\Icons\\Ability_Warrior_Rampage", label = "Champions", value = "up to 4 per zone", noTooltip = true })
-    Row({ icon = "Interface\\Icons\\Ability_Creature_Cursed_02", label = "Champion modifiers", value = tostring(affixes),
-      active = affixes > 0, noTooltip = true })
-    Row({ icon = "Interface\\Icons\\INV_Misc_Bone_ElfSkull_01", label = "Champion reward", sub = "level 80",
-      value = isNormal and "-" or (ashes80 .. " / " .. shards80), active = not isNormal, noTooltip = true })    EndSection()
+    -- Every rule explained in the tooltips (owner, 2026-11-10: "tout doit etre explique").
+    Section(L["Demonic Portals"], L["every difficulty"])
+    -- One row (owner, 2026-11-21: "BEAUCOUP TROP LONG", "ca sert a rien de mettre 4 lignes pour expliquer la meme
+    -- chose", "fait une seule ligne"); the portal's own text gives the details. The level-80 Torment reward stays as
+    -- its value, the only figure that moves with the Torment.
+    Row({ icon = "Interface\\Icons\\Spell_Shadow_SummonFelGuard", label = L["Portals"], sub = L["up to 4 per zone"],
+      value = isNormal and "-" or (ashes80 .. " |TInterface\\Icons\\inv_soulash:12:12:0:0|t  " .. shards80
+        .. " |TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_frost:12:12:0:0|t"), active = not isNormal,
+      tooltipTitle = L["Demonic Portal"],
+      -- The amounts of the Torment selected in the panel (owner's wording, 2026-11-21); Normal pays the cache only.
+      tooltipBody = isNormal
+        and T("Give half of your life to open one, then survive the horde {s} seconds with your group or alone. Each survivor opens a cache.",
+          { s = STANDARD_HOLD_S })
+        or T("Give half of your life to open one, then survive the horde {s} seconds with your group or alone. Each survivor opens a cache and earns {ashes} Soul Ashes and {shards} Soul Shards (level 80).",
+          -- Green amounts with their icons, easy to recognise (owner, 2026-11-21); same icons as the run HUD.
+          { s = STANDARD_HOLD_S,
+            ashes = "|cff40ff40" .. ashes80 .. "|r |TInterface\\Icons\\inv_soulash:14:14:0:0|t",
+            shards = "|cff40ff40" .. shards80 .. "|r |TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_frost:14:14:0:0|t" }),
+      -- The footer is the grey part (owner: "up to 4... ca doit etre en bas, en gris").
+      tooltipFoot = L["Die or go 100 yards away: out, no reward.\n\nUp to 4 are spread across each zone: find them, each one you come near is marked on your map."] })
+    EndSection()
   end
 
   --------------------------------------------------------
@@ -782,7 +802,7 @@ local function ShowAchievementGateTooltip(owner, tier)
   GameTooltip:SetText(name, 1, 0.82, 0)
   GameTooltip:AddLine(hint.task, 1, 1, 1, true)
   GameTooltip:AddLine(" ")
-  GameTooltip:AddLine("World difficulty: " .. hint.difficulty, 0.4, 0.9, 0.4, true)
+  GameTooltip:AddLine(T("World difficulty: {difficulty}", { difficulty = hint.difficulty }), 0.4, 0.9, 0.4, true)
   if hint.note then
     GameTooltip:AddLine(hint.note, 0.7, 0.7, 0.7, true)
   end
@@ -845,7 +865,7 @@ local function ShowConfirmationPopup(tier)
     confirmPopup.desc:SetJustifyH("CENTER")
     confirmPopup.desc:SetWordWrap(true)
 
-    confirmPopup.acceptBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(confirmPopup, "HardmodeConfirmPopupAccept", 130, 24, "Accept")
+    confirmPopup.acceptBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(confirmPopup, "HardmodeConfirmPopupAccept", 130, 24, ACCEPT)
     confirmPopup.acceptBtn:SetPoint("BOTTOM", confirmPopup, "BOTTOM", -72, 22)
     confirmPopup.acceptBtn:SetScript("OnClick", function()
       HidePopup()
@@ -855,7 +875,7 @@ local function ShowConfirmationPopup(tier)
       end
     end)
 
-    confirmPopup.cancelBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(confirmPopup, "HardmodeConfirmPopupCancel", 130, 24, "Cancel")
+    confirmPopup.cancelBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(confirmPopup, "HardmodeConfirmPopupCancel", 130, 24, CANCEL)
     confirmPopup.cancelBtn:SetPoint("BOTTOM", confirmPopup, "BOTTOM", 72, 22)
     confirmPopup.cancelBtn:SetScript("OnClick", HidePopup)
 
@@ -869,15 +889,15 @@ local function ShowConfirmationPopup(tier)
   end
 
   confirmPopup.pendingTier = tier
-  confirmPopup.title:SetText("Change Difficulty")
+  confirmPopup.title:SetText(L["Change Difficulty"])
 
   local msg
   if tier <= 1 then
-    msg = "Return to |cffFFFFFFNormal|r difficulty?\nAll Torment effects will be removed."
+    msg = L["Return to |cffFFFFFFNormal|r difficulty?\nAll Torment effects will be removed."]
   else
     local td = GetTierDisplayData(tier)
     local tierStr = ColorText(td.name, GetTierColor(tier))
-    msg = "Activate " .. tierStr .. "?\nEnemies will become significantly stronger\nand you will receive increased rewards."
+    msg = T("Activate {tierStr}?\nEnemies will become significantly stronger\nand you will receive increased rewards.", { tierStr = tierStr })
   end
   confirmPopup.desc:SetText(msg)
 
@@ -914,23 +934,23 @@ local function BuildContent(canvas, currentTier)
   hardmodeFrame.tierSelector = slider
 
   -- Full-width panel button at the bottom; BuildInfoSections places it under the sections.
-  local applyBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(canvas, nil, SECTION_WIDTH, 24, "Apply")
+  local applyBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(canvas, nil, SECTION_WIDTH, 24, APPLY)
   applyBtn:SetScript("OnClick", function()
     local playerLevel = UnitLevel("player")
     local instanceKind = InstanceLockKind()
     if instanceKind then
       DEFAULT_CHAT_FRAME:AddMessage(
-        "|cffFF0000[Torment] You cannot change difficulty while inside a " .. instanceKind .. ".|r")
+        T("|cffFF0000[Torment] You cannot change difficulty while inside a {instanceKind}.|r", { instanceKind = instanceKind }))
       return
     end
     if UnitAffectingCombat and UnitAffectingCombat("player") then
       DEFAULT_CHAT_FRAME:AddMessage(
-        "|cffFF0000[Torment] You cannot change difficulty while in combat.|r")
+        L["|cffFF0000[Torment] You cannot change difficulty while in combat.|r"])
       return
     end
     if playerLevel > 10 and not IsResting() then
       DEFAULT_CHAT_FRAME:AddMessage(
-        "|cffFF0000[Torment] You must be level 10 or below, or rested (in an inn or capital city) to change difficulty.|r")
+        L["|cffFF0000[Torment] You must be level 10 or below, or rested (in an inn or capital city) to change difficulty.|r"])
       return
     end
     local svc = ProjectEbonhold.HardmodeService
@@ -1009,7 +1029,7 @@ local function CreateHardmodeFrame()
   hardmodeFrame:FitSlate()
   local banner = ProjectEbonhold.TormentWidgets.CreateBanner(hardmodeFrame, 160, 14)
   banner:SetPoint("TOP", hardmodeFrame, "TOP", 0, 14)
-  banner.text:SetText("Torment")
+  banner.text:SetText(L["Torment"])
 
   hardmodeFrame:SetMovable(true)
   hardmodeFrame:EnableMouse(true)
@@ -1056,7 +1076,7 @@ local function CreateHardmodeFrame()
   lockTitle:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
   lockTitle:SetPoint("TOP", lockSkull, "BOTTOM", 0, -8)
   lockTitle:SetTextColor(1, 0, 0)
-  lockTitle:SetText("Torment")
+  lockTitle:SetText(L["Torment"])
 
   local lockMsg = lockOverlay:CreateFontString(nil, "OVERLAY")
   lockMsg:SetFont("Fonts\\FRIZQT__.TTF", 13, "")
@@ -1068,13 +1088,10 @@ local function CreateHardmodeFrame()
   lockMsg:SetSpacing(4)
   lockMsg:SetTextColor(1, 1, 1)
   lockMsg:SetText(
-    "Torment lets you increase your |cffFFD100rewards|r, at the cost of a much harder challenge.\n\n" ..
-    "To unlock Torment, you must reach |cffFFD100level 80|r with one of the characters on your account.\n\n" ..
-    "Then, |cffFFD100defeat a raid boss|r to open the next Torment.\n\n" ..
-    "Monsters hit much harder in Torment. Dying works the same way as in Normal."
+    L["Torment lets you increase your |cffFFD100rewards|r, at the cost of a much harder challenge.\n\nTo unlock Torment, you must reach |cffFFD100level 80|r with one of the characters on your account.\n\nThen, |cffFFD100defeat a raid boss|r to open the next Torment.\n\nMonsters hit much harder in Torment. Dying works the same way as in Normal."]
   )
 
-  local gotItBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(lockOverlay, "HardmodeLockOverlayGotIt", 120, 24, "Got it")
+  local gotItBtn = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(lockOverlay, "HardmodeLockOverlayGotIt", 120, 24, L["Got it"])
   gotItBtn:SetScript("OnClick", function() lockOverlay:Hide() end)
   gotItBtn:SetPoint("BOTTOM", lockOverlay, "BOTTOM", 0, 20)
   gotItBtn:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -1113,7 +1130,7 @@ local function CreateHardmodeFrame()
   instTitle:SetFont("Fonts\\FRIZQT__.TTF", 20, "OUTLINE")
   instTitle:SetPoint("TOP", instIcon, "BOTTOM", 0, -8)
   instTitle:SetTextColor(1, 0, 0)
-  instTitle:SetText("Locked in an instance")
+  instTitle:SetText(L["Locked in an instance"])
 
   local instMsg = instOverlay:CreateFontString(nil, "OVERLAY")
   instMsg:SetFont("Fonts\\FRIZQT__.TTF", 13, "")
@@ -1126,7 +1143,7 @@ local function CreateHardmodeFrame()
   instMsg:SetTextColor(1, 1, 1)
   instOverlay.msg = instMsg
 
-  local instGotIt = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(instOverlay, "HardmodeInstanceOverlayGotIt", 120, 24, "Got it")
+  local instGotIt = ProjectEbonhold.TormentWidgets.CreateBlizzardButton(instOverlay, "HardmodeInstanceOverlayGotIt", 120, 24, L["Got it"])
   instGotIt:SetScript("OnClick", function() instOverlay:Hide() end)
   instGotIt:SetPoint("BOTTOM", instOverlay, "BOTTOM", 0, 20)
   instGotIt:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -1265,7 +1282,7 @@ ShowNextUnlockAlert = function()
 
   local tier = rank + 1   -- rank R is difficulty tier R+1 (tier 1 is Normal)
   local td = TIER_DATA[tier]
-  local tierName = (td and td.name) or ("Torment " .. rank)
+  local tierName = (td and td.name) or (T("Torment {rank}", { rank = rank }))
   local svc = ProjectEbonhold.HardmodeService
   local required = svc and svc.GetSoulAshRequirement(tier) or 0
 
@@ -1273,16 +1290,15 @@ ShowNextUnlockAlert = function()
   local achievement = svc and svc.GetAchievementLink and svc.GetAchievementLink(tier) or ""
   if achievement == "" and svc then achievement = svc.GetAchievementName(tier) end
 
-  local text = "|cffFFD100" .. tierName .. " unlocked!|r" .. "\n\n"
+  local text = T("|cffFFD100{tierName} unlocked!|r\n\n", { tierName = tierName })
   -- The achievement is what the player just did; the Soul Ash floor is only mentioned when the
   -- tier has no achievement of its own, so the alert never credits the wrong thing.
   if achievement ~= "" then
-    text = text .. "You earned " .. achievement .. "." .. "\n\n"
+    text = T("{text}You earned {achievement}.\n\n", { text = text, achievement = achievement })
   elseif required > 0 then
-    text = text .. "You have reached " .. ProjectEbonhold.FormatThousands(required)
-      .. " committed Soul Ashes." .. "\n\n"
+    text = T("{text}You have reached {required} committed Soul Ashes.\n\n", { text = text, required = ProjectEbonhold.FormatThousands(required) })
   end
-  text = text .. "Click here to choose your difficulty."
+  text = T("{text}Click here to choose your difficulty.", { text = text })
 
   local alert = unlockAlert or CreateUnlockAlert()
   if not alert then
@@ -1309,7 +1325,7 @@ ShowNextUnlockAlert = function()
 
     -- Chat line and sound ride with the alert that was actually shown, so a retry does not
     -- announce the same unlock twice.
-    DEFAULT_CHAT_FRAME:AddMessage("|cffFFD100[Torment]|r " .. tierName .. " unlocked!")
+    DEFAULT_CHAT_FRAME:AddMessage(T("|cffFFD100[Torment]|r {tierName} unlocked!", { tierName = tierName }))
     if PlaySound then PlaySound("LEVELUP") end
   end
 end
@@ -1357,23 +1373,18 @@ local function UpdateInstanceOverlay(currentTier)
   local svc = ProjectEbonhold.HardmodeService
   local ts = ProjectEbonhold.TierSelector
   local function Name(t)
-    if not t or t <= 1 then return "Normal" end
-    return "Torment " .. ((ts and ts.ShortName and ts.ShortName(t)) or tostring(t - 1))
+    if not t or t <= 1 then return L["Normal"] end
+    return T("Torment {t}", { t = ((ts and ts.ShortName and ts.ShortName(t)) or tostring(t - 1)) })
   end
 
   -- The instance's own tier, when the server told us it is not the player's.
   local hereTier = svc and svc.GetInstanceDifficulty and svc.GetInstanceDifficulty()
-  local text = "You cannot change your Torment while you are inside a " .. kind .. ".\n\n"
-    .. "Leave the " .. kind .. " and return to an inn or a capital city to change it."
+  local text = T("You cannot change your Torment while you are inside a {kind}.\n\nLeave the {kind2} and return to an inn or a capital city to change it.", { kind = kind, kind2 = kind })
 
   if hereTier then
-    text = text .. "\n\n|cffFF4444This " .. kind .. " runs at " .. Name(hereTier) .. ", not at your own "
-      .. Name(currentTier) .. ".|r Its difficulty and its rewards are the ones of "
-      .. Name(hereTier) .. " until you leave."
+    text = T("{text}\n\n|cffFF4444This {kind} runs at {hereTier}, not at your own {currentTier}.|r Its difficulty and its rewards are the ones of {hereTier2} until you leave.", { text = text, kind = kind, hereTier = Name(hereTier), currentTier = Name(currentTier), hereTier2 = Name(hereTier) })
   else
-    text = text .. "\n\n|cffAAAAAAThis " .. kind .. " runs at " .. Name(currentTier)
-      .. ", the Torment it was opened at. A " .. kind
-      .. " opened by someone else can run at another Torment than yours.|r"
+    text = T("{text}\n\n|cffAAAAAAThis {kind} runs at {currentTier}, the Torment it was opened at. A {kind2} opened by someone else can run at another Torment than yours.|r", { text = text, kind = kind, currentTier = Name(currentTier), kind2 = kind })
   end
 
   if overlay.msg then overlay.msg:SetText(text) end

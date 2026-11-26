@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ==============================================================================
 -- Dungeon Finder rework (server: LFGQueue / LFGMgr, dungeon_finder_scripts.cpp).
 --
@@ -11,10 +12,12 @@
 --     widget (name + arrows, segmented ladder, creature modifiers of the dungeon) drawn where
 --     the role buttons were. Locked tiers can be looked at (padlock, unlock achievement) but
 --     not picked; the server re-checks every pick.
---   * The reward is one Orb of Lost Memories per difficulty tier, every run, and ten per tier
---     for the first run of the day - no daily quest. The first run of the day also pays one
---     reward cache at level 80, of the realm's release and of the tier played. The stock
---     random-dungeon text is hidden and a REWARDS band of the panel shows the three lines.
+--   * The reward is Orbs of Lost Memories by difficulty tier, every run, and ten times more for
+--     the first run of the day (level 80) - no daily quest. The first run of the WEEK (level 80,
+--     board week, Tuesday 03:00 UTC) pays one reward cache of the realm's release and of the
+--     tier played, plus one Emblem of Valor per Torment level. The stock random-dungeon text is
+--     hidden and a REWARDS band of the panel shows three lines: orbs per run, the daily orb
+--     bonus, the weekly cache with its emblems.
 --   * No refill: the "continue with a replacement" panel is hidden.
 --   * One "Fill empty spots" box under the Torment ladder, unticked by default. Unticked = Solo
 --     on the server: no matching, the invitation comes at once and the run starts with the party
@@ -23,10 +26,11 @@
 --
 -- Wire:
 --   CS.REQUEST_LFG_TORMENT_DATA (1250) ""       -> SS.SEND_LFG_TORMENT_DATA (1250)
---        "<selected>|<maxQueueable>|<maxTier>|<minGroupSize>|<firstRunDone>|<release>|<mode>"
+--        "<selected>|<maxQueueable>|<maxTier>|<minGroupSize>|<firstRunDone>|<release>|<mode>|<weeklyCacheDone>|<secondsToWeeklyReset>"
 --   CS.REQUEST_LFG_TORMENT_SET  (1251) "<tier>" -> SS.SEND_LFG_TORMENT_RESULT (1251) "OK,<tier>" / "FAIL,<reason>"
 --   CS.REQUEST_LFG_MODE_SET     (1253) "<mode>" -> SS.SEND_LFG_TORMENT_DATA (1250); a refusal comes as RESULT "FAIL,<reason>"
 --   SS.SEND_LFG_QUEUE_STATE (1252) "<players>|<secondsLeft>|<min>|<max>|<proposed>|<tier>|<mode>" every queue tick
+--   SS.SEND_LFG_TIER_COUNTS (1268) "<waiting at tier 1>|...|<tier 11>" (Group mode) after every DATA and every queue tick
 -- ==============================================================================
 local DF = {}
 ProjectEbonhold = ProjectEbonhold or {}
@@ -49,10 +53,14 @@ local state = {
   maxQueueable = 1,       -- highest tier the server lets this character queue at
   maxTier = 11,           -- highest tier the finder queues (Torment X)
   firstRunDone = false,   -- the first (10x) run of the day was already claimed today
+  weeklyCacheDone = false, -- the cache (and its emblems) of the week was already claimed
+  weeklyResetIn = 0,      -- seconds to the weekly reset, as the server counted them...
+  weeklyReceivedAt = 0,   -- ...at this GetTime()
   release = 5,            -- the realm's phase (patch + 1, clamped 1..5): picks the cache family
   minGroupSize = 2,
   mode = 1,               -- queue mode for the next run: 0 = Group (fill empty spots), 1 = Solo (as is, the server's default)
   queue = { players = 0, secondsLeft = -1, min = 2, max = 5, proposed = false, tier = 1, mode = 1, receivedAt = 0, valid = false },
+  waiting = {},           -- players waiting in Group mode, by tier (SEND_LFG_TIER_COUNTS); empty until the first one
 }
 
 ------------------------------------------------------------
@@ -61,8 +69,8 @@ local state = {
 
 local function TierName(tier)
   tier = tonumber(tier) or 1
-  if tier <= 1 then return "Normal" end
-  return "Torment " .. (ROMAN[tier - 1] or tostring(tier - 1))
+  if tier <= 1 then return L["Normal"] end
+  return T("Torment {tier}", { tier = (ROMAN[tier - 1] or tostring(tier - 1)) })
 end
 DF.TierName = TierName
 
@@ -76,8 +84,8 @@ end
 
 -- Short name for the status lines: "Solo" alone, "Your party" in a party, "Open group" when filling.
 local function ModeName(mode)
-  if (tonumber(mode) or MODE_SOLO) == MODE_GROUP then return "Open group" end
-  return InParty() and "Your party" or "Solo"
+  if (tonumber(mode) or MODE_SOLO) == MODE_GROUP then return L["Open group"] end
+  return InParty() and L["Your party"] or L["Solo"]
 end
 DF.ModeName = ModeName
 
@@ -109,7 +117,7 @@ local function FirstRunOrbsFor(tier)
   return ORBS_FIRST_RUN[tonumber(tier) or 1] or ORBS_FIRST_RUN[#ORBS_FIRST_RUN]
 end
 
--- The reward cache of the first run of the day (level 80 only). Everything below mirrors the
+-- The reward cache of the first run of the week (level 80 only). Everything below mirrors the
 -- server and is display data: CallboardMgr::GetRewardCacheItem for the entry,
 -- CACHE_RELEASE_ILVL + CACHE_BRACKET_ILVL for the item level, HardmodeMgr::GetTormentBracket
 -- for the tier -> bracket step. Retune the two together.
@@ -117,7 +125,7 @@ local CACHE_MIN_LEVEL   = 80
 local CACHE_RELEASE_ILVL = { 213, 239, 239, 252, 265 }
 local CACHE_BRACKET_ILVL = { 0, 7, 13, 20, 26 }
 local CACHE_PHASE_NAME   = { "Adventurer's", "Champion's", "Conqueror's", "Vanquisher's", "Ascendant's" }
-local CACHE_BRACKET_NAME = { "", " of Suffering", " of Torment", " of Anguish", " of Damnation" }
+local CACHE_BRACKET_NAME = { "", L[" of Suffering"], L[" of Torment"], L[" of Anguish"], L[" of Damnation"] }
 local CACHE_ICON = {
   { "INV_Misc_Bag_10", "INV_Misc_Bag_10_Green", "INV_Misc_Bag_10_Blue", "INV_Misc_Bag_10_Red", "INV_Misc_Bag_10_Black" },
   { "INV_Misc_Bag_09", "INV_Misc_Bag_09_Green", "INV_Misc_Bag_09_Blue", "INV_Misc_Bag_09_Red", "INV_Misc_Bag_09_Black" },
@@ -143,10 +151,40 @@ end
 local function CacheFor(tier)
   local phase = math.max(1, math.min(#CACHE_PHASE_NAME, state.release or 5))
   local b = BracketFor(tier)
-  return CACHE_PHASE_NAME[phase] .. " Cache" .. CACHE_BRACKET_NAME[b + 1],
+  return T("{phase} Cache{b}", { phase = CACHE_PHASE_NAME[phase], b = CACHE_BRACKET_NAME[b + 1] }),
          "Interface\\Icons\\" .. CACHE_ICON[phase][b + 1],
          CACHE_RELEASE_ILVL[phase] + CACHE_BRACKET_ILVL[b + 1],
-         CACHE_PHASE_NAME[phase] .. " Cache"
+         T("{phase} Cache", { phase = CACHE_PHASE_NAME[phase] })
+end
+
+--- Emblems of Valor paid with the weekly cache: one per Torment level (CallboardMgr::
+--- LFG_EMBLEMS_PER_TORMENT), none in Normal.
+local function EmblemsFor(tier)
+  return math.max(0, (tonumber(tier) or 1) - 1)
+end
+
+-- Emblem of Valor (PatchProgressionHandler::SINGLE_EMBLEM). Its name and icon come from the
+-- item itself, so the client shows them in its own language; the fallbacks cover an item
+-- not yet in the client cache.
+local EMBLEM_ITEM = 40753
+local function EmblemInfo()
+  local name, _, _, _, _, _, _, _, _, icon = GetItemInfo(EMBLEM_ITEM)
+  return name or L["Emblem of Valor"],
+         icon or (GetItemIcon and GetItemIcon(EMBLEM_ITEM)) or "Interface\\Icons\\Spell_Holy_ProclaimChampion_02"
+end
+
+--- Seconds until the weekly cache comes back, counted down from what the server sent.
+local function WeeklyResetLeft()
+  return math.max(0, (state.weeklyResetIn or 0) - (GetTime() - (state.weeklyReceivedAt or 0)))
+end
+
+--- "3d 4h" for the reward line, where the room is short.
+local function WeeklyResetShort()
+  local left = WeeklyResetLeft()
+  local d, h, m = math.floor(left / 86400), math.floor(left % 86400 / 3600), math.floor(left % 3600 / 60)
+  if d > 0 then return T("{d}d {h}h", { d = d, h = h }) end
+  if h > 0 then return T("{h}h {m}m", { h = h, m = m }) end
+  return T("{m}m", { m = math.max(1, m) })
 end
 
 local function IsQueueBusy()
@@ -200,7 +238,7 @@ local ICON_LOCK  = "Interface\\AddOns\\ProjectEbonhold\\assets\\lock"
 
 local PANEL_X, PANEL_Y, PANEL_W = 32, -66, 300   -- PANEL_Y: the stepper, 20 px below the title bar area
 local ICON_ORB   = "Interface\\Icons\\inv_112_arcane_orb"   -- the Orb of Lost Memories icon (modules/perks/orb_of_lost_memories.lua)
-local ORB_TOOLTIP = "An Orb of Lost Memories lets you forget one stack of an Echo you own and draw a fresh choice in its place. Spend them from the Echo Journal."
+local ORB_TOOLTIP = L["An Orb of Lost Memories lets you forget one stack of an Echo you own and draw a fresh choice in its place. Spend them from the Echo Journal."]
 
 local panel            -- the widget under LFDQueueFrame
 local viewTier = 1     -- tier being looked at (may be locked); the server selection is state.selected
@@ -257,10 +295,10 @@ local function LockReason(tier)
   if svc and svc.GetAchievementName then
     local link = (svc.GetAchievementLink and svc.GetAchievementLink(tier)) or ""
     local name = svc.GetAchievementName(tier)
-    if link ~= "" then return "Requires " .. link end
-    if name ~= "" then return "Requires the achievement |cffFFD100" .. name .. "|r" end
+    if link ~= "" then return T("Requires {link}", { link = link }) end
+    if name ~= "" then return T("Requires the achievement |cffFFD100{name}|r", { name = name }) end
   end
-  return "Locked"
+  return L["Locked"]
 end
 
 --- Ask the server for @p tier when it is open; a locked tier is only looked at.
@@ -269,7 +307,7 @@ local function Select(tier)
   viewTier = tier
   if not IsLocked(tier) and tier ~= state.selected then
     if IsQueueBusy() then
-      UIErrorsFrame:AddMessage("Leave the queue before changing the difficulty.", 1.0, 0.1, 0.1, 1.0)
+      UIErrorsFrame:AddMessage(L["Leave the queue before changing the difficulty."], 1.0, 0.1, 0.1, 1.0)
       viewTier = state.selected
     else
       Send(CS.REQUEST_LFG_TORMENT_SET, tostring(tier))
@@ -282,7 +320,7 @@ end
 function DF.SelectMode(mode)
   if mode == state.mode then return end
   if IsQueueBusy() then
-    UIErrorsFrame:AddMessage("Leave the queue before changing Fill empty spots.", 1.0, 0.1, 0.1, 1.0)
+    UIErrorsFrame:AddMessage(L["Leave the queue before changing Fill empty spots."], 1.0, 0.1, 0.1, 1.0)
     return
   end
   Send(CS.REQUEST_LFG_MODE_SET, tostring(mode))
@@ -349,23 +387,33 @@ local function CreateTormentSelector()
       GameTooltip:SetOwner(btn, "ANCHOR_TOP")
       GameTooltip:SetText(TierName(tier), TierColor(tier))
       if tier == state.selected then
-        GameTooltip:AddLine("Your next run is at this difficulty", 0.1, 1, 0.1)
+        GameTooltip:AddLine(L["Your next run is at this difficulty"], 0.1, 1, 0.1)
       elseif IsLocked(tier) then
-        GameTooltip:AddLine(LockReason(tier) or "Locked", 1, 0.3, 0.3, true)
+        GameTooltip:AddLine(LockReason(tier) or L["Locked"], 1, 0.3, 0.3, true)
         if GmState() == 1 then
-          GameTooltip:AddLine("GM: type .gm on to step in", 0.25, 0.78, 0.92, true)
+          GameTooltip:AddLine(L["GM: type .gm on to step in"], 0.25, 0.78, 0.92, true)
         end
       elseif IsGmPassOnly(tier) then
-        GameTooltip:AddLine(LockReason(tier) or "Locked", 1, 0.3, 0.3, true)
-        GameTooltip:AddLine("GM (.gm on): you may step in", 0.25, 0.78, 0.92, true)
+        GameTooltip:AddLine(LockReason(tier) or L["Locked"], 1, 0.3, 0.3, true)
+        GameTooltip:AddLine(L["GM (.gm on): you may step in"], 0.25, 0.78, 0.92, true)
       end
       GameTooltip:AddLine(" ")
-      GameTooltip:AddDoubleLine("Reward per run", Plural(OrbsFor(tier), "Orb") .. " of Lost Memories", 1, 0.82, 0, 1, 1, 1)
-      GameTooltip:AddDoubleLine("First run of the day", Plural(FirstRunOrbsFor(tier), "Orb"), 1, 0.82, 0, 1, 1, 1)
+      GameTooltip:AddDoubleLine(L["Reward per dungeon"], T("{Orb} of Lost Memories", { Orb = Plural(OrbsFor(tier), L["Orb"]) }), 1, 0.82, 0, 1, 1, 1)
+      GameTooltip:AddDoubleLine(L["First run of the day"], Plural(FirstRunOrbsFor(tier), L["Orb"]), 1, 0.82, 0, 1, 1, 1)
+      local cacheName, _, cacheIlvl = CacheFor(tier)
+      GameTooltip:AddDoubleLine(L["First run of the week"], T("{cache} (ilvl {ilvl})", { cache = cacheName, ilvl = cacheIlvl }), 1, 0.82, 0, 1, 1, 1)
+      if EmblemsFor(tier) > 0 then
+        GameTooltip:AddDoubleLine(" ", T("+ {emblems} of Valor", { emblems = Plural(EmblemsFor(tier), L["Emblem"]) }), 1, 0.82, 0, 1, 1, 1)
+      end
       GameTooltip:Show()
     end,
   })
   panel.selector:SetPoint("TOP", panel, "TOP", 0, 0)
+
+  -- Players waiting at the tier on display, under its name: picking a tier where others wait
+  -- fills a group faster (Group mode only, Solo never waits).
+  panel.waiting = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  panel.waiting:SetPoint("TOP", panel.selector.banner, "BOTTOM", 0, -4)
   panel.selector.ladder:ClearAllPoints()
   panel.selector.ladder:SetPoint("TOP", body, "TOP", 0, y + 20)   -- 20 px above the body, more air before the sections
   y = y - TS.RUNG_HEIGHT - 14
@@ -379,7 +427,7 @@ local function CreateTormentSelector()
   fill:SetPoint("LEFT", body, "TOPLEFT", 0, -23)
   fill.label = _G[fill:GetName() .. "Text"]
   fill.label:SetFontObject("GameFontNormal")
-  fill.label:SetText("Fill empty spots")
+  fill.label:SetText(L["Fill empty spots"])
   fill:SetHitRectInsets(0, -fill.label:GetStringWidth() - 4, 0, 0)   -- the label is clickable too
   fill:SetScript("OnClick", function(self)
     local wanted = self:GetChecked() and MODE_GROUP or MODE_SOLO
@@ -389,12 +437,12 @@ local function CreateTormentSelector()
   end)
   fill:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Fill empty spots", 1, 0.82, 0)
-    GameTooltip:AddLine("Unticked: you go in as you are, alone or with your own party only. The invitation comes at once.", 1, 1, 1, true)
+    GameTooltip:SetText(L["Fill empty spots"], 1, 0.82, 0)
+    GameTooltip:AddLine(L["Unticked: you go in as you are, alone or with your own party only. The invitation comes at once."], 1, 1, 1, true)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Ticked: other players join you until the run has 5 players. It starts with 2 to 5.", 1, 1, 1, true)
+    GameTooltip:AddLine(L["Ticked: other players join you until the run has 5 players. It starts with 2 to 5."], 1, 1, 1, true)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Same rewards and dungeons either way. In a party, the leader's choice counts.", 0.6, 0.6, 0.6, true)
+    GameTooltip:AddLine(L["Same rewards and dungeons either way. In a party, the leader's choice counts."], 0.6, 0.6, 0.6, true)
     GameTooltip:Show()
   end)
   fill:SetScript("OnLeave", GameTooltip_Hide)
@@ -402,7 +450,7 @@ local function CreateTormentSelector()
   y = y - 5   -- the sections sit 5 px lower, clear of the box
 
   -- Section: creature modifiers in the dungeon
-  local modHeader = W.CreateSectionHeader(body, PANEL_W, "Creature Modifiers", "in the dungeon")
+  local modHeader = W.CreateSectionHeader(body, PANEL_W, L["Creature Modifiers"], L["in the dungeon"])
   modHeader:SetPoint("TOP", body, "TOP", 0, y)
   y = y - W.HEADER_H
   panel.rows = {}
@@ -416,48 +464,85 @@ local function CreateTormentSelector()
   y = y - 3
 
   -- Section: rewards of the run (Orbs of Lost Memories)
-  local rewardHeader = W.CreateSectionHeader(body, PANEL_W, "Rewards")
+  local rewardHeader = W.CreateSectionHeader(body, PANEL_W, L["Rewards"])
   rewardHeader:SetPoint("TOP", body, "TOP", 0, y)
   y = y - W.HEADER_H
-  -- The three rewards sit side by side: two orb figures and the cache of the day. The band
-  -- keeps the height the two stacked rows used to take, so nothing else on the panel moves.
-  -- Two full-width lines, the shape the band always had: the orb of every run, then the
-  -- reward of the first run of the day - the cache, which brings the orb bonus with it.
-  panel.rewardRows = {}
-  for i = 1, 2 do
-    local row = W.CreateItemRow(body, PANEL_W)
-    if i > 1 then y = y - 1 end   -- 1 px between the two rows, none under the last
-    row:SetPoint("TOP", body, "TOP", 0, y)
-    y = y - W.ITEM_H
-    panel.rewardRows[i] = row
+  -- The four rewards as a 2 x 2 grid of item tiles (owner, 2026-11-14): orbs on the left (every
+  -- run, then the bonus of the first run of the day), the week on the right (the cache, then
+  -- the Emblems of Valor that come with it). Two tile rows take the height the two full-width
+  -- item rows always took, so nothing else on the panel moves. All four tiles are the same
+  -- size (owner, 2026-11-14): two equal columns, 4 px apart, 2 px from each edge.
+  local TILE_GAP = 4
+  local LEFT_W  = math.floor((PANEL_W - 4 - TILE_GAP) / 2)
+  local RIGHT_X = 2 + LEFT_W + TILE_GAP
+  local RIGHT_W = LEFT_W
+  --- An item row cut to a tile: icon with its count, the name over a one-line state.
+  local function CreateTile(x, w, tileY)
+    local tile = W.CreateItemRow(body, w)
+    tile:SetPoint("TOPLEFT", body, "TOPLEFT", x, tileY)
+    local textW = w - 36 - 2 - 8 - 6
+    tile.name:ClearAllPoints()
+    tile.name:SetPoint("BOTTOMLEFT", tile.iconFrame, "RIGHT", 8, 1)
+    tile.name:SetWidth(textW)
+    tile.note:ClearAllPoints()
+    tile.note:SetPoint("TOPLEFT", tile.iconFrame, "RIGHT", 8, -1)
+    tile.note:SetWidth(textW)
+    tile.note:SetJustifyH("LEFT")
+    tile.note:SetWordWrap(false)
+    -- Below the level cap the padlock sits on the icon itself: inline in the one-line state it
+    -- did not show (owner, 2026-11-14).
+    tile.lock = tile.iconFrame:CreateTexture(nil, "OVERLAY")
+    tile.lock:SetTexture(ICON_LOCK)
+    tile.lock:SetSize(22, 22)
+    tile.lock:SetPoint("CENTER", tile.iconFrame, "CENTER", 0, 0)
+    tile.lock:Hide()
+    return tile
+  end
+  local tiles = {}
+  tiles.orbs  = CreateTile(2, LEFT_W, y)
+  tiles.cache = CreateTile(RIGHT_X, RIGHT_W, y)
+  y = y - W.ITEM_H - 1   -- 1 px between the two tile rows, none under the last
+  tiles.daily   = CreateTile(2, LEFT_W, y)
+  tiles.emblems = CreateTile(RIGHT_X, RIGHT_W, y)
+  y = y - W.ITEM_H
+  -- The emblem tile has no state line (its state is the cache's, beside it): the item name
+  -- alone, centred on the icon, on two lines if the locale needs them.
+  tiles.emblems.name:ClearAllPoints()
+  tiles.emblems.name:SetPoint("LEFT", tiles.emblems.iconFrame, "RIGHT", 8, 0)
+  tiles.emblems.name:SetWordWrap(true)
+  panel.rewardTiles = tiles
+
+  -- Tooltips say only what the tile does not (owner, 2026-11-14: they repeated too much): the
+  -- count, the state and the time left are on the tile already. Below the level cap the
+  -- padlock has no text, so the requirement is the one state line a tooltip adds.
+  local function AddLevelRequirement()
+    if UnitLevel("player") < CACHE_MIN_LEVEL then
+      GameTooltip:AddLine(T("Requires Level {CACHEMINLEVEL}", { CACHEMINLEVEL = CACHE_MIN_LEVEL }), 1, 0.1, 0.1)
+    end
   end
 
-  panel.rewardRows[1].tooltip = function()
-    GameTooltip:SetText("Orbs of Lost Memories", 1, 0.82, 0)
+  tiles.orbs.tooltip = function()
+    GameTooltip:SetText(L["Orbs of Lost Memories"], 1, 0.82, 0)
     GameTooltip:AddLine(ORB_TOOLTIP, 1, 1, 1, true)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine("Every run", Plural(OrbsFor(viewTier), "Orb"), 1, 0.82, 0, 1, 1, 1)
   end
-  -- The cache line reads the tier shown on the panel, not the one the run was queued at.
-  panel.rewardRows[2].tooltip = function()
+
+  tiles.daily.tooltip = function()
+    GameTooltip:SetText(L["Orb bonus"], 1, 0.82, 0)
+    GameTooltip:AddLine(L["Ten times the orbs on your first dungeon of the day."], 1, 1, 1, true)
+    AddLevelRequirement()
+  end
+
+  tiles.cache.tooltip = function()
     local name, _, ilvl = CacheFor(viewTier)
     GameTooltip:SetText(name, 1, 0.82, 0)
-    GameTooltip:AddLine("One piece of equipment for your class, item level " .. ilvl .. ".", 1, 1, 1, true)
-    GameTooltip:AddLine(" ")
-    -- The bonus is always spelled out, whatever the state: greyed when it cannot be had, and
-    -- the requirement stated underneath in the game's own words.
-    local tooLow = UnitLevel("player") < CACHE_MIN_LEVEL
-    if state.firstRunDone then
-      GameTooltip:AddDoubleLine("First run of the day", "claimed", 1, 0.82, 0, 0.6, 0.6, 0.6)
-    else
-      local bonus = Plural(FirstRunOrbsFor(viewTier), "Orb") .. " + the cache"
-      if tooLow then
-        GameTooltip:AddDoubleLine("First run of the day", bonus, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6)
-        GameTooltip:AddLine("Requires Level " .. CACHE_MIN_LEVEL, 1, 0.1, 0.1)
-      else
-        GameTooltip:AddDoubleLine("First run of the day", bonus, 1, 0.82, 0, 0.1, 1, 0.1)
-      end
-    end
+    GameTooltip:AddLine(T("One piece of equipment for your class, item level {ilvl}, on your first dungeon of the week.", { ilvl = ilvl }), 1, 1, 1, true)
+    AddLevelRequirement()
+  end
+
+  tiles.emblems.tooltip = function()
+    GameTooltip:SetText((EmblemInfo()), 1, 0.82, 0)
+    GameTooltip:AddLine(L["One per Torment level, with the cache of the week."], 1, 1, 1, true)
+    AddLevelRequirement()
   end
 
   body:SetHeight(-y)
@@ -483,6 +568,18 @@ function DF.RefreshSelector()
   panel.selector:SetValue(tier)
   UpdateFindGroupLock()
 
+  -- Waiting count of the viewed tier; nothing until the server has sent one.
+  local waiting = state.waiting[tier]
+  if not waiting then
+    panel.waiting:SetText("")
+  elseif waiting == 0 then
+    panel.waiting:SetText(L["No one waiting"])
+    panel.waiting:SetTextColor(0.6, 0.6, 0.6)
+  else
+    panel.waiting:SetText(waiting == 1 and L["1 player waiting"] or T("{count} players waiting", { count = waiting }))
+    panel.waiting:SetTextColor(0.1, 1, 0.1)
+  end
+
   -- Mode: the server's value; frozen while queued (the entry was built with it)
   panel.mode:SetChecked(state.mode == MODE_GROUP)
   if IsQueueBusy() or not state.known then
@@ -497,12 +594,12 @@ function DF.RefreshSelector()
   local s = td and td.scaling or {}
   local isNormal = tier <= 1
   local specs = {
-    { "Interface\\Icons\\PetBattle_Health", s.dungeon_boss_hp_mul or s.hp_multiplier, "Health",
-      { { "Dungeon boss", X(s.dungeon_boss_hp_mul or s.hp_multiplier) }, { "Dungeon adds", X(s.dungeon_add_hp_mul or s.hp_multiplier) } } },
-    { "Interface\\Icons\\Ability_MeleeDamage", s.dungeon_boss_melee_mul or s.melee_multiplier, "Melee damage",
-      { { "Dungeon boss", X(s.dungeon_boss_melee_mul or s.melee_multiplier) }, { "Dungeon adds", X(s.dungeon_add_melee_mul or s.melee_multiplier) } } },
-    { "Interface\\Icons\\Spell_Ice_MagicDamage", s.dungeon_boss_spell_mul or s.spell_multiplier, "Spell damage",
-      { { "Dungeon boss", X(s.dungeon_boss_spell_mul or s.spell_multiplier) }, { "Dungeon adds", X(s.dungeon_add_spell_mul or s.spell_multiplier) } } },
+    { "Interface\\Icons\\PetBattle_Health", s.dungeon_boss_hp_mul or s.hp_multiplier, L["Health"],
+      { { L["Dungeon boss"], X(s.dungeon_boss_hp_mul or s.hp_multiplier) }, { L["Dungeon adds"], X(s.dungeon_add_hp_mul or s.hp_multiplier) } } },
+    { "Interface\\Icons\\Ability_MeleeDamage", s.dungeon_boss_melee_mul or s.melee_multiplier, L["Melee damage"],
+      { { L["Dungeon boss"], X(s.dungeon_boss_melee_mul or s.melee_multiplier) }, { L["Dungeon adds"], X(s.dungeon_add_melee_mul or s.melee_multiplier) } } },
+    { "Interface\\Icons\\Spell_Ice_MagicDamage", s.dungeon_boss_spell_mul or s.spell_multiplier, L["Spell damage"],
+      { { L["Dungeon boss"], X(s.dungeon_boss_spell_mul or s.spell_multiplier) }, { L["Dungeon adds"], X(s.dungeon_add_spell_mul or s.spell_multiplier) } } },
   }
   for i, spec in ipairs(specs) do
     local row = panel.rows[i]
@@ -519,31 +616,53 @@ function DF.RefreshSelector()
   end
 
   -- Rewards of the viewed tier
-  local orbs, cache = panel.rewardRows[1], panel.rewardRows[2]
-  orbs:Set(ICON_ORB, OrbsFor(tier), "Orb of Lost Memories", "per run")
-
-  -- The reward of the first run of the day, on one line: the cache, and the orb bonus that
-  -- comes with it. Greyed once taken, and below the level cap where it is out of reach.
-  local _, cacheIcon, _, cacheShort = CacheFor(tier)
+  local tiles = panel.rewardTiles
+  -- Below the level cap both bonuses are out of reach: the padlock alone (owner, 2026-11-14),
+  -- the tooltip says why. A bonus still there reads green; once taken, its tile greys out. The names
+  -- never grey out, only the icons and the state lines do.
   local tooLow = UnitLevel("player") < CACHE_MIN_LEVEL
-  local note
+  local LOCKED = ""   -- the padlock is drawn on the icon (tile.lock), the state line stays empty
+  local function Paint(tile, out, note, r, g, b)
+    tile:SetClaimed(out)
+    if tooLow and tile ~= tiles.orbs then tile.lock:Show() else tile.lock:Hide() end   -- no SetShown in 3.3.5
+    tile.name:SetTextColor(1, 1, 1)
+    tile.note:SetText(note or "")
+    if out then tile.note:SetTextColor(0.5, 0.5, 0.5) else tile.note:SetTextColor(r or 0.35, g or 1, b or 0.35) end
+  end
+
+  -- Orbs of every run: never claimed, never locked.
+  tiles.orbs:Set(ICON_ORB, OrbsFor(tier), L["Orbs"])
+  Paint(tiles.orbs, false, L["per dungeon"], 0.75, 0.7, 0.63)   -- "par donjon", not "par expédition" (owner, 2026-11-14)
+
+  -- The orb bonus of the first run of the day.
+  tiles.daily:Set(ICON_ORB, FirstRunOrbsFor(tier), L["Orb bonus"])
   if tooLow then
-    -- Out of reach: the padlock alone, same art as a locked tier. The tooltip says why.
-    note = "|T" .. ICON_LOCK .. ":22:22:0:-3|t"
+    Paint(tiles.daily, true, LOCKED)
   elseif state.firstRunDone then
-    note = "daily: claimed"
+    Paint(tiles.daily, true, L["claimed today"])
   else
-    note = "+" .. FirstRunOrbsFor(tier) .. " orbs · daily"
+    Paint(tiles.daily, false, L["first run of the day"])
   end
-  cache:Set(cacheIcon, nil, cacheShort, note)
-  cache:SetClaimed(tooLow or state.firstRunDone)
-  cache.name:SetTextColor(1, 1, 1)   -- the name never greys out, only the icon and the note do
-  -- Green while the bonus is there, grey once it is not.
-  if tooLow or state.firstRunDone then
-    cache.note:SetTextColor(0.5, 0.5, 0.5)
+
+  -- The cache of the first run of the week. Once taken, it says when the next one comes, so
+  -- nobody has to hover to know.
+  local _, cacheIcon, _, cacheShort = CacheFor(tier)
+  tiles.cache:Set(cacheIcon, 1, cacheShort)
+  local weeklyOut = tooLow or state.weeklyCacheDone
+  if tooLow then
+    Paint(tiles.cache, true, LOCKED)
+  elseif state.weeklyCacheDone then
+    Paint(tiles.cache, true, T("claimed · {time}", { time = WeeklyResetShort() }))
   else
-    cache.note:SetTextColor(0.35, 1, 0.35)
+    Paint(tiles.cache, false, L["first run of the week"])
   end
+
+  -- The Emblems of Valor that come with the cache: greyed with it, and in Normal, which pays
+  -- none. Every tile shows its count in the icon corner, 0 included (owner, 2026-11-14).
+  local emblems = EmblemsFor(tier)
+  local emblemName, emblemIcon = EmblemInfo()
+  tiles.emblems:Set(emblemIcon, emblems, emblemName)
+  Paint(tiles.emblems, weeklyOut or emblems == 0, nil)
 end
 local RefreshSelector = DF.RefreshSelector
 
@@ -571,14 +690,14 @@ end
 --- Why no random wrapper is open, in the game's own words when it has them.
 local function NoRandomReason()
   if UnitLevel("player") < FINDER_MIN_LEVEL then
-    return "The Dungeon Finder opens at level " .. FINDER_MIN_LEVEL .. "."
+    return T("The Dungeon Finder opens at level {FINDERMINLEVEL}.", { FINDERMINLEVEL = FINDER_MIN_LEVEL })
   end
   local id = GetRandomDungeonBestChoice and GetRandomDungeonBestChoice()
   if not id and GetNumRandomDungeons and GetNumRandomDungeons() > 0 then
     id = GetLFGRandomDungeonInfo(1)
   end
   local reason = id and LFDConstructDeclinedMessage and LFDConstructDeclinedMessage(id)
-  return reason or "No dungeon is open to you right now. Try again in a moment."
+  return reason or L["No dungeon is open to you right now. Try again in a moment."]
 end
 
 --- The random panel stays shown here even when the stock frame picked "specific", and the stock
@@ -649,24 +768,24 @@ end
 local function SearchStatusText()
   local q = state.queue
   if not q.valid then
-    return "Looking for players..."
+    return L["Looking for players..."]
   end
-  local head = string.format("%d/%d players", q.players, q.max)
+  local head = string.format(L["%d/%d players"], q.players, q.max)
   if q.proposed then
-    return head .. " - invitation sent"
+    return T("{head} - invitation sent", { head = head })
   end
   if q.mode == MODE_SOLO then
-    return (InParty() and "Your party only" or "Solo run") .. " - invitation on its way"
+    return T("{head} - invitation on its way", { head = (InParty() and L["Your party only"] or L["Solo run"]) })
   end
   if q.players < q.min then
     local missing = q.min - q.players
-    return head .. string.format(" - waiting for %d more", missing)
+    return head .. T(" - waiting for {missing} more", { missing = string.format("%d", missing) })
   end
   local left = QueueSecondsLeft()
   if left <= 0 then
-    return head .. " - invitation on its way"
+    return T("{head} - invitation on its way", { head = head })
   end
-  return head .. string.format(" - invitation in %ds unless someone joins", math.ceil(left))
+  return head .. T(" - invitation in {left}s unless someone joins", { left = string.format("%d", math.ceil(left)) })
 end
 
 local function RefreshSearchStatus()
@@ -742,7 +861,7 @@ local function RefreshReadyDialog()
   if not LFDDungeonReadyDialog or not LFDDungeonReadyDialog:IsShown() then return end
   local desc = LFDDungeonReadyDialogYourRoleDescription
   local label = LFDDungeonReadyDialogRoleLabel
-  if desc then desc:SetText("Difficulty:") end
+  if desc then desc:SetText(L["Difficulty:"]) end
   if label then
     local tier = state.queue.valid and state.queue.tier or state.selected
     local mode = state.queue.valid and state.queue.mode or state.mode
@@ -757,7 +876,7 @@ end
 if ProjectEbonhold.onEventReceived and SS then
   ProjectEbonhold.onEventReceived(SS.SEND_LFG_TORMENT_DATA, function(body)
     if not body or body == "" then return end
-    local selected, maxQueueable, maxTier, minSize, firstDone, release, mode = strsplit("|", body)
+    local selected, maxQueueable, maxTier, minSize, firstDone, release, mode, weeklyDone, weeklyIn = strsplit("|", body)
     state.selected = tonumber(selected) or 1
     state.maxQueueable = tonumber(maxQueueable) or 1
     state.maxTier = tonumber(maxTier) or state.maxTier
@@ -765,6 +884,9 @@ if ProjectEbonhold.onEventReceived and SS then
     state.firstRunDone = firstDone == "1"
     state.release = tonumber(release) or state.release
     state.mode = tonumber(mode) or MODE_SOLO
+    state.weeklyCacheDone = weeklyDone == "1"
+    state.weeklyResetIn = tonumber(weeklyIn) or 0
+    state.weeklyReceivedAt = GetTime()
     state.known = true
     viewTier = state.selected
     RefreshSelector()
@@ -779,7 +901,7 @@ if ProjectEbonhold.onEventReceived and SS then
     if status == "OK" then
       state.selected = tonumber(payload) or state.selected
     else
-      DEFAULT_CHAT_FRAME:AddMessage("|cffFF0000[Dungeon Finder]|r " .. tostring(payload))
+      DEFAULT_CHAT_FRAME:AddMessage(T("|cffFF0000[Dungeon Finder]|r {payload}", { payload = tostring(payload) }))
     end
     viewTier = state.selected
     RefreshSelector()
@@ -799,6 +921,18 @@ if ProjectEbonhold.onEventReceived and SS then
     q.receivedAt = GetTime()
     q.valid = true
     RefreshSearchStatus()
+  end)
+
+  ProjectEbonhold.onEventReceived(SS.SEND_LFG_TIER_COUNTS, function(body)
+    if not body or body == "" then return end
+    local waiting = {}
+    local tier = 1
+    for count in body:gmatch("[^|]+") do
+      waiting[tier] = tonumber(count) or 0
+      tier = tier + 1
+    end
+    state.waiting = waiting
+    RefreshSelector()
   end)
 end
 
@@ -841,7 +975,7 @@ local function Install()
   local origJoin = LFDQueueFrame_Join
   LFDQueueFrame_Join = function(...)
     if IsLocked(viewTier) then
-      UIErrorsFrame:AddMessage("This difficulty is locked.", 1.0, 0.1, 0.1, 1.0)
+      UIErrorsFrame:AddMessage(L["This difficulty is locked."], 1.0, 0.1, 0.1, 1.0)
       return
     end
     ForceDamageRole()
@@ -896,10 +1030,30 @@ frame:SetScript("OnEvent", function(self, event)
   RefreshSelector()
 end)
 
+-- The window holds the Raids tab too (modules/raidFinder): retitle it. The stock title is an
+-- unnamed FontString showing LOOKING_FOR_DUNGEON; it is found by its text, never by writing the
+-- global (a Blizzard string written by the addon taints every stock reader).
+local WINDOW_TITLE = L["Dungeon & Raid Finder"]
+local function SetWindowTitle()
+  local title = _G.LFDParentFrameTitle
+  if not title then
+    for _, region in ipairs({ LFDParentFrame:GetRegions() }) do
+      local text = region.GetText and region:GetText()
+      if text and (text == LOOKING_FOR_DUNGEON or text == WINDOW_TITLE) then
+        title = region
+        break
+      end
+    end
+  end
+  if title then title:SetText(WINDOW_TITLE) end
+end
+
 -- The reward line and the selector depend on what the server said: ask again whenever the
 -- window opens, a /reload leaves both at their placeholders otherwise.
 if LFDParentFrame then
+  SetWindowTitle()
   LFDParentFrame:HookScript("OnShow", function()
+    SetWindowTitle()
     Install()
     ForceRandomType()
     Send(CS.REQUEST_LFG_TORMENT_DATA, "")

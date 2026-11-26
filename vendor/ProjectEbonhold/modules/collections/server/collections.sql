@@ -18,4 +18,8 @@ WHERE class IN (2, 4)          -- ITEM_CLASS_WEAPON, ITEM_CLASS_ARMOR
   AND displayid > 0
   AND Quality <= 6             -- 0 poor .. 6 artifact; 7 = heirloom, skipped
   AND InventoryType IN (1, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 25, 26)
+  -- Torment copies (base entry + 1 000 000 x bracket) wear the base item's
+  -- model under their own icon-variant displayid: listing them would show
+  -- every Torment look twice. The base entry carries the visual.
+  AND entry < 1000000
 ORDER BY class, subclass, InventoryType, displayid, entry;

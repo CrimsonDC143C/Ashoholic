@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 ------------------------------------------------------------
 -- SPELL UNLEARN UI
 --
@@ -42,16 +43,16 @@ local function IsUnlearnableTab()
         return false
     end
     local tabName = GetSpellTabInfo(SpellBookFrame.selectedSkillLine)
-    return tabName == UNLEARN_TAB_NAME
+    return tabName == UNLEARN_TAB_NAME or tabName == L[UNLEARN_TAB_NAME]
 end
 
 ------------------------------------------------------------
 -- Confirmation popup
 ------------------------------------------------------------
 StaticPopupDialogs["EBONHOLD_CONFIRM_UNLEARN_SPELL"] = {
-    text         = "Are you sure you want to unlearn |cffFFD100%s|r?\n\n|cffFF4444This is permanent.|r You will lose this Echo and will need to loot it again to relearn it.",
-    button1      = "Yes",
-    button2      = "No",
+    text         = L["Are you sure you want to unlearn |cffFFD100%s|r?\n\n|cffFF4444This is permanent.|r You will lose this Echo and will need to loot it again to relearn it."],
+    button1      = YES,
+    button2      = NO,
     OnAccept     = function()
         local spellID = ProjectEbonhold._pendingUnlearnSpellID
         if spellID then
@@ -98,7 +99,7 @@ local function ShowUnlearnMenu(spellButton)
 
         -- Unlearn option
         local unlearn = UIDropDownMenu_CreateInfo()
-        unlearn.text         = "|cffFF4444Unlearn|r"
+        unlearn.text         = L["|cffFF4444Unlearn|r"]
         unlearn.notCheckable = true
         unlearn.func = function()
             ProjectEbonhold._pendingUnlearnSpellID = spellID
@@ -108,7 +109,7 @@ local function ShowUnlearnMenu(spellButton)
 
         -- Cancel
         local cancel = UIDropDownMenu_CreateInfo()
-        cancel.text         = "Cancel"
+        cancel.text         = CANCEL
         cancel.notCheckable = true
         cancel.func         = function() CloseDropDownMenus() end
         UIDropDownMenu_AddButton(cancel, level)
@@ -157,7 +158,7 @@ local function CreateOverlay(spellButton, index)
                 local spellName = GetSpellName(slot, BOOKTYPE_SPELL)
                 if spellName and spellName ~= "" then
                     GameTooltip:AddLine(" ")
-                    GameTooltip:AddLine("|cff888888Right-click to unlearn|r", 0.6, 0.6, 0.6)
+                    GameTooltip:AddLine(L["|cff888888Right-click to unlearn|r"], 0.6, 0.6, 0.6)
                     GameTooltip:Show()
                 end
             end
@@ -190,7 +191,7 @@ local function CreateBanner()
     local text = bannerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     text:SetPoint("RIGHT")
     text:SetFont(text:GetFont(), 10)
-    text:SetText("|cffFFD100Right-click an Echo to unlearn it|r")
+    text:SetText(L["|cffFFD100Right-click an Echo to unlearn it|r"])
     text:SetJustifyH("RIGHT")
     bannerFrame.text = text
 

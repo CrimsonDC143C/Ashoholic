@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 
@@ -27,19 +28,19 @@ local function GetSpecName(specIndex)
     if SpecCustomNames[specIndex] and SpecCustomNames[specIndex] ~= "" then
         return SpecCustomNames[specIndex]
     end
-    local defaultNames = { "Primary", "Secondary", "Third", "Fourth", "Fifth" }
-    return defaultNames[specIndex] .. " Specialization"
+    local defaultNames = { "Primary", "Secondary", L["Third"], L["Fourth"], L["Fifth"] }
+    return T("{specIndex} Specialization", { specIndex = defaultNames[specIndex] })
 end
 
 
 local function EditSpecName(specIndex)
-    local defaultNames = { "Primary", "Secondary", "Third", "Fourth", "Fifth" }
+    local defaultNames = { "Primary", "Secondary", L["Third"], L["Fourth"], L["Fifth"] }
     local currentName = SpecCustomNames[specIndex] or ""
 
     StaticPopupDialogs["EDIT_SPEC_NAME"] = {
-        text = "Edit name for " .. defaultNames[specIndex] .. " Specialization:",
-        button1 = "Save",
-        button2 = "Cancel",
+        text = T("Edit name for {specIndex} Specialization:", { specIndex = defaultNames[specIndex] }),
+        button1 = SAVE,
+        button2 = CANCEL,
         hasEditBox = true,
         timeout = 0,
         whileDead = true,
@@ -52,7 +53,7 @@ local function EditSpecName(specIndex)
             local newName = self.editBox:GetText()
             if newName and newName ~= "" then
                 SpecCustomNames[specIndex] = newName
-                print("|cff00FF00Spec name updated to: " .. newName .. "|r")
+                print(T("|cff00FF00Spec name updated to: {newName}|r", { newName = newName }))
             else
                 SpecCustomNames[specIndex] = nil
             end
@@ -67,7 +68,7 @@ local function EditSpecName(specIndex)
             local newName = self:GetText()
             if newName and newName ~= "" then
                 SpecCustomNames[specIndex] = newName
-                print("|cff00FF00Spec name updated to: " .. newName .. "|r")
+                print(T("|cff00FF00Spec name updated to: {newName}|r", { newName = newName }))
             else
                 SpecCustomNames[specIndex] = nil
             end
@@ -126,8 +127,8 @@ local function GetRowGear(rowIndex)
     gear:SetScript("OnEnter", function(self)
         self.tex:SetAlpha(1)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Rename", 1, 1, 1)
-        GameTooltip:AddLine("Give this specialization your own name.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["Rename"], 1, 1, 1)
+        GameTooltip:AddLine(L["Give this specialization your own name."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     gear:SetScript("OnLeave", function(self)
@@ -157,7 +158,7 @@ local function SelectSpec(specIndex)
     if specDropdown then
         UIDropDownMenu_SetText(specDropdown, GetSpecName(specIndex))
     end
-    print("|cff00FF00Switching to " .. GetSpecName(specIndex) .. "...|r")
+    print(T("|cff00FF00Switching to {specIndex}...|r", { specIndex = GetSpecName(specIndex) }))
     NotifyListeners()
 end
 
@@ -206,7 +207,7 @@ local function CreateSpecDropdown()
     if selectedSpecIndex then
         UIDropDownMenu_SetText(dropdown, GetSpecName(selectedSpecIndex))
     else
-        UIDropDownMenu_SetText(dropdown, "Select Specialization")
+        UIDropDownMenu_SetText(dropdown, L["Select Specialization"])
     end
 
     specDropdown = dropdown
@@ -217,14 +218,14 @@ end
 local function ConfirmResetTalents()
     
     if not selectedSpecIndex then
-        print("|cffFF0000Please select a specialization first|r")
+        print(L["|cffFF0000Please select a specialization first|r"])
         return
     end
     local selectedSpec = GetSpecName(selectedSpecIndex)
     StaticPopupDialogs["RESET_TALENTS_CONFIRM"] = {
-        text = "Are you sure you want to reset all your talents?\n\n|cffFFD700Current Spec: " .. selectedSpec .. "|r",
-        button1 = "Yes",
-        button2 = "No",
+        text = T("Are you sure you want to reset all your talents?\n\n|cffFFD700Current Spec: {selectedSpec}|r", { selectedSpec = selectedSpec }),
+        button1 = YES,
+        button2 = NO,
         OnAccept = function()
             if ProjectEbonhold and ProjectEbonhold.SpecService and ProjectEbonhold.SpecService.ResetTalents then
                 ProjectEbonhold.SpecService.ResetTalents(selectedSpecIndex)
@@ -248,7 +249,7 @@ local function CreateResetButton()
     -- Sized to the spec dropdown next to it, which is the only thing it sits
     -- beside; the art reads big at any size, so the label drops a point to keep
     -- its margins inside 100px.
-    local button = utils.CreateSimpleCustomButton(PlayerTalentFrame, "Reset Talents", nil, 100, 32)
+    local button = utils.CreateSimpleCustomButton(PlayerTalentFrame, L["Reset Talents"], nil, 100, 32)
     -- Sits a few pixels below the dropdown line rather than centred on it,
     -- which is what keeps it clear of the frame header above.
     button:SetPoint("TOPRIGHT", PlayerTalentFrame, "TOPRIGHT", -40, -40)
@@ -259,10 +260,10 @@ local function CreateResetButton()
 
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Reset Talents", 1, 1, 1)
-        GameTooltip:AddLine("Resets all talent points for the selected specialization.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["Reset Talents"], 1, 1, 1)
+        GameTooltip:AddLine(L["Resets all talent points for the selected specialization."], 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("|cffFFD700This will refund all spent talent points, allowing you to redistribute them.|r", 1,
+        GameTooltip:AddLine(L["|cffFFD700This will refund all spent talent points, allowing you to redistribute them.|r"], 1,
             1, 0, true)
         GameTooltip:Show()
     end)
@@ -299,7 +300,7 @@ end)
 
 local function UpdateSelectedSpec(specIndex)
     if not specIndex or specIndex < 1 or specIndex > 5 then
-        print("|cffFF0000Invalid spec index received from server|r")
+        print(L["|cffFF0000Invalid spec index received from server|r"])
         return
     end
 

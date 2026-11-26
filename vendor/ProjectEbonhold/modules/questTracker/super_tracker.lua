@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- super_tracker.lua -- Dragonflight-style "super tracked" quest waypoint.
 --
 -- Projects the tracked quest's POI into the game world through the client
@@ -83,7 +84,7 @@ local function DB()
 end
 
 local function Msg(text)
-    DEFAULT_CHAT_FRAME:AddMessage("|cffffd100Ebonhold:|r " .. text)
+    DEFAULT_CHAT_FRAME:AddMessage(T("|cffffd100Ebonhold:|r {text}", { text = text }))
 end
 
 -- --------------------------------------------------------- world helpers ----
@@ -486,7 +487,7 @@ pin.driver:SetScript("OnUpdate", function(self, dt)
     if not DLLReady() then
         if not warnedNoDLL and EbonholdLog then
             warnedNoDLL = true
-            EbonholdLog("supertrack: EbonholdWorldToScreen missing, pin disabled")
+            EbonholdLog(L["supertrack: EbonholdWorldToScreen missing, pin disabled"])
         end
         HidePin()
         return
@@ -521,7 +522,7 @@ pin.driver:SetScript("OnUpdate", function(self, dt)
 
     if kind == "waypoint" and dist and dist < ARRIVAL_DIST then
         customWaypoint = nil
-        Msg("waypoint reached.")
+        Msg(L["waypoint reached."])
         NotifyChanged()
         HidePin()
         return
@@ -592,7 +593,7 @@ pin.driver:SetScript("OnUpdate", function(self, dt)
         local yd = math.floor(dist)             -- what "%d" printed
         if yd ~= lastDistYd then
             lastDistYd = yd
-            distText:SetText(string.format("%d yd", yd))
+            distText:SetText(T("{yd} yd", { yd = string.format("%d", yd) }))
         end
         distText:Show()
     else
@@ -684,7 +685,7 @@ SlashCmdList["EBTPOI"] = function()
         local title, _, _, _, isHeader, _, isComplete, _, questID = GetQuestLogTitle(questIndex)
         if not isHeader and questID and questID > 0 and watched[questID] then
             local a, b, c, d, e = QuestPOIGetIconInfo(questID)
-            Msg(string.format("q%d '%s' complete=%s poi=[%s, %s, %s, %s, %s]",
+            Msg(string.format(L["q%d '%s' complete=%s poi=[%s, %s, %s, %s, %s]"],
                 questID, tostring(title), tostring(isComplete),
                 tostring(a), tostring(b), tostring(c), tostring(d), tostring(e)))
         end
@@ -694,13 +695,13 @@ end
 SLASH_EBTWP1 = "/ebtwp"
 SlashCmdList["EBTWP"] = function(msg)
     if not IsEnabled() then
-        Msg("the quest tracker is disabled in the options (Quest Tracker section).")
+        Msg(L["the quest tracker is disabled in the options (Quest Tracker section)."])
         return
     end
     msg = string.lower(string.gsub(msg or "", "^%s*(.-)%s*$", "%1"))
     if msg == "clear" or msg == "off" then
         ST.ClearWaypoint()
-        Msg("waypoint cleared.")
+        Msg(L["waypoint cleared."])
         return
     end
     local a, b = string.match(msg, "^([%d%.]+)[%s,]+([%d%.]+)$")
@@ -708,23 +709,23 @@ SlashCmdList["EBTWP"] = function(msg)
         if not (WorldMapFrame and WorldMapFrame:IsShown()) then SetMapToCurrentZone() end
         local bounds = CurrentZoneBounds()
         if not bounds then
-            Msg("no map bounds for this zone; cannot place a map waypoint here.")
+            Msg(L["no map bounds for this zone; cannot place a map waypoint here."])
             return
         end
         local wx, wy = MapToWorld(bounds, tonumber(a) / 100, tonumber(b) / 100)
         local _, _, pz = GetPlayerWorld()
         ST.SetWaypoint(wx, wy, pz)
-        Msg(string.format("waypoint set at %s %.1f, %.1f.", GetMapInfo() or "?", tonumber(a), tonumber(b)))
+        Msg(string.format(L["waypoint set at %s %.1f, %.1f."], GetMapInfo() or "?", tonumber(a), tonumber(b)))
     elseif msg == "" then
         local px, py, pz = GetPlayerWorld()
         if not px then
-            Msg("player position unavailable (is ebonhold.dll loaded?).")
+            Msg(L["player position unavailable (is ebonhold.dll loaded?)."])
             return
         end
         ST.SetWaypoint(px, py, pz)
-        Msg("waypoint set at your current position. Walk away to test the pin; /ebtwp clear to remove.")
+        Msg(L["waypoint set at your current position. Walk away to test the pin; /ebtwp clear to remove."])
     else
-        Msg("usage: /ebtwp  |  /ebtwp 45 67  |  /ebtwp clear")
+        Msg(L["usage: /ebtwp  |  /ebtwp 45 67  |  /ebtwp clear"])
     end
 end
 
@@ -734,7 +735,7 @@ SlashCmdList["EBTCAL"] = function(msg)
     local db = DB()
     if msg == "reset" then
         db.calX, db.calY = nil, nil
-        Msg("projection calibration reset (1.0 / 1.0).")
+        Msg(L["projection calibration reset (1.0 / 1.0)."])
         return
     end
     local a, b = string.match(msg, "^([%d%.]+)%s*([%d%.]*)$")
@@ -742,9 +743,9 @@ SlashCmdList["EBTCAL"] = function(msg)
     if x then
         db.calX = x
         db.calY = tonumber(b) or x
-        Msg(string.format("projection calibration set: X=%.3f Y=%.3f.", db.calX, db.calY))
+        Msg(string.format(L["projection calibration set: X=%.3f Y=%.3f."], db.calX, db.calY))
     else
-        Msg(string.format("projection calibration: X=%.3f Y=%.3f  (/ebtcal <x> [y] | reset)",
+        Msg(string.format(L["projection calibration: X=%.3f Y=%.3f  (/ebtcal <x> [y] | reset)"],
             db.calX or 1, db.calY or 1))
     end
 end
