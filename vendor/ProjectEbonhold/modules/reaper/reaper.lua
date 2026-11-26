@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ==============================================================================
 -- The Reaper's Gaze (server: ReaperMgr): the run's risk gauge, the Eye, the Reaper of this layer.
 --
@@ -64,27 +65,27 @@ end
 function RP.Lines()
     local lines = {}
     if not RP.enabled then
-        table.insert(lines, { "The Reaper does not answer on this realm.", 0.6, 0.6, 0.6 })
+        table.insert(lines, { L["The Reaper does not answer on this realm."], 0.6, 0.6, 0.6 })
         return lines
     end
     -- One line: the gauge and its cap (100% + 10% per Torment level of the account). Nothing
     -- about the next Torment here: the content list below is the only place that says where to go.
     -- the gauge against the absolute maximum (+400%, Torment 30): one figure, nothing else
-    table.insert(lines, { "Contract bonus", 1, 1, 1, RP.GaugeText() .. " |cffaaaaaa/ " .. RP.CapText() .. "|r" })
+    table.insert(lines, { L["Contract bonus"], 1, 1, 1, RP.GaugeText() .. " |cffaaaaaa/ " .. RP.CapText() .. "|r" })
     if RP.pact then
-        table.insert(lines, { "|cff9370dbPact of the Reaper: sealed at the cap for this run.|r", 0.58, 0.44, 0.86 })
+        table.insert(lines, { L["|cff9370dbPact of the Reaper: sealed at the cap for this run.|r"], 0.58, 0.44, 0.86 })
     end
     if RP.harvested then
-        table.insert(lines, { "|cffff4040Soul harvested: only accepting death remains.|r", 1, 0.25, 0.25 })
+        table.insert(lines, { L["|cffff4040Soul harvested: only accepting death remains.|r"], 1, 0.25, 0.25 })
     end
     if RP.hasEye then
-        table.insert(lines, { "|T" .. RP.ICON_EYE .. ":14:14:0:0|t Eye of the Reaper", 0.58, 0.44, 0.86,
-            RP.reaperAlive and "|cffaaaaaaReaper already here|r" or "|cff40ff40Click the eye to break it|r" })
+        table.insert(lines, { T("|T{ICONEYE}:14:14:0:0|t Eye of the Reaper", { ICONEYE = RP.ICON_EYE }), 0.58, 0.44, 0.86,
+            RP.reaperAlive and L["|cffaaaaaaReaper already here|r"] or L["|cff40ff40Click the eye to break it|r"] })
     elseif (RP.fragments or 0) > 0 then
-        table.insert(lines, { "|T" .. RP.ICON_FRAGMENT .. ":14:14:0:0|t Eye fragments", 0.8, 0.8, 0.8, RP.fragments .. " / " .. RP.perEye })
+        table.insert(lines, { T("|T{ICONFRAGMENT}:14:14:0:0|t Eye fragments", { ICONFRAGMENT = RP.ICON_FRAGMENT }), 0.8, 0.8, 0.8, RP.fragments .. " / " .. RP.perEye })
     end
     if RP.reaperAlive then
-        table.insert(lines, { "|cffff4040The Reaper walks this layer (Torment " .. RP.reaperTorment .. ").|r", 1, 0.25, 0.25 })
+        table.insert(lines, { T("|cffff4040The Reaper walks this layer (Torment {reaperTorment}).|r", { reaperTorment = RP.reaperTorment }), 1, 0.25, 0.25 })
     end
     return lines
 end
@@ -99,11 +100,11 @@ end
 -- the Eye in the bags): this only asks.
 function RP.Summon()
     if not RP.hasEye then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffffd100Ebonhold:|r you do not hold the Eye of the Reaper.")
+        DEFAULT_CHAT_FRAME:AddMessage(L["|cffffd100Ebonhold:|r you do not hold the Eye of the Reaper."])
         return
     end
     if RP.reaperAlive then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffffd100Ebonhold:|r the Reaper already walks this layer.")
+        DEFAULT_CHAT_FRAME:AddMessage(L["|cffffd100Ebonhold:|r the Reaper already walks this layer."])
         return
     end
     if ProjectEbonhold.sendToServer and ProjectEbonhold.CS and ProjectEbonhold.CS.REQUEST_SUMMON_REAPER then
@@ -113,8 +114,8 @@ end
 
 -- Confirmation before breaking the Eye: the summon is irreversible and the Reaper's touch is death.
 StaticPopupDialogs["EBONHOLD_BREAK_EYE"] = {
-    text = "Break the Eye of the Reaper?\n\nThe Reaper will walk this layer at your Torment. Its Harvest kills beyond any resurrection. Slay it to seal your gauge for the rest of the run.",
-    button1 = "Break it",
+    text = L["Break the Eye of the Reaper?\n\nThe Reaper will walk this layer at your Torment. Its Harvest kills beyond any resurrection. Slay it to seal your gauge for the rest of the run."],
+    button1 = L["Break it"],
     button2 = CANCEL,
     OnAccept = function() RP.Summon() end,
     timeout = 0, whileDead = false, hideOnEscape = true, preferredIndex = 3,
@@ -132,11 +133,11 @@ SlashCmdList["EBONHOLDREAPER"] = function(msg)
         RP.AskSummon()
         return
     end
-    DEFAULT_CHAT_FRAME:AddMessage("|cffffd100Ebonhold Reaper:|r")
+    DEFAULT_CHAT_FRAME:AddMessage(L["|cffffd100Ebonhold Reaper:|r"])
     for _, l in ipairs(RP.Lines()) do
         DEFAULT_CHAT_FRAME:AddMessage("  " .. l[1] .. (l[5] and ("  " .. l[5]) or ""), l[2], l[3], l[4])
     end
-    DEFAULT_CHAT_FRAME:AddMessage("  /reaper break - break the Eye", 0.6, 0.6, 0.6)
+    DEFAULT_CHAT_FRAME:AddMessage(L["  /reaper break - break the Eye"], 0.6, 0.6, 0.6)
     RP.Request()
 end
 

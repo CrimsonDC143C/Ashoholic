@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 ------------------------------------------------------------
@@ -34,10 +35,10 @@ local TOAST_SPACING = 4      -- vertical gap between stacked toasts
 local PLAY_SOUND    = true
 local PLAY_ANIMS    = true
 
-local LABEL_NEW   = "Affix not learned"
-local HINT_NEW    = "Extract it: Enchanted Anvil, Dalaran"
-local LABEL_KNOWN = "You receive"
-local TOOLTIP_NOT_LEARNED = "Affix not learned: extract this item at the Enchanted Anvil in Dalaran (Northrend) to learn it."
+local LABEL_NEW   = L["Affix not learned"]
+local HINT_NEW    = L["Extract it: Enchanted Anvil, Dalaran"]
+local LABEL_KNOWN = L["You receive"]
+local TOOLTIP_NOT_LEARNED = L["Affix not learned: extract this item at the Enchanted Anvil in Dalaran (Northrend) to learn it."]
 local ROMAN = { "I", "II", "III", "IV", "V" }
 
 -- Icon border cut from LootToastAtlas, by item quality
@@ -144,25 +145,20 @@ local affixTour = ProjectEbonhold.GuidedTour.Create({
     dbKey = "seenAffixLootTour",
     steps = {
         {
-            title = "Affix not learned yet",
-            text = "This item carries an affix. While you wear the item, you benefit from it, " ..
-                "but looting it does |cffff8040not|r teach it to you.",
+            title = L["Affix not learned yet"],
+            text = L["This item carries an affix. While you wear the item, you benefit from it, but looting it does |cffff8040not|r teach it to you."],
             zone = function() return tourToast end,
             boxAnchor = { "RIGHT", "LEFT", -14, 0 },
         },
         {
-            title = "Learn it at the Enchanted Anvil",
-            text = "Go to the |cffffd700Enchanted Anvil in Dalaran|r (Northrend), or open it anywhere with " ..
-                "the |cffffd700Portable Affix-Anvil|r of your Toolbelt once unlocked. Extract the item there " ..
-                "to learn its affix for good, on all your characters. Extraction |cffff4040destroys the item|r: " ..
-                "the anvil shows its cost first.",
+            title = L["Learn it at the Enchanted Anvil"],
+            text = L["Go to the |cffffd700Enchanted Anvil in Dalaran|r (Northrend), or open it anywhere with the |cffffd700Portable Affix-Anvil|r of your Toolbelt once unlocked. Extract the item there to learn its affix for good, on all your characters. Extraction |cffff4040destroys the item|r: the anvil shows its cost first."],
             zone = function() return tourToast end,
             boxAnchor = { "RIGHT", "LEFT", -14, 0 },
         },
         {
-            title = "Engrave it",
-            text = "Once learned, an affix can be engraved at the anvil onto other items that " ..
-                "can carry it.",
+            title = L["Engrave it"],
+            text = L["Once learned, an affix can be engraved at the anvil onto other items that can carry it."],
             zone = function() return tourToast end,
             boxAnchor = { "RIGHT", "LEFT", -14, 0 },
         },
@@ -210,6 +206,7 @@ local function QueueToast(link, count, affix)
         texture   = texture or FALLBACK_ICON,
         count     = count,
         affixName = affix.name,
+        affix     = affix,   -- display name resolved at SetText (ExtractionService.DisplayName)
         rank      = rank,
         knownRank = knownRank,
         isNew     = knownRank < rank,
@@ -320,22 +317,24 @@ function EbonholdAffixToast_OnShow(self)
     local border = LOOT_BORDER_BY_QUALITY[data.quality] or LOOT_BORDER_BY_QUALITY[2]
     self.IconBorder:SetTexCoord(unpack(border))
 
+    -- display-only name in the player's language; data.affixName stays English
+    local affixLabel = ExtractionService and ExtractionService.DisplayName and ExtractionService.DisplayName(data.affix) or data.affixName
     if isNew then
         self.Label:SetText(LABEL_NEW)
         self.Label:SetTextColor(1, 0.5, 0.25)
         if data.knownRank > 0 then
-            self.AffixName:SetFormattedText("%s |cff9d9d9d(you know rank %s)|r", data.affixName, ROMAN[data.knownRank] or data.knownRank)
+            self.AffixName:SetText(T("{name} |cff9d9d9d(you know rank {rank})|r", { name = affixLabel, rank = ROMAN[data.knownRank] or data.knownRank }))
         else
-            self.AffixName:SetText(data.affixName)
+            self.AffixName:SetText(affixLabel)
         end
         self.AffixName:SetTextColor(1, 0.82, 0)
     else
         self.Label:SetText(LABEL_KNOWN)
         self.Label:SetTextColor(1, 0.82, 0)
         if data.knownRank > data.rank then
-            self.AffixName:SetFormattedText("%s - rank %s known", data.affixName, ROMAN[data.knownRank] or data.knownRank)
+            self.AffixName:SetText(T("{name} - rank {rank} known", { name = affixLabel, rank = ROMAN[data.knownRank] or data.knownRank }))
         else
-            self.AffixName:SetFormattedText("%s - already known", data.affixName)
+            self.AffixName:SetText(T("{name} - already known", { name = affixLabel }))
         end
         self.AffixName:SetTextColor(0.62, 0.62, 0.62)
     end
@@ -403,7 +402,7 @@ function EbonholdAffixToast_OnEnter(self)
     GameTooltip:SetHyperlink(data.link)
     if not data.isNew then
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Affix already known.", 0.62, 0.62, 0.62, true)
+        GameTooltip:AddLine(L["Affix already known."], 0.62, 0.62, 0.62, true)
     end
     GameTooltip:Show()
 end
@@ -413,12 +412,12 @@ SLASH_EBONHOLDAFFIXTOAST1 = "/affixtoast"
 SlashCmdList["EBONHOLDAFFIXTOAST"] = function(text)
     local link = text and text:match("|c%x%x%x%x%x%x%x%x|Hitem:[-%d:]+|h%[.-%]|h|r")
     if not link then
-        DEFAULT_CHAT_FRAME:AddMessage("Usage: /affixtoast <item link>")
+        DEFAULT_CHAT_FRAME:AddMessage(L["Usage: /affixtoast <item link>"])
         return
     end
     local affix = FindAffixInLink(link)
     if not affix then
-        DEFAULT_CHAT_FRAME:AddMessage("No affix on " .. link)
+        DEFAULT_CHAT_FRAME:AddMessage(T("No affix on {link}", { link = link }))
         return
     end
     QueueToast(link, 1, affix)

@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addon, Addon = ...
 
 ProjectEbonhold = ProjectEbonhold or {}
@@ -11,10 +12,10 @@ local CURRENT_PROMPT_VERSION = 2
 -- The channels offered by the prompt. `default = true` rows are pre-checked;
 -- any channel the player is already in is pre-checked as well (see the UI).
 ProjectEbonhold.WorldChannelService.Channels = {
-    { name = "world",    label = "World - English",  default = true },
-    { name = "world-fr", label = "World - Français", default = false },
-    { name = "world-de", label = "World - Deutsch",  default = false },
-    { name = "world-es", label = "World - Español   ",  default = false },
+    { name = "world",    label = L["World - English"],  default = true },
+    { name = "world-fr", label = L["World - Français"], default = false },
+    { name = "world-de", label = L["World - Deutsch"],  default = false },
+    { name = "world-es", label = L["World - Español   "],  default = false },
 }
 
 -- Ensure DB is initialized

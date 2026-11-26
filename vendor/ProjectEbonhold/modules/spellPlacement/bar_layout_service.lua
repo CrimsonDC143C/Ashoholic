@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- =============================================================
 -- Bar Layout Management
 -- Save / load / delete named action bar layouts.
@@ -77,8 +78,8 @@ end
 
 -- Snapshot every action button into a serialized string table.
 function Service:SaveLayout(name)
-    if type(name) ~= "string" or name == "" then return false, "Invalid name" end
-    if isBarOverridden() then return false, "Cannot save layout while in a vehicle" end
+    if type(name) ~= "string" or name == "" then return false, L["Invalid name"] end
+    if isBarOverridden() then return false, L["Cannot save layout while in a vehicle"] end
     local store = ensureDB()
     local set = {}
 
@@ -200,14 +201,14 @@ end
 function Service:LoadLayout(name)
     if InCombatLockdown() then
         if DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[Project Ebonhold]|r Cannot switch bar layout while in combat.")
+            DEFAULT_CHAT_FRAME:AddMessage(L["|cffff5555[Project Ebonhold]|r Cannot switch bar layout while in combat."])
         end
         return false
     end
 
     if isBarOverridden() then
         if DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[Project Ebonhold]|r Cannot switch bar layout while in a vehicle.")
+            DEFAULT_CHAT_FRAME:AddMessage(L["|cffff5555[Project Ebonhold]|r Cannot switch bar layout while in a vehicle."])
         end
         return false
     end

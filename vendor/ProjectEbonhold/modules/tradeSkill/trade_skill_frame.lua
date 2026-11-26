@@ -26,6 +26,8 @@ local searchBox
 local lastSearch
 local chrome                    -- le cadre Collections pose derriere la fenetre
 local insets = {}               -- les deux panneaux marbres (liste, details)
+local tabHolder                 -- onglets des metiers, a droite (BuildTabs)
+local UpdateTabHighlight        -- defini avec les onglets, plus bas
 
 -- Ordre d'affichage explicite : cadre (niveau N), panneaux (N+1), puis tous les
 -- controles de Blizzard (N+2). A niveau egal le client ne garantit pas qui passe
@@ -35,8 +37,10 @@ local function ApplyLayers()
     chrome:SetFrameLevel(base)
     for _, inset in ipairs(insets) do inset:SetFrameLevel(base + 1) end
     for _, child in ipairs({ TradeSkillFrame:GetChildren() }) do
-        if child ~= chrome then child:SetFrameLevel(base + 2) end
+        if child ~= chrome and child ~= tabHolder then child:SetFrameLevel(base + 2) end
     end
+    -- les onglets portent des boutons securises : pas de changement de niveau en combat
+    if tabHolder and not InCombatLockdown() then tabHolder:SetFrameLevel(base + 3) end
 end
 
 -- Le titre et le portrait vivent dans le cadre Collections : on y recopie le titre
@@ -121,6 +125,7 @@ local function TradeSkillFrame_Update_Ebonhold()
 
     TradeSkillFrameEditBox:Hide();
     SyncChrome();
+    UpdateTabHighlight();
 
     -- ScrollFrame update
     FauxScrollFrame_Update(TradeSkillListScrollFrame, numTradeSkills, TRADE_SKILLS_DISPLAYED, TRADE_SKILL_HEIGHT, nil, nil, nil, TradeSkillHighlightFrame, 293, 316 );
@@ -266,6 +271,120 @@ local function UpdateItemBorder()
     itemBorder:Show()
 end
 
+-- ---- onglets des metiers, colles au bord droit ----
+-- Un onglet par metier appris qui a une fenetre (liste dans profession_book.lua), dans le
+-- style des onglets du grimoire. Bouton securise type "spell" : un clic ouvre l'autre
+-- metier, meme en combat. Les onglets (Show/Hide, attributs) ne bougent que hors combat ;
+-- en combat on ne change que la surbrillance, le reste attend PLAYER_REGEN_ENABLED.
+local TAB_SIZE, TAB_GAP, TAB_TOP = 32, 12, -48
+local MAX_TABS = 14
+local tabs = {}
+local tabsPending = false
+
+function UpdateTabHighlight()
+    local line = GetTradeSkillLine()
+    local linked = IsTradeSkillLinked and IsTradeSkillLinked()
+    for _, tab in ipairs(tabs) do
+        local on = tab.line and line == tab.line and not linked
+        if on then tab:SetChecked(true) else tab:SetChecked(false) end
+    end
+end
+
+local function LayoutTabs()
+    if not tabHolder then return end
+    if InCombatLockdown() then tabsPending = true; return end
+    tabsPending = false
+    local book = ProjectEbonhold and ProjectEbonhold.ProfessionBook
+    local list = book and book.OpenableProfessions and book.OpenableProfessions() or {}
+    for i, tab in ipairs(tabs) do
+        local e = list[i]
+        if e then
+            tab.spellID = e.spellID
+            tab.line = e.line
+            tab:SetAttribute("type", "spell")
+            tab:SetAttribute("spell", e.spellID)
+            tab:SetNormalTexture(e.icon)
+            tab:Show()
+        else
+            tab.spellID, tab.line = nil, nil
+            tab:SetAttribute("type", nil)
+            tab:SetAttribute("spell", nil)
+            tab:Hide()
+        end
+    end
+    UpdateTabHighlight()
+end
+
+local function Tab_OnEnter(self)
+    if not self.spellID then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    local link = GetSpellLink(self.spellID)
+    if link then GameTooltip:SetHyperlink(link) else GameTooltip:SetText(GetSpellInfo(self.spellID)) end
+    GameTooltip:Show()
+end
+
+local function BuildTabs(frame)
+    tabHolder = CreateFrame("Frame", "TradeSkillFrameProfessionTabs", frame)
+    tabHolder:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, TAB_TOP)
+    tabHolder:SetSize(TAB_SIZE + 4, MAX_TABS * (TAB_SIZE + TAB_GAP))
+    tabHolder:SetFrameLevel(frame:GetFrameLevel() + 3)
+    for i = 1, MAX_TABS do
+        local tab = CreateFrame("CheckButton", "TradeSkillFrameProfessionTab" .. i, tabHolder, "SecureActionButtonTemplate")
+        tab:SetSize(TAB_SIZE, TAB_SIZE)
+        tab:SetPoint("TOPLEFT", tabHolder, "TOPLEFT", 2, -(i - 1) * (TAB_SIZE + TAB_GAP))
+        tab:RegisterForClicks("LeftButtonUp")
+        -- le fond d'onglet du grimoire (SpellBookSkillLineTabTemplate)
+        local bg = tab:CreateTexture(nil, "BACKGROUND")
+        bg:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
+        bg:SetSize(64, 64)
+        bg:SetPoint("TOPLEFT", tab, "TOPLEFT", -3, 11)
+        tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        tab:SetCheckedTexture("Interface\\Buttons\\CheckButtonHilight", "ADD")
+        -- un clic sur l'onglet deja ouvert relancerait le sort et fermerait la fenetre
+        -- (GetChecked est deja inverse par le clic quand PreClick tourne : l'onglet actif
+        -- se lit donc "pas coche"). Hors combat seulement : SetAttribute y est interdit.
+        tab:SetScript("PreClick", function(self)
+            if not InCombatLockdown() and self.line and self.line == GetTradeSkillLine()
+                and TradeSkillFrame:IsShown() then
+                self:SetAttribute("type", nil)
+            end
+        end)
+        tab:SetScript("PostClick", function(self)
+            if self.spellID and not InCombatLockdown() then self:SetAttribute("type", "spell") end
+            UpdateTabHighlight()
+        end)
+        tab:SetScript("OnEnter", Tab_OnEnter)
+        tab:SetScript("OnLeave", GameTooltip_Hide)
+        tab:Hide()
+        tabs[i] = tab
+    end
+    -- les onglets debordent a droite : ils restent dans l'ecran avec la fenetre
+    frame:SetClampRectInsets(0, TAB_SIZE + 4, 0, 0)
+
+    local ev = CreateFrame("Frame")
+    ev:RegisterEvent("SPELLS_CHANGED")
+    ev:RegisterEvent("SKILL_LINES_CHANGED")
+    ev:RegisterEvent("PLAYER_REGEN_ENABLED")
+    ev:RegisterEvent("TRADE_SKILL_SHOW")
+    -- SPELLS_CHANGED / SKILL_LINES_CHANGED come in bursts (~30 on a level-up) and each layout reads
+    -- the whole spellbook: lay the tabs out once, on the next frame.
+    ev:Hide()
+    ev:SetScript("OnUpdate", function(self)
+        self:Hide()
+        LayoutTabs()
+    end)
+    ev:SetScript("OnEvent", function(self, event)
+        if event == "PLAYER_REGEN_ENABLED" then
+            if tabsPending then LayoutTabs() end
+        elseif event == "TRADE_SKILL_SHOW" then
+            UpdateTabHighlight()
+        else
+            self:Show()
+        end
+    end)
+    LayoutTabs()
+end
+
 local function HideOwnTextures(frame)
     for _, region in ipairs({ frame:GetRegions() }) do
         if region:GetObjectType() == "Texture" then region:Hide() end
@@ -356,6 +475,9 @@ local function Setup()
     detailInset:SetPoint("TOPLEFT", frame, "TOPLEFT", DETAIL_X - 6, DETAIL_TOP + 8)
     detailInset:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, BOTTOM_BAR - 8)
     insets[2] = detailInset
+    -- reachable from outside (ElvUI's skin, owner 2026-11-16)
+    frame.ebonholdChrome = chrome
+    frame.ebonholdInsets = insets
 
     -- le titre d'origine est recopie dans la barre de titre du cadre (SyncChrome)
     TradeSkillFrameTitleText:Hide()
@@ -445,6 +567,10 @@ local function Setup()
     TradeSkillDetailScrollFrame:SetHeight(detailH)
     TradeSkillDetailScrollChildFrame:SetHeight(detailH - 10)
 
+    -- DragonUI's scroll bar on the list and the details (utils.lua, owner 2026-11-13)
+    utils.UseDragonScrollBar(TradeSkillListScrollFrame)
+    utils.UseDragonScrollBar(TradeSkillDetailScrollFrame)
+
     -- Quitter en bas a droite ; Creer colle a sa gauche comme a l'origine (81 px
     -- d'entraxe). Creer tout / - / nombre / + suivent Creer par leurs propres ancres.
     TradeSkillCancelButton:ClearAllPoints()
@@ -452,6 +578,18 @@ local function Setup()
     TradeSkillCreateButton:ClearAllPoints()
     TradeSkillCreateButton:SetPoint("RIGHT", TradeSkillCancelButton, "LEFT", -1, 0)
 
+    -- boutons securises : crees et places hors combat seulement
+    if InCombatLockdown() then
+        local wait = CreateFrame("Frame")
+        wait:RegisterEvent("PLAYER_REGEN_ENABLED")
+        wait:SetScript("OnEvent", function(self)
+            self:UnregisterAllEvents()
+            BuildTabs(frame)
+            ApplyLayers()
+        end)
+    else
+        BuildTabs(frame)
+    end
     ApplyLayers()
 
     -- ---- comportement ----

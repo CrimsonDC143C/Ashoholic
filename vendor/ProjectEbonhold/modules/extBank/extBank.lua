@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- ExtBank.lua — in-game UI for the extended bank (TRUE bag-slot model).
@@ -163,7 +164,7 @@ end
 
 local function CanSend()
     if type(ExtBankMove) ~= "function" then
-        UIError("The Extended Bank is not available right now.")
+        UIError(L["The Extended Bank is not available right now."])
         return false
     end
     return true
@@ -185,7 +186,7 @@ local function Unlock()
     if type(ExtBankUnlock) == "function" then
         ExtBankUnlock()
     else
-        UIError("The Extended Bank is not available right now.")
+        UIError(L["The Extended Bank is not available right now."])
     end
 end
 
@@ -221,6 +222,20 @@ local function FirstFreeActiveSlot()
     return nil
 end
 
+-- true when the store holds a stack of this bag item's kind that still has room
+local function HasPartialStack(bag, slot)
+    local link = GetContainerItemLink(bag, slot)
+    local id = link and tonumber(link:match("item:(%d+)"))
+    local cap = id and select(8, GetItemInfo(id))
+    if not cap or cap <= 1 then return false end
+    for _, page in pairs(cells) do
+        for _, d in pairs(page) do
+            if d.itemId == id and (d.count or 1) < cap then return true end
+        end
+    end
+    return false
+end
+
 local lastEquip = { bag = -1, slot = -1, t = 0 }
 local function InvRightClick(self, button, source)
     if button ~= "RightButton" then return end
@@ -242,7 +257,9 @@ local function InvRightClick(self, button, source)
     elseif not IsControlKeyDown() then
         -- Deposit into the currently SELECTED bag first; only fall back to
         -- "first free slot anywhere" if that bag is full or none is selected.
-        local freeSlot = FirstFreeActiveSlot()
+        -- A partial stack of the same item in the store: let the server top it up first
+        -- (AUTO_EXT folds into partial stacks, 31 + 20 -> 50 + 1, bug 4477).
+        local freeSlot = not HasPartialStack(bag, slot) and FirstFreeActiveSlot() or nil
         if freeSlot ~= nil then
             DepositToSlot(bag, slot, activeBag, freeSlot)
         else
@@ -304,7 +321,7 @@ local function MoneyString(copper)
     local g = math.floor(copper / 10000)
     local sv = math.floor(copper / 100) % 100
     local c = copper % 100
-    return ("%s %s  %d |TInterface\\MoneyFrame\\UI-SilverIcon:14:14:2:0|t  %d |TInterface\\MoneyFrame\\UI-CopperIcon:14:14:2:0|t")
+    return (L["%s %s  %d |TInterface\\MoneyFrame\\UI-SilverIcon:14:14:2:0|t  %d |TInterface\\MoneyFrame\\UI-CopperIcon:14:14:2:0|t"])
         :format(FormatGold(g), GOLD_ICON, sv, c)
 end
 
@@ -315,7 +332,7 @@ local function PopupCopper(dialog)
 end
 local function WarbandGoldPopup(deposit)
     return {
-        text = deposit and "Deposit how much gold into the Warband bank?" or "Withdraw how much gold from the Warband bank?",
+        text = deposit and L["Deposit how much gold into the Warband bank?"] or L["Withdraw how much gold from the Warband bank?"],
         button1 = ACCEPT,
         button2 = CANCEL,
         hasMoneyInputFrame = 1,
@@ -339,7 +356,7 @@ StaticPopupDialogs["EXTBANK_WARBAND_WITHDRAW"] = WarbandGoldPopup(false)
 
 -- confirmation before actually sending CMSG_EXTBANK_UNLOCK
 StaticPopupDialogs["EXTBANK_WARBAND_OPEN_CONFIRM"] = {
-    text = "Unlock the Warband Bank for %s?\n\nEvery character of your account will share its bags and gold.",
+    text = L["Unlock the Warband Bank for %s?\n\nEvery character of your account will share its bags and gold."],
     button1 = YES,
     button2 = NO,
     OnAccept = function() Unlock() end,
@@ -348,7 +365,7 @@ StaticPopupDialogs["EXTBANK_WARBAND_OPEN_CONFIRM"] = {
     hideOnEscape = 1,
 }
 StaticPopupDialogs["EXTBANK_UNLOCK_CONFIRM"] = {
-    text = "Unlock bag slot %s for %s?",
+    text = L["Unlock bag slot %s for %s?"],
     button1 = YES,
     button2 = NO,
     OnAccept = function() Unlock() end,
@@ -462,7 +479,8 @@ end
 -- from the real contents once the server has answered, until nothing moves.
 -- Regular bags are sorted as one long list; a special bag (herb, enchanting...)
 -- is sorted on its own, since the server refuses to swap across bag families.
--- Stacks are reordered, never merged.
+-- Partial stacks of one item are merged first: a move onto a stack of the same
+-- item with room tops it up on the server, the rest stays behind.
 local TYPE_ORDER = { Weapon = 1, Armor = 2, Gem = 3, Glyph = 4, Consumable = 5, Recipe = 6,
     ["Trade Goods"] = 7, Container = 8, Quiver = 9, Projectile = 10, Key = 11, Quest = 12, Miscellaneous = 13 }
 
@@ -527,6 +545,41 @@ local function PlanSort()
     return moves
 end
 
+-- Moves that fold the partial stacks of each item into as few stacks as fit,
+-- the last ones onto the first ones, counted on a copy so one round does it all.
+local function PlanMerges()
+    local groups = SortGroups()
+    if not groups then return nil end
+    local moves = {}
+    for _, g in ipairs(groups) do
+        local open, order = {}, {}
+        for _, pos in ipairs(g) do
+            local d = cells[pos.bag] and cells[pos.bag][pos.slot]
+            if d then
+                local cap = select(8, GetItemInfo(d.itemId))
+                if not cap then ItemName(d.itemId) end
+                if cap and cap > 1 and (d.count or 1) < cap then
+                    local list = open[d.itemId]
+                    if not list then list = {}; open[d.itemId] = list; order[#order + 1] = list end
+                    list[#list + 1] = { pos = pos, count = d.count or 1, cap = cap }
+                end
+            end
+        end
+        for _, list in ipairs(order) do
+            local i, j = 1, #list
+            while i < j do
+                local dst, src = list[i], list[j]
+                local n = math.min(dst.cap - dst.count, src.count)
+                moves[#moves + 1] = { src.pos.bag, src.pos.slot, dst.pos.bag, dst.pos.slot }
+                dst.count, src.count = dst.count + n, src.count - n
+                if dst.count >= dst.cap then i = i + 1 end
+                if src.count <= 0 then j = j - 1 end
+            end
+        end
+    end
+    return moves
+end
+
 local sortFrame = CreateFrame("Frame")
 sortFrame:Hide()
 
@@ -540,10 +593,17 @@ end
 local function NextRound()
     sorter.rounds = sorter.rounds + 1
     if sorter.rounds > 8 then
-        StopSort("Some items could not be sorted.")
+        StopSort(L["Some items could not be sorted."])
         return
     end
-    local moves = PlanSort()
+    -- Merges first, as long as each round leaves fewer to do (a server that
+    -- swaps instead of merging would otherwise plan the same merges forever).
+    local moves = PlanMerges()
+    if moves and (#moves == 0 or #moves >= sorter.merges) then
+        moves = PlanSort()
+    elseif moves then
+        sorter.merges = #moves
+    end
     if not moves then                      -- bag info still loading: look again shortly
         sorter.queue, sorter.qi, sorter.hold = {}, 1, 0.5
         return
@@ -581,6 +641,7 @@ local function StartSort()
     if sorter.running or not CanSend() then return end
     ExtBank.pickSrc = nil
     sorter.running, sorter.rounds, sorter.pending, sorter.hold = true, 0, 0, 0
+    sorter.merges = math.huge
     NextRound()
     if sorter.running then sortFrame:Show() end
     ExtBank_Redraw()
@@ -634,9 +695,9 @@ local function NewCell(c)
             if cursorSrc and cursorSrc.bag >= 0 and cursorSrc.bag <= 4 then
                 DepositToSlot(cursorSrc.bag, cursorSrc.slot, self.bag, self.slot)
             elseif cursorSrc then
-                UIError("You can only store items from your bags.")
+                UIError(L["You can only store items from your bags."])
             else
-                UIError("Right-click an item in your bags to store it.")
+                UIError(L["Right-click an item in your bags to store it."])
             end
             ClearCursor(); cursorSrc = nil
             return true
@@ -677,9 +738,9 @@ local function NewCell(c)
         if not d then GameTooltip:Hide(); return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         -- full link so enchant / random suffix show, not just the base item
-        GameTooltip:SetHyperlink(("item:%d:%d:0:0:0:0:%d"):format(
+        GameTooltip:SetHyperlink((L["item:%d:%d:0:0:0:0:%d"]):format(
             d.itemId, d.enchant or 0, d.randomProp or 0))
-        if d.count and d.count > 1 then GameTooltip:AddLine("Stack: " .. d.count, 0.7, 0.7, 0.7) end
+        if d.count and d.count > 1 then GameTooltip:AddLine(T("Stack: {count}", { count = d.count }), 0.7, 0.7, 0.7) end
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -713,9 +774,9 @@ local function GetStripButton(i)
             if cursorSrc and cursorSrc.bag >= 0 and cursorSrc.bag <= 4 then
                 EquipBagToSlot(cursorSrc.bag, cursorSrc.slot, self.bagIndex)
             elseif cursorSrc then
-                UIError("You can only place a bag here from your inventory.")
+                UIError(L["You can only place a bag here from your inventory."])
             else
-                UIError("Shift-right-click a bag in your inventory to place it here.")
+                UIError(L["Shift-right-click a bag in your inventory to place it here."])
             end
             ClearCursor(); cursorSrc = nil
             return true
@@ -734,9 +795,9 @@ local function GetStripButton(i)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             local d = bags[self.bagIndex]
             if d then GameTooltip:SetHyperlink("item:"..d.itemId)
-                     GameTooltip:AddLine("Click to show it in the list", 0.6,0.6,0.6)
-                     GameTooltip:AddLine("Right-click to unequip (must be empty)", 0.6,0.6,0.6)
-            else GameTooltip:SetText("Empty bag slot\nDrag a bag here, or Shift+right-click a bag in your inventory") end
+                     GameTooltip:AddLine(L["Click to show it in the list"], 0.6,0.6,0.6)
+                     GameTooltip:AddLine(L["Right-click to unequip (must be empty)"], 0.6,0.6,0.6)
+            else GameTooltip:SetText(L["Empty bag slot\nDrag a bag here, or Shift+right-click a bag in your inventory"]) end
             GameTooltip:Show()
         end)
         btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -759,7 +820,13 @@ end
 
 -- Lay the bank chrome over w x h. The middle column and row are filled with
 -- copies of the source piece, every other copy mirrored so the seams match.
+local dragonSkinned = false   -- DragonUI's frame art replaced the bank chrome (ApplyDragonSkin)
+
 local function LayoutChrome(w, h)
+    if dragonSkinned then
+        for k = 1, #chromeTex do chromeTex[k]:Hide() end
+        return
+    end
     local wl, wr = CHROME_COLS[1][2] - CHROME_COLS[1][1], CHROME_COLS[3][2] - CHROME_COLS[3][1]
     local ht, hb = CHROME_ROWS[1][2] - CHROME_ROWS[1][1], CHROME_ROWS[3][2] - CHROME_ROWS[3][1]
     local xs = { { 0, wl }, { wl, w - wr }, { w - wr, w } }
@@ -824,7 +891,7 @@ UpdateWarbandTabs = function()
     for _, tabs in ipairs({ frameTabs or {}, bankTabs or {} }) do
         local t = tabs[3]
         if t then
-            t:SetText((warbandOpen and "" or LOCK_ICON) .. "Warband Bank")
+            t:SetText(T("{LOCKICON}Warband Bank", { LOCKICON = (warbandOpen and "" or LOCK_ICON) }))
             ResizeTab(t)
         end
     end
@@ -833,7 +900,7 @@ end
 -- tab 1 = the native bank, 2 = Extended Bank (store 0), 3 = Warband Bank (store 1)
 local function CreateBankTabs(parent, prefix, selected)
     local tabs = {}
-    for i, label in ipairs({ "Bank", "Extended Bank", "Warband Bank" }) do
+    for i, label in ipairs({ L["Bank"], L["Extended Bank"], L["Warband Bank"] }) do
         local t = CreateFrame("Button", prefix .. i, parent, "CharacterFrameTabButtonTemplate")
         t:SetHeight(32)
         t:SetText(label)
@@ -856,15 +923,15 @@ local function CreateBankTabs(parent, prefix, selected)
         if i == 3 then
             t:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:SetText("Warband Bank")
-                GameTooltip:AddLine("Bags and gold shared by every character of your account.", 1, 1, 1, true)
-                GameTooltip:AddLine("Only items you could mail to an alt can be stored: no soulbound, conjured or temporary items.", 0.8, 0.8, 0.8, true)
+                GameTooltip:SetText(L["Warband Bank"])
+                GameTooltip:AddLine(L["Bags and gold shared by every character of your account."], 1, 1, 1, true)
+                GameTooltip:AddLine(L["Only items you could mail to an alt can be stored: no soulbound, conjured or temporary items."], 0.8, 0.8, 0.8, true)
                 if warbandOpen then
-                    GameTooltip:AddLine("Bag slots are bought with gold, or all at once with a Warband Bank Voucher.", 0.8, 0.8, 0.8, true)
+                    GameTooltip:AddLine(L["Bag slots are bought with gold, or all at once with a Warband Bank Voucher."], 0.8, 0.8, 0.8, true)
                 else
                     GameTooltip:AddLine(" ")
-                    GameTooltip:AddLine("Locked", 1, 0.3, 0.3)
-                    GameTooltip:AddLine(("Click to unlock it for your account for %s %s."):format(FormatGold(WARBAND_OPEN_COST), GOLD_ICON), 1, 0.82, 0, true)
+                    GameTooltip:AddLine(L["Locked"], 1, 0.3, 0.3)
+                    GameTooltip:AddLine((L["Click to unlock it for your account for %s %s."]):format(FormatGold(WARBAND_OPEN_COST), GOLD_ICON), 1, 0.82, 0, true)
                 end
                 GameTooltip:Show()
             end)
@@ -903,9 +970,10 @@ local function BuildUI()
 
     titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleText:SetPoint("TOP", frame, "TOP", 22, -17)   -- centred on the title bar, right of the portrait
-    titleText:SetText(curStore == 1 and "Warband Bank" or "Extended Bank")
+    titleText:SetText(curStore == 1 and L["Warband Bank"] or L["Extended Bank"])
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    frame.closeButton = close
     close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 2, -7)   -- on the bank's close-button corner
     close:SetScript("OnClick", function() ExtBank_Close() end)
 
@@ -918,7 +986,7 @@ local function BuildUI()
     searchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 80, -44)
     searchBox:SetAutoFocus(false)
     searchBox:SetMaxLetters(50)
-    searchBox.Instructions:SetText("Search")
+    searchBox.Instructions:SetText(SEARCH)
     searchStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     searchStatus:SetPoint("LEFT", searchBox, "RIGHT", 6, 0)
     searchStatus:SetText("")
@@ -926,12 +994,12 @@ local function BuildUI()
     sortBtn = CreateFrame("Button", "ExtBankSortButton", frame, "UIPanelButtonTemplate")
     sortBtn:SetWidth(72); sortBtn:SetHeight(22)
     sortBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", 300, -43)
-    sortBtn:SetText("Sort")
+    sortBtn:SetText(L["Sort"])
     sortBtn:SetScript("OnClick", function() StartSort() end)
     sortBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Sort")
-        GameTooltip:AddLine("Orders the items of every bag by type, quality and name. Stacks are not merged.", 0.8, 0.8, 0.8, true)
+        GameTooltip:SetText(L["Sort"])
+        GameTooltip:AddLine(L["Merges partial stacks, then orders the items of every bag by type, quality and name."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     sortBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -984,6 +1052,7 @@ local function BuildUI()
 
     -- the contents of every bag, one after the other
     view = CreateFrame("ScrollFrame", "ExtBankScrollFrame", frame, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(view)  -- DragonUI's scroll bar (utils.lua)
     view.scrollBarHideable = 1
     child = CreateFrame("Frame", nil, view)
     child:SetWidth(GRID_W); child:SetHeight(1)
@@ -1017,14 +1086,14 @@ local function BuildUI()
 
     -- bag-slot page arrows, shown only when the slots fill more than two rows
     pageUp = NewArrow("Up", function() stripPage = stripPage - 1; ExtBank_Redraw() end)
-    pageDown = NewArrow("Down", function() stripPage = stripPage + 1; ExtBank_Redraw() end)
+    pageDown = NewArrow(L["Down"], function() stripPage = stripPage + 1; ExtBank_Redraw() end)
 
     -- Cost / Purchase under the bag slots, as on the bank
     costText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     costText:SetJustifyH("LEFT")
     purchaseBtn = CreateFrame("Button", "ExtBankPurchaseButton", frame, "UIPanelButtonTemplate")
     purchaseBtn:SetWidth(96); purchaseBtn:SetHeight(22)
-    purchaseBtn:SetText("Purchase")
+    purchaseBtn:SetText(L["Purchase"])
     purchaseBtn:SetScript("OnClick", function()
         if curStore == 1 and not warbandOpen then
             StaticPopup_Show("EXTBANK_WARBAND_OPEN_CONFIRM", FormatGold(WARBAND_OPEN_COST) .. " " .. GOLD_ICON)
@@ -1047,11 +1116,11 @@ local function BuildUI()
     goldText:SetJustifyH("LEFT")
     withdrawBtn = CreateFrame("Button", "ExtBankWarbandWithdrawButton", frame, "UIPanelButtonTemplate")
     withdrawBtn:SetWidth(80); withdrawBtn:SetHeight(22)
-    withdrawBtn:SetText("Withdraw")
+    withdrawBtn:SetText(L["Withdraw"])
     withdrawBtn:SetScript("OnClick", function() StaticPopup_Show("EXTBANK_WARBAND_WITHDRAW") end)
     depositBtn = CreateFrame("Button", "ExtBankWarbandDepositButton", frame, "UIPanelButtonTemplate")
     depositBtn:SetWidth(80); depositBtn:SetHeight(22)
-    depositBtn:SetText("Deposit")
+    depositBtn:SetText(L["Deposit"])
     depositBtn:SetPoint("RIGHT", withdrawBtn, "LEFT", -4, 0)
     depositBtn:SetScript("OnClick", function() StaticPopup_Show("EXTBANK_WARBAND_DEPOSIT") end)
 
@@ -1059,6 +1128,70 @@ local function BuildUI()
     frameTabs = CreateBankTabs(frame, "ExtBankFrameTab", curStore + 2)
     frameTabs[1]:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 12, 6)
     UpdateWarbandTabs()
+end
+
+-- ── DragonUI look ────────────────────────────────────────────────────────────
+-- With DragonUI's bags on (its "Bagster" module draws the bank), the window takes
+-- DragonUI's frame instead of the stretched Blizzard bank art: its metal border and
+-- portrait ring, its title band, its close corner and its bottom tabs. The contents
+-- (bag strip, list, search, sort, Warband gold) do not change.
+local function DragonBags()
+    local dmod = _G.DragonUI and _G.DragonUI.BagsterModule
+    if dmod and dmod.BagsterModule and dmod.BagsterModule.applied
+        and dmod.BagsterAddNineSlice and dmod.SetupBottomTabButton then
+        return dmod
+    end
+end
+
+-- DragonUI tab art on a row of Bank / Extended Bank / Warband Bank tabs.
+local function DragonTabs(tabs)
+    local dmod = DragonBags()
+    if not (dmod and tabs) then return end
+    for i, t in ipairs(tabs) do
+        if not t.dragonSkinned then
+            dmod.SetupBottomTabButton(t)
+            t.dragonSkinned = true
+        end
+        if i > 1 then
+            t:ClearAllPoints()
+            t:SetPoint("LEFT", tabs[i - 1], "RIGHT", 1, 0)   -- DragonUI's own tab gap
+        end
+    end
+end
+
+local function ApplyDragonSkin()
+    if dragonSkinned or not frame then return end
+    local dmod = DragonBags()
+    if not dmod then return end
+    dragonSkinned = true
+
+    for k = 1, #chromeTex do chromeTex[k]:Hide() end
+    dmod.BagsterAddNineSlice(frame)
+    local ns = frame._BagSkin_NineSlice
+    if ns and ns.Bg then
+        ns.Bg:ClearAllPoints()
+        ns.Bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 2, -18)
+        ns.Bg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, 3)
+    end
+
+    -- the ring of DragonUI's top-left corner frames a 56 px portrait
+    portraitTex:SetDrawLayer("BORDER")
+    portraitTex:ClearAllPoints()
+    portraitTex:SetWidth(56); portraitTex:SetHeight(56)
+    portraitTex:SetPoint("TOPLEFT", frame, "TOPLEFT", -3, 6)
+
+    titleText:ClearAllPoints()
+    titleText:SetPoint("TOP", frame, "TOP", 0, -5)
+
+    if frame.closeButton then
+        frame.closeButton:ClearAllPoints()
+        frame.closeButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    end
+
+    DragonTabs(frameTabs)
+    frameTabs[1]:ClearAllPoints()
+    frameTabs[1]:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 13, 2)
+    DragonTabs(bankTabs)
 end
 
 -- The packet says the window now shows the other store: start it clean.
@@ -1072,7 +1205,7 @@ OnStoreChanged = function()
     end
     searchText, matches, bagHasMatch, matchIndex = "", {}, {}, 0
     if searchMarker then searchMarker:Hide() end
-    if titleText then titleText:SetText(curStore == 1 and "Warband Bank" or "Extended Bank") end
+    if titleText then titleText:SetText(curStore == 1 and L["Warband Bank"] or L["Extended Bank"]) end
     if portraitTex then SetPortraitToTexture(portraitTex, curStore == 1 and WARBAND_ICON or VOID_ICON) end
     if curStore ~= 1 then
         StaticPopup_Hide("EXTBANK_WARBAND_DEPOSIT")
@@ -1151,7 +1284,7 @@ function ExtBank_LayoutVisible()
                 if page then for _ in pairs(page) do used = used + 1 end end
                 h.name:ClearAllPoints(); h.name:SetPoint("TOPLEFT", child, "TOPLEFT", 2, -ln.y - 4)
                 h.count:ClearAllPoints(); h.count:SetPoint("TOPRIGHT", child, "TOPRIGHT", -2, -ln.y - 5)
-                h.name:SetText((GetItemInfo(bag.itemId)) or ("Bag " .. (ln.bag + 1)))
+                h.name:SetText((GetItemInfo(bag.itemId)) or (T("Bag {bag}", { bag = (ln.bag + 1) })))
                 h.count:SetText(used .. " / " .. (bag.size or 0))
                 h.name:Show(); h.count:Show()
             else
@@ -1204,17 +1337,17 @@ function ExtBank_Redraw()
             total = total + (bag.size or 0)
         end
     end
-    usageText:SetText(("|cffffd100%d|r / %d"):format(used, total))
+    usageText:SetText((L["|cffffd100%d|r / %d"]):format(used, total))
     local warband = (curStore == 1)
     local locked  = warband and not warbandOpen   -- Warband tab of an account that has not paid yet
-    if sorter.running then sortBtn:SetText("Sorting..."); sortBtn:Disable()
-    elseif locked then sortBtn:SetText("Sort"); sortBtn:Disable()
-    else sortBtn:SetText("Sort"); sortBtn:Enable() end
+    if sorter.running then sortBtn:SetText(L["Sorting..."]); sortBtn:Disable()
+    elseif locked then sortBtn:SetText(L["Sort"]); sortBtn:Disable()
+    else sortBtn:SetText(L["Sort"]); sortBtn:Enable() end
 
     -- hit counter beside the search box, and the hit lookup for the cells
     if searchText == "" then searchStatus:SetText("")
-    elseif #matches == 0 then searchStatus:SetText("|cffff5555none|r")
-    else searchStatus:SetText(("|cffffd100%d / %d|r"):format(matchIndex, #matches)) end
+    elseif #matches == 0 then searchStatus:SetText(L["|cffff5555none|r"])
+    else searchStatus:SetText((L["|cffffd100%d / %d|r"]):format(matchIndex, #matches)) end
     hitKey, focusKey = {}, nil
     for i, m in ipairs(matches) do
         hitKey[m.bag * 256 + m.slot] = true
@@ -1230,12 +1363,12 @@ function ExtBank_Redraw()
     child:SetHeight(contentH)
     view:UpdateScrollChildRect()
     if locked then
-        emptyText:SetText("The Warband Bank is locked.\n\nUnlock it once and every character of your account\nshares its bags and its gold.")
+        emptyText:SetText(L["The Warband Bank is locked.\n\nUnlock it once and every character of your account\nshares its bags and its gold."])
         emptyText:Show()
     elseif #lines == 0 then
         emptyText:SetText(unlockedBags == 0
-            and "No bag slot yet.\n\nPurchase one below, then drag a bag into it."
-            or  "No bag here yet.\n\nDrag a bag onto an empty bag slot below,\nor Shift+right-click a bag in your inventory.")
+            and L["No bag slot yet.\n\nPurchase one below, then drag a bag into it."]
+            or  L["No bag here yet.\n\nDrag a bag onto an empty bag slot below,\nor Shift+right-click a bag in your inventory."])
         emptyText:Show()
     else
         emptyText:Hide()
@@ -1290,16 +1423,16 @@ function ExtBank_Redraw()
     costText:ClearAllPoints(); costText:SetPoint("TOPLEFT", frame, "TOPLEFT", 28, -costY - 5)
     purchaseBtn:ClearAllPoints(); purchaseBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -32, -costY)
     if locked then
-        costText:SetText(("|cffffd100Unlock the Warband Bank:|r %s %s"):format(FormatGold(WARBAND_OPEN_COST), GOLD_ICON))
-        purchaseBtn:SetText("Unlock")
+        costText:SetText((L["|cffffd100Unlock the Warband Bank:|r %s %s"]):format(FormatGold(WARBAND_OPEN_COST), GOLD_ICON))
+        purchaseBtn:SetText(L["Unlock"])
         purchaseBtn:Enable()
     elseif unlockedBags < MAX_BAGS then
-        costText:SetText(("|cffffd100Cost:|r %s %s"):format(FormatGold(NextSlotCost()), GOLD_ICON))
-        purchaseBtn:SetText("Purchase")
+        costText:SetText((L["|cffffd100Cost:|r %s %s"]):format(FormatGold(NextSlotCost()), GOLD_ICON))
+        purchaseBtn:SetText(L["Purchase"])
         purchaseBtn:Enable()
     else
-        purchaseBtn:SetText("Purchase")
-        costText:SetText("|cffffd100All bag slots unlocked|r")
+        purchaseBtn:SetText(L["Purchase"])
+        costText:SetText(L["|cffffd100All bag slots unlocked|r"])
         purchaseBtn:Disable()
     end
 
@@ -1307,24 +1440,24 @@ function ExtBank_Redraw()
     if warband and not locked then
         local goldY = costY + GOLD_ROW_H
         goldText:ClearAllPoints(); goldText:SetPoint("TOPLEFT", frame, "TOPLEFT", 28, -goldY - 5)
-        goldText:SetText("|cffffd100Warband gold:|r " .. MoneyString(warbandMoney))
+        goldText:SetText(T("|cffffd100Warband gold:|r {warbandMoney}", { warbandMoney = MoneyString(warbandMoney) }))
         withdrawBtn:ClearAllPoints(); withdrawBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -32, -goldY)
         if warbandMoney > 0 then withdrawBtn:Enable() else withdrawBtn:Disable() end
         goldText:Show(); depositBtn:Show(); withdrawBtn:Show()
     else
         goldText:Hide(); depositBtn:Hide(); withdrawBtn:Hide()
     end
-    hintText:SetText(locked and "Shared by every character of your account"
-        or warband and "Right-click to store anything you could mail to an alt"
-        or "Right-click an item in your bags to store it")
+    hintText:SetText(locked and L["Shared by every character of your account"]
+        or warband and L["Right-click to store anything you could mail to an alt"]
+        or L["Right-click an item in your bags to store it"])
 
     -- the chrome follows the height; the bottom bar holds the bag-slot count
     local h = costY + 63 + ((warband and not locked) and GOLD_ROW_H or 0)
     frame:SetHeight(h)
     LayoutChrome(FRAME_W, h)
     footText:ClearAllPoints(); footText:SetPoint("TOPLEFT", frame, "TOPLEFT", 30, -(h - 27))
-    footText:SetText(("|cffa8a8a8Bag slots:|r %d"):format(unlockedBags)
-        .. (paged and ("   |cffa8a8a8Page|r %d / %d"):format(stripPage + 1, pages) or ""))
+    footText:SetText((L["|cffa8a8a8Bag slots:|r %d"]):format(unlockedBags)
+        .. (paged and T("   |cffa8a8a8Page|r {page} / {pages}", { page = stripPage + 1, pages = pages }) or ""))
     hintText:ClearAllPoints(); hintText:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -(h - 27))
 
     -- tabs only while a banker session is live: they swap the windows / stores
@@ -1340,11 +1473,25 @@ end
 local function BagnonBankPanel()
     local f = _G["BagnonFramebank"]
     if f and f:IsShown() then return f end
+    -- DragonUI's Bagster (embedded) does the same: its bank is one of the
+    -- DragonUI_BagsterFrameN windows (isBank), and its OnHide ends the banker
+    -- session like Bagnon's, so it takes the same dock-beside path.
+    for i = 1, 4 do
+        f = _G["DragonUI_BagsterFrame" .. i]
+        if f and f.isBank and f:IsShown() then return f end
+    end
     return nil
+end
+-- ElvUI (offered on the website) draws the bank in its own window and never shows
+-- BankFrame. Like the native frame, its OnHide only ends the banker session
+-- (CloseBankFrame), so it is swapped in place with that script set aside.
+local function ElvUIBankPanel()
+    local f = _G["ElvUI_BankContainerFrame"]
+    if f and f:IsShown() then return f end
 end
 local function VisibleBankPanel()
     if BankFrame and BankFrame:IsShown() then return BankFrame end
-    return BagnonBankPanel()
+    return ElvUIBankPanel() or BagnonBankPanel()
 end
 
 -- Hide the native bank WITHOUT ending the banker session: BankFrame's OnHide
@@ -1353,7 +1500,39 @@ end
 -- frame can be swapped away like this -- hiding Bagnon's bank frame runs its
 -- OnHide, which calls CloseBankFrame() unconditionally and kills the session,
 -- so with Bagnon the ext bank docks BESIDE the bank window instead.
+-- DragonUI's bank window (Bagster, isBank) can be swapped away too: its OnHide ends
+-- the banker session only when the frame says it is the bank (InventoryFrame:OnHide
+-- -> self:IsBank()), so the flag is lowered for that one hide.
+local hidDragonBank = nil   -- the DragonUI bank window we hid, owed a Show on close
+local hidElvBank = nil      -- the ElvUI bank window we hid, owed a Show on close
+local function DragonBankPanel()
+    if not DragonBags() then return nil end
+    for i = 1, 4 do
+        local f = _G["DragonUI_BagsterFrame" .. i]
+        if f and f.isBank and f:IsShown() then return f end
+    end
+end
+
 local function HideBankPanel()
+    local dragon = DragonBankPanel()
+    if dragon then
+        dragon.isBank = false
+        dragon:Hide()
+        dragon.isBank = true
+        hidDragonBank = dragon
+        hidBankPanel = true
+        return
+    end
+    local elv = ElvUIBankPanel()
+    if elv then
+        local onHide = elv:GetScript("OnHide")
+        elv:SetScript("OnHide", nil)
+        elv:Hide()
+        elv:SetScript("OnHide", onHide)
+        hidElvBank = elv
+        hidBankPanel = true
+        return
+    end
     if not (BankFrame and BankFrame:IsShown()) then return end
     local onHide = BankFrame:GetScript("OnHide")
     BankFrame:SetScript("OnHide", nil)
@@ -1362,16 +1541,25 @@ local function HideBankPanel()
     hidBankPanel = true
 end
 local function RestoreBankPanel()
-    if hidBankPanel and bankOpen and BankFrame and not BankFrame:IsShown() then
-        ShowUIPanel(BankFrame)
+    if hidBankPanel and bankOpen then
+        if hidDragonBank then
+            if not hidDragonBank:IsShown() then hidDragonBank:Show() end
+        elseif hidElvBank then
+            if not hidElvBank:IsShown() then hidElvBank:Show() end
+        elseif BankFrame and not BankFrame:IsShown() then
+            ShowUIPanel(BankFrame)
+        end
     end
     hidBankPanel = false
+    hidDragonBank = nil
+    hidElvBank = nil
 end
 
 -- store: 0 = Extended Bank (default), 1 = Warband bank. Already open: switch store.
 function ExtBank_Open(store)
     store = store or 0
     if not frame then BuildUI() end
+    ApplyDragonSkin()
     if isOpen then
         if store ~= curStore then SelectStore(store) end   -- the answer redraws the window
         return
@@ -1382,8 +1570,17 @@ function ExtBank_Open(store)
     -- windows share the bank chrome, so the portraits line up. With Bagnon the
     -- bank window can't be hidden (its OnHide ends the banker session), so dock
     -- the extended bank to its right instead of replacing it.
-    if bankOpen and BankFrame and BankFrame:IsShown() then
-        local l, t = BankFrame:GetLeft(), BankFrame:GetTop()
+    local inPlace = bankOpen and ((BankFrame and BankFrame:IsShown() and BankFrame) or DragonBankPanel())
+    local elvBank = bankOpen and not inPlace and ElvUIBankPanel()
+    if elvBank then
+        -- ElvUI's bank sits low at the screen's left edge and is shorter than this
+        -- window: bottom-aligned on it, raised by the height of the tabs that hang
+        -- under this window so they stay on screen
+        frame:ClearAllPoints()
+        frame:SetPoint("BOTTOMLEFT", elvBank, "BOTTOMLEFT", 0, 26)
+    elseif inPlace then
+        -- the native bank, or DragonUI's: both can be hidden without ending the session
+        local l, t = inPlace:GetLeft(), inPlace:GetTop()
         if l and t then
             frame:ClearAllPoints()
             frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
@@ -1414,6 +1611,8 @@ function ExtBank_Close(endSession)
     StaticPopup_Hide("EXTBANK_WARBAND_WITHDRAW")
     if endSession and bankOpen then
         hidBankPanel = false
+        hidDragonBank = nil
+        hidElvBank = nil
         CloseBankFrame()     -- BANKFRAME_CLOSED follows; the bank stays hidden
     else
         RestoreBankPanel()   -- swap back to the personal bank if the session is live
@@ -1439,7 +1638,7 @@ ExtBank.SortKey, ExtBank.KeyLess = SortKey, KeyLess
 -- BANKFRAME_OPENED handler runs, so we poll for a moment until one of the two
 -- is actually on screen.
 local function AttachBankTabs(panel)
-    if not bankTabs then bankTabs = CreateBankTabs(panel, "ExtBankBankTab", 1); UpdateWarbandTabs() end
+    if not bankTabs then bankTabs = CreateBankTabs(panel, "ExtBankBankTab", 1); UpdateWarbandTabs(); DragonTabs(bankTabs) end
     for _, t in ipairs(bankTabs) do
         t:SetParent(panel)
         t:SetFrameStrata(panel:GetFrameStrata())
@@ -1450,6 +1649,9 @@ local function AttachBankTabs(panel)
     if panel == BankFrame then
         -- the bank's art ends 424 px down its 512 px frame
         bankTabs[1]:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -418)
+    elseif panel == _G["ElvUI_BankContainerFrame"] and (panel:GetBottom() or 0) < 40 then
+        -- ElvUI's bank grows up from the bottom of the screen: no room under it
+        bankTabs[1]:SetPoint("BOTTOMLEFT", panel, "TOPLEFT", 12, -6)
     else
         bankTabs[1]:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 12, 6)
     end

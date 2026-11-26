@@ -1,0 +1,4179 @@
+-- Copyright (c) 2026 NeticSoul. Licensed under the MIT License; see LICENSE.
+
+local addon = DragonUI
+local UF = addon.UF
+local L = addon.L
+
+-- ====================================================================
+-- DRAGONUI PLAYER FRAME MODULE
+-- ====================================================================
+
+-- ============================================================================
+-- MODULE VARIABLES & CONFIGURATION
+-- ============================================================================
+
+-- Variable to defer application after combat
+local deferredPositionUpdate = false
+
+local Module = {
+    playerFrame = nil,
+    textSystem = nil,
+    initialized = false,
+    applied = false,
+    eventsFrame = nil,
+    hooks = {},
+    registeredEvents = {},
+    originalStates = {}
+}
+
+if addon.RegisterModule then
+    addon:RegisterModule("player", Module,
+        L["Player Frame"],
+        L["Dragonflight-styled player unit frame"])
+end
+-- Animation variables for Combat Flash pulse effect
+local combatPulseTimer = 0
+local restPulseTimer = 0
+
+-- Elite Glow System State
+local eliteGlowActive = false
+local statusGlowVisible = false
+local combatGlowVisible = false
+
+-- Cache frequently accessed globals for performance
+local PlayerFrame = _G.PlayerFrame
+local PlayerFrameHealthBar = _G.PlayerFrameHealthBar
+local PlayerFrameManaBar = _G.PlayerFrameManaBar
+local PlayerPortrait = _G.PlayerPortrait
+local PlayerStatusTexture = _G.PlayerStatusTexture
+local PlayerFrameFlash = _G.PlayerFrameFlash
+local PlayerRestIcon = _G.PlayerRestIcon
+local PlayerStatusGlow = _G.PlayerStatusGlow
+local PlayerRestGlow = _G.PlayerRestGlow
+local PlayerName = _G.PlayerName
+local PlayerLevelText = _G.PlayerLevelText
+
+-- Texture paths from shared core (single source of truth)
+local TEXTURES = UF.TEXTURES.player
+
+-- Keep a fixed on-screen border size so higher-resolution replacements
+-- do not render larger than the original DragonUI frame.
+local PLAYER_BORDER_WIDTH = 256
+local PLAYER_BORDER_HEIGHT = 128
+
+-- Dedicated player corner embellishment (normal state) from standalone texture.
+local PLAYER_CORNER_TEXTURE = "Interface\\AddOns\\ProjectEbonhold\\DragonUI\\Textures\\UnitFrames\\Player\\ui-hud-unitframe-player-portraiton-cornerembellishment-2x"
+local PLAYER_CORNER_TEX_COORDS = {
+    0, 44 / 64,
+    0, 44 / 64
+}
+
+-- Combat icon uses the white crossed-swords glyph from atlas crop.
+local PLAYER_COMBAT_ICON_TEXTURE = "Interface\\AddOns\\ProjectEbonhold\\DragonUI\\Textures\\UnitFrames\\Player\\uiunitframe2x_ptr_icons_crop"
+local PLAYER_COMBAT_ICON_TEX_COORDS = {
+    2 / 256, 32 / 256,   -- x: 2..31 (exclusive right edge at 32)
+    63 / 256, 90 / 256   -- y: 63..89 (exclusive bottom edge at 90)
+}
+
+-- Coordinates for elite/rare glows (inverted target frame)
+local ELITE_GLOW_COORDINATES = {
+    -- Using the correct texture: 'Interface\\AddOns\\ProjectEbonhold\\DragonUI\\Textures\\UI\\UnitFrame'
+    texCoord = {0.2061015625, 0, 0.537109375, 0.712890625},
+    size = {209, 90},
+    texture = 'Interface\\AddOns\\ProjectEbonhold\\DragonUI\\Textures\\UI\\UnitFrame'
+}
+
+-- Combat Flash animation settings *NO Elite activated
+local COMBAT_PULSE_SETTINGS = {
+    speed = 9, -- Pulse speed
+    minAlpha = 0.3, -- Minimum transparency
+    maxAlpha = 1.0, -- Maximum transparency
+    enabled = true -- Enable/disable animation
+}
+
+-- Elite Combat Flash animation settings (when elite decoration is ON)
+local ELITE_COMBAT_PULSE_SETTINGS = {
+    speed = 9, -- Speed for combat in elite mode (different from normal)
+    minAlpha = 0.2,
+    maxAlpha = 0.9,
+    enabled = true
+}
+
+-- Retail's PlayerFrame_OnUpdate breathing: alpha runs 55/255 -> 1 -> 55/255 once a second.
+local function RestPulseAlpha(t)
+    local phase = t % 1
+    if phase > 0.5 then phase = 1 - phase end
+    return (55 + phase * 400) / 255
+end
+
+-- Event lookup tables for O(1) performance
+local HEALTH_EVENTS = {
+    UNIT_HEALTH = true,
+    UNIT_MAXHEALTH = true
+}
+
+-- 3.3.5a has no UNIT_POWER/UNIT_MAXPOWER; power changes fire one event per power token.
+local POWER_EVENTS = {
+    UNIT_DISPLAYPOWER = true,
+    UNIT_MANA = true,
+    UNIT_RAGE = true,
+    UNIT_FOCUS = true,
+    UNIT_ENERGY = true,
+    UNIT_HAPPINESS = true,
+    UNIT_RUNIC_POWER = true,
+    UNIT_MAXMANA = true,
+    UNIT_MAXRAGE = true,
+    UNIT_MAXFOCUS = true,
+    UNIT_MAXENERGY = true,
+    UNIT_MAXHAPPINESS = true,
+    UNIT_MAXRUNIC_POWER = true
+}
+
+-- Rune type coordinates
+local RUNE_COORDS = {
+    [1] = {0 / 128, 34 / 128, 0 / 128, 34 / 128}, -- Blood
+    [2] = {0 / 128, 34 / 128, 68 / 128, 102 / 128}, -- Unholy
+    [3] = {34 / 128, 68 / 128, 0 / 128, 34 / 128}, -- Frost
+    [4] = {38 / 128, 72 / 128, 68 / 128, 102 / 128} -- Death
+}
+
+-- ============================================================================
+-- UTILITY FUNCTIONS
+-- ============================================================================
+
+-- Get player configuration with defaults fallback via shared core
+local function GetPlayerConfig()
+    return UF.GetConfig("player")
+end
+
+local function IsPlayerModuleEnabled()
+    return UF and UF.IsEnabled and UF.IsEnabled("player")
+end
+
+-- unitframe.player.enabled = false: Blizzard's original PlayerFrame (the switch takes a reload, and
+-- ElvUI's yield sets it too). Every entry point below stands down, so the stock frame is never touched.
+local function BlizzardFrame()
+    return not IsPlayerModuleEnabled()
+end
+
+-- Check if we're currently in a vehicle
+local function IsInVehicle()
+    return UnitHasVehicleUI("player")
+end
+
+-- Check if fat healthbar is enabled in config (regardless of vehicle/decoration state)
+local function IsFatConfigEnabled()
+    local config = GetPlayerConfig()
+    return config and config.fat_healthbar or false
+end
+
+-- Check if fat healthbar mode should be visually active right now
+-- Fat mode is disabled during vehicle (reverts to normal vehicle frame)
+local function IsFatHealthbarActive()
+    if not IsFatConfigEnabled() then return false end
+    -- Fat mode disabled during vehicle — show standard vehicle interface
+    if IsInVehicle() then return false end
+    -- The portrait-off art has no fat variant: the two options exclude each other (portrait off wins).
+    return not UF.IsCompact("player")
+end
+
+-- Get the correct BASE texture path (fat or normal, not vehicle — vehicle uses atlas)
+local function GetBaseTexture()
+    return IsFatHealthbarActive() and TEXTURES.BASE_FAT or TEXTURES.BASE
+end
+
+-- Get the correct BORDER texture path (fat or normal, not vehicle — vehicle uses atlas)
+local function GetBorderTexture()
+    return IsFatHealthbarActive() and TEXTURES.BORDER_FAT or TEXTURES.BORDER
+end
+
+-- Get fat mana bar configuration values
+local function GetFatManaConfig()
+    local config = GetPlayerConfig()
+    if not config then return 200, 8, false end
+    return config.fat_manabar_width or 200,
+           config.fat_manabar_height or 8,
+           config.fat_manabar_hidden or false
+end
+
+-- Mana bar texture override lookup (vanilla Blizzard textures available in 3.3.5a)
+local MANABAR_TEXTURE_OVERRIDES = {
+    blizzard       = "Interface\\TargetingFrame\\UI-StatusBar",
+    blizzard_flat  = "Interface\\ChatFrame\\ChatFrameBackground",
+    smooth         = "Interface\\PaperDollInfoFrame\\UI-Character-Skills-Bar",
+    aluminium      = "Interface\\BUTTONS\\WHITE8X8",
+    litestep       = "Interface\\PaperDollInfoFrame\\UI-Character-Tab-Highlight",
+}
+
+-- Dragonflight-style power bar colors (from RetailUI reference)
+-- These are applied via SetStatusBarColor on vanilla override textures
+-- which are neutral/grayscale and need explicit coloring.
+local DF_POWER_COLORS = {
+    ["MANA"]         = { r = 0.02, g = 0.32, b = 0.71 },
+    ["RAGE"]         = { r = 1.00, g = 0.00, b = 0.00 },
+    ["FOCUS"]        = { r = 1.00, g = 0.50, b = 0.25 },
+    ["ENERGY"]       = { r = 1.00, g = 1.00, b = 0.00 },
+    ["HAPPINESS"]    = { r = 0.00, g = 1.00, b = 1.00 },
+    ["RUNES"]        = { r = 0.50, g = 0.50, b = 0.50 },
+    ["RUNIC_POWER"]  = { r = 0.00, g = 0.82, b = 1.00 },
+    ["AMMOSLOT"]     = { r = 0.80, g = 0.60, b = 0.00 },
+    ["FUEL"]         = { r = 0.00, g = 0.55, b = 0.50 },
+}
+
+-- Get the correct power bar texture path, applying user texture override ONLY in fat mode
+local function GetPowerBarTexture(powerTypeString)
+    -- Override textures only apply when fat healthbar is active
+    if IsFatHealthbarActive() then
+        local config = GetPlayerConfig()
+        local textureSetting = config and config.manabar_texture or "dragonui"
+        if textureSetting ~= "dragonui" and MANABAR_TEXTURE_OVERRIDES[textureSetting] then
+            return MANABAR_TEXTURE_OVERRIDES[textureSetting]
+        end
+    end
+    
+    -- Default DragonUI per-power-type textures (normal mode always uses these)
+    return TEXTURES.POWER_BARS[powerTypeString] or TEXTURES.POWER_BARS.MANA
+end
+
+-- Create or get the fat mana bar anchor frame (for editor mode movability)
+local function GetOrCreateFatManaAnchor()
+    if Module.fatManaFrame then return Module.fatManaFrame end
+
+    local width, height = GetFatManaConfig()
+    Module.fatManaFrame = addon.CreateUIFrame(width, height + 4, "ManaBar")
+    Module.fatManaFrame:SetFrameStrata("LOW")
+
+    return Module.fatManaFrame
+end
+
+-- Apply fat mana bar position from widget config
+local function ApplyFatManaPosition()
+    if not Module.fatManaFrame then return end
+
+    local widgetConfig = addon:GetConfigValue("widgets", "fat_manabar")
+    if not widgetConfig then
+        widgetConfig = { anchor = "TOPLEFT", posX = 187, posY = -9 }
+    end
+
+    Module.fatManaFrame:ClearAllPoints()
+    Module.fatManaFrame:SetPoint(
+        widgetConfig.anchor or "TOPLEFT", UIParent,
+        widgetConfig.anchor or "TOPLEFT",
+        widgetConfig.posX or 187, widgetConfig.posY or -9
+    )
+end
+
+-- Apply fat mana bar config (size, visibility, position)
+local function ApplyFatManaBar()
+    local fatMode = IsFatHealthbarActive()
+    local hasVehicleUI = UnitHasVehicleUI("player")
+
+    if not fatMode then
+        -- Normal mode: standard mana bar positioning (ignore fat settings)
+        PlayerFrameManaBar:ClearAllPoints()
+        if hasVehicleUI then
+            -- Vehicle: position relative to PlayerFrame (matches RetailUI pattern)
+            PlayerFrameManaBar:SetSize(117, 9)
+            PlayerFrameManaBar:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 114, -58.5)
+        else
+            local mana = UF.GetFrameSkin().player.bars.mana
+            PlayerFrameManaBar:SetSize(mana.w, mana.h)
+            PlayerFrameManaBar:SetPoint('LEFT', PlayerPortrait, 'RIGHT', mana.x, mana.y)
+        end
+        PlayerFrameManaBar:Show()
+
+        -- Hide the fat anchor if it exists
+        if Module.fatManaFrame then
+            Module.fatManaFrame:SetSize(1, 1)
+        end
+        return
+    end
+
+    -- Fat mode: check hidden state
+    local width, height, hidden = GetFatManaConfig()
+    if hidden then
+        PlayerFrameManaBar:Hide()
+        if Module.fatManaFrame then
+            Module.fatManaFrame:SetSize(1, 1)
+        end
+        return
+    end
+
+    -- Fat mode: use configurable width/height and anchor frame
+    PlayerFrameManaBar:Show()
+
+    -- Create anchor if needed and apply position
+    local anchor = GetOrCreateFatManaAnchor()
+    anchor:SetSize(width, height + 4)
+    ApplyFatManaPosition()
+
+    -- Lazy-register in editor system if not already registered
+    if not Module.fatManaRegistered and addon.RegisterEditableFrame then
+        addon:RegisterEditableFrame({
+            name = "fat_manabar",
+            frame = anchor,
+            configPath = {"widgets", "fat_manabar"},
+            editorVisible = function() return IsFatHealthbarActive() end,
+            onHide = function()
+                ApplyFatManaBar()
+            end,
+            module = Module
+        })
+        Module.fatManaRegistered = true
+    end
+
+    -- Parent mana bar to anchor frame
+    PlayerFrameManaBar:ClearAllPoints()
+    PlayerFrameManaBar:SetSize(hasVehicleUI and 117 or width, hasVehicleUI and 9 or height)
+    PlayerFrameManaBar:SetPoint('CENTER', anchor, 'CENTER', 0, 0)
+end
+
+-- ============================================================================
+-- BLIZZARD FRAME MANAGEMENT
+-- ============================================================================
+-- Hide Blizzard's original player frame texts permanently using alpha 0
+local function HideBlizzardPlayerTexts()
+    if BlizzardFrame() then return end
+    -- Get Blizzard's ORIGINAL text elements (not our custom ones)
+    local blizzardTexts = { -- These are the actual Blizzard frame text elements in WoW 3.3.5a
+    PlayerFrameHealthBar.TextString, PlayerFrameManaBar.TextString, -- Alternative names that might exist
+    _G.PlayerFrameHealthBarText, _G.PlayerFrameManaBarText}
+
+    -- Hide each BLIZZARD text element permanently with alpha 0 (ONE TIME SETUP)
+    for _, textElement in pairs(blizzardTexts) do
+        if textElement and not textElement.DragonUIHidden then
+            -- Set alpha to 0 immediately (taint-free)
+            textElement:SetAlpha(0)
+
+            -- Phase 2: hooksecurefunc instead of direct .Show override to avoid taint
+            hooksecurefunc(textElement, "Show", function(self)
+                if not self.DragonUI_ShowGuard then
+                    self.DragonUI_ShowGuard = true
+                    self:SetAlpha(0)
+                    self.DragonUI_ShowGuard = nil
+                end
+            end)
+
+            -- Mark as processed to avoid duplicate setup
+            textElement.DragonUIHidden = true
+        end
+    end
+end
+-- Hide and permanently disable Blizzard glow effects
+local function HideBlizzardGlows()
+    local glows = {PlayerStatusGlow, PlayerRestGlow}
+    for _, glow in ipairs(glows) do
+        if glow then
+            glow:Hide()
+            glow:SetAlpha(0)
+            -- Permanent hook: prevent Blizzard from re-showing the resting glow
+            if not glow.__DragonUI_GlowHooked and glow.HookScript then
+                glow:HookScript("OnShow", function(self)
+                    self:Hide()
+                    self:SetAlpha(0)
+                end)
+                glow.__DragonUI_GlowHooked = true
+            end
+        end
+    end
+    -- Always suppress Blizzard's PlayerFrameFlash (combat red flash)
+    -- UIFrameFlash drives alpha in an OnUpdate loop, so we must stop it here too
+    if PlayerFrameFlash then
+        PlayerFrameFlash:Hide()
+        PlayerFrameFlash:SetAlpha(0)
+        if UIFrameFlashStop then
+            UIFrameFlashStop(PlayerFrameFlash)
+        end
+    end
+end
+
+-- Remove unwanted Blizzard frame elements
+local function RemoveBlizzardFrames(isVehicle)
+    -- NOTE: PlayerGuideIcon is intentionally NOT in this list — it's the LFG
+    -- "dungeon leader" flag (shares LeaderIcon's anchor, shown instead of it for
+    -- LFG-formed groups), not decorative clutter. See UpdateLeaderIconPosition().
+    local elementsToHide = {"PlayerAttackIcon", "PlayerFrameBackground", "PlayerAttackBackground",
+                            "PlayerFrameGroupIndicatorLeft", "PlayerFrameGroupIndicatorRight"}
+
+    for _, name in ipairs(elementsToHide) do
+        local obj = _G[name]
+        if obj and not obj.__DragonUIHidden then
+            obj:Hide()
+            obj:SetAlpha(0)
+
+            if obj.HookScript then
+                obj:HookScript("OnShow", function(self)
+                    self:Hide()
+                    self:SetAlpha(0)
+                end)
+            end
+
+            if obj.GetObjectType and obj:GetObjectType() == "Texture" and obj.SetTexture then
+                obj:SetTexture(nil)
+            end
+
+            obj.__DragonUIHidden = true
+        end
+    end
+
+    -- Hide standard frame textures (always hidden — we use our own custom textures)
+    if PlayerFrameTexture then
+        PlayerFrameTexture:SetAlpha(0)
+    end
+    -- Hide Blizzard's PlayerFrameBackground (global, not our DragonUI one)
+    if PlayerFrameBackground then
+        PlayerFrameBackground:SetAlpha(0)
+    end
+
+    -- Vehicle texture: toggle visibility only — positioning and atlas applied by
+    -- UpdatePlayerDragonDecoration() which runs at the end of ChangePlayerframe()
+    if PlayerFrameVehicleTexture then
+        if isVehicle then
+            PlayerFrameVehicleTexture:Show()
+        else
+            PlayerFrameVehicleTexture:SetAlpha(0)
+        end
+    end
+end
+
+-- ============================================================================
+-- ELITE GLOW SYSTEM - Switch system
+
+-- Check if elite mode is active based on dragon decoration
+local function IsEliteModeActive()
+    local config = GetPlayerConfig()
+    local decorationType = config.dragon_decoration or "none"
+    return UF.PLAYER_DECORATIONS[decorationType] ~= nil
+end
+
+-- Player art helpers in one local: this file sits at Lua 5.1's 200-local limit.
+local PlayerArt = {
+    noEdges = { 0, 0 },
+    texts = {
+        { prefix = "PlayerFrameHealth", key = "health", y = 0 },
+        -- Half a unit under its bar's centre, like the target's mana text.
+        { prefix = "PlayerFrameMana", key = "mana", y = -0.5 },
+    },
+    -- Corner strips per bar: the decoration's mana, or its health when fat merges the wells.
+    pools = {},
+    strips = {},
+    count = 0,
+    shown = false,
+    fillStart = 0,
+}
+
+-- Skin art for the fat layout; nil means DragonUI's own fat art, with fixed numbers and no skin spots.
+function PlayerArt.FatSkin()
+    if not IsFatHealthbarActive() then return nil end
+    local skin = UF.GetFrameSkin()
+    return IsEliteModeActive() and skin.playerDecorationFat or skin.playerFat
+end
+
+-- The fat skin pieces keep the normal art's contour, so only the legacy fat art loses the skin's spots.
+function PlayerArt.LegacyFat()
+    return IsFatHealthbarActive() and not PlayerArt.FatSkin()
+end
+
+-- The skin kind for the frame's spots (name, level, glows); uf_compact.lua adds the portrait-off ones.
+function PlayerArt.Kind()
+    local compact = UF.IsCompact("player")
+    if IsEliteModeActive() then
+        return compact and "playerCompactDecoration" or "playerDecoration"
+    end
+    return compact and "playerCompact" or "player"
+end
+
+-- The art the bars sit in without a decoration's own: portrait off, or the normal frame.
+function PlayerArt.BaseKind()
+    return UF.IsCompact("player") and "playerCompact" or "player"
+end
+
+-- The decoration's bent dragon on a portrait-off frame, or nil.
+function PlayerArt.CompactDragon()
+    if not UF.IsCompact("player") then return nil end
+    local decoration = UF.PLAYER_DECORATIONS[GetPlayerConfig().dragon_decoration or "none"]
+    return decoration and UF.GetCompactDragon(decoration.kind, decoration.set)
+end
+
+-- Portrait off, the mouse area ends at the bars or a decoration's dragon; Blizzard's insets come back after.
+function PlayerArt.ApplyHitRect()
+    if UF.IsCompact("player") then
+        PlayerArt.hitHome = PlayerArt.hitHome or { PlayerFrame:GetHitRectInsets() }
+        local dragon = PlayerArt.CompactDragon()
+        -- Frame 98.5..226.5 by 20..66 on the 232x100 PlayerFrame; the mirrored dragon starts w - x left of 100.
+        local left = dragon and math.min(98.5, 100 - dragon.x - dragon.w) or 98.5
+        UF.SetHitRect(PlayerFrame, "player_hitrect", left, 5.5, 20, 34)
+    elseif PlayerArt.hitHome then
+        UF.SetHitRect(PlayerFrame, "player_hitrect", unpack(PlayerArt.hitHome))
+        PlayerArt.hitHome = nil
+    end
+end
+
+-- Get combat flash configuration (enabled + opacity multiplier)
+local function GetCombatFlashConfig()
+    local config = GetPlayerConfig()
+    local enabled = config.combat_flash_enabled ~= false -- default true
+    local opacity = config.combat_flash_opacity or 1.0
+    return enabled, opacity
+end
+
+-- Toggle glow visibility based on elite mode
+local function UpdateGlowVisibility()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame then
+        return
+    end
+
+    -- Check if rest glow is disabled by user option
+    local config = GetPlayerConfig()
+    local restGlowEnabled = config.show_rest_glow ~= false -- default true
+
+    -- Vehicle mode: the normal/elite glows don't fit the vehicle border; the Vehicle* frames carry retail's vehicle cells.
+    if IsInVehicle() then
+        -- Suppress ALL normal/elite custom glows (wrong shape for vehicle frame)
+        if dragonFrame.DragonUICombatGlow then
+            dragonFrame.DragonUICombatGlow:Hide()
+        end
+        if dragonFrame.DragonUIStatusGlow then
+            dragonFrame.DragonUIStatusGlow:Hide()
+        end
+        if dragonFrame.EliteStatusGlow then
+            dragonFrame.EliteStatusGlow:Hide()
+        end
+        if dragonFrame.EliteCombatGlow then
+            dragonFrame.EliteCombatGlow:Hide()
+        end
+
+        -- Suppress Blizzard's native flash/status to avoid UIFrameFlash conflicts
+        if PlayerFrameFlash then
+            PlayerFrameFlash:Hide()
+            PlayerFrameFlash:SetAlpha(0)
+        end
+        if PlayerStatusTexture then
+            PlayerStatusTexture:Hide()
+            PlayerStatusTexture:SetAlpha(0)
+        end
+
+        -- Vehicle combat flash: dedicated DragonUI frame
+        local combatFlashEnabled = GetCombatFlashConfig()
+        if dragonFrame.VehicleCombatFlash then
+            if combatGlowVisible and combatFlashEnabled then
+                dragonFrame.VehicleCombatFlash:Show()
+                dragonFrame.VehicleCombatTexture:SetAlpha(1)
+            else
+                dragonFrame.VehicleCombatFlash:Hide()
+            end
+        end
+
+        -- Vehicle status (resting) glow: dedicated DragonUI frame
+        if dragonFrame.VehicleStatusGlow then
+            if statusGlowVisible and restGlowEnabled then
+                dragonFrame.VehicleStatusGlow:Show()
+                dragonFrame.VehicleStatusTexture:SetAlpha(1)
+            else
+                dragonFrame.VehicleStatusGlow:Hide()
+            end
+        end
+        return
+    end
+
+    --  DragonUI always suppresses Blizzard's PlayerStatusTexture
+    --  Custom glow is handled by DragonUIStatusGlow / EliteStatusGlow / VehicleStatusGlow
+    if PlayerStatusTexture then
+        PlayerStatusTexture:Hide()
+        PlayerStatusTexture:SetAlpha(0)
+    end
+
+    eliteGlowActive = IsEliteModeActive()
+    local combatFlashEnabled = GetCombatFlashConfig()
+
+    if dragonFrame.DragonUICombatGlow then
+        if eliteGlowActive then
+            -- In elite mode: hide normal combat glow
+            dragonFrame.DragonUICombatGlow:Hide()
+            dragonFrame.DragonUICombatGlow:SetAlpha(0)
+        else
+            -- In normal mode: show/hide original glow based on combatGlowVisible
+            dragonFrame.DragonUICombatGlow:SetAlpha(1) -- Restore alpha
+            if combatGlowVisible and combatFlashEnabled then
+                dragonFrame.DragonUICombatGlow:Show()
+            else
+                dragonFrame.DragonUICombatGlow:Hide()
+            end
+        end
+    end
+
+    -- Normal/fat status glow (only when NOT in elite mode)
+    if dragonFrame.DragonUIStatusGlow then
+        if not eliteGlowActive and statusGlowVisible and restGlowEnabled then
+            dragonFrame.DragonUIStatusGlow:Show()
+        else
+            dragonFrame.DragonUIStatusGlow:Hide()
+        end
+    end
+
+    -- Update elite glows (only in elite mode)
+    if eliteGlowActive then
+        if dragonFrame.EliteStatusGlow then
+            if statusGlowVisible and restGlowEnabled then
+                dragonFrame.EliteStatusGlow:Show()
+            else
+                dragonFrame.EliteStatusGlow:Hide()
+            end
+        end
+        if dragonFrame.EliteCombatGlow then
+            if combatGlowVisible and combatFlashEnabled then
+                dragonFrame.EliteCombatGlow:Show()
+            else
+                dragonFrame.EliteCombatGlow:Hide()
+            end
+        end
+    else
+        -- Hide elite glows in normal mode
+        if dragonFrame.EliteStatusGlow then
+            dragonFrame.EliteStatusGlow:Hide()
+        end
+        if dragonFrame.EliteCombatGlow then
+            dragonFrame.EliteCombatGlow:Hide()
+        end
+    end
+
+    -- Hide vehicle glows when NOT in vehicle
+    if dragonFrame.VehicleCombatFlash then
+        dragonFrame.VehicleCombatFlash:Hide()
+    end
+    if dragonFrame.VehicleStatusGlow then
+        dragonFrame.VehicleStatusGlow:Hide()
+    end
+end
+
+-- Set status glow state (replaces original logic)
+local function SetStatusGlowVisible(visible)
+    statusGlowVisible = visible
+    UpdateGlowVisibility()
+end
+
+-- Set combat glow state (replaces original logic)
+local function SetEliteCombatFlashVisible(visible)
+    combatGlowVisible = visible
+    UpdateGlowVisibility()
+end
+
+-- ============================================================================
+-- ANIMATION & VISUAL EFFECTS
+-- ============================================================================
+
+-- Animate texture coordinates for rest icon
+local function AnimateTexCoords(texture, textureWidth, textureHeight, frameWidth, frameHeight, numFrames, elapsed,
+    throttle)
+    if not texture or not texture:IsVisible() then
+        return
+    end
+
+    texture.animationTimer = (texture.animationTimer or 0) + elapsed
+    if texture.animationTimer >= throttle then
+        texture.animationFrame = ((texture.animationFrame or 0) + 1) % numFrames
+        local col = texture.animationFrame % (textureWidth / frameWidth)
+        local row = math.floor(texture.animationFrame / (textureWidth / frameWidth))
+
+        local left = col * frameWidth / textureWidth
+        local right = (col + 1) * frameWidth / textureWidth
+        local top = row * frameHeight / textureHeight
+        local bottom = (row + 1) * frameHeight / textureHeight
+
+        texture:SetTexCoord(left, right, top, bottom)
+        texture.animationTimer = 0
+    end
+end
+
+-- Animate Combat Flash pulse effect
+local function AnimateCombatFlashPulse(elapsed)
+    if not COMBAT_PULSE_SETTINGS.enabled then
+        return
+    end
+
+    local combatFlashEnabled, combatFlashOpacity = GetCombatFlashConfig()
+    if not combatFlashEnabled then
+        return
+    end
+
+    -- Vehicle mode: pulse dedicated VehicleCombatFlash
+    if IsInVehicle() then
+        local dragonFrame = _G["DragonUIUnitframeFrame"]
+        if dragonFrame and dragonFrame.VehicleCombatFlash and dragonFrame.VehicleCombatFlash:IsVisible() then
+            combatPulseTimer = combatPulseTimer + (elapsed * COMBAT_PULSE_SETTINGS.speed)
+            local pulseAlpha = COMBAT_PULSE_SETTINGS.minAlpha +
+                                   (COMBAT_PULSE_SETTINGS.maxAlpha - COMBAT_PULSE_SETTINGS.minAlpha) *
+                                   (math.sin(combatPulseTimer) * 0.5 + 0.5)
+            dragonFrame.VehicleCombatTexture:SetAlpha(pulseAlpha * combatFlashOpacity)
+        end
+        return
+    end
+
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame then
+        return
+    end
+
+    if eliteGlowActive then
+        -- Elite mode: use specific configuration for elite combat
+        if not ELITE_COMBAT_PULSE_SETTINGS.enabled then
+            return
+        end
+
+        combatPulseTimer = combatPulseTimer + (elapsed * ELITE_COMBAT_PULSE_SETTINGS.speed)
+
+        local pulseAlpha = ELITE_COMBAT_PULSE_SETTINGS.minAlpha +
+                               (ELITE_COMBAT_PULSE_SETTINGS.maxAlpha - ELITE_COMBAT_PULSE_SETTINGS.minAlpha) *
+                               (math.sin(combatPulseTimer) * 0.5 + 0.5)
+
+        if dragonFrame.EliteCombatGlow and dragonFrame.EliteCombatGlow:IsVisible() then
+            dragonFrame.EliteCombatTexture:SetAlpha(pulseAlpha * combatFlashOpacity)
+        end
+    else
+        -- Normal mode: use normal configuration
+        if not COMBAT_PULSE_SETTINGS.enabled then
+            return
+        end
+
+        combatPulseTimer = combatPulseTimer + (elapsed * COMBAT_PULSE_SETTINGS.speed)
+
+        local pulseAlpha = COMBAT_PULSE_SETTINGS.minAlpha +
+                               (COMBAT_PULSE_SETTINGS.maxAlpha - COMBAT_PULSE_SETTINGS.minAlpha) *
+                               (math.sin(combatPulseTimer) * 0.5 + 0.5)
+
+        if dragonFrame.DragonUICombatGlow and dragonFrame.DragonUICombatGlow:IsVisible() then
+            dragonFrame.DragonUICombatTexture:SetAlpha(pulseAlpha * combatFlashOpacity)
+        end
+    end
+end
+
+-- Animate Status/Rest pulse effect (vehicle, elite and normal/fat modes)
+local function AnimateStatusPulse(elapsed)
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame then
+        return
+    end
+
+    local glow, texture
+    if IsInVehicle() then
+        glow, texture = dragonFrame.VehicleStatusGlow, dragonFrame.VehicleStatusTexture
+    elseif eliteGlowActive then
+        glow, texture = dragonFrame.EliteStatusGlow, dragonFrame.EliteStatusTexture
+    else
+        glow, texture = dragonFrame.DragonUIStatusGlow, dragonFrame.DragonUIStatusTexture
+    end
+    if glow and glow:IsVisible() then
+        restPulseTimer = (restPulseTimer + elapsed) % 1
+        texture:SetAlpha(RestPulseAlpha(restPulseTimer))
+    end
+end
+
+-- Frame update handler for animations
+local function PlayerFrame_OnUpdate(self, elapsed)
+    -- Rest icon animation
+    if PlayerRestIcon and PlayerRestIcon:IsVisible() then
+        AnimateTexCoords(PlayerRestIcon, 512, 512, 64, 64, 42, elapsed, 0.09)
+    end
+
+    -- Combat Flash pulse animation
+    AnimateCombatFlashPulse(elapsed)
+
+    -- Status/Rest pulse animation (normal and elite)
+    AnimateStatusPulse(elapsed)
+end
+
+-- Override Blizzard status update to prevent glow interference
+local function PlayerFrame_UpdateStatus()
+    HideBlizzardGlows()
+    -- Trigger status glow based on player state
+    local isResting = IsResting()
+    SetStatusGlowVisible(isResting)
+end
+
+-- ============================================================================
+-- CLASS-SPECIFIC FEATURES
+-- ============================================================================
+
+-- Update Death Knight rune display
+local function UpdateRune(button)
+    if not button then
+        return
+    end
+
+    local rune = button:GetID()
+    local runeType = GetRuneType and GetRuneType(rune)
+
+    if runeType and RUNE_COORDS[runeType] then
+        local runeTexture = _G[button:GetName() .. "Rune"]
+        if runeTexture then
+            runeTexture:SetTexture(TEXTURES.RUNE_TEXTURE)
+            runeTexture:SetTexCoord(unpack(RUNE_COORDS[runeType]))
+        end
+    end
+end
+
+-- One table, not locals: this file is at Lua's 200-local limit.
+local Runes = { size = 18, gap = 4 }
+
+-- Moved in the editor and with a saved spot (a layout reset can drop the spot while the flag stays).
+function Runes.Detached()
+    local widgets = addon.db.profile.widgets
+    local spot = widgets and widgets.dkrunes
+    return Runes.box and GetPlayerConfig().runes_detached and spot and spot.posX ~= nil and true or false
+end
+
+-- Moves the box onto UIParent's centre where it stands (it may sit on the runes), so its offsets are screen ones.
+function Runes.Pin()
+    local x, y = Runes.box:GetCenter()
+    local cx, cy = UIParent:GetCenter()
+    if not (x and cx) then return false end
+    Runes.box:ClearAllPoints()
+    Runes.box:SetPoint('CENTER', UIParent, 'CENTER', x - cx, y - cy)
+    return true
+end
+
+-- In the row under the player frame until moved in the editor; then on the box (widgets.dkrunes).
+function Runes.Place()
+    local first = _G.RuneButtonIndividual1
+    if not first then return end
+    first:ClearAllPoints()
+    if Runes.Detached() then
+        -- Off the runes first: the saved spot is not applied in combat, and the box may still hang from them.
+        Runes.Pin()
+        addon.ApplyWidgetPositionFromDB("dkrunes", Runes.box)
+        first:SetPoint('LEFT', Runes.box, 'LEFT', 0, 0)
+    else
+        first:SetPoint('CENTER', PlayerFrame, 'BOTTOM', -10, 15)
+    end
+end
+
+function Runes.SyncBox()
+    if not Runes.Detached() and _G.RuneButtonIndividual1 then
+        Runes.box:ClearAllPoints()
+        Runes.box:SetPoint('LEFT', _G.RuneButtonIndividual1, 'LEFT', 0, 0)
+    end
+end
+
+function Runes.Detach()
+    if Runes.Pin() then
+        addon.SaveUIFramePosition(Runes.box, "widgets", "dkrunes")
+        GetPlayerConfig().runes_detached = true
+    end
+    Runes.Place()
+end
+
+-- Attached, the box rides on the runes; turned around before the drag, they follow from the first move.
+function Runes.Grab()
+    local first = _G.RuneButtonIndividual1
+    if not first or Runes.Detached() or not Runes.Pin() then return end
+    first:ClearAllPoints()
+    first:SetPoint('LEFT', Runes.box, 'LEFT', 0, 0)
+end
+
+function Runes.CreateEditor()
+    if Runes.box or select(2, UnitClass("player")) ~= "DEATHKNIGHT" then return end
+    Runes.box = addon.CreateUIFrame(6 * Runes.size + 5 * Runes.gap, Runes.size, "DKRunes")
+    -- Before the stock handler's StartMoving: re-anchoring a frame mid-move breaks the drag.
+    Runes.startDrag = Runes.box:GetScript("OnDragStart")
+    Runes.box:SetScript("OnDragStart", function(self, ...)
+        Runes.Grab()
+        if Runes.startDrag then return Runes.startDrag(self, ...) end
+    end)
+    Runes.box:HookScript("OnDragStop", Runes.Detach)
+    addon:RegisterEditableFrame({
+        name = "dkrunes",
+        frame = Runes.box,
+        configPath = { "widgets", "dkrunes" },
+        editorVisible = function()
+            return IsPlayerModuleEnabled() and GetPlayerConfig().show_runes ~= false
+        end,
+        showTest = Runes.SyncBox,
+        onNudge = Runes.Detach,
+        resetPosition = function()
+            GetPlayerConfig().runes_detached = false
+            Runes.Place()
+            Runes.SyncBox()
+        end,
+        isDefaultPosition = function()
+            return not Runes.Detached()
+        end,
+        applyPosition = Runes.Place,
+        module = Module,
+    })
+end
+
+-- Setup Death Knight rune frame
+local function SetupRuneFrame()
+    -- WoW automatically handles rune availability for DKs
+    -- No need to manually check the class
+    Runes.CreateEditor()
+
+    for index = 1, 6 do
+        local button = _G['RuneButtonIndividual' .. index]
+        if button then
+            button:ClearAllPoints()
+            if index > 1 then
+                button:SetPoint('LEFT', _G['RuneButtonIndividual' .. (index - 1)], 'RIGHT', Runes.gap, 0)
+            else
+                Runes.Place()
+            end
+            UpdateRune(button)
+
+            -- FIX: Hook each button's OnEvent to re-apply DragonUI texture
+            -- AFTER Blizzard's built-in handler runs (HookScript fires post-original).
+            -- This prevents Blizzard's handler from permanently overwriting our texture.
+            if not button.__DragonUIRuneHooked then
+                button:HookScript('OnEvent', function(self, event)
+                    if event == 'RUNE_TYPE_UPDATE' then
+                        UpdateRune(self)
+                    end
+                end)
+                button.__DragonUIRuneHooked = true
+            end
+        end
+    end
+end
+
+-- Handle Death Knight runes in vehicle transitions (like RetailUI)
+local function HandleRuneFrameVehicleTransition(toVehicle)
+    for index = 1, 6 do
+        local button = _G['RuneButtonIndividual' .. index]
+        if button then
+            if toVehicle then
+                button:Hide() -- Hide runes in vehicle
+            else
+                button:Show() -- Show runes outside vehicle
+                UpdateRune(button) -- Update when exiting vehicle
+            end
+        end
+    end
+end
+
+-- The DragonUI level text gives way to the role icon (retail); run it last, SetTextColor brings the alpha back.
+local function ApplyPlayerLevelVisibility()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    local role = dragonFrame and dragonFrame.PlayerRoleIcon
+    local circle = not PlayerArt.LegacyFat() and UF.GetLevelSpot(PlayerArt.Kind())
+    PlayerLevelText:SetAlpha((role and role:IsShown() and not circle) and 0 or 1)
+end
+
+-- Retail's spot at the end of the name row.
+local function UpdatePlayerRoleIcon()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame or not dragonFrame.PlayerRoleIcon then
+        return
+    end
+
+    local iconTexture = dragonFrame.PlayerRoleIcon
+    local isTank, isHealer, isDamage = UnitGroupRolesAssigned("player")
+    local role = (isTank and "TANK") or (isHealer and "HEALER") or (isDamage and "DAMAGER")
+    local shown = role and not IsInVehicle()
+
+    if shown then
+        local spot = UF.GetPlayerIcons().role
+        if dragonFrame.EliteIconContainer then
+            iconTexture:SetParent(dragonFrame.EliteIconContainer)
+        end
+        iconTexture:SetSize(spot.w, spot.h)
+        iconTexture:ClearAllPoints()
+        iconTexture:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", spot.x, spot.y)
+        iconTexture:SetTexture(UF.STATUS_ICONS.file)
+        iconTexture:SetTexCoord(unpack(UF.STATUS_ICONS.roles[UF.GetStatusIconStyle()][role]))
+        iconTexture:Show()
+    else
+        iconTexture:Hide()
+    end
+    -- Blizzard's own 3.3.5a role icon (PORTRAITROLES, by the portrait) would show next to ours.
+    if _G.PlayerFrameRoleIcon then
+        _G.PlayerFrameRoleIcon:SetAlpha(0)
+    end
+    ApplyPlayerLevelVisibility()
+end
+
+-- Update group indicator for raids
+local function UpdateGroupIndicator()
+    local groupIndicatorFrame = _G[PlayerFrame:GetName() .. 'GroupIndicator']
+    local groupText = _G[PlayerFrame:GetName() .. 'GroupIndicatorText']
+
+    if not groupIndicatorFrame or not groupText then
+        return
+    end
+
+    -- Blizzard's art swaps SetPoint this global without clearing ours; the vehicle art keeps Blizzard's spot.
+    groupIndicatorFrame:ClearAllPoints()
+    if PlayerFrame.state == "vehicle" then
+        groupIndicatorFrame:SetPoint("BOTTOMLEFT", PlayerFrame, "TOPLEFT", 97, -13)
+    else
+        local spot = UF.PLAYER_ICONS.tab
+        groupIndicatorFrame:SetPoint("BOTTOMRIGHT", PlayerFrame, "TOPLEFT", spot.x, spot.y)
+    end
+
+    groupIndicatorFrame:Hide()
+
+    local numRaidMembers = GetNumRaidMembers()
+    if numRaidMembers == 0 then
+        return
+    end
+
+    for i = 1, numRaidMembers do
+        local name, _, subgroup = GetRaidRosterInfo(i)
+        if name and name == UnitName("player") then
+            local groupFormat = _G.GROUP_NUMBER or "Group %d"
+            groupText:SetText(string.format(groupFormat, subgroup))
+            groupIndicatorFrame:SetWidth(groupText:GetStringWidth() + 40)
+            groupIndicatorFrame:Show()
+            break
+        end
+    end
+end
+
+-- ============================================================================
+-- LEADERSHIP & PVP ICONS MANAGEMENT
+-- ============================================================================
+
+-- Cache leadership and PVP icons
+local PlayerLeaderIcon = _G.PlayerLeaderIcon
+local PlayerGuideIcon = _G.PlayerGuideIcon
+local PlayerMasterIcon = _G.PlayerMasterIcon
+local PlayerPVPIcon = _G.PlayerPVPIcon
+
+-- Places an icon at a UF.PLAYER_ICONS spot inside the icon container, so it draws over the border and the dragon.
+local function PlacePlayerIcon(icon, spot)
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if dragonFrame and dragonFrame.EliteIconContainer then
+        icon:SetParent(dragonFrame.EliteIconContainer)
+    end
+    icon:SetSize(spot.w, spot.h)
+    icon:ClearAllPoints()
+    icon:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", spot.x, spot.y)
+end
+
+-- The guide icon replaces the leader's in LFG groups (Blizzard shows one), so both share the slot.
+local function UpdateLeaderIconPosition()
+    local art = UF.STATUS_ICONS
+    local style = UF.GetStatusIconStyle()
+    local spots = UF.GetPlayerIcons()
+    if PlayerLeaderIcon then
+        PlacePlayerIcon(PlayerLeaderIcon, spots[style == "forever" and "foreverLeader" or "leader"])
+        PlayerLeaderIcon:SetTexture(art.file)
+        PlayerLeaderIcon:SetTexCoord(unpack(art.leader[style]))
+    end
+    if PlayerGuideIcon then
+        PlacePlayerIcon(PlayerGuideIcon, spots.leader)
+        PlayerGuideIcon:SetTexture(art.file)
+        PlayerGuideIcon:SetTexCoord(unpack(art.guide))
+    end
+end
+
+local function UpdateMasterIconPosition()
+    if PlayerMasterIcon then
+        PlacePlayerIcon(PlayerMasterIcon, UF.GetPlayerIcons().master)
+        PlayerMasterIcon:SetTexture(UF.STATUS_ICONS.file)
+        PlayerMasterIcon:SetTexCoord(unpack(UF.STATUS_ICONS.master[UF.GetStatusIconStyle()]))
+    end
+end
+
+-- Hide/show dragon decoration AND all glow effects for vehicle transitions.
+-- The vehicle frame border has a different shape from normal/fat/elite, so
+-- glow textures designed for those shapes must be suppressed in vehicle mode.
+local function UpdateDragonVisibilityForVehicle(inVehicle, hasEliteDecoration)
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame then
+        return
+    end
+    
+    -- Dragon decoration texture (only relevant with elite/rareelite decoration)
+    if hasEliteDecoration and dragonFrame.PlayerDragonDecoration then
+        dragonFrame.PlayerDragonDecoration:SetAlpha(inVehicle and 0 or 1)
+    end
+    
+    -- Update glow visibility: switches between atlas-based glows (vehicle)
+    -- and DragonUI custom glows (normal) based on current vehicle/combat/rest state
+    UpdateGlowVisibility()
+end
+
+-- No PvP on this realm. Runs after PlayerFrame_UpdatePvPStatus, the only code that shows the icon.
+local function HidePlayerPvP()
+    if not PlayerPVPIcon or not IsPlayerModuleEnabled() then
+        return
+    end
+    -- Alpha, not Hide: Blizzard owns Show/Hide and re-shows the timer from PlayerFrame_OnEvent.
+    PlayerPVPIcon:SetAlpha(0)
+    if _G.PlayerPVPTimerText then _G.PlayerPVPTimerText:SetAlpha(0) end
+    if _G.PlayerPVPIconHitArea then _G.PlayerPVPIconHitArea:Hide() end
+end
+
+-- Master function to update all leadership icons positioning
+local function UpdateLeadershipIcons()
+    UpdateLeaderIconPosition()
+    UpdateMasterIconPosition()
+    HidePlayerPvP()
+end
+
+-- ============================================================================
+-- BAR COLOR & TEXTURE MANAGEMENT
+-- ============================================================================
+-- Update player health bar color and texture based on class color setting
+local function UpdatePlayerHealthBarColor()
+    if not PlayerFrameHealthBar then
+        return
+    end
+
+    local config = GetPlayerConfig()
+    local texture = PlayerFrameHealthBar:GetStatusBarTexture()
+
+    if not texture then
+        return
+    end
+
+    if config.classcolor then
+        --  USE STATUS TEXTURE (WHITE) FOR CLASS COLOR
+        local statusTexturePath = TEXTURES.HEALTH_STATUS
+        if texture:GetTexture() ~= statusTexturePath then
+            texture:SetTexture(statusTexturePath)
+        end
+
+        --  APPLY PLAYER CLASS COLOR
+        local _, class = UnitClass("player")
+        local color = RAID_CLASS_COLORS[class]
+        if color then
+            PlayerFrameHealthBar:SetStatusBarColor(color.r, color.g, color.b, 1)
+        else
+            PlayerFrameHealthBar:SetStatusBarColor(1, 1, 1, 1)
+        end
+    else
+        --  USE NORMAL TEXTURE (COLORED) WITHOUT CLASS COLOR
+        local normalTexturePath = TEXTURES.HEALTH_BAR
+        if texture:GetTexture() ~= normalTexturePath then
+            texture:SetTexture(normalTexturePath)
+        end
+
+        --  WHITE COLOR (texture already has color)
+        PlayerFrameHealthBar:SetStatusBarColor(1, 1, 1, 1)
+    end
+    PlayerArt.TintCorner()
+end
+-- Update health bar color and texture
+local function UpdateHealthBarColor(statusBar, unit)
+    if not unit then
+        unit = "player"
+    end
+    if statusBar ~= PlayerFrameHealthBar or unit ~= "player" then
+        return
+    end
+
+    --  CALL THE NEW FUNCTION
+    UpdatePlayerHealthBarColor()
+end
+
+-- Update mana bar color based on texture mode:
+-- DragonUI textures: force white (1,1,1) because color is baked into the texture.
+-- How far a decoration bar's left and right ends moved from where its texts, the name and the level were laid out.
+function PlayerArt.Edges(key)
+    local fat = IsFatHealthbarActive()
+    local edges = PlayerArt.Kind() == "playerDecoration" and not IsInVehicle() and not (fat and key == "mana")
+        and UF.GetFrameSkin()[fat and "playerDecorationFat" or "playerDecoration"].edges
+    return unpack(edges and edges[key] or PlayerArt.noEdges)
+end
+
+-- Re-anchors the bar texts (the text system anchors them once).
+function PlayerArt.PlaceTexts()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame then return end
+    for _, spec in ipairs(PlayerArt.texts) do
+        local bar = spec.key == "health" and PlayerFrameHealthBar or PlayerFrameManaBar
+        if bar then
+            local left, right, textLeft = PlayerArt.Edges(spec.key)
+            local center, leftText, rightText = dragonFrame[spec.prefix .. "Text"],
+                dragonFrame[spec.prefix .. "TextLeft"], dragonFrame[spec.prefix .. "TextRight"]
+            if center then
+                center:ClearAllPoints()
+                center:SetPoint("CENTER", bar, "CENTER", -(left + right) / 2, spec.y)
+            end
+            if leftText then
+                leftText:ClearAllPoints()
+                leftText:SetPoint("LEFT", bar, "LEFT", 6 - (textLeft or left), spec.y)
+            end
+            if rightText then
+                rightText:ClearAllPoints()
+                rightText:SetPoint("RIGHT", bar, "RIGHT", -6 - right, spec.y)
+            end
+        end
+    end
+end
+
+function PlayerArt.ShowCorner(show)
+    if show == PlayerArt.shown then return end
+    PlayerArt.shown = show
+    for i = 1, PlayerArt.count do
+        if show then
+            PlayerArt.strips[i]:Show()
+        else
+            PlayerArt.strips[i]:Hide()
+        end
+    end
+end
+
+-- The strips continue the fill to its left, so they show whenever it has any.
+function PlayerArt.UpdateCorner()
+    local show = false
+    local bar = PlayerArt.bar
+    if PlayerArt.count > 0 and bar then
+        local _, max = bar:GetMinMaxValues()
+        local cur = bar:GetValue()
+        show = (max and max > 0 and cur and cur > 0) and true or false
+    end
+    PlayerArt.ShowCorner(show)
+end
+
+-- The fill's texcoords follow its value (the art is baked); on the bar with strips it starts at their column.
+function PlayerArt.ApplyFill(bar)
+    local texture = bar:GetStatusBarTexture()
+    if not texture then return end
+    local _, max = bar:GetMinMaxValues()
+    local cur = bar:GetValue()
+    local corner = bar == PlayerArt.bar
+    if max > 0 and cur and cur >= 0 then
+        local start = corner and PlayerArt.fillStart or 0
+        texture:SetTexCoord(start, start + (1 - start) * cur / max, 0, 1)
+    end
+    if corner then
+        PlayerArt.UpdateCorner()
+    end
+end
+
+-- Health strips take the bar's texture and colour (class colour tints a white texture); mana's colour is baked.
+function PlayerArt.TintCorner()
+    local bar = PlayerArt.bar
+    if not bar or bar ~= PlayerFrameHealthBar then return end
+    local file = bar:GetStatusBarTexture():GetTexture()
+    local r, g, b = bar:GetStatusBarColor()
+    -- Runs on every health change: compare instead of re-tinting the strips.
+    local tint = PlayerArt.tint
+    if tint and tint[1] == file and tint[2] == r and tint[3] == g and tint[4] == b then return end
+    PlayerArt.tint = { file, r, g, b }
+    for i = 1, PlayerArt.count do
+        PlayerArt.strips[i]:SetTexture(file)
+        PlayerArt.strips[i]:SetVertexColor(r, g, b, 1)
+    end
+end
+
+-- The decoration's ring curves past the start of its lower well: the mana's, or the fat health's.
+function PlayerArt.CornerSpec()
+    if PlayerArt.Kind() ~= "playerDecoration" or IsInVehicle() then return nil end
+    local skin = UF.GetFrameSkin()
+    if IsFatHealthbarActive() then
+        local fat = skin.playerDecorationFat
+        return PlayerFrameHealthBar, fat.healthCorner, fat.bars.health.h
+    end
+    return PlayerFrameManaBar, skin.playerDecoration.manaCorner, skin.playerDecoration.bars.mana.h
+end
+
+-- No masks in 3.3.5a: strips left of the fill trace the ring, in ARTWORK as the border is OVERLAY at their level.
+function PlayerArt.LayoutCorner()
+    if not PlayerFrameManaBar or not PlayerFrameHealthBar then return end
+    for i = 1, PlayerArt.count do
+        PlayerArt.strips[i]:Hide()
+    end
+    PlayerArt.shown = false
+    PlayerArt.count = 0
+    PlayerArt.tint = nil
+    local bar, corner, height = PlayerArt.CornerSpec()
+    PlayerArt.bar = corner and bar or nil
+    PlayerArt.fillStart = corner and corner.column or 0
+    if corner then
+        PlayerArt.pools[bar] = PlayerArt.pools[bar] or {}
+        PlayerArt.strips = PlayerArt.pools[bar]
+        local file = bar:GetStatusBarTexture():GetTexture()
+        for i, row in ipairs(corner.rows) do
+            local strip = PlayerArt.strips[i]
+            if not strip then
+                strip = bar:CreateTexture(nil, "ARTWORK")
+                PlayerArt.strips[i] = strip
+            end
+            strip:SetDrawLayer("ARTWORK")
+            strip:SetTexture(file)
+            strip:SetVertexColor(1, 1, 1, 1)
+            strip:SetTexCoord(corner.column, corner.column, row[1] / height, (row[1] + corner.step) / height)
+            strip:SetSize(-row[2], corner.step)
+            strip:ClearAllPoints()
+            strip:SetPoint("TOPLEFT", bar, "TOPLEFT", row[2], -row[1])
+            strip:Hide()
+        end
+        PlayerArt.count = #corner.rows
+        PlayerArt.TintCorner()
+    end
+    PlayerArt.ApplyFill(PlayerFrameManaBar)
+    PlayerArt.ApplyFill(PlayerFrameHealthBar)
+end
+
+-- Override textures: apply power colors from DB (user-customizable) or DF defaults.
+-- (vanilla textures are neutral/grayscale and need explicit coloring).
+local function UpdateManaBarColor(statusBar)
+    if statusBar ~= PlayerFrameManaBar then return end
+
+    local useOverride = IsFatHealthbarActive()
+    if useOverride then
+        local config = GetPlayerConfig()
+        local textureSetting = config and config.manabar_texture or "dragonui"
+        if textureSetting ~= "dragonui" then
+            -- Override texture: use DB color if available, else fall back to DF defaults
+            local _, powerToken = UnitPowerType('player')
+            local dbColors = config and config.power_colors
+            local color = (dbColors and dbColors[powerToken]) or DF_POWER_COLORS[powerToken] or DF_POWER_COLORS["MANA"]
+            statusBar:SetStatusBarColor(color.r or 1, color.g or 1, color.b or 1)
+            return
+        end
+    end
+    -- DragonUI textures (or normal mode): force white so baked color shows
+    statusBar:SetStatusBarColor(1, 1, 1)
+end
+
+-- Update power bar texture based on current power type (handles druid forms)
+local function UpdatePowerBarTexture(statusBar)
+    if statusBar ~= PlayerFrameManaBar then
+        return
+    end
+
+    local powerType, powerTypeString = UnitPowerType('player')
+    local powerTexture = GetPowerBarTexture(powerTypeString)
+
+    --  CHANGE TEXTURE based on current power type
+    local currentTexture = statusBar:GetStatusBarTexture():GetTexture()
+    if currentTexture ~= powerTexture then
+        statusBar:GetStatusBarTexture():SetTexture(powerTexture)
+        PlayerArt.LayoutCorner()
+    end
+
+    -- Update color after texture change (druid form shifts change power type)
+    UpdateManaBarColor(statusBar)
+end
+-- ============================================================================
+-- VEHICLE SYSTEM INTEGRATION
+-- ============================================================================
+
+-- Function to update textSystem unit based on vehicle state
+local function UpdateTextSystemUnit()
+    if not Module.textSystem then
+        return
+    end
+
+    local hasVehicleUI = UnitHasVehicleUI("player")
+    local targetUnit = hasVehicleUI and "vehicle" or "player"
+
+    -- Update both the public unit field and internal reference
+    Module.textSystem.unit = targetUnit
+    if Module.textSystem._unitRef then
+        Module.textSystem._unitRef.unit = targetUnit
+    end
+
+    -- Force immediate update
+    if Module.textSystem.update then
+        Module.textSystem.update()
+    end
+end
+
+-- Create DragonUI text elements for alternate mana bar
+local function SetupAlternateManaTextElements()
+    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+    if not alternateManaBar or not addon.TextSystem then
+        return
+    end
+    
+    -- Create dual text elements using TextSystem
+    addon.TextSystem.CreateDualTextElements(
+        alternateManaBar, -- parentFrame
+        alternateManaBar, -- barFrame (same as parent for this case)
+        "AlternateMana", -- prefix
+        "OVERLAY", -- layer
+        "TextStatusBarText" -- font template
+    )
+end
+
+-- Update alternate mana text using DragonUI TextSystem
+local function UpdateAlternateManaText()
+    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+    if not alternateManaBar or not addon.TextSystem then
+        return
+    end
+    
+    -- Get current mana values
+    local currentMana = UnitPower("player", POWER_TYPE_MANA or 0)
+    local maxMana = UnitPowerMax("player", POWER_TYPE_MANA or 0)
+    
+    if not currentMana or not maxMana or maxMana == 0 then
+        return
+    end
+    
+    -- Get configuration
+    local config = GetPlayerConfig()
+    local textFormat = config and config.alternateManaFormat or "both"
+    local useBreakup = config and config.breakUpLargeNumbers
+    
+    -- Custom handling for alternate mana bar
+    if textFormat == "both" then
+        -- Custom separation for alternate mana bar - adjust spacing here
+        local currentText = useBreakup and addon.TextSystem.AbbreviateLargeNumbers(currentMana) or tostring(currentMana)
+        local percent = math.floor((currentMana / maxMana) * 100)
+        local customSeparator = "    " -- Custom spacing for alternate mana bar (adjust here) 
+        local combinedText = percent .. "%" .. customSeparator .. currentText
+        
+        -- Use as single text instead of dual
+        addon.TextSystem.UpdateDualText(
+            alternateManaBar,
+            "AlternateMana",
+            combinedText,
+            "numeric", -- Treat as single text
+            true -- shouldShow
+        )
+    else
+        -- Use normal TextSystem for other formats
+        local formattedText = addon.TextSystem.FormatStatusText(
+            currentMana, 
+            maxMana, 
+            textFormat, 
+            useBreakup, 
+            "alternateMana"
+        )
+        
+        addon.TextSystem.UpdateDualText(
+            alternateManaBar,
+            "AlternateMana",
+            formattedText,
+            textFormat,
+            true -- shouldShow
+        )
+    end
+end
+
+-- Setup always visible behavior for DragonUI alternate mana text
+local function SetupAlternateManaAlwaysVisible()
+    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+    if not alternateManaBar then
+        return
+    end
+    
+    -- Phase 3C: Disable hover mode via flag (can't unhook HookScript)
+    alternateManaBar.DragonUIHoverEnabled = false
+    
+    -- Show text immediately and keep it visible
+    UpdateAlternateManaText()
+end
+
+-- Hide DragonUI alternate mana text elements
+local function HideAlternateManaTextElements()
+    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+    if not alternateManaBar or not addon.TextSystem then
+        return
+    end
+    
+    -- Hide all text elements
+    addon.TextSystem.UpdateDualText(
+        alternateManaBar,
+        "AlternateMana", 
+        "", 
+        "numeric", 
+        false -- shouldShow = false
+    )
+end
+
+-- Setup hover-only behavior for DragonUI alternate mana text
+local function SetupAlternateManaHoverBehavior()
+    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+    if not alternateManaBar then
+        return
+    end
+    
+    -- Hide text initially
+    HideAlternateManaTextElements()
+    
+    -- Phase 3C: Use HookScript instead of SetScript on Blizzard frame
+    -- Hook only once, use flag to enable/disable behavior
+    if not alternateManaBar.DragonUIHoverHooked then
+        alternateManaBar:HookScript("OnEnter", function()
+            if alternateManaBar.DragonUIHoverEnabled then
+                UpdateAlternateManaText()
+            end
+        end)
+        
+        alternateManaBar:HookScript("OnLeave", function()
+            if alternateManaBar.DragonUIHoverEnabled then
+                HideAlternateManaTextElements()
+            end
+        end)
+        alternateManaBar.DragonUIHoverHooked = true
+    end
+    
+    alternateManaBar.DragonUIHoverEnabled = true
+end
+
+-- Setup alternate mana bar text system based on configuration
+local function SetupAlternateManaBarAlwaysVisible()
+    local _, playerClass = UnitClass("player")
+    if playerClass ~= "DRUID" then
+        return
+    end
+    
+    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+    if not alternateManaBar then
+        return
+    end
+    
+    -- ALWAYS hide Blizzard text - we always use DragonUI system for druids
+    local blizzardText = alternateManaBar.TextString or _G.PlayerFrameAlternateManaBarText
+    if blizzardText then
+        blizzardText:Hide()
+        blizzardText:SetAlpha(0)
+    end
+    
+    -- ALWAYS setup DragonUI text elements for druids
+    SetupAlternateManaTextElements()
+    
+    -- Get configuration to determine visibility behavior
+    local config = GetPlayerConfig()
+    local alwaysShow = config and config.alwaysShowAlternateManaText
+    
+    if alwaysShow then
+        -- Show DragonUI text always
+        UpdateAlternateManaText()
+        SetupAlternateManaAlwaysVisible()
+    else
+        -- Show DragonUI text only on hover (default behavior)
+        SetupAlternateManaHoverBehavior()
+    end
+end
+
+-- ============================================================================
+-- FRAME CREATION & CONFIGURATION
+-- ============================================================================
+
+local playerDragonParent, playerDragonTexture
+local playerCombatIconShown = false
+local playerSwords
+
+-- Forever's swords sit over its art (the corner piece draws under the BORDER), in the icon container.
+local function UpdatePlayerSwords(show)
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    local swords = UF.GetFrameSkin().player.swords
+    local art = dragonFrame and dragonFrame.PlayerFrameBackground
+    show = show and swords and art and not IsInVehicle() and not UF.IsCompact("player")
+    if show and not playerSwords then
+        local container = dragonFrame.EliteIconContainer
+        if not container then return end
+        playerSwords = container:CreateTexture("DragonUIPlayerForeverSwords", "ARTWORK")
+    end
+    if not playerSwords then return end
+    if show then
+        playerSwords:SetTexture(swords.file)
+        playerSwords:SetSize(swords.w, swords.h)
+        playerSwords:ClearAllPoints()
+        playerSwords:SetPoint("TOPLEFT", art, "TOPLEFT", swords.x, swords.y)
+        playerSwords:Show()
+    else
+        playerSwords:Hide()
+    end
+end
+
+-- Forever bakes the corner wedge into its art: there the piece only appears as the combat swords.
+local function ApplyPlayerCornerAlpha(deco)
+    local fat = PlayerArt.LegacyFat()
+    local foreverSwords = UF.GetFrameSkin().player.swords and not fat and not IsEliteModeActive()
+    local wanted = (playerCombatIconShown and not foreverSwords) or fat or UF.GetFrameSkin().player.corner
+    -- The wedge and the swords sit on the portrait's ring, which a portrait-off frame does not have.
+    deco:SetAlpha((wanted and not UF.IsCompact("player")) and 1 or 0)
+    UpdatePlayerSwords(foreverSwords and playerCombatIconShown)
+end
+
+-- The wedge follows the normal art's ring (fat keeps the 1x spot); the combat swords sit (3, -4) off it.
+function PlayerArt.PlaceCorner(deco)
+    local corner = not PlayerArt.LegacyFat() and UF.GetFrameSkin().player.corner
+    local x, y = 15.5, -16
+    if type(corner) == "table" then
+        x, y = corner.x, corner.y
+    end
+    if deco.DragonUI_Swords then
+        x, y = x + 3, y - 4
+    end
+    deco:ClearAllPoints()
+    deco:SetPoint('CENTER', PlayerPortrait, 'CENTER', x, y)
+end
+
+-- Read at load, before the Forever badge takes the text away from its Blizzard frame.
+local levelTextHome = PlayerLevelText:GetParent()
+local levelTextColor = { PlayerLevelText:GetTextColor() }
+local levelTextSize = select(2, PlayerLevelText:GetFont())
+local playerLevelFrame, playerLevelCircle
+
+-- The dragon draws in MEDIUM, so Forever's level badge (circle and text) moves into the icon container.
+local function UpdatePlayerLevelLayout()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    local container = dragonFrame and dragonFrame.EliteIconContainer
+    local level
+    if container and dragonFrame.PlayerFrameBackground and not IsInVehicle() and not PlayerArt.LegacyFat() then
+        level = UF.GetLevelSpot(PlayerArt.Kind())
+    end
+    if level and not playerLevelFrame then
+        -- One level above the icon container, so the circle draws over the portrait and border.
+        playerLevelFrame = CreateFrame("Frame", nil, container)
+        playerLevelFrame:SetAllPoints(container)
+        playerLevelFrame:SetFrameLevel(container:GetFrameLevel() + 2)
+        playerLevelCircle = playerLevelFrame:CreateTexture("DragonUIPlayerLevelCircle", "ARTWORK")
+    end
+    local onCircle = playerLevelCircle
+        and UF.ApplyLevelCircle(playerLevelCircle, level, dragonFrame.PlayerFrameBackground)
+    PlayerLevelText:ClearAllPoints()
+    if onCircle then
+        PlayerLevelText:SetParent(playerLevelFrame)
+        PlayerLevelText:SetPoint('CENTER', playerLevelCircle, 'CENTER', 0, UF.GetLevelTextY(playerLevelFrame))
+        PlayerLevelText:SetTextColor(1, 1, 1)
+    else
+        PlayerLevelText:SetParent(levelTextHome)
+        local _, rightEdge = PlayerArt.Edges("health")
+        PlayerLevelText:SetPoint('BOTTOMRIGHT', PlayerFrameHealthBar, 'TOPRIGHT', -5 - rightEdge, 3)
+        PlayerLevelText:SetTextColor(unpack(levelTextColor))
+    end
+    local font, _, flags = PlayerLevelText:GetFont()
+    if font then
+        PlayerLevelText:SetFont(font, onCircle and UF.LEVEL_ART.fontSize or levelTextSize, flags)
+    end
+    PlayerLevelText:SetDrawLayer('OVERLAY', 7)
+    ApplyPlayerLevelVisibility()
+end
+
+local PLAYER_GLOW_TEX_COORDS = { 0.1943359375, 0.3818359375, 0.169921875, 0.30859375 }
+
+local function PlaceGlow(frame, texture, glow, art)
+    frame:SetSize(glow.w, glow.h)
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", art, "TOPLEFT", glow.x, glow.y)
+    texture:SetTexture(glow.file)
+    texture:SetTexCoord(unpack(glow.tc))
+end
+
+-- Both arts take retail's 2x glows; fat keeps the 1x ones on the portrait and vehicle has its own.
+local function ApplyPlayerGlowArt()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame or not dragonFrame.DragonUIStatusGlow or not dragonFrame.EliteStatusGlow then return end
+    UpdatePlayerSwords(playerCombatIconShown and not PlayerArt.LegacyFat() and not IsEliteModeActive())
+    if IsInVehicle() then return end
+    local skin = UF.GetFrameSkin()
+    local art = dragonFrame.PlayerFrameBackground
+    local fat = PlayerArt.LegacyFat()
+    -- Fat skin art brings glows without the health/mana line; each set reads its own mode's.
+    local fatSkin = PlayerArt.FatSkin()
+    local elite = IsEliteModeActive()
+    local normal = not fat and (fatSkin and not elite and fatSkin.glows or skin[PlayerArt.BaseKind()].glows)
+    if normal then
+        PlaceGlow(dragonFrame.DragonUIStatusGlow, dragonFrame.DragonUIStatusTexture, normal.status, art)
+        PlaceGlow(dragonFrame.DragonUICombatGlow, dragonFrame.DragonUICombatTexture, normal.combat, art)
+    else
+        for _, key in ipairs({ "DragonUIStatus", "DragonUICombat" }) do
+            local frame, texture = dragonFrame[key .. "Glow"], dragonFrame[key .. "Texture"]
+            frame:SetSize(192, 71)
+            frame:ClearAllPoints()
+            frame:SetPoint('TOPLEFT', PlayerPortrait, 'TOPLEFT', -9, 9)
+            texture:SetTexture(GetBaseTexture())
+            texture:SetTexCoord(unpack(PLAYER_GLOW_TEX_COORDS))
+        end
+    end
+    local decoKind = UF.IsCompact("player") and "playerCompactDecoration" or "playerDecoration"
+    local deco = not fat and (fatSkin and elite and fatSkin.glows or skin[decoKind].glows)
+    if deco then
+        PlaceGlow(dragonFrame.EliteStatusGlow, dragonFrame.EliteStatusTexture, deco.status, art)
+        PlaceGlow(dragonFrame.EliteCombatGlow, dragonFrame.EliteCombatTexture, deco.combat, art)
+    else
+        for _, key in ipairs({ "EliteStatus", "EliteCombat" }) do
+            local frame, texture = dragonFrame[key .. "Glow"], dragonFrame[key .. "Texture"]
+            frame:SetSize(ELITE_GLOW_COORDINATES.size[1], ELITE_GLOW_COORDINATES.size[2])
+            frame:ClearAllPoints()
+            frame:SetPoint('TOPLEFT', PlayerPortrait, 'TOPLEFT', -24.5, 19)
+            texture:SetTexture(ELITE_GLOW_COORDINATES.texture)
+            texture:SetTexCoord(unpack(ELITE_GLOW_COORDINATES.texCoord))
+        end
+    end
+end
+
+-- The Zzz rises from the dragon's snout; a crown, guide flag or looter icon in that row sends it to the plain spot.
+function PlayerArt.PlaceRestIcon()
+    if not PlayerRestIcon then
+        return
+    end
+    local iconShown = (PlayerLeaderIcon and PlayerLeaderIcon:IsShown()) or (PlayerGuideIcon and PlayerGuideIcon:IsShown())
+        or (PlayerMasterIcon and PlayerMasterIcon:IsShown())
+    if UF.IsCompact("player") then
+        local dragon = PlayerArt.CompactDragon()
+        local x, y, size = UF.CompactRestSpot(dragon)
+        local ink, spots = UF.COMPACT.restInk, UF.GetPlayerIcons()
+        local tab = _G.DragonUIPlayerGroupIndicator
+        -- The tab hangs by its BOTTOMRIGHT, growing left with its text; x on PlayerFrame to the health bar's (100 in).
+        local tabLimit = tab and tab:IsShown() and spots.tab.x - tab:GetWidth() - 1 - 100 - ink[2] * size
+        -- The crown and looter share the corner's row: the ink rises right after them, or left if the tab is there.
+        if iconShown and not (dragon and dragon.nose) then
+            local leader = (PlayerLeaderIcon and PlayerLeaderIcon:IsShown()) or (PlayerGuideIcon and PlayerGuideIcon:IsShown())
+            local last = (PlayerMasterIcon and PlayerMasterIcon:IsShown()) and spots.master or spots.leader
+            x = last.x + last.w + 1 - 100 - ink[1] * size
+            if tabLimit and x > tabLimit then
+                local right = (leader and spots.leader or spots.master).x - 1
+                x = right - 100 - ink[2] * size
+            end
+        end
+        if tabLimit then
+            x = math.min(x, tabLimit)
+        end
+        PlayerRestIcon:SetSize(size, size)
+        PlayerRestIcon:ClearAllPoints()
+        PlayerRestIcon:SetPoint("TOPLEFT", PlayerFrameHealthBar, "TOPLEFT", x, y)
+        return
+    end
+    local config = GetPlayerConfig()
+    local decoration = config and UF.PLAYER_DECORATIONS[config.dragon_decoration or "none"]
+    local place = decoration and select(6, UF.GetDragon("player", decoration.kind, decoration.set))
+    local rest = place and place.rest
+    PlayerRestIcon:SetSize(28, 28)
+    PlayerRestIcon:ClearAllPoints()
+    if rest and not iconShown then
+        PlayerRestIcon:SetPoint("TOPLEFT", PlayerPortrait, "TOPLEFT", rest.x, rest.y)
+    else
+        PlayerRestIcon:SetPoint("TOPLEFT", PlayerPortrait, "TOPLEFT", 40, 15)
+    end
+end
+
+-- Update decorative dragon for player frame
+local function UpdatePlayerDragonDecoration()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame then
+        return
+    end
+
+    local config = GetPlayerConfig()
+    local decorationType = config.dragon_decoration or "none"
+
+    -- Hide the dragon; the fields stay nil while hidden because vehicles test them.
+    if dragonFrame.PlayerDragonFrame then
+        dragonFrame.PlayerDragonFrame:Hide()
+    end
+    -- Portrait off, the texture sits on PlayerFrame itself, out of its frame.
+    if playerDragonTexture then
+        playerDragonTexture:Hide()
+    end
+    dragonFrame.PlayerDragonFrame = nil
+    dragonFrame.PlayerDragonDecoration = nil
+
+    local decoration = UF.PLAYER_DECORATIONS[decorationType]
+    PlayerArt.PlaceRestIcon()
+
+    --  Change background, border AND STRETCH MANA BAR based on decoration
+    local inVehicle = IsInVehicle()
+
+    -- Portrait off keeps its art with or without a decoration: the dragon only wraps its end.
+    if decoration and not inVehicle and not UF.IsCompact("player") then
+        -- Fat merges the two wells: the same art without the health/mana line, under one tall health bar.
+        local fatMode = IsFatHealthbarActive()
+        local deco = UF.GetFrameSkin()[fatMode and "playerDecorationFat" or "playerDecoration"]
+
+        -- Placed before the art, which anchors to it; ChangePlayerframe restores the normal layout.
+        local health = deco.bars.health
+        PlayerFrameHealthBar:ClearAllPoints()
+        PlayerFrameHealthBar:SetSize(health.w, health.h)
+        PlayerFrameHealthBar:SetPoint('LEFT', PlayerPortrait, 'RIGHT', health.x, health.y)
+
+        if dragonFrame.PlayerFrameBackground then
+            dragonFrame.PlayerFrameBackground:Show()
+            UF.ApplySkinPiece(dragonFrame.PlayerFrameBackground, deco.background, 'LEFT', PlayerFrameHealthBar, 'LEFT', 0, 0)
+        end
+        if dragonFrame.PlayerFrameBorder then
+            dragonFrame.PlayerFrameBorder:Show()
+            UF.ApplySkinPiece(dragonFrame.PlayerFrameBorder, deco.border, 'LEFT', PlayerFrameHealthBar, 'LEFT', 0, 0)
+        end
+
+        -- Hide deco dot when dragon decoration is active
+        if dragonFrame.PlayerFrameDeco then
+            dragonFrame.PlayerFrameDeco:Hide()
+        end
+
+        -- Mana bar: fat mode uses its own anchor system, non-fat stretches for decoration
+        if fatMode then
+            ApplyFatManaBar()
+        elseif PlayerFrameManaBar then
+            local mana = deco.bars.mana
+            PlayerFrameManaBar:ClearAllPoints()
+            PlayerFrameManaBar:SetSize(mana.w, mana.h)
+            -- Anchor by RIGHT side so it stretches leftward
+            PlayerFrameManaBar:SetPoint('RIGHT', PlayerPortrait, 'RIGHT', mana.x, mana.y)
+        end
+        -- Left over from the old fat decoration, which redrew the portrait above a bar stretched under it.
+        if dragonFrame.PortraitOverlay then dragonFrame.PortraitOverlay:Hide() end
+        if dragonFrame.BorderOverlay then dragonFrame.BorderOverlay:Hide() end
+        if dragonFrame.ClassPortraitOverlay then dragonFrame.ClassPortraitOverlay:Hide() end
+
+        -- Raise PlayerHitIndicator above decoration/dragon overlays.
+        -- PlayerHitIndicator is a FontString on PlayerFrame (combat feedback: heals/damage).
+        -- Border and dragon decoration are on higher-level frames and cover it.
+        local hitIndicator = _G["PlayerHitIndicator"]
+        if hitIndicator then
+            if not dragonFrame.HitIndicatorFrame then
+                local hif = CreateFrame("Frame", nil, PlayerFrame)
+                hif:SetSize(100, 100)
+                dragonFrame.HitIndicatorFrame = hif
+            end
+            -- HIGH strata to render above dragon decoration (MEDIUM strata)
+            -- Level PlayerFrame+11 to render above EliteIconContainer (level+10) which holds PVP icon
+            dragonFrame.HitIndicatorFrame:SetFrameStrata("MEDIUM")
+            dragonFrame.HitIndicatorFrame:SetFrameLevel(PlayerFrame:GetFrameLevel() + 11)
+            dragonFrame.HitIndicatorFrame:ClearAllPoints()
+            dragonFrame.HitIndicatorFrame:SetPoint("CENTER", PlayerPortrait, "CENTER", 0, 0)
+            dragonFrame.HitIndicatorFrame:Show()
+            hitIndicator:SetParent(dragonFrame.HitIndicatorFrame)
+            hitIndicator:ClearAllPoints()
+            hitIndicator:SetPoint("CENTER", dragonFrame.HitIndicatorFrame, "CENTER", 0, 0)
+        end
+    else
+        -- No dragon decoration, OR in vehicle: use normal/fat/vehicle textures
+        local fatMode = IsFatHealthbarActive() -- false during vehicle
+
+        -- Hide fat+decoration overlay frames (not needed without decoration)
+        if dragonFrame.PortraitOverlay then dragonFrame.PortraitOverlay:Hide() end
+        if dragonFrame.BorderOverlay then dragonFrame.BorderOverlay:Hide() end
+        if dragonFrame.ClassPortraitOverlay then dragonFrame.ClassPortraitOverlay:Hide() end
+
+        -- Raise PlayerHitIndicator above border (lives on HealthBar at level+1).
+        -- No HIGH strata needed here — just a higher frame level than the border.
+        local hitIndicator = _G["PlayerHitIndicator"]
+        if hitIndicator then
+            if not dragonFrame.HitIndicatorFrame then
+                local hif = CreateFrame("Frame", nil, PlayerFrame)
+                hif:SetSize(100, 100)
+                dragonFrame.HitIndicatorFrame = hif
+            end
+            -- MEDIUM strata + level PlayerFrame+11 to render above EliteIconContainer (level+10)
+            -- which holds the PVP icon
+            dragonFrame.HitIndicatorFrame:SetFrameStrata("MEDIUM")
+            dragonFrame.HitIndicatorFrame:SetFrameLevel(PlayerFrame:GetFrameLevel() + 11)
+            dragonFrame.HitIndicatorFrame:ClearAllPoints()
+            local hit = UF.IsCompact("player") and UF.COMPACT.player.hit
+            dragonFrame.HitIndicatorFrame:SetPoint("CENTER", PlayerPortrait, "CENTER",
+                hit and hit.x or 0, hit and hit.y or 0)
+            dragonFrame.HitIndicatorFrame:Show()
+            hitIndicator:SetParent(dragonFrame.HitIndicatorFrame)
+            hitIndicator:ClearAllPoints()
+            hitIndicator:SetPoint("CENTER", dragonFrame.HitIndicatorFrame, "CENTER", 0, 0)
+        end
+
+        if inVehicle then
+            -- VEHICLE MODE: Use atlas on Blizzard's PlayerFrameVehicleTexture (RetailUI pattern)
+            -- This is more reliable than custom textures which can be hidden by Blizzard's frame management
+            if PlayerFrameVehicleTexture then
+                PlayerFrameVehicleTexture:ClearAllPoints()
+                PlayerFrameVehicleTexture:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 35, 0)
+                PlayerFrameVehicleTexture:SetAtlasTexture('PlayerFrame-TextureFrame-Vehicle', true)
+                PlayerFrameVehicleTexture:SetDrawLayer('BORDER') -- Below flash/status OVERLAY
+                PlayerFrameVehicleTexture:SetBlendMode('BLEND') -- Normal rendering (not ADD)
+                PlayerFrameVehicleTexture:SetVertexColor(1, 1, 1, 1) -- No tint
+                PlayerFrameVehicleTexture:Show()
+                PlayerFrameVehicleTexture:SetAlpha(1)
+            end
+
+            -- Hide our custom bg/border (designed for normal player frame, not vehicle layout)
+            if dragonFrame.PlayerFrameBackground then
+                dragonFrame.PlayerFrameBackground:Hide()
+            end
+            if dragonFrame.PlayerFrameBorder then
+                dragonFrame.PlayerFrameBorder:Hide()
+            end
+            if dragonFrame.PlayerFrameDeco then
+                dragonFrame.PlayerFrameDeco:Hide()
+            end
+
+            -- Hide combat glow in vehicle
+            if dragonFrame.DragonUICombatGlow then
+                dragonFrame.DragonUICombatGlow:Hide()
+            end
+
+            -- Standard vehicle mana bar positioning
+            ApplyFatManaBar() -- IsFatHealthbarActive() is false → normal positioning
+        else
+            -- NORMAL / FAT MODE (no vehicle): show our custom bg/border
+            local baseTexture = GetBaseTexture()
+            local borderTexture = GetBorderTexture()
+            local HP_OFFSET = fatMode and 6 or 0
+
+            if PlayerArt.LegacyFat() then
+                if dragonFrame.PlayerFrameBackground then
+                    dragonFrame.PlayerFrameBackground:Show()
+                    dragonFrame.PlayerFrameBackground:SetTexture(baseTexture)
+                    dragonFrame.PlayerFrameBackground:SetTexCoord(0.7890625, 0.982421875, 0.001953125, 0.140625)
+                    dragonFrame.PlayerFrameBackground:SetSize(198, 71)
+
+                    dragonFrame.PlayerFrameBackground:ClearAllPoints()
+                    dragonFrame.PlayerFrameBackground:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', -67, 0 + HP_OFFSET)
+                end
+                if dragonFrame.PlayerFrameBorder then
+                    dragonFrame.PlayerFrameBorder:Show()
+                    dragonFrame.PlayerFrameBorder:SetTexture(borderTexture)
+                    dragonFrame.PlayerFrameBorder:SetTexCoord(0, 1, 0, 1)
+                    dragonFrame.PlayerFrameBorder:SetSize(PLAYER_BORDER_WIDTH, PLAYER_BORDER_HEIGHT)
+
+                    dragonFrame.PlayerFrameBorder:ClearAllPoints()
+                    dragonFrame.PlayerFrameBorder:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', -67, -28.5 + HP_OFFSET)
+                end
+            else
+                local skin = PlayerArt.FatSkin() or UF.GetFrameSkin()[PlayerArt.BaseKind()]
+                if dragonFrame.PlayerFrameBackground then
+                    dragonFrame.PlayerFrameBackground:Show()
+                    UF.ApplySkinPiece(dragonFrame.PlayerFrameBackground, skin.background, 'LEFT', PlayerFrameHealthBar, 'LEFT', 0, 0)
+                end
+                if dragonFrame.PlayerFrameBorder then
+                    dragonFrame.PlayerFrameBorder:Show()
+                    UF.ApplySkinPiece(dragonFrame.PlayerFrameBorder, skin.border, 'LEFT', PlayerFrameHealthBar, 'LEFT', 0, 0)
+                end
+            end
+
+            -- Update combat and status glow textures to match fat/normal mode
+            if dragonFrame.DragonUICombatTexture then
+                dragonFrame.DragonUICombatTexture:SetTexture(baseTexture)
+            end
+            if dragonFrame.DragonUIStatusTexture then
+                dragonFrame.DragonUIStatusTexture:SetTexture(baseTexture)
+            end
+
+            -- Show deco dot when no dragon decoration
+            if dragonFrame.PlayerFrameDeco then
+                PlayerArt.PlaceCorner(dragonFrame.PlayerFrameDeco)
+                dragonFrame.PlayerFrameDeco:Show()
+                ApplyPlayerCornerAlpha(dragonFrame.PlayerFrameDeco)
+            end
+
+            -- Adjust mana bar for fat/normal mode
+            ApplyFatManaBar()
+        end
+
+    end
+
+    ApplyPlayerGlowArt()
+    UpdatePlayerLevelLayout()
+    PlayerArt.PlaceTexts()
+    PlayerArt.LayoutCorner()
+    PlayerArt.ApplyHitRect()
+
+    -- Don't create dragon if decoration is disabled or currently in vehicle
+    if not decoration or inVehicle then
+        return
+    end
+
+    local compact = PlayerArt.CompactDragon()
+    local file, left, right, top, bottom, place = UF.GetDragon("player", decoration.kind, decoration.set)
+    if not file and not compact then
+        return
+    end
+
+    -- Created once and reused: WoW never frees a frame.
+    if not playerDragonParent then
+        playerDragonParent = CreateFrame("Frame", nil, PlayerFrame)
+        playerDragonTexture = playerDragonParent:CreateTexture(nil, "OVERLAY")
+        playerDragonTexture:SetAllPoints(playerDragonParent)
+        local pawFrame = CreateFrame("Frame", nil, PlayerFrame)
+        pawFrame:SetAllPoints(PlayerFrame)
+        local paw = pawFrame:CreateTexture("DragonUI_PlayerDragonPaw", "ARTWORK")
+        paw:Hide()
+        PlayerArt.paw = paw
+        -- The paw follows its dragon out (Hide) and through vehicles (SetAlpha).
+        hooksecurefunc(playerDragonTexture, "Hide", function() paw:Hide() end)
+        hooksecurefunc(playerDragonTexture, "SetAlpha", function(_, alpha) paw:SetAlpha(alpha) end)
+    end
+    local dragonParent, dragon = playerDragonParent, playerDragonTexture
+    if compact then
+        -- Mirrored round the frame's left end, on PlayerFrame: over the background, under the rims and bars.
+        dragon:SetParent(PlayerFrame)
+        dragon:SetDrawLayer("ARTWORK")
+        dragon:SetTexture(compact.file)
+        dragon:SetTexCoord(compact.tc[2], compact.tc[1], compact.tc[3], compact.tc[4])
+        dragon:SetSize(compact.w, compact.h)
+        dragon:ClearAllPoints()
+        dragon:SetPoint("TOPRIGHT", PlayerFrameHealthBar, "TOPLEFT", -compact.x, compact.y)
+        if compact.pawFile then
+            local paw = PlayerArt.paw
+            -- One level over the health bar, which carries the border.
+            paw:GetParent():SetFrameLevel(PlayerFrameHealthBar:GetFrameLevel() + 1)
+            paw:SetTexture(compact.pawFile)
+            paw:SetTexCoord(compact.tc[2], compact.tc[1], compact.tc[3], compact.tc[4])
+            paw:SetSize(compact.w, compact.h)
+            paw:ClearAllPoints()
+            paw:SetPoint("TOPRIGHT", PlayerFrameHealthBar, "TOPLEFT", -compact.x, compact.y)
+            paw:Show()
+        end
+    else
+        if dragon:GetParent() ~= dragonParent then
+            dragon:SetParent(dragonParent)
+            dragon:SetDrawLayer("OVERLAY")
+            dragon:ClearAllPoints()
+            dragon:SetAllPoints(dragonParent)
+        end
+        dragonParent:SetFrameStrata("MEDIUM")
+        dragonParent:SetFrameLevel(1)
+        dragonParent:SetSize(place.w, place.h)
+        dragonParent:ClearAllPoints()
+        dragonParent:SetPoint("TOPLEFT", PlayerFrame, "TOPLEFT", place.x, place.y)
+        dragon:SetTexture(file)
+        dragon:SetTexCoord(left, right, top, bottom)
+        dragonParent:Show()
+        dragonFrame.PlayerDragonFrame = dragonParent
+    end
+    -- A reused texture can still carry the 0 alpha UpdateDragonVisibilityForVehicle gave it.
+    dragon:SetAlpha(1)
+    dragon:Show()
+
+    -- Store references
+    dragonFrame.PlayerDragonDecoration = dragon
+
+    UpdateLeadershipIcons() -- Reposition leadership icons
+
+end
+
+-- Create custom DragonUI textures and elements
+local function CreatePlayerFrameTextures()
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if not dragonFrame then
+        dragonFrame = CreateFrame('FRAME', 'DragonUIUnitframeFrame', UIParent)
+
+    end
+
+    HideBlizzardGlows()
+
+    if not dragonFrame.EliteIconContainer then
+        local iconContainer = CreateFrame("Frame", "DragonUI_EliteIconContainer", PlayerFrame)
+        iconContainer:SetFrameStrata("MEDIUM")
+        iconContainer:SetFrameLevel(PlayerFrame:GetFrameLevel() + 10)
+        iconContainer:SetSize(200, 200)
+        iconContainer:SetPoint("CENTER", PlayerFrame, "CENTER", 0, 0)
+        dragonFrame.EliteIconContainer = iconContainer
+    end
+
+    if not dragonFrame.DragonUICombatGlow then
+        local combatFlashFrame = CreateFrame("Frame", "DragonUICombatFlash", PlayerFrame)
+        combatFlashFrame:SetFrameStrata("LOW")
+        combatFlashFrame:SetFrameLevel(900)
+        combatFlashFrame:SetSize(192, 71)
+        combatFlashFrame:Hide()
+
+        local combatTexture = combatFlashFrame:CreateTexture(nil, "OVERLAY")
+        combatTexture:SetTexture(GetBaseTexture())
+        combatTexture:SetTexCoord(0.1943359375, 0.3818359375, 0.169921875, 0.30859375)
+        combatTexture:SetAllPoints(combatFlashFrame)
+        combatTexture:SetVertexColor(1.0, 0.0, 0.0, 1.0)
+
+        dragonFrame.DragonUICombatGlow = combatFlashFrame
+        dragonFrame.DragonUICombatTexture = combatTexture
+
+    end
+
+    -- CREATE NORMAL STATUS GLOW (rest glow for normal/fat mode, no elite)
+    if not dragonFrame.DragonUIStatusGlow then
+        local statusGlowFrame = CreateFrame("Frame", "DragonUIStatusGlow", PlayerFrame)
+        statusGlowFrame:SetFrameStrata("LOW")
+        statusGlowFrame:SetFrameLevel(998)
+        statusGlowFrame:SetSize(192, 71)
+        statusGlowFrame:Hide()
+
+        local statusGlowTexture = statusGlowFrame:CreateTexture(nil, "OVERLAY")
+        statusGlowTexture:SetTexture(GetBaseTexture()) -- uses uiunitframe or uiunitframe-fat
+        statusGlowTexture:SetTexCoord(0.1943359375, 0.3818359375, 0.169921875, 0.30859375)
+        statusGlowTexture:SetAllPoints(statusGlowFrame)
+        statusGlowTexture:SetVertexColor(1.0, 0.88, 0.25, 1.0) -- Retail's resting gold
+
+        dragonFrame.DragonUIStatusGlow = statusGlowFrame
+        dragonFrame.DragonUIStatusTexture = statusGlowTexture
+    end
+
+    -- CREATE ELITE GLOW SYSTEM - Two glows using ELITE_GLOW_COORDINATES
+    if not dragonFrame.EliteStatusGlow then
+        -- Elite Status Glow (Yellow)
+        local statusFrame = CreateFrame("Frame", "DragonUIEliteStatusGlow", PlayerFrame)
+        statusFrame:SetFrameStrata("LOW")
+        statusFrame:SetFrameLevel(998)
+        statusFrame:SetSize(ELITE_GLOW_COORDINATES.size[1], ELITE_GLOW_COORDINATES.size[2])
+        statusFrame:Hide()
+
+        local statusTexture = statusFrame:CreateTexture(nil, "OVERLAY")
+        statusTexture:SetTexture(ELITE_GLOW_COORDINATES.texture) --  Use from coordinates
+        statusTexture:SetTexCoord(unpack(ELITE_GLOW_COORDINATES.texCoord))
+        statusTexture:SetAllPoints(statusFrame)
+        statusTexture:SetVertexColor(1.0, 0.88, 0.25, 1.0) -- Retail's resting gold
+
+        dragonFrame.EliteStatusGlow = statusFrame
+        dragonFrame.EliteStatusTexture = statusTexture
+
+        -- Elite Combat Glow (Red with pulse)
+        local combatFrame = CreateFrame("Frame", "DragonUIEliteCombatGlow", PlayerFrame)
+        combatFrame:SetFrameStrata("LOW")
+        combatFrame:SetFrameLevel(900)
+        combatFrame:SetSize(ELITE_GLOW_COORDINATES.size[1], ELITE_GLOW_COORDINATES.size[2])
+        combatFrame:Hide()
+
+        local eliteCombatTexture = combatFrame:CreateTexture(nil, "OVERLAY")
+        eliteCombatTexture:SetTexture(ELITE_GLOW_COORDINATES.texture) --  Use from coordinates
+        eliteCombatTexture:SetTexCoord(unpack(ELITE_GLOW_COORDINATES.texCoord))
+        eliteCombatTexture:SetAllPoints(combatFrame)
+        eliteCombatTexture:SetVertexColor(1.0, 0.0, 0.0, 1.0) -- Red
+
+        dragonFrame.EliteCombatGlow = combatFrame
+        dragonFrame.EliteCombatTexture = eliteCombatTexture
+
+    end
+
+    -- CREATE VEHICLE GLOW SYSTEM - own frames, so Blizzard's UIFrameFlash on PlayerFrameFlash can't fight them.
+    if not dragonFrame.VehicleCombatFlash then
+        local vehicleCombatFrame = CreateFrame("Frame", "DragonUIVehicleCombatFlash", PlayerFrame)
+        vehicleCombatFrame:SetFrameStrata("MEDIUM")
+        vehicleCombatFrame:SetFrameLevel(PlayerFrame:GetFrameLevel() + 10)
+        vehicleCombatFrame:SetSize(198, 84)
+        -- Retail's Vehicle-InCombat/-Status offsets from the vehicle art, which starts 5 below our atlas top.
+        vehicleCombatFrame:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 35.5, -4)
+        vehicleCombatFrame:Hide()
+
+        local vehicleCombatTexture = vehicleCombatFrame:CreateTexture(nil, "OVERLAY", nil, 7)
+        vehicleCombatTexture:SetTexture(TEXTURES.BASE)
+        vehicleCombatTexture:SetTexCoord(408 / 1024, 606 / 1024, 1 / 512, 85 / 512)
+        vehicleCombatTexture:SetAllPoints(vehicleCombatFrame)
+        vehicleCombatTexture:SetVertexColor(1.0, 0.0, 0.0, 1.0) -- Red for combat
+
+        dragonFrame.VehicleCombatFlash = vehicleCombatFrame
+        dragonFrame.VehicleCombatTexture = vehicleCombatTexture
+    end
+
+    if not dragonFrame.VehicleStatusGlow then
+        local vehicleStatusFrame = CreateFrame("Frame", "DragonUIVehicleStatusGlow", PlayerFrame)
+        vehicleStatusFrame:SetFrameStrata("MEDIUM")
+        vehicleStatusFrame:SetFrameLevel(PlayerFrame:GetFrameLevel() + 10)
+        vehicleStatusFrame:SetSize(201, 84)
+        vehicleStatusFrame:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 33, -5)
+        vehicleStatusFrame:Hide()
+
+        local vehicleStatusTexture = vehicleStatusFrame:CreateTexture(nil, "OVERLAY", nil, 7)
+        vehicleStatusTexture:SetTexture(TEXTURES.BASE)
+        vehicleStatusTexture:SetTexCoord(205 / 1024, 406 / 1024, 1 / 512, 85 / 512)
+        vehicleStatusTexture:SetAllPoints(vehicleStatusFrame)
+        vehicleStatusTexture:SetVertexColor(1.0, 0.88, 0.25, 1.0) -- Retail's resting gold
+
+        dragonFrame.VehicleStatusGlow = vehicleStatusFrame
+        dragonFrame.VehicleStatusTexture = vehicleStatusTexture
+    end
+
+    -- Create background texture
+    if not dragonFrame.PlayerFrameBackground then
+        local background = PlayerFrame:CreateTexture('DragonUIPlayerFrameBackground')
+        background:SetDrawLayer('BACKGROUND', 2)
+        background:SetTexture(GetBaseTexture())
+        background:SetTexCoord(0.7890625, 0.982421875, 0.001953125, 0.140625)
+        background:SetSize(198, 71)
+        background:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', -67, 0)
+        dragonFrame.PlayerFrameBackground = background
+    end
+
+    -- Create border texture
+    if not dragonFrame.PlayerFrameBorder then
+        local border = PlayerFrameHealthBar:CreateTexture('DragonUIPlayerFrameBorder')
+        border:SetDrawLayer('OVERLAY', 5)
+        border:SetTexture(GetBorderTexture())
+        border:SetSize(PLAYER_BORDER_WIDTH, PLAYER_BORDER_HEIGHT)
+        border:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', -67, -28.5)
+        dragonFrame.PlayerFrameBorder = border
+    end
+
+    -- Create decoration texture
+    if not dragonFrame.PlayerFrameDeco then
+        local deco = PlayerFrame:CreateTexture('DragonUIPlayerFrameDeco')
+        deco:SetDrawLayer('OVERLAY', 5)
+        deco:SetTexture(PLAYER_CORNER_TEXTURE)
+        deco:SetTexCoord(unpack(PLAYER_CORNER_TEX_COORDS))
+        deco:SetPoint('CENTER', PlayerPortrait, 'CENTER', 15.5, -16)
+        deco:SetSize(23, 23)
+        dragonFrame.PlayerFrameDeco = deco
+    end
+
+    -- Setup rest icon
+    if not dragonFrame.PlayerRestIconOverride then
+        -- With the group icons, so the Zzz draws over the dragon when it rests on its head.
+        PlayerRestIcon:SetParent(dragonFrame.EliteIconContainer)
+        PlayerRestIcon:SetTexture(TEXTURES.REST_ICON)
+        PlayerRestIcon:ClearAllPoints()
+        PlayerRestIcon:SetPoint("TOPLEFT", PlayerPortrait, "TOPLEFT", 40, 15)
+        PlayerRestIcon:SetSize(28, 28)
+        PlayerRestIcon:SetTexCoord(0, 0.125, 0, 0.125) -- First frame
+        dragonFrame.PlayerRestIconOverride = true
+    end
+
+    -- Create group indicator
+    if not dragonFrame.PlayerGroupIndicator then
+        local groupIndicator = CreateFrame("Frame", "DragonUIPlayerGroupIndicator", PlayerFrame)
+
+        -- Retail's tab in 2x: caps at their atlas sizes, the middle stretched; Blizzard sets the width.
+        local art = UF.STATUS_ICONS
+        local left = groupIndicator:CreateTexture(nil, "BACKGROUND")
+        left:SetTexture(art.file)
+        left:SetTexCoord(unpack(art.tabLeft))
+        left:SetSize(5, 13)
+        left:SetPoint("TOPLEFT")
+        local right = groupIndicator:CreateTexture(nil, "BACKGROUND")
+        right:SetTexture(art.file)
+        right:SetTexCoord(unpack(art.tabRight))
+        right:SetSize(7, 16)
+        right:SetPoint("TOPRIGHT")
+        local bgTexture = groupIndicator:CreateTexture(nil, "BACKGROUND")
+        bgTexture:SetTexture(art.file)
+        bgTexture:SetTexCoord(unpack(art.tabMid))
+        bgTexture:SetPoint("TOPLEFT", left, "TOPRIGHT")
+        bgTexture:SetPoint("BOTTOMRIGHT", right, "TOPLEFT", 0, -13)
+
+        local spot = UF.PLAYER_ICONS.tab
+        groupIndicator:SetSize(71, 16)
+        groupIndicator:SetPoint("BOTTOMRIGHT", PlayerFrame, "TOPLEFT", spot.x, spot.y)
+
+        local text = groupIndicator:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        text:SetPoint("CENTER", groupIndicator, "CENTER", 0, 1.5)
+        text:SetJustifyH("CENTER")
+        text:SetTextColor(1, 1, 1, 1)
+        text:SetFont(UF.DEFAULT_FONT, 9)
+        text:SetShadowOffset(1, -1)
+        text:SetShadowColor(0, 0, 0, 1)
+
+        groupIndicator.text = text
+        groupIndicator.backgroundTexture = bgTexture
+        groupIndicator:Hide()
+        -- Portrait off, the crown, looter and Zzz share the tab's row: they make room for it while it shows.
+        local function OnTabToggled()
+            if UF.IsCompact("player") and IsPlayerModuleEnabled() then
+                UpdateLeaderIconPosition()
+                UpdateMasterIconPosition()
+                PlayerArt.PlaceRestIcon()
+            end
+        end
+        hooksecurefunc(groupIndicator, "Show", OnTabToggled)
+        hooksecurefunc(groupIndicator, "Hide", OnTabToggled)
+
+        _G[PlayerFrame:GetName() .. 'GroupIndicator'] = groupIndicator
+        _G[PlayerFrame:GetName() .. 'GroupIndicatorText'] = text
+        _G[PlayerFrame:GetName() .. 'GroupIndicatorMiddle'] = bgTexture --  Like original
+        dragonFrame.PlayerGroupIndicator = groupIndicator
+    end
+
+    -- Create role icon
+    if not dragonFrame.PlayerRoleIcon then
+        local roleIcon = PlayerFrame:CreateTexture(nil, "OVERLAY")
+        roleIcon:SetSize(18, 18)
+        roleIcon:SetPoint("TOPRIGHT", PlayerPortrait, "TOPRIGHT", -2, -2)
+        roleIcon:Hide()
+        dragonFrame.PlayerRoleIcon = roleIcon
+    end
+
+    -- Create text elements for health and mana bars
+    local textElements = {{
+        name = "PlayerFrameHealthBarTextLeft",
+        parent = PlayerFrameHealthBar,
+        point = "LEFT",
+        x = 6,
+        y = 0,
+        justify = "LEFT"
+    }, {
+        name = "PlayerFrameHealthBarTextRight",
+        parent = PlayerFrameHealthBar,
+        point = "RIGHT",
+        x = -6,
+        y = 0,
+        justify = "RIGHT"
+    }, {
+        name = "PlayerFrameManaBarTextLeft",
+        parent = PlayerFrameManaBar,
+        point = "LEFT",
+        x = 6,
+        y = 0,
+        justify = "LEFT"
+    }, {
+        name = "PlayerFrameManaBarTextRight",
+        parent = PlayerFrameManaBar,
+        point = "RIGHT",
+        x = -6,
+        y = 0,
+        justify = "RIGHT"
+    }}
+
+    for _, elem in ipairs(textElements) do
+        if not dragonFrame[elem.name] then
+            local text = elem.parent:CreateFontString(nil, "OVERLAY", "TextStatusBarText")
+            local font, size, flags = text:GetFont()
+            if font and size then
+                text:SetFont(font, size + 1, flags)
+            end
+            text:SetPoint(elem.point, elem.parent, elem.point, elem.x, elem.y)
+            text:SetJustifyH(elem.justify)
+            dragonFrame[elem.name] = text
+        end
+    end
+    -- NOTE: UpdatePlayerDragonDecoration() is called at the end of ChangePlayerframe()
+    -- to ensure all bar/portrait positioning is done before decoration is applied
+end
+
+-- ============================================================================
+-- CLASS PORTRAIT SYSTEM
+-- ============================================================================
+
+-- Class icon texture coordinates (matches WoW's CLASS_ICON_TCOORDS)
+-- NOTE: CLASS_ICON_TEXTURE is declared at top of file (before UpdatePlayerDragonDecoration)
+
+local function RestorePlayerPortraitTexture()
+    -- Skip in vehicle mode: Blizzard controls the vehicle portrait texture.
+    if not IsInVehicle() then
+        -- No SetDrawLayer here: BigDebuffs moves the portrait's layer so its icon draws on top (#242).
+        SetPortraitTexture(PlayerPortrait, "player")
+    end
+    PlayerPortrait:SetTexCoord(0, 1, 0, 1)
+    PlayerPortrait:SetAlpha(1)
+end
+
+-- Apply class portrait if enabled in config
+local function UpdatePlayerClassPortrait()
+    local config = GetPlayerConfig()
+    if not config then return end
+
+    local useClassPortrait = (config.classPortrait or config.racePortrait) and not IsInVehicle()
+    if useClassPortrait and UF.ApplyPortraitStyle("player", PlayerPortrait, config) then
+        local dragonFrame = _G["DragonUIUnitframeFrame"]
+        if dragonFrame and dragonFrame.ClassPortraitOverlay then
+            dragonFrame.ClassPortraitOverlay:Hide()
+        end
+        return
+    end
+
+    RestorePlayerPortraitTexture()
+
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if dragonFrame and dragonFrame.ClassPortraitOverlay then
+        dragonFrame.ClassPortraitOverlay:Hide()
+    end
+end
+
+local function RefreshPlayerPortraitState(unit)
+    local portraitUnit = unit == "vehicle" and "vehicle" or "player"
+
+    UpdatePlayerClassPortrait()
+
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if dragonFrame and dragonFrame.PortraitOverlayTexture
+       and dragonFrame.PortraitOverlay
+       and dragonFrame.PortraitOverlay:IsShown() then
+        local pConfig = GetPlayerConfig()
+        if pConfig and (pConfig.classPortrait or pConfig.racePortrait) and not IsInVehicle() and portraitUnit ~= "vehicle" then
+            if not UF.ApplyPortraitStyle("player", dragonFrame.PortraitOverlayTexture, pConfig) then
+                SetPortraitTexture(dragonFrame.PortraitOverlayTexture, portraitUnit)
+            end
+        else
+            SetPortraitTexture(dragonFrame.PortraitOverlayTexture, portraitUnit)
+        end
+    end
+end
+
+-- Main frame configuration function
+local function ChangePlayerframe()
+    if BlizzardFrame() then return end
+    CreatePlayerFrameTextures()
+
+    local hasVehicleUI = IsInVehicle()
+
+    RemoveBlizzardFrames(hasVehicleUI)
+    HideBlizzardGlows()
+
+    -- Configure portrait with vehicle-specific positioning
+    PlayerPortrait:ClearAllPoints()
+    PlayerPortrait:SetDrawLayer('ARTWORK', 2)  -- Lower layer so border is on top
+    
+    if hasVehicleUI then
+        -- Vehicle: position relative to PlayerFrame (matches RetailUI pattern)
+        PlayerPortrait:SetPoint('LEFT', PlayerFrame, 'LEFT', 45, 5)
+        PlayerPortrait:SetSize(69, 69)
+    else
+        -- Normal player position
+        PlayerPortrait:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 42, -15)
+        PlayerPortrait:SetSize(56, 56)
+    end
+    
+    -- Apply class portrait if enabled
+    UpdatePlayerClassPortrait()
+    -- Portrait off, it stays as the bars' invisible anchor whatever shows it again.
+    UF.KeepPortraitHidden(PlayerPortrait, "player")
+    PlayerPortrait:SetAlpha(1)
+
+    -- Position name and level (shifted right in vehicle due to larger portrait)
+    -- Ensure name/level are on OVERLAY draw layer so they render above vehicle textures
+    PlayerName:SetDrawLayer('OVERLAY', 7)
+    PlayerName:ClearAllPoints()
+    if hasVehicleUI then
+        PlayerName:SetJustifyH("LEFT")
+        PlayerName:SetWidth(90)
+        PlayerName:SetPoint('CENTER', PlayerFrame, 'CENTER', 50, 20)
+    else
+        local pConfig = GetPlayerConfig()
+        local decorationType = pConfig.dragon_decoration or "none"
+        local isPlayerEliteMode = UF.PLAYER_DECORATIONS[decorationType] ~= nil
+        local foreverName = not PlayerArt.LegacyFat()
+            and UF.GetNameSpot(isPlayerEliteMode and "playerDecoration" or "player")
+        if UF.IsCompact("player") then
+            local point, x, y, w, justify = UF.CompactPlayerName(PlayerArt.CompactDragon())
+            PlayerName:SetJustifyH(justify)
+            PlayerName:SetWidth(w)
+            PlayerName:SetPoint(point, PlayerFrameHealthBar, "TOPLEFT", x, y)
+        elseif foreverName then
+            PlayerName:SetJustifyH(UF.GetNameSpotJustify())
+            PlayerName:SetWidth(foreverName.w)
+            PlayerName:SetPoint('LEFT', PlayerFrameHealthBar, 'TOPLEFT', foreverName.x, foreverName.y)
+        elseif isPlayerEliteMode then
+            -- Decoration: name centred over the health bar; 90 wide keeps it off the role icon.
+            PlayerName:SetJustifyH("CENTER")
+            PlayerName:SetWidth(90)
+            local left, right = PlayerArt.Edges("health")
+            PlayerName:SetPoint('BOTTOM', PlayerFrameHealthBar, 'TOP', -(left + right) / 2, 2)
+        else
+            -- Normal mode: left-aligned above health bar
+            PlayerName:SetJustifyH("LEFT")
+            PlayerName:SetWidth(90)
+            PlayerName:SetPoint('BOTTOMLEFT', PlayerFrameHealthBar, 'TOPLEFT', 12, 2)
+        end
+    end
+    -- Force name visible — Blizzard vehicle transition can hide it
+    PlayerName:SetAlpha(1)
+    PlayerName:Show()
+
+    UpdatePlayerLevelLayout()
+    ApplyPlayerLevelVisibility()
+    PlayerLevelText:Show()
+
+    -- Configure health bar (fat mode uses full-width bar, vehicle uses standard)
+    local fatMode = IsFatHealthbarActive() -- false during vehicle
+    local HP_OFFSET = fatMode and 6 or 0
+    PlayerFrameHealthBar:ClearAllPoints()
+    if hasVehicleUI then
+        -- Vehicle: bar position relative to PlayerFrame
+        PlayerFrameHealthBar:SetSize(117.5, 19)
+        PlayerFrameHealthBar:SetPoint('TOPLEFT', PlayerFrame, 'TOPLEFT', 113, -38)
+        -- Raise bars above vehicle border texture
+        PlayerFrameHealthBar:SetFrameLevel(PlayerFrame:GetFrameLevel() + 3)
+        PlayerFrameManaBar:SetFrameLevel(PlayerFrame:GetFrameLevel() + 3)
+    elseif PlayerArt.LegacyFat() then
+        PlayerFrameHealthBar:SetSize(125, 29.5) -- Taller in fat mode
+        PlayerFrameHealthBar:SetPoint('LEFT', PlayerPortrait, 'RIGHT', 1, -HP_OFFSET)
+        PlayerFrameHealthBar:SetFrameLevel(PlayerFrame:GetFrameLevel() + 1)
+        PlayerFrameManaBar:SetFrameLevel(PlayerFrame:GetFrameLevel() + 1)
+    else
+        local health = (PlayerArt.FatSkin() or UF.GetFrameSkin()[PlayerArt.BaseKind()]).bars.health
+        PlayerFrameHealthBar:SetSize(health.w, health.h)
+        PlayerFrameHealthBar:SetPoint('LEFT', PlayerPortrait, 'RIGHT', health.x, health.y)
+        PlayerFrameHealthBar:SetFrameLevel(PlayerFrame:GetFrameLevel() + 1)
+        PlayerFrameManaBar:SetFrameLevel(PlayerFrame:GetFrameLevel() + 1)
+    end
+
+    -- Configure mana bar (fat mode uses anchor frame, vehicle/normal use inline position)
+    ApplyFatManaBar()
+
+    -- Set power bar texture based on type (respects user texture override)
+    local powerType, powerTypeString = UnitPowerType('player')
+    local powerTexture = GetPowerBarTexture(powerTypeString)
+    PlayerFrameManaBar:GetStatusBarTexture():SetTexture(powerTexture)
+
+    -- Configure status and flash textures 
+    -- In vehicle: hide our custom glow effects (vehicle frame doesn't use them)
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    local baseTexture = GetBaseTexture()
+    if hasVehicleUI then
+        -- Vehicle mode: suppress Blizzard's native flash/status completely.
+        -- DragonUI uses dedicated VehicleCombatFlash / VehicleStatusGlow frames
+        -- (created in CreatePlayerFrameTextures) to avoid UIFrameFlash conflicts.
+        if PlayerStatusTexture then
+            PlayerStatusTexture:Hide()
+            PlayerStatusTexture:SetAlpha(0)
+        end
+        if PlayerFrameFlash then
+            PlayerFrameFlash:Hide()
+            PlayerFrameFlash:SetAlpha(0)
+            -- Stop Blizzard's UIFrameFlash animation if running
+            if UIFrameFlashStop then
+                UIFrameFlashStop(PlayerFrameFlash)
+            end
+        end
+        -- Hide DragonUI normal-mode combat glow (wrong shape for vehicle frame)
+        if dragonFrame and dragonFrame.DragonUICombatGlow then
+            dragonFrame.DragonUICombatGlow:Hide()
+        end
+    else
+        -- Normal/fat mode: update DragonUIStatusGlow texture to match current base texture
+        -- (PlayerStatusTexture is permanently suppressed by UpdateGlowVisibility)
+        if dragonFrame and dragonFrame.DragonUIStatusTexture then
+            dragonFrame.DragonUIStatusTexture:SetTexture(baseTexture)
+        end
+        -- Also update combat glow texture to match fat/normal
+        if dragonFrame and dragonFrame.DragonUICombatTexture then
+            dragonFrame.DragonUICombatTexture:SetTexture(baseTexture)
+        end
+    end
+
+    -- ALWAYS hide Blizzard's PlayerFrameFlash — DragonUI uses its own glow system
+    -- (DragonUICombatGlow in normal, VehicleCombatFlash in vehicle, EliteCombatGlow in elite)
+    if PlayerFrameFlash then
+        PlayerFrameFlash:Hide()
+        PlayerFrameFlash:SetAlpha(0)
+        if UIFrameFlashStop then
+            UIFrameFlashStop(PlayerFrameFlash)
+        end
+    end
+
+    -- Position glow effects ONLY in normal mode — vehicle hides all glows
+    -- (UpdateGlowVisibility blocks them in vehicle; positioning them at the wrong
+    -- portrait offset would cause misaligned effects if they were ever shown)
+    if not hasVehicleUI then
+        if dragonFrame and dragonFrame.DragonUICombatGlow then
+            dragonFrame.DragonUICombatGlow:ClearAllPoints()
+            dragonFrame.DragonUICombatGlow:SetPoint('TOPLEFT', PlayerPortrait, 'TOPLEFT', -9, 9)
+        end
+        if dragonFrame and dragonFrame.DragonUIStatusGlow then
+            dragonFrame.DragonUIStatusGlow:ClearAllPoints()
+            dragonFrame.DragonUIStatusGlow:SetPoint('TOPLEFT', PlayerPortrait, 'TOPLEFT', -9, 9)
+        end
+        if dragonFrame and dragonFrame.EliteStatusGlow then
+            dragonFrame.EliteStatusGlow:ClearAllPoints()
+            dragonFrame.EliteStatusGlow:SetPoint('TOPLEFT', PlayerPortrait, 'TOPLEFT', -24.5, 19)
+        end
+        if dragonFrame and dragonFrame.EliteCombatGlow then
+            dragonFrame.EliteCombatGlow:ClearAllPoints()
+            dragonFrame.EliteCombatGlow:SetPoint('TOPLEFT', PlayerPortrait, 'TOPLEFT', -24.5, 19)
+        end
+        ApplyPlayerGlowArt()
+    end
+
+    -- Setup class-specific elements
+    local config = GetPlayerConfig()
+    if config.show_runes ~= false then -- Only setup if not explicitly disabled
+        SetupRuneFrame()
+    end
+    UpdatePlayerRoleIcon()
+    UpdateGroupIndicator()
+    UpdateHealthBarColor(PlayerFrameHealthBar, "player")
+    UpdateManaBarColor(PlayerFrameManaBar)
+    UpdateLeadershipIcons()
+
+    -- Hide Blizzard texts after frame configuration
+    HideBlizzardPlayerTexts()
+
+    -- Apply decoration LAST — after all positioning is finalized
+    -- This ensures vehicle atlas, bg/border, and dragon decoration are properly placed
+    UpdatePlayerDragonDecoration()
+
+end
+
+local function SetCombatFlashVisible(visible)
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+
+    -- Update deco icon (swords in combat, dot in normal) — skip if deco doesn't exist
+    -- or we're in vehicle (deco is hidden during vehicle anyway)
+    if dragonFrame and dragonFrame.PlayerFrameDeco and not IsInVehicle() then
+        if visible then
+            combatPulseTimer = 0 -- Reset pulse timer
+
+            --  CHANGE DECORATION TO COMBAT ICON (crossed swords)
+            dragonFrame.PlayerFrameDeco:SetTexture(PLAYER_COMBAT_ICON_TEXTURE)
+            dragonFrame.PlayerFrameDeco:SetTexCoord(unpack(PLAYER_COMBAT_ICON_TEX_COORDS))
+            --  ADJUST SIZE FOR COMBAT ICON
+            dragonFrame.PlayerFrameDeco:SetSize(16, 14)
+        else
+            --  RESTORE NORMAL DECORATION
+            dragonFrame.PlayerFrameDeco:SetTexture(PLAYER_CORNER_TEXTURE)
+            dragonFrame.PlayerFrameDeco:SetTexCoord(unpack(PLAYER_CORNER_TEX_COORDS))
+            --  RESTORE ORIGINAL SIZE
+            dragonFrame.PlayerFrameDeco:SetSize(23, 23)
+        end
+        dragonFrame.PlayerFrameDeco.DragonUI_Swords = visible and true or false
+        PlayerArt.PlaceCorner(dragonFrame.PlayerFrameDeco)
+    end
+    playerCombatIconShown = visible and true or false
+    if dragonFrame and dragonFrame.PlayerFrameDeco then
+        ApplyPlayerCornerAlpha(dragonFrame.PlayerFrameDeco)
+    end
+
+    -- ALWAYS update glow state — this drives both normal and vehicle combat flash
+    if visible then
+        combatPulseTimer = 0
+    end
+    SetEliteCombatFlashVisible(visible) -- Use unified system
+end
+
+-- Vehicle transition slide, same feel as Blizzard's PlayerFrameAnimTable (0.3s / 140px up)
+local PLAYER_SLIDE_TIME = 0.3
+local PLAYER_SLIDE_DIST = 140
+local slideOffset = 0
+local slideDriver, slideStart, slideReverse
+
+local PLAYER_ANCHOR_OFFSETS = {
+    player = {-15, -7},
+    vehicle = {-20, -5}
+}
+
+local secureGuard, secureAnchor, Ghost_Refresh
+
+-- Restricted SetPoint only accepts relative frames from the protected handle pool, hence the mirror.
+local SECURE_GUARD_SNIPPET = [[
+    if newstate ~= "fix" then return end
+
+    -- The manager only re-fires on a value change, so dirtying our own state is the 0.2s clock.
+    self:SetAttribute("state-duipos", "idle")
+
+    local pf = self:GetFrameRef("playerFrame")
+    if not pf then return end
+
+    local n = pf:GetNumPoints()
+    if n < 2 then return end
+
+    local anchor = self:GetFrameRef("playerAnchor")
+    if not anchor then return end
+
+    local stock = false
+    for i = 1, n do
+        local p, rel, rp, x, y = pf:GetPoint(i)
+        -- GetPoint hands back scale-skewed offsets, so match a window, never equality.
+        if p == "TOPLEFT" and rp == "TOPLEFT" and x and y
+            and x > -19.5 and x < -18.5 and y > -4.5 and y < -3.5 then
+            stock = true
+        end
+    end
+    if not stock then return end
+
+    local ox, oy
+    if pf:GetAttribute("unit") == "vehicle" then
+        ox, oy = self:GetAttribute("duiVehX"), self:GetAttribute("duiVehY")
+    else
+        ox, oy = self:GetAttribute("duiPlrX"), self:GetAttribute("duiPlrY")
+    end
+
+    pf:ClearAllPoints()
+    pf:SetPoint("CENTER", anchor, "CENTER", ox or 0, oy or 0)
+]]
+
+local function SecureGuard_Install()
+    if secureGuard or InCombatLockdown() or not Module.playerFrame then
+        return
+    end
+    if not IsPlayerModuleEnabled() then
+        return
+    end
+
+    secureAnchor = CreateFrame("Frame", "DragonUI_PlayerSecureAnchor", UIParent, "SecureFrameTemplate")
+    secureAnchor:SetAllPoints(Module.playerFrame)
+
+    local guard = CreateFrame("Frame", "DragonUI_PlayerPosGuard", UIParent, "SecureHandlerStateTemplate")
+    guard:SetFrameRef("playerFrame", PlayerFrame)
+    guard:SetFrameRef("playerAnchor", secureAnchor)
+
+    -- Handles only exist when the lookup ran securely; a missing ref makes the snippet a silent no-op.
+    if not guard:GetAttribute("frameref-playerFrame") or not guard:GetAttribute("frameref-playerAnchor") then
+        addon:Debug("Secure position guard disabled: frame refs unavailable")
+        return
+    end
+
+    guard:SetAttribute("duiPlrX", PLAYER_ANCHOR_OFFSETS.player[1])
+    guard:SetAttribute("duiPlrY", PLAYER_ANCHOR_OFFSETS.player[2])
+    guard:SetAttribute("duiVehX", PLAYER_ANCHOR_OFFSETS.vehicle[1])
+    guard:SetAttribute("duiVehY", PLAYER_ANCHOR_OFFSETS.vehicle[2])
+    guard:SetAttribute("_onstate-duipos", SECURE_GUARD_SNIPPET)
+
+    secureGuard = guard
+    RegisterStateDriver(guard, "duipos", "[combat] fix; off")
+end
+
+local function SecureGuard_Uninstall()
+    if not secureGuard or InCombatLockdown() then
+        return
+    end
+    UnregisterStateDriver(secureGuard, "duipos")
+    UnregisterStateDriver(secureGuard)
+    secureGuard:SetAttribute("_onstate-duipos", nil)
+    secureGuard = nil
+end
+
+-- Apply saved widget position to the player frame
+local function ApplyWidgetPosition()
+    -- COMBAT GUARD: Do NOT touch ANY frame during combat.
+    -- Even our aux frame (DragonUI_PlayerFrame) generates taint when called from
+    -- a secure context (AnimationSystem, vehicle transitions). Defer everything.
+    if InCombatLockdown() then
+        deferredPositionUpdate = true
+        return
+    end
+
+    if not Module.playerFrame then
+        return
+    end
+
+    local widgetConfig = addon:GetConfigValue("widgets", "player")
+    if not widgetConfig then
+        widgetConfig = {
+            anchor = "TOPLEFT",
+            posX = -19,
+            posY = -4
+        }
+    end
+
+    -- Position the auxiliary frame
+    Module.playerFrame:ClearAllPoints()
+    Module.playerFrame:SetPoint(widgetConfig.anchor or "TOPLEFT", UIParent, widgetConfig.anchor or "TOPLEFT",
+        widgetConfig.posX or -19, widgetConfig.posY or -4)
+
+    -- Anchor PlayerFrame to auxiliary frame
+    PlayerFrame:ClearAllPoints()
+    local ofs = PLAYER_ANCHOR_OFFSETS[UnitHasVehicleUI("player") and "vehicle" or "player"]
+    local shift = UF.CompactShift("player")
+    PlayerFrame:SetPoint("CENTER", Module.playerFrame, "CENTER", ofs[1] - shift, ofs[2] + slideOffset)
+    UF.FitEditorBox(Module.playerFrame, PlayerFrame, ofs[1] - shift, ofs[2],
+        shift ~= 0 and UF.COMPACT.player.box or nil, GetPlayerConfig().scale)
+
+    SecureGuard_Install()
+    if secureGuard then
+        -- The combat guard restores the player art (vehicle exits too), so the option decides, not the vehicle.
+        local plrShift = GetPlayerConfig().portrait_off and UF.COMPACT.player.shift or 0
+        secureGuard:SetAttribute("duiPlrX", PLAYER_ANCHOR_OFFSETS.player[1] - plrShift)
+    end
+    if Ghost_Refresh then
+        Ghost_Refresh()
+    end
+end
+
+local function PlayerSlide_Stop()
+    slideStart = nil
+    if slideDriver then
+        slideDriver:SetScript("OnUpdate", nil)
+    end
+end
+
+local function PlayerSlide_IsRunning()
+    return slideDriver ~= nil and slideDriver:GetScript("OnUpdate") ~= nil
+end
+
+-- Returns false when combat blocks the move; PlayerFrame:SetPoint is protected there.
+local function PlayerSlide_Place(fraction)
+    if InCombatLockdown() then
+        PlayerSlide_Stop()
+        slideOffset = 0
+        deferredPositionUpdate = true
+        return false
+    end
+    slideOffset = fraction * PLAYER_SLIDE_DIST
+    ApplyWidgetPosition()
+    return true
+end
+
+local function PlayerSlide_OnUpdate()
+    local now = GetTime()
+    if not slideStart then
+        slideStart = now
+    end
+    local fraction = (now - slideStart) / PLAYER_SLIDE_TIME
+    if fraction >= 1 then
+        PlayerSlide_Stop()
+        PlayerSlide_Place(slideReverse and 0 or 1)
+        return
+    end
+    PlayerSlide_Place(slideReverse and (1 - fraction) or fraction)
+end
+
+-- reverse = slide back down into the configured position, otherwise slide up and out
+local function PlayerSlide_Start(reverse)
+    if not Module.playerFrame then
+        return
+    end
+    -- Blizzard re-applies art several times during load; restarting would re-park and never let it land.
+    if PlayerSlide_IsRunning() and slideReverse == reverse then
+        return
+    end
+    PlayerSlide_Stop()
+    slideReverse = reverse
+    if not PlayerSlide_Place(reverse and 1 or 0) then
+        return
+    end
+    if not slideDriver then
+        slideDriver = CreateFrame("Frame")
+    end
+    -- t0 comes from the first tick we receive; SetUpAnimation's shared clock eats a whole slide after a reload
+    slideStart = nil
+    slideDriver:SetScript("OnUpdate", PlayerSlide_OnUpdate)
+end
+
+local function PlayerSlide_Out()
+    PlayerSlide_Start(false)
+    -- An aborted vehicle entry never sends the event that brings the frame back; never leave it off screen
+    addon:After(2, function()
+        if slideOffset ~= 0 and not PlayerSlide_IsRunning() then
+            PlayerSlide_Start(true)
+        end
+    end)
+end
+
+-- Apply configuration settings
+local function ApplyPlayerConfig()
+    if BlizzardFrame() then return end
+    local config = GetPlayerConfig()
+
+    -- Apply scale (protected — pcall for combat safety)
+    local scaleOk, scaleErr = pcall(function() PlayerFrame:SetScale(config.scale or 1.0) end)
+    if not scaleOk and addon.Debug then addon:Debug("PlayerFrame:SetScale error:", scaleErr) end
+    addon.SetEditorBoxScale(Module.playerFrame, config.scale or 1)
+
+    --  ALWAYS use widget position (Editor Mode)
+    ApplyWidgetPosition()
+
+    -- Setup text system
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
+    if dragonFrame and addon.TextSystem then
+        if not Module.textSystem then
+            -- Initialize with dynamic unit based on vehicle state
+            local initialUnit = UnitHasVehicleUI("player") and "vehicle" or "player"
+            Module.textSystem = addon.TextSystem.SetupFrameTextSystem("player", initialUnit, dragonFrame,
+                PlayerFrameHealthBar, PlayerFrameManaBar, "PlayerFrame")
+            PlayerArt.PlaceTexts()
+        end
+        if Module.textSystem then
+            -- Ensure we have the correct unit after setup
+            UpdateTextSystemUnit()
+            Module.textSystem.update()
+        end
+    end
+
+    UpdatePlayerDragonDecoration()
+    UpdateGlowVisibility()
+    
+    -- Setup alternate mana bar text to always be visible for druids
+    SetupAlternateManaBarAlwaysVisible()
+
+end
+
+-- ============================================================================
+-- PUBLIC API FUNCTIONS
+-- ============================================================================
+
+-- Reset frame to default configuration
+local function ResetPlayerFrame()
+    -- Use database defaults instead of local DEFAULTS
+    local dbDefaults = addon.defaults and addon.defaults.profile.unitframe.player or {}
+    for key, value in pairs(dbDefaults) do
+        addon:SetConfigValue("unitframe", "player", key, value)
+    end
+    ApplyPlayerConfig()
+
+end
+
+-- Refresh frame configuration
+local function RefreshPlayerFrame()
+    if BlizzardFrame() then return end
+    if InCombatLockdown() then
+        if addon.CombatQueue then
+            addon.CombatQueue:Add("player_refresh_frame", RefreshPlayerFrame)
+        end
+        return
+    end
+
+    --  APPLY CONFIGURATION IMMEDIATELY
+    ApplyPlayerConfig()
+
+    --  RE-APPLY FRAME LAYOUT (health/mana bar sizes, positions - needed for fat healthbar toggle)
+    ChangePlayerframe()
+
+    --  UPDATE CLASS COLOR
+    UpdatePlayerHealthBarColor()
+
+    --  UPDATE DRAGON DECORATION (important for scale)
+    UpdatePlayerDragonDecoration()
+
+    --  UPDATE TEXT SYSTEM
+    if Module.textSystem then
+        Module.textSystem.update()
+    end
+
+    --  Alternate mana bar text visibility is configured once in ApplyPlayerConfig()
+
+    -- Fade PlayerFrame and its detached decoration frame together (see uf_core.lua UF.GetConfig)
+    if addon.VisibilityFade then
+        local dragonFrame = _G["DragonUIUnitframeFrame"]
+        addon.VisibilityFade.Register("player", PlayerFrame, {
+            frames = { dragonFrame },
+            dbTable = function() return addon.UF.GetConfig("player") end,
+            hoverFrames = { PlayerFrame, PlayerFrameHealthBar, PlayerFrameManaBar },
+            clickThrough = true,
+        })
+        addon.VisibilityFade.Update("player")
+    end
+end
+
+-- ============================================================================
+-- INITIALIZATION
+-- ============================================================================
+-- Hook for automatic class color refresh on health bar updates
+local function SetupPlayerClassColorHooks()
+    if not _G.DragonUI_PlayerHealthHookSetup then
+        -- Taint-safe hook: refresh color when Blizzard updates health bar
+        hooksecurefunc("UnitFrameHealthBar_Update", function(statusbar, unit)
+            if statusbar == PlayerFrameHealthBar and unit == "player" and not BlizzardFrame() then
+                UpdatePlayerHealthBarColor()
+            end
+        end)
+
+        _G.DragonUI_PlayerHealthHookSetup = true
+
+    end
+end
+-- Initialize the PlayerFrame module
+local function InitializePlayerFrame()
+    if Module.initialized or BlizzardFrame() then
+        return
+    end
+
+    -- Setup vehicle transition hooks with safe function
+    local function SafeHookSecureFunc(funcName, hookFunc)
+        if _G[funcName] and type(_G[funcName]) == "function" then
+            hooksecurefunc(funcName, hookFunc)
+        end
+    end
+
+    
+    -- These are hooked at file scope below with richer logic (vehicle transitions section)
+    -- HandleRuneFrameVehicleTransition is called from the file-scope hooks instead
+
+    -- BLIZZARD FUNCTION HOOKS — must defer in combat.
+    -- These hooks fire when Blizzard internally manages PlayerFrame during reload/vehicle
+    -- transitions. If registered during combat, ChangePlayerframe() fires at a time when
+    -- vehicle state isn't fully initialized → disrupts vehicle action bar layout.
+    local function RegisterBlizzardHooks()
+        if Module.blizzardHooksRegistered then return end
+        SafeHookSecureFunc("PlayerFrame_UpdateStatus", PlayerFrame_UpdateStatus)
+        SafeHookSecureFunc("PlayerFrame_UpdateArt", ChangePlayerframe)
+        SafeHookSecureFunc("PlayerFrame_UpdateGroupIndicator", UpdateGroupIndicator)
+        SafeHookSecureFunc("UnitFramePortrait_Update", function(frame, unit)
+            if frame == PlayerFrame and (unit == "player" or unit == "vehicle") then
+                RefreshPlayerPortraitState(unit)
+            end
+        end)
+        SafeHookSecureFunc("ShowHelm", function()
+            RefreshPlayerPortraitState("player")
+        end)
+        SafeHookSecureFunc("HideHelm", function()
+            RefreshPlayerPortraitState("player")
+        end)
+        Module.blizzardHooksRegistered = true
+    end
+
+    if InCombatLockdown() then
+        -- Defer Blizzard hooks to after combat
+        local hookFrame = CreateFrame("Frame")
+        hookFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+        hookFrame:SetScript("OnEvent", function(self)
+            self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+            RegisterBlizzardHooks()
+        end)
+    else
+        RegisterBlizzardHooks()
+    end
+    
+    -- Alternate mana bar text setup done once in ApplyPlayerConfig() - no need for hooks
+
+    -- Create auxiliary frame
+    Module.playerFrame = addon.CreateUIFrame(200, 75, "PlayerFrame")
+
+    --  AUTOMATIC REGISTRATION IN CENTRALIZED SYSTEM
+    addon:RegisterEditableFrame({
+        name = "player",
+        frame = Module.playerFrame,
+        blizzardFrame = PlayerFrame,
+        configPath = {"widgets", "player"},
+        onHide = function()
+            ApplyPlayerConfig() -- Apply new configuration when exiting editor
+            UpdateLeadershipIcons()
+        end,
+        module = Module
+    })
+
+    -- Register fat mana bar anchor as editable frame (for editor mode movability)
+    if IsFatHealthbarActive() and not Module.fatManaRegistered then
+        local fatAnchor = GetOrCreateFatManaAnchor()
+        addon:RegisterEditableFrame({
+            name = "fat_manabar",
+            frame = fatAnchor,
+            configPath = {"widgets", "fat_manabar"},
+            editorVisible = function() return IsFatHealthbarActive() end,
+            onHide = function()
+                ApplyFatManaBar()
+            end,
+            module = Module
+        })
+        Module.fatManaRegistered = true
+    end
+
+    -- Setup frame hooks
+    if PlayerFrame and PlayerFrame.HookScript then
+        PlayerFrame:HookScript('OnUpdate', PlayerFrame_OnUpdate)
+    end
+
+    -- Phase 2: Removed duplicate hooksecurefunc for PlayerFrame_UpdateStatus and
+    -- PlayerFrame_UpdateArt — already hooked via SafeHookSecureFunc above (L1685-1686)
+
+    -- Setup bar hooks for persistent colors
+    if PlayerFrameHealthBar and PlayerFrameHealthBar.HookScript then
+        PlayerFrameHealthBar:HookScript('OnValueChanged', function(self)
+            --  APPLY CLASS COLOR ON EACH CHANGE
+            UpdatePlayerHealthBarColor()
+        end)
+        PlayerFrameHealthBar:HookScript('OnShow', function(self)
+            --  APPLY CLASS COLOR ON SHOW
+            UpdatePlayerHealthBarColor()
+        end)
+    end
+
+    -- Instance-level SetStatusBarColor defense (same pattern as small_frame.lua).
+    -- Blizzard's HealthBar_OnValueChanged calls SetStatusBarColor(green) on every
+    -- health change through code paths that DragonUI's higher-level hooks don't
+    -- intercept.  WeakAuras (and similar addons) trigger additional Blizzard UI
+    -- refresh cycles asynchronously, making the race visible.  This hook catches
+    -- ALL SetStatusBarColor calls regardless of code path and re-applies our color.
+    if PlayerFrameHealthBar then
+        local healthColorGuard = false
+        hooksecurefunc(PlayerFrameHealthBar, "SetStatusBarColor", function(self)
+            if healthColorGuard then return end
+            healthColorGuard = true
+            UpdatePlayerHealthBarColor()
+            healthColorGuard = false
+        end)
+    end
+
+    if PlayerFrameManaBar and PlayerFrameManaBar.HookScript then
+        PlayerFrameManaBar:HookScript('OnValueChanged', UpdateManaBarColor)
+    end
+
+    -- TexCoord clipping for baked textures (critical for DragonUI dynamic cropping).
+    -- Overlay anchoring uses the statusbar texture object, so clipping remains compatible.
+    if PlayerFrameHealthBar then
+        hooksecurefunc(PlayerFrameHealthBar, "SetValue", PlayerArt.ApplyFill)
+    end
+
+    -- Mana texcoord clipping (same baked texture rule).
+    if PlayerFrameManaBar then
+        hooksecurefunc(PlayerFrameManaBar, "SetValue", PlayerArt.ApplyFill)
+    end
+
+    -- Instance-level SetStatusBarColor defense for mana bar (same rationale).
+    if PlayerFrameManaBar then
+        local manaColorGuard = false
+        hooksecurefunc(PlayerFrameManaBar, "SetStatusBarColor", function(self)
+            if manaColorGuard then return end
+            manaColorGuard = true
+            UpdateManaBarColor(self)
+            manaColorGuard = false
+        end)
+    end
+
+    -- Blizzard re-Shows this bar on its own (e.g. UnitFrameManaBar_UpdateType), undoing "hide mana bar".
+    if PlayerFrameManaBar then
+        hooksecurefunc(PlayerFrameManaBar, "Show", function(self)
+            if IsFatHealthbarActive() then
+                local _, _, hidden = GetFatManaConfig()
+                if hidden then
+                    self:Hide()
+                end
+            end
+        end)
+    end
+
+    -- Protect against Blizzard's UnitFrameManaBar_UpdateType resetting our texture
+    if not Module._manaTypeHooked and _G.UnitFrameManaBar_UpdateType then
+        hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar)
+            if manaBar == PlayerFrameManaBar then
+                UpdatePowerBarTexture(PlayerFrameManaBar)
+            end
+        end)
+        Module._manaTypeHooked = true
+    end
+
+    -- Setup glow suppression hooks
+    local glows = {PlayerStatusGlow, PlayerRestGlow}
+    for _, glow in ipairs(glows) do
+        if glow and glow.HookScript then
+            glow:HookScript('OnShow', function(self)
+                self:Hide()
+                self:SetAlpha(0)
+            end)
+        end
+    end
+
+    -- Suppress Blizzard's PlayerFrameFlash permanently — DragonUI uses its own combat flash
+    -- (DragonUICombatGlow / VehicleCombatFlash / EliteCombatGlow depending on mode)
+    -- Clear the texture entirely so UIFrameFlash's OnUpdate alpha animation has nothing to render
+    if PlayerFrameFlash then
+        PlayerFrameFlash:SetTexture('')
+        PlayerFrameFlash:Hide()
+        PlayerFrameFlash:SetAlpha(0)
+        if UIFrameFlashStop then
+            UIFrameFlashStop(PlayerFrameFlash)
+        end
+    end
+
+    if PlayerFrameFlash and not PlayerFrameFlash.__DragonUI_FlashHooked then
+        hooksecurefunc(PlayerFrameFlash, 'Show', function(self)
+            self:Hide()
+            self:SetAlpha(0)
+            self:SetTexture('')
+            if UIFrameFlashStop then
+                UIFrameFlashStop(self)
+            end
+        end)
+        PlayerFrameFlash.__DragonUI_FlashHooked = true
+    end
+
+    -- Always suppress Blizzard's PlayerStatusTexture (resting glow)
+    -- DragonUI provides custom glow system (EliteStatusGlow / VehicleStatusGlow)
+    -- and the status glow state is tracked via statusGlowVisible
+    if PlayerStatusTexture and PlayerStatusTexture.HookScript then
+        PlayerStatusTexture:HookScript('OnShow', function(self)
+            if not self.DragonUI_ShowGuard then
+                self.DragonUI_ShowGuard = true
+                self:Hide()
+                self:SetAlpha(0)
+                self.DragonUI_ShowGuard = nil
+            end
+        end)
+    end
+
+    -- Hide Blizzard texts after module initialization
+    HideBlizzardPlayerTexts()
+
+    Module.initialized = true
+    Module.applied = true
+
+end
+
+-- ============================================================================
+-- EVENT SYSTEM
+-- ============================================================================
+
+-- Combined update function for efficiency
+local function UpdateBothBars()
+    UpdateHealthBarColor(PlayerFrameHealthBar, "player")
+    UpdateManaBarColor(PlayerFrameManaBar)
+end
+
+-- Re-skin for whatever art Blizzard just installed; only ever called while the frame is slid away
+local function ApplyPlayerArtState()
+    if BlizzardFrame() then return end
+    local inVehicle = IsInVehicle()
+
+    if InCombatLockdown() then
+        deferredPositionUpdate = true
+    else
+        ApplyWidgetPosition()
+    end
+
+    HandleRuneFrameVehicleTransition(inVehicle)
+
+    local config = GetPlayerConfig()
+    local decorationType = config.dragon_decoration or "none"
+    local isEliteMode = UF.PLAYER_DECORATIONS[decorationType] ~= nil
+    UpdateDragonVisibilityForVehicle(inVehicle, isEliteMode)
+
+    UpdateGlowVisibility()
+    ChangePlayerframe()
+    UpdatePlayerDragonDecoration()
+
+    -- Blizzard owns these anchors while the vehicle art is up; ours only fit the normal frame
+    if not inVehicle then
+        UpdateLeadershipIcons()
+    end
+end
+
+-- Setup event handling system
+local function SetupPlayerEvents()
+    if Module.eventsFrame then
+        return
+    end
+
+    local f = CreateFrame("Frame")
+    Module.eventsFrame = f
+
+    -- Event handlers
+    local handlers = {
+        PLAYER_REGEN_ENABLED = function()
+            UpdateBothBars()
+            SetCombatFlashVisible(false)
+            -- Ensure module is initialized before deferred updates
+            -- (reload in combat defers InitializePlayerFrame; this runs it now)
+            if not Module.initialized then
+                InitializePlayerFrame()
+            end
+            -- SAFE: Apply deferred changes after combat
+            if deferredPositionUpdate then
+                ApplyPlayerConfig()  -- Includes ApplyWidgetPosition + scale
+                ChangePlayerframe()  -- Re-apply full layout (vehicle state may have changed during combat)
+                HideBlizzardPlayerTexts()
+                deferredPositionUpdate = false
+                -- Delayed retry: Blizzard may reposition PlayerFrame after PLAYER_REGEN_ENABLED
+                -- (vehicle exit animation, level-up, etc.). Re-apply after a few frames to
+                -- ensure our position is the final one.
+                if not Module.regenDelayFrame then
+                    Module.regenDelayFrame = CreateFrame("Frame")
+                end
+                Module.regenDelayAttempts = 0
+                Module.regenDelayFrame:SetScript("OnUpdate", function(self)
+                    Module.regenDelayAttempts = (Module.regenDelayAttempts or 0) + 1
+                    if Module.regenDelayAttempts >= 3 then -- After 3 frames (~0.1s)
+                        if not InCombatLockdown() then
+                            ApplyPlayerConfig()
+                            ChangePlayerframe()
+                        end
+                        self:SetScript("OnUpdate", nil)
+                    end
+                end)
+            end
+        end,
+
+        PLAYER_REGEN_DISABLED = function()
+            SetCombatFlashVisible(true)
+        end,
+
+
+        ADDON_LOADED = function(addonName)
+            if addonName == "ProjectEbonhold" then
+                InitializePlayerFrame()
+            end
+        end,
+
+        PLAYER_ENTERING_WORLD = function()
+            if InCombatLockdown() then
+                -- Reload happened in combat: touching ANY frame generates taint
+                -- that breaks vehicle action bar. Defer everything to after combat.
+                -- This is a WoW 3.3.5a limitation — RetailUI has the same issue.
+                deferredPositionUpdate = true
+                -- Only safe non-frame operations:
+                UpdateTextSystemUnit()
+                return
+            end
+            ChangePlayerframe()
+            ApplyPlayerConfig()
+            -- Ensure Blizzard texts are hidden after entering world
+            HideBlizzardPlayerTexts()
+            -- Update textSystem unit in case of reload while in vehicle
+            UpdateTextSystemUnit()
+
+            -- Applying the art inside this dispatch is what kills the restyle flash; sliding during load is
+            -- not, and frame pacing there is too erratic to time it, so land it at rest like Blizzard does.
+            if UnitHasVehicleUI("player") then
+                ApplyPlayerArtState()
+            end
+        end,
+
+        RUNE_TYPE_UPDATE = function(runeIndex)
+            -- FIX: Update ALL 6 runes, not just the one that changed.
+            -- Blizzard's OnEvent fires on ALL rune buttons for any RUNE_TYPE_UPDATE,
+            -- resetting ALL textures to the Blizzard default. Updating only the
+            -- changed rune leaves the other 5 stuck on Blizzard's texture.
+            for i = 1, 6 do
+                local button = _G['RuneButtonIndividual' .. i]
+                if button then
+                    UpdateRune(button)
+                end
+            end
+        end,
+
+        LFG_ROLE_UPDATE = UpdatePlayerRoleIcon,
+        PLAYER_ROLES_ASSIGNED = UpdatePlayerRoleIcon,
+        PARTY_MEMBERS_CHANGED = UpdatePlayerRoleIcon,
+        RAID_ROSTER_UPDATE = UpdateGroupIndicator,
+
+        UNIT_AURA = function(unit)
+            if unit == "player" then
+                UpdateBothBars()
+            end
+        end,
+
+        UNIT_MODEL_CHANGED = function(unit)
+            if unit == "player" or unit == "vehicle" then
+                RefreshPlayerPortraitState(unit)
+            end
+        end,
+
+        UNIT_PORTRAIT_UPDATE = function(unit)
+            if unit == "player" or unit == "vehicle" then
+                RefreshPlayerPortraitState(unit)
+            end
+        end,
+
+        PLAYER_EQUIPMENT_CHANGED = function()
+            RefreshPlayerPortraitState("player")
+        end,
+
+        -- Vehicle events for proper unit switching
+        UNIT_ENTERING_VEHICLE = function(unit, showVehicleFrame)
+            if unit == "player" and (showVehicleFrame or PlayerFrame.state == "vehicle") then
+                PlayerSlide_Out()
+            end
+        end,
+
+        UNIT_EXITING_VEHICLE = function(unit)
+            if unit == "player" and PlayerFrame.state == "vehicle" then
+                PlayerSlide_Out()
+            end
+        end,
+
+        UNIT_ENTERED_VEHICLE = function(unit)
+            if unit == "player" then
+                UpdateTextSystemUnit()
+                UpdateBothBars()
+                -- Force textSystem update after unit change
+                if Module.textSystem and Module.textSystem.update then
+                    Module.textSystem.update()
+                end
+                
+                -- Hide dragon decoration when entering vehicle
+                local config = GetPlayerConfig()
+                local decorationType = config.dragon_decoration or "none"
+                local isEliteMode = UF.PLAYER_DECORATIONS[decorationType] ~= nil
+                UpdateDragonVisibilityForVehicle(true, isEliteMode)
+            end
+        end,
+
+        UNIT_EXITED_VEHICLE = function(unit)
+            if unit == "player" then
+                UpdateTextSystemUnit()
+                UpdateBothBars()
+                -- Force textSystem update after unit change and trigger health events
+                if Module.textSystem and Module.textSystem.update then
+                    Module.textSystem.update()
+                end
+                
+                -- Show dragon decoration when exiting vehicle
+                local config = GetPlayerConfig()
+                local decorationType = config.dragon_decoration or "none"
+                local isEliteMode = UF.PLAYER_DECORATIONS[decorationType] ~= nil
+                UpdateDragonVisibilityForVehicle(false, isEliteMode)
+                -- Force health and power updates to ensure bars show correctly
+                if PlayerFrameHealthBar then
+                    PlayerFrameHealthBar:GetScript("OnEvent")(PlayerFrameHealthBar, "UNIT_HEALTH", "player")
+                end
+                if PlayerFrameManaBar then
+                    PlayerFrameManaBar:GetScript("OnEvent")(PlayerFrameManaBar, "UNIT_MANA", "player")
+                    -- FIX: Restore white tint for texture purity
+                    UpdateManaBarColor(PlayerFrameManaBar)
+                end
+            end
+        end
+    }
+
+    -- Register events
+    for event in pairs(handlers) do
+        f:RegisterEvent(event)
+    end
+
+    for event in pairs(HEALTH_EVENTS) do
+        f:RegisterEvent(event)
+    end
+
+    for event in pairs(POWER_EVENTS) do
+        f:RegisterEvent(event)
+    end
+
+    -- Event dispatcher
+    f:SetScript("OnEvent", function(_, event, ...)
+        if BlizzardFrame() then return end
+        local handler = handlers[event]
+        if handler then
+            handler(...)
+            return
+        end
+
+        local unit = ...
+        if unit ~= "player" then
+            return
+        end
+
+        if HEALTH_EVENTS[event] then
+            UpdateHealthBarColor(PlayerFrameHealthBar, "player")
+        elseif POWER_EVENTS[event] then
+            UpdateManaBarColor(PlayerFrameManaBar)
+            UpdatePowerBarTexture(PlayerFrameManaBar)
+            -- Update alternate mana text for druids (both always visible and hover modes)
+            local _, playerClass = UnitClass("player")
+            if playerClass == "DRUID" then
+                local config = GetPlayerConfig()
+                if config and config.alwaysShowAlternateManaText then
+                    -- Always visible mode: update immediately
+                    UpdateAlternateManaText()
+                else
+                    -- Hover mode: only update if currently showing (mouse over)
+                    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+                    if alternateManaBar and alternateManaBar:IsMouseOver() then
+                        UpdateAlternateManaText()
+                    end
+                end
+            end
+        end
+    end)
+
+end
+
+-- ============================================================================
+-- MODULE STARTUP
+-- ============================================================================
+
+-- Initialize event system
+SetupPlayerEvents()
+SetupPlayerClassColorHooks()
+
+-- Blizzard's texts are hidden at PLAYER_ENTERING_WORLD, not here: at file load the profile is still
+-- the defaults, so a player on Blizzard's original frame would lose them for the session.
+
+-- Druid alternate mana bar: Blizzard updates the bar but never our text on it
+hooksecurefunc("UnitFrameManaBar_Update", function(statusbar, unit)
+    -- Every unit frame's mana bar also runs this for the player's power events; one is enough.
+    if unit ~= "player" or statusbar ~= PlayerFrameManaBar or BlizzardFrame() then
+        return
+    end
+    local _, playerClass = UnitClass("player")
+    if playerClass ~= "DRUID" then
+        return
+    end
+
+    local config = GetPlayerConfig()
+    if config and config.alwaysShowAlternateManaText then
+        UpdateAlternateManaText()
+        return
+    end
+
+    local alternateManaBar = _G.PlayerFrameAlternateManaBar
+    if alternateManaBar and alternateManaBar:IsMouseOver() then
+        UpdateAlternateManaText()
+    end
+end)
+
+-- ===============================================================
+-- HOOKS TO MAINTAIN POSITION DURING VEHICLE TRANSITIONS
+-- ===============================================================
+
+-- Blizzard swaps art only while the frame is animated away, so this is where the slide turns around.
+-- After a reload its AnimationSystem clock is frozen, so the swap can land before our outbound slide has
+-- moved at all; testing the driver too (not just the offset) is what stops the frame parking off screen.
+local function OnBlizzardArtApplied()
+    if BlizzardFrame() then return end
+    ApplyPlayerArtState()
+    if slideOffset ~= 0 or (PlayerSlide_IsRunning() and not slideReverse) then
+        PlayerSlide_Start(true)
+    end
+end
+
+hooksecurefunc("PlayerFrame_ToPlayerArt", OnBlizzardArtApplied)
+hooksecurefunc("PlayerFrame_ToVehicleArt", OnBlizzardArtApplied)
+hooksecurefunc("PlayerFrame_UpdatePvPStatus", HidePlayerPvP)
+
+-- Blizzard toggles these from its event handlers (the looter inline), so the Zzz follows the icons themselves.
+do
+    local function OnPlayerGroupIconToggled()
+        local dragonFrame = _G["DragonUIUnitframeFrame"]
+        if dragonFrame and dragonFrame.PlayerRestIconOverride and IsPlayerModuleEnabled() then
+            PlayerArt.PlaceRestIcon()
+        end
+    end
+    for _, icon in ipairs({ PlayerLeaderIcon, PlayerGuideIcon, PlayerMasterIcon }) do
+        hooksecurefunc(icon, "Show", OnPlayerGroupIconToggled)
+        hooksecurefunc(icon, "Hide", OnPlayerGroupIconToggled)
+    end
+end
+
+if PlayerFrame_SequenceFinished then
+    hooksecurefunc("PlayerFrame_SequenceFinished", function()
+        ApplyPlayerArtState()
+    end)
+end
+
+-- Stand-in for the transition: DragonUI owns it and nothing protected anchors to it, so unlike
+-- PlayerFrame it can be moved during combat lockdown.
+local GHOST_BASE_LEVEL = 8
+local ghostFrame, ghostKids, ghostPortraits, ghostLive
+local ghostLayout, ghostRefreshPending
+local ghostDriver, ghostStart, ghostReverse, ghostActive
+local ghostCache = {}
+
+-- Textures have no GetEffectiveScale in 3.3.5a, so the scale has to come from the owning frame.
+local function Ghost_RegionScale(region)
+    local parent = region.GetParent and region:GetParent()
+    if parent and parent.GetEffectiveScale then
+        return parent:GetEffectiveScale()
+    end
+    return UIParent:GetEffectiveScale()
+end
+
+-- Rect of a frame or region in PlayerFrame units; nil when it cannot be measured yet.
+local function Ghost_Rect(obj)
+    local left, right = obj:GetLeft(), obj:GetRight()
+    local top, bottom = obj:GetTop(), obj:GetBottom()
+    local baseLeft, baseTop = PlayerFrame:GetLeft(), PlayerFrame:GetTop()
+    if not left or not right or not top or not bottom or not baseLeft or not baseTop then
+        return nil
+    end
+    local os = obj.GetEffectiveScale and obj:GetEffectiveScale() or Ghost_RegionScale(obj)
+    local ps = PlayerFrame:GetEffectiveScale()
+    if not ps or ps == 0 then
+        return nil
+    end
+    return (left * os - baseLeft * ps) / ps, (top * os - baseTop * ps) / ps,
+        (right - left) * os / ps, (top - bottom) * os / ps
+end
+
+local function Ghost_Capture(region, parentAlpha)
+    if not region or not region.IsShown or not region:IsShown() then
+        return nil
+    end
+    local kind = region.GetObjectType and region:GetObjectType()
+    if kind ~= "Texture" and kind ~= "FontString" then
+        return nil
+    end
+    -- DragonUI suppresses Blizzard's own art with SetAlpha(0) rather than Hide(), so IsShown lies.
+    local alpha = parentAlpha * ((region.GetAlpha and region:GetAlpha()) or 1)
+    if alpha < 0.05 then
+        return nil
+    end
+
+    local x, y, w, h = Ghost_Rect(region)
+    if not x then
+        return nil
+    end
+
+    -- Anything living outside the frame is not part of it: a parked mana bar, a stray overlay.
+    if x + w <= 0 or x >= PlayerFrame:GetWidth() or y <= -PlayerFrame:GetHeight() or y - h >= 0 then
+        return nil
+    end
+
+    local coords
+    if kind == "Texture" and region.GetTexCoord then
+        local ulx, uly, llx, lly, urx = region:GetTexCoord()
+        if ulx then
+            coords = {ulx, urx, uly, lly}
+        end
+    end
+
+    local layer = region.GetDrawLayer and region:GetDrawLayer()
+    local capture = {
+        kind = kind,
+        layer = layer or "ARTWORK",
+        src = region,
+        alpha = alpha,
+        x = x,
+        y = y,
+        w = w,
+        h = h
+    }
+
+    if kind == "Texture" then
+        capture.isPortrait = (region == PlayerPortrait) or nil
+        capture.texture = region:GetTexture()
+        if not capture.texture and not capture.isPortrait then
+            return nil
+        end
+        capture.coords = coords
+        if region.GetVertexColor then
+            capture.r, capture.g, capture.b = region:GetVertexColor()
+        end
+    else
+        capture.text = region:GetText()
+        capture.font, capture.size, capture.flags = region:GetFont()
+        if not capture.font then
+            return nil
+        end
+        capture.r, capture.g, capture.b = region:GetTextColor()
+        capture.justifyH = region:GetJustifyH() or "LEFT"
+        -- Anchor the justified edge, so a capture taken while the text was still empty
+        -- lands in the right place once the text exists.
+        if capture.justifyH == "RIGHT" then
+            capture.anchor, capture.ax = "TOPRIGHT", capture.x + capture.w
+        elseif capture.justifyH == "CENTER" then
+            capture.anchor, capture.ax = "TOP", capture.x + capture.w / 2
+        else
+            capture.anchor, capture.ax = "TOPLEFT", capture.x
+        end
+        capture.ay = capture.y
+    end
+    return capture
+end
+
+-- Fat mode and the elite/dragon decorations change which pieces exist and where they sit,
+-- so a snapshot is only valid for the layout it was taken under. Use the raw config, never
+-- IsFatHealthbarActive: that reports false inside a vehicle and would invalidate every snapshot.
+local function Ghost_Layout()
+    local config = GetPlayerConfig()
+    return tostring(IsFatConfigEnabled()) .. "|" .. tostring((config and config.dragon_decoration) or "none")
+        .. "|" .. UF.GetFrameStyle() .. "|" .. UF.GetDragonSet() .. "|" .. UF.GetLevelStyle()
+        .. "|" .. UF.GetNameSpotJustify()
+        .. "|" .. tostring(config and config.portrait_off or false)
+end
+
+-- Mirror the frame tree rather than flattening it: draw layers only order regions inside one
+-- frame, while frame level orders the frames themselves, and DragonUI relies on both.
+local function Ghost_Walk(frame, parentAlpha, depth, out, baseLevel)
+    local index = table.getn(out.frames) + 1
+    table.insert(out.frames, {
+        level = (frame:GetFrameLevel() or baseLevel) - baseLevel
+    })
+
+    local fill = nil
+    if frame.GetObjectType and frame:GetObjectType() == "StatusBar" then
+        -- Clone the bar as a real StatusBar: 3.3.5a clips the fill rather than resizing it,
+        -- so replaying it as a plain texture can only ever guess at the value.
+        fill = frame:GetStatusBarTexture()
+        local info = out.frames[index]
+        info.isBar = true
+        info.barSrc = frame
+        info.bx, info.by, info.bw, info.bh = Ghost_Rect(frame)
+        if not info.bx then
+            info.bx, info.by, info.bw, info.bh = 0, 0, 0, 0
+        end
+    end
+
+    local regions = {frame:GetRegions()}
+    for i = 1, table.getn(regions) do
+        if regions[i] ~= fill then
+            local capture = Ghost_Capture(regions[i], parentAlpha)
+            if capture then
+                capture.frame = index
+                table.insert(out.pieces, capture)
+            end
+        end
+    end
+
+    if depth >= 3 then
+        return
+    end
+    local children = {frame:GetChildren()}
+    for i = 1, table.getn(children) do
+        local child = children[i]
+        -- PetFrame is parented to PlayerFrame but is a different unit entirely.
+        if child ~= ghostFrame and child ~= _G.PetFrame and child:IsShown() then
+            local childAlpha = parentAlpha * (child:GetAlpha() or 1)
+            if childAlpha >= 0.05 then
+                Ghost_Walk(child, childAlpha, depth + 1, out, baseLevel)
+            end
+        end
+    end
+end
+
+local function Ghost_Create()
+    if ghostFrame then
+        return
+    end
+    ghostFrame = CreateFrame("Frame", "DragonUI_PlayerGhost", UIParent)
+    ghostFrame:SetFrameLevel(GHOST_BASE_LEVEL)
+    ghostFrame:Hide()
+    ghostKids = {}
+    ghostPortraits = {}
+end
+
+local function Ghost_Mirror(index, info)
+    local kid = ghostKids[index]
+    local wantBar = (info and info.isBar) or false
+    if kid and (kid.duiIsBar or false) ~= wantBar then
+        kid:Hide()
+        kid = nil
+    end
+    if not kid then
+        kid = CreateFrame(wantBar and "StatusBar" or "Frame", nil, ghostFrame)
+        kid.duiPool = {}
+        kid.duiIsBar = wantBar
+        ghostKids[index] = kid
+    end
+    kid:ClearAllPoints()
+    if wantBar then
+        kid:SetPoint("TOPLEFT", ghostFrame, "TOPLEFT", info.bx, info.by)
+        kid:SetWidth(info.bw > 0 and info.bw or 1)
+        kid:SetHeight(info.bh > 0 and info.bh or 1)
+    else
+        kid:SetAllPoints(ghostFrame)
+    end
+    local level = GHOST_BASE_LEVEL + (info and info.level or 0)
+    if level < 0 then
+        level = 0
+    end
+    kid:SetFrameLevel(level)
+    kid:Show()
+    return kid
+end
+
+local function Ghost_Acquire(kid, capture, used)
+    local key = capture.kind .. capture.layer
+    used[key] = (used[key] or 0) + 1
+    local pool = kid.duiPool[key]
+    if not pool then
+        pool = {}
+        kid.duiPool[key] = pool
+    end
+    local obj = pool[used[key]]
+    if not obj then
+        if capture.kind == "Texture" then
+            obj = kid:CreateTexture(nil, capture.layer)
+        else
+            obj = kid:CreateFontString(nil, capture.layer)
+        end
+        pool[used[key]] = obj
+    end
+    return obj
+end
+
+-- Bars are copied wholesale from the source every frame: value, texture and colour are all live.
+local function Ghost_SyncBar(kid, source)
+    if not kid or not source then
+        return
+    end
+    local fill = source:GetStatusBarTexture()
+    if fill and fill:GetTexture() then
+        kid:SetStatusBarTexture(fill:GetTexture())
+        local r, g, b, a = fill:GetVertexColor()
+        if r then
+            kid:SetStatusBarColor(r, g, b, a or 1)
+        end
+        local barFill = kid:GetStatusBarTexture()
+        if barFill then
+            barFill:SetDrawLayer("ARTWORK")
+        end
+    end
+    if source.GetOrientation then
+        kid:SetOrientation(source:GetOrientation())
+    end
+    local minValue, maxValue = source:GetMinMaxValues()
+    kid:SetMinMaxValues(minValue or 0, maxValue or 1)
+    kid:SetValue(source:GetValue() or 0)
+    kid:SetAlpha(source:GetAlpha() or 1)
+end
+
+-- Only the geometry is cached; the frame is displaced mid-transition so it cannot be re-measured,
+-- but every value the player can see is re-read live so the ghost never shows a stale bar.
+local function Ghost_ApplyRegion(obj, capture)
+    local x, y, w, h = capture.x, capture.y, capture.w, capture.h
+    local texture, coords = capture.texture, capture.coords
+    local r, g, b, text = capture.r, capture.g, capture.b, capture.text
+    local src = capture.src
+
+    if src and src:IsShown() then
+        if capture.kind == "Texture" then
+            -- Texture and texcoords must be read together: fat mode and the elite decorations
+            -- swap atlases, so a live texture with cached coords shows the wrong slice.
+            texture = src:GetTexture() or texture
+            if src.GetTexCoord then
+                local ulx, uly, llx, lly, urx = src:GetTexCoord()
+                if ulx then
+                    coords = {ulx, urx, uly, lly}
+                end
+            end
+            if src.GetVertexColor then
+                local vr, vg, vb = src:GetVertexColor()
+                if vr then
+                    r, g, b = vr, vg, vb
+                end
+            end
+        else
+            text = src:GetText() or text
+            local vr, vg, vb = src:GetTextColor()
+            if vr then
+                r, g, b = vr, vg, vb
+            end
+        end
+    end
+
+    if capture.kind == "Texture" then
+        if w <= 0 or h <= 0 or (not texture and not capture.isPortrait) then
+            obj:Hide()
+            return
+        end
+    elseif not text or text == "" then
+        obj:Hide()
+        return
+    end
+
+    obj:SetDrawLayer(capture.layer)
+    obj:ClearAllPoints()
+    obj:SetAlpha(capture.alpha or 1)
+    if capture.kind == "Texture" then
+        obj:SetPoint("TOPLEFT", ghostFrame, "TOPLEFT", x, y)
+        obj:SetWidth(w)
+        obj:SetHeight(h)
+        if not capture.isPortrait then
+            obj:SetTexture(texture)
+        end
+        -- Always reset: these objects are pooled, and a leftover crop from a previous
+        -- configuration is what renders as a whole uncropped atlas sheet.
+        if coords and table.getn(coords) >= 4 then
+            obj:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+        else
+            obj:SetTexCoord(0, 1, 0, 1)
+        end
+        obj:SetVertexColor(r or 1, g or 1, b or 1)
+    else
+        obj:SetPoint(capture.anchor or "TOPLEFT", ghostFrame, "TOPLEFT", capture.ax or x, capture.ay or y)
+        -- Zero means the text was empty when captured; let it size itself instead.
+        obj:SetWidth(w > 0 and w or 0)
+        obj:SetHeight(h > 0 and h or 0)
+        obj:SetFont(capture.font, capture.size, capture.flags)
+        obj:SetText(text)
+        obj:SetTextColor(r or 1, g or 1, b or 1)
+        obj:SetJustifyH(capture.justifyH or "LEFT")
+    end
+    obj:Show()
+end
+
+-- Snapshots must be taken while the frame is settled; mid-transition it carries Blizzard's
+-- extra anchor and every measurement is taken against a displaced, over-constrained rect.
+local function Ghost_Snapshot()
+    -- Read-only, so combat is fine; the frame just has to be settled on a single anchor.
+    if slideOffset ~= 0 or not Module.playerFrame then
+        return false
+    end
+    if PlayerFrame:GetNumPoints() ~= 1 or not PlayerFrame:GetLeft() then
+        return false
+    end
+    Ghost_Create()
+
+    local layout = Ghost_Layout()
+    if ghostLayout ~= layout then
+        ghostLayout = layout
+        ghostCache = {}
+    end
+
+    local out = {frames = {}, pieces = {}}
+    Ghost_Walk(PlayerFrame, 1, 0, out, PlayerFrame:GetFrameLevel() or 0)
+    if table.getn(out.pieces) == 0 then
+        return false
+    end
+
+    -- Bake the portrait content now: once the transition starts the vehicle unit is gone.
+    local state = UnitHasVehicleUI("player") and "vehicle" or "player"
+    local root = Ghost_Mirror(1, out.frames[1])
+    local tex = ghostPortraits[state]
+    if not tex then
+        tex = root:CreateTexture(nil, "ARTWORK")
+        ghostPortraits[state] = tex
+    end
+    tex:Hide()
+    -- A live portrait reports a generated name like "Portrait1", not a path; only a class icon is copyable.
+    local file = PlayerPortrait:GetTexture()
+    local portraitFile = nil
+    if file and string.find(tostring(file), "\\") then
+        portraitFile = file
+        tex:SetTexture(file)
+    else
+        local unit = PlayerFrame.unit or "player"
+        if not UnitExists(unit) then
+            unit = "player"
+        end
+        SetPortraitTexture(tex, unit)
+    end
+
+    ghostCache[state] = {
+        scale = PlayerFrame:GetScale() or 1,
+        width = PlayerFrame:GetWidth(),
+        height = PlayerFrame:GetHeight(),
+        strata = PlayerFrame:GetFrameStrata(),
+        layout = layout,
+        portraitFile = portraitFile,
+        frames = out.frames,
+        pieces = out.pieces
+    }
+    return true
+end
+
+-- ApplyWidgetPosition runs inside ApplyPlayerConfig, before ChangePlayerframe has applied the
+-- new fat/decoration art, so capturing inline would store old art under the new layout tag.
+Ghost_Refresh = function()
+    if ghostRefreshPending then
+        return
+    end
+    ghostRefreshPending = true
+    local attempts = 0
+    local function attempt()
+        attempts = attempts + 1
+        if Ghost_Snapshot() or attempts >= 12 then
+            ghostRefreshPending = false
+            return
+        end
+        addon:After(0.25, attempt)
+    end
+    addon:After(0.05, attempt)
+end
+
+local function Ghost_Build(state)
+    local snapshot = ghostCache[state]
+    if not snapshot or not Module.playerFrame then
+        return false
+    end
+    if snapshot.layout ~= Ghost_Layout() then
+        return false
+    end
+    Ghost_Create()
+
+    ghostFrame:SetScale(snapshot.scale)
+    ghostFrame:SetWidth(snapshot.width)
+    ghostFrame:SetHeight(snapshot.height)
+    ghostFrame:SetFrameStrata(snapshot.strata)
+    ghostFrame:SetFrameLevel(GHOST_BASE_LEVEL)
+
+    for i = 1, table.getn(snapshot.frames) do
+        Ghost_Mirror(i, snapshot.frames[i])
+    end
+
+    for key, tex in pairs(ghostPortraits) do
+        if key ~= state then
+            tex:Hide()
+        end
+    end
+
+    -- Re-bake now when possible: the very first snapshot after a reload can predate the portrait.
+    local portrait = ghostPortraits[state]
+    if portrait then
+        local unit = (state == "vehicle") and "vehicle" or "player"
+        if snapshot.portraitFile then
+            portrait:SetTexture(snapshot.portraitFile)
+        elseif UnitExists(unit) then
+            SetPortraitTexture(portrait, unit)
+        end
+    end
+
+    local used = {}
+    ghostLive = {}
+    for i = 1, table.getn(snapshot.frames) do
+        local info = snapshot.frames[i]
+        if info.isBar then
+            Ghost_SyncBar(ghostKids[i], info.barSrc)
+            table.insert(ghostLive, {bar = ghostKids[i], barSrc = info.barSrc})
+        end
+    end
+    for i = 1, table.getn(snapshot.pieces) do
+        local capture = snapshot.pieces[i]
+        local kid = ghostKids[capture.frame or 1]
+        if kid then
+            local obj
+            if capture.isPortrait then
+                obj = ghostPortraits[state]
+            else
+                if not used[kid] then
+                    used[kid] = {}
+                end
+                obj = Ghost_Acquire(kid, capture, used[kid])
+            end
+            if obj then
+                Ghost_ApplyRegion(obj, capture)
+                -- Text can change mid-slide; static textures cannot.
+                if capture.kind == "FontString" then
+                    table.insert(ghostLive, {obj = obj, capture = capture})
+                end
+            end
+        end
+    end
+
+    for i = 1, table.getn(ghostKids) do
+        local kid = ghostKids[i]
+        local counts = used[kid]
+        for key, pool in pairs(kid.duiPool) do
+            for n = ((counts and counts[key]) or 0) + 1, table.getn(pool) do
+                pool[n]:Hide()
+            end
+        end
+    end
+    return true
+end
+
+local function Ghost_Place(offset)
+    local ofs = PLAYER_ANCHOR_OFFSETS[UnitHasVehicleUI("player") and "vehicle" or "player"]
+    ghostFrame:ClearAllPoints()
+    ghostFrame:SetPoint("CENTER", Module.playerFrame, "CENTER", ofs[1] - (PlayerArt.ghostShift or 0), ofs[2] + offset)
+end
+
+local function Ghost_Stop()
+    if ghostDriver then
+        ghostDriver:SetScript("OnUpdate", nil)
+    end
+    if ghostFrame then
+        ghostFrame:Hide()
+    end
+    ghostLive = nil
+    ghostActive = false
+end
+
+local function Ghost_OnUpdate()
+    local fraction = (GetTime() - ghostStart) / PLAYER_SLIDE_TIME
+    if fraction >= 1 then
+        Ghost_Stop()
+        return
+    end
+    Ghost_Place(PLAYER_SLIDE_DIST * (ghostReverse and (1 - fraction) or fraction))
+    if ghostLive then
+        for i = 1, table.getn(ghostLive) do
+            local entry = ghostLive[i]
+            if entry.bar then
+                Ghost_SyncBar(entry.bar, entry.barSrc)
+            else
+                Ghost_ApplyRegion(entry.obj, entry.capture)
+            end
+        end
+    end
+end
+
+local function Ghost_Start(reverse)
+    -- Outbound still shows the vehicle; inbound is already back on the player art.
+    local state = "player"
+    if not reverse and PlayerFrame.unit == "vehicle" then
+        state = "vehicle"
+    end
+    if not Ghost_Build(state) then
+        return false
+    end
+    -- The player art's snapshot is portrait off whenever the option is, vehicle or not by now.
+    PlayerArt.ghostShift = (state == "player" and GetPlayerConfig().portrait_off) and UF.COMPACT.player.shift or 0
+    ghostReverse = reverse
+    ghostStart = GetTime()
+    ghostActive = true
+    Ghost_Place(reverse and PLAYER_SLIDE_DIST or 0)
+    ghostFrame:SetAlpha(1)
+    ghostFrame:Show()
+    if not ghostDriver then
+        ghostDriver = CreateFrame("Frame")
+    end
+    ghostDriver:SetScript("OnUpdate", Ghost_OnUpdate)
+    return true
+end
+
+-- Runs inside Blizzard's vehicle event path, so a fault here must never escape.
+local function Ghost_SafeStart(reverse)
+    local ok, err = pcall(Ghost_Start, reverse)
+    if not ok and addon.Debug then
+        addon:Debug("Ghost_Start error:", err)
+    end
+end
+
+local PLAYER_MASK_TIMEOUT = 2
+local PLAYER_MASK_HARDCAP = 10
+local PLAYER_MASK_SETTLE = 0.02
+local PLAYER_MASK_FADE = 0.06
+local maskDriver, maskStart, maskLastWrite, maskFadeStart, maskAlpha
+
+local function PlayerMask_Stop()
+    Ghost_Stop()
+    if maskDriver then
+        maskDriver:SetScript("OnUpdate", nil)
+    end
+    maskStart = nil
+    maskFadeStart = nil
+    if maskAlpha then
+        PlayerFrame:SetAlpha(maskAlpha)
+        maskAlpha = nil
+    end
+    if Ghost_Refresh then
+        Ghost_Refresh()
+    end
+end
+
+local function PlayerMask_OnUpdate()
+    local now = GetTime()
+
+    if maskFadeStart then
+        if ghostActive then
+            return
+        end
+        local fraction = (now - maskFadeStart) / PLAYER_MASK_FADE
+        if fraction >= 1 then
+            PlayerMask_Stop()
+        else
+            PlayerFrame:SetAlpha((maskAlpha or 1) * fraction)
+        end
+        return
+    end
+
+    if not InCombatLockdown() or (now - maskStart) > PLAYER_MASK_HARDCAP then
+        PlayerMask_Stop()
+        return
+    end
+
+    -- One point means the guard corrected; a live animation re-adds Blizzard's within a frame.
+    local quiet = (now - maskLastWrite) > PLAYER_MASK_SETTLE
+    if quiet and PlayerFrame:GetNumPoints() == 1 then
+        maskFadeStart = now
+        Ghost_SafeStart(true)
+    elseif quiet and (now - maskStart) > PLAYER_MASK_TIMEOUT then
+        -- Giving up while Blizzard is still writing would reveal the frame at its stock anchor.
+        PlayerMask_Stop()
+    end
+end
+
+-- Blizzard animates at frame rate and the secure guard can only answer at 5Hz, so hide rather than race.
+local function PlayerMask_Begin()
+    if not secureGuard then
+        return
+    end
+    local now = GetTime()
+    maskLastWrite = now
+    if maskStart and not maskFadeStart then
+        return
+    end
+    if maskAlpha == nil then
+        maskAlpha = PlayerFrame:GetAlpha()
+    end
+    maskStart = now
+    maskFadeStart = nil
+    PlayerFrame:SetAlpha(0)
+    Ghost_SafeStart(false)
+    if not maskDriver then
+        maskDriver = CreateFrame("Frame")
+    end
+    maskDriver:SetScript("OnUpdate", PlayerMask_OnUpdate)
+end
+
+-- hooksecurefunc fires after Blizzard's SetPoint, so our position is restored in the same frame.
+hooksecurefunc(PlayerFrame, "SetPoint", function(self, point, relativeTo, relativePoint, x, y)
+    if self.DragonUI_SettingPoint or BlizzardFrame() then return end
+    if InCombatLockdown() then
+        deferredPositionUpdate = true
+        if point == "TOPLEFT" and relativeTo == UIParent then
+            PlayerMask_Begin()
+        end
+        return
+    end
+
+    -- Blizzard only auto-anchors to UIParent TOPLEFT/CENTER; anything else is ours or another addon's.
+    if point and relativeTo == UIParent and (point == "TOPLEFT" or point == "CENTER") then
+        self.DragonUI_SettingPoint = true
+        local ok, err = pcall(ApplyWidgetPosition)
+        if not ok and addon.Debug then addon:Debug("ApplyWidgetPosition error:", err) end
+        self.DragonUI_SettingPoint = nil
+    end
+end)
+
+local function OnProfileChanged()
+    if not IsPlayerModuleEnabled() then
+        SecureGuard_Uninstall()
+        addon:ShouldDeferModuleDisable("player", Module)
+        return
+    end
+
+    RefreshPlayerFrame()
+    SetupAlternateManaBarAlwaysVisible()
+end
+
+if addon.db and addon.db.RegisterCallback then
+    addon.db.RegisterCallback(Module, "OnProfileChanged", OnProfileChanged)
+    addon.db.RegisterCallback(Module, "OnProfileCopied", OnProfileChanged)
+    addon.db.RegisterCallback(Module, "OnProfileReset", OnProfileChanged)
+end
+
+addon.PlayerFrame = {
+    Refresh = RefreshPlayerFrame,
+    RefreshPlayerFrame = RefreshPlayerFrame,
+    Reset = ResetPlayerFrame,
+    anchor = function()
+        return Module.playerFrame
+    end,
+    ChangePlayerframe = ChangePlayerframe,
+    CreatePlayerFrameTextures = CreatePlayerFrameTextures,
+    UpdatePlayerHealthBarColor = UpdatePlayerHealthBarColor,
+    UpdatePlayerClassPortrait = UpdatePlayerClassPortrait
+}

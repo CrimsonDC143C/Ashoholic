@@ -6,6 +6,9 @@
 	<Include file="compat.xml"/>
 	<Include file="Libs\libs.xml"/>
 	<Script file="locales\Details-enUS.lua"/>
+	<Script file="locales\Details-frFR.lua"/>
+	<Script file="locales\Details-esES.lua"/>
+	<Script file="locales\Details-deDE.lua"/>
 	<Script file="boot.lua"/>
 	<Script file="indent.lua"/>
 	<Script file="core\util.lua"/>
@@ -76,6 +79,9 @@
 	<Script file="functions\loaddata.lua"/>
 	<Script file="startup.lua"/>
 	<Script file="functions\api2.lua"/>
+	<!-- Project Ebonhold: "WoW Forever" skin (DragonUI's metal frame), default skin, moves existing windows once.
+	     After startup.lua: it hooks ChangeSkin, InstanceColor, ApplyProfile and AtivarInstancia. -->
+	<Script file="ebonhold_forever_skin.lua"/>
 	<!-- Details_TinyThreat -->
 	<Script file="plugins\Details_TinyThreat\enUS.lua"/>
 	<Script file="plugins\Details_TinyThreat\Details_TinyThreat.lua"/>

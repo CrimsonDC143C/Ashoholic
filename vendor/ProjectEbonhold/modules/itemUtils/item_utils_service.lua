@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- Local reference to send junk request

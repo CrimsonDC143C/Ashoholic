@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 
 -- ── The Toolbelt: state + requests ───────────────────────────────────────────
 -- Bank, Mailbox, Auction House, Guild Bank and the Enchanted Anvil (open them
@@ -117,7 +118,16 @@ function Service.PlaceForge()
 end
 
 -- Same steps as UIParent's GUILDBANKFRAME_OPENED handler, minus the vault.
+-- PTR bug 4275: Wow.exe sends no guild bank packet (deposit, withdraw, swap,
+-- tab query) while its banker guid is empty, and only a vault click sets it.
+-- ebonhold.dll's EbonholdGuildBankOpenSelf sets it to the player's own guid
+-- (the server's CanUseGuildBank accepts it) and fires GUILDBANKFRAME_OPENED,
+-- so the stock frame opens itself; without that DLL the frame stays view-only.
 local function ShowGuildBankFrame()
+    if EbonholdGuildBankOpenSelf then
+        EbonholdGuildBankOpenSelf()
+        return
+    end
     if not GuildBankFrame then
         if GuildBankFrame_LoadUI then GuildBankFrame_LoadUI() else LoadAddOn("Blizzard_GuildBankUI") end
     end
@@ -165,6 +175,30 @@ function Service.Sell()
     return true
 end
 
+-- Vendor: the server opens the stock merchant window with no creature (the player
+-- stands in for the vendor): buy, sell anything by hand, buyback, repair.
+local merchantRequestedAt   -- GetTime() of the last OpenMerchant, until its MERCHANT_SHOW
+local portableMerchantOpen = false
+
+-- One message per real opening: a click while the window is open, or while the previous
+-- request is still on its way, sends nothing. Each reopened list fired MERCHANT_SHOW and
+-- several modules wrote to the server on it, until the server's anti-flood kick dropped the player.
+function Service.OpenMerchant()
+    if portableMerchantOpen and MerchantFrame and MerchantFrame:IsShown() then return end
+    if merchantRequestedAt and GetTime() - merchantRequestedAt < 2 then return end
+    merchantRequestedAt = GetTime()
+    ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_TOOLBELT_OPEN_MERCHANT, "")
+end
+
+-- True while the merchant window is the Toolbelt's (the player stands in for the vendor).
+-- The request time covers Blizzard's own MERCHANT_SHOW handler, which runs before ours.
+function Service.IsPortableMerchant()
+    if portableMerchantOpen then return true end
+    if merchantRequestedAt and GetTime() - merchantRequestedAt < 10 then return true end
+    local npc = UnitGUID("npc")
+    return npc ~= nil and npc == UnitGUID("player")
+end
+
 function Service.Repair()
     ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_TOOLBELT_REPAIR, "")
 end
@@ -175,7 +209,9 @@ function Service.SetLoot(fields)
     local l = State.loot
     local on = fields.on; if on == nil then on = l.on end
     local d = fields.destroy; if d == nil then d = l.destroy end
-    local body = string.format("on:%d|q:%d|t:%d|d:%d|dq:%d|dt:%d",
+    -- Masks use %.0f: "%d" breaks on a 32-bit mask at or above 2^31 (all boxes ticked = 4294967295).
+    -- A negative mask from bit.* is fine too: the server keeps the low 32 bits.
+    local body = string.format("on:%d|q:%d|t:%.0f|d:%d|dq:%d|dt:%.0f",
         on and 1 or 0,
         fields.minQuality or l.minQuality,
         fields.classMask or l.classMask,
@@ -245,13 +281,14 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_TOOLBELT_STATE, function
 end)
 
 local FAIL_TEXT = {
-    locked  = "This is not unlocked on this character. It is sold in the shop.",
-    dead    = "You cannot do that while dead.",
-    goldcap = "You are carrying too much gold to sell anything.",
-    invalid = "Invalid waystone slot.",
-    empty   = "That waystone slot is empty.",
-    refused = "You cannot travel right now.",
-    noguild = "You are not in a guild.",
+    locked  = L["This is not unlocked on this character. It is sold in the shop."],
+    dead    = L["You cannot do that while dead."],
+    goldcap = L["You are carrying too much gold to sell anything."],
+    invalid = L["Invalid waystone slot."],
+    empty   = L["That waystone slot is empty."],
+    refused = L["You cannot travel right now."],
+    noguild = L["You are not in a guild."],
+    here    = L["You cannot do that here."],
 }
 
 ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_TOOLBELT_RESULT, function(body)
@@ -264,10 +301,9 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_TOOLBELT_RESULT, functio
     if kind == "SELL" then
         local count, copper = tonumber(parts[2]) or 0, tonumber(parts[3]) or 0
         if count > 0 then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. string.format("Sold %d item%s for %s. Any vendor's buyback tab still has them.",
-                count, count > 1 and "s" or "", FormatMoney(copper)))
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. T("Sold {count} item{s} for {money}. Any vendor's buyback tab still has them.", { count = count, s = (count > 1 and "s" or ""), money = FormatMoney(copper) }))
         elseif not Service._silentSell then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. "Nothing to sell.")
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. L["Nothing to sell."])
         end
         Service._silentSell = false
         Notify()
@@ -275,25 +311,26 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_TOOLBELT_RESULT, functio
         local spent, remaining = tonumber(parts[2]) or 0, tonumber(parts[3]) or 0
         State.repairCost = remaining
         if spent > 0 then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. "Gear repaired for " .. FormatMoney(spent) .. ".")
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. T("Gear repaired for {money}.", { money = FormatMoney(spent) }))
         elseif remaining > 0 then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. "Not enough money to repair (" .. FormatMoney(remaining) .. " needed).")
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. T("Not enough money to repair ({money} needed).", { money = FormatMoney(remaining) }))
         elseif not Service._silentRepair then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. "Nothing to repair.")
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. L["Nothing to repair."])
         end
         Service._silentRepair = false
         Notify()
+        Service.RefreshMerchantRepair()
     elseif kind == "GBANK" then
         ShowGuildBankFrame()
     elseif kind == "FORGE" then
         local minutes = math.floor((tonumber(parts[2]) or 0) / 60)
-        DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. string.format("A forge and an anvil stand beside you for %d minutes.", minutes))
+        DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. T("A forge and an anvil stand beside you for {minutes} minutes.", { minutes = minutes }))
     elseif kind == "FAIL" then
         local what, reason = parts[2], parts[3]
         if what == "WAYSTONE" and reason == "locked" then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. "Your account has not discovered that waystone.")
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. L["Your account has not discovered that waystone."])
         else
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. (FAIL_TEXT[reason] or ("Request refused (" .. tostring(reason) .. ")")))
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. (FAIL_TEXT[reason] or T("Request refused ({reason})", { reason = tostring(reason) })))
         end
     end
 end)
@@ -324,6 +361,88 @@ auto:SetScript("OnEvent", function(self, event)
         end
     end
 end)
+
+-- ── Repair in the Toolbelt's merchant window ─────────────────────────────────
+-- The client shows the repair buttons only for a merchant with the repair flag, and
+-- the Toolbelt's merchant is the player itself, so CanMerchantRepair() said no and the
+-- buttons stayed hidden. While that window is open the repair calls below answer for
+-- it: "Repair all" (and the guild button) runs the Toolbelt's repair on the server
+-- (own gold, full price), and the per-item repair button is hidden. Every other
+-- merchant keeps the client's own answers.
+local Stock = {
+    CanMerchantRepair  = CanMerchantRepair,
+    CanGuildBankRepair = CanGuildBankRepair,
+    GetRepairAllCost   = GetRepairAllCost,
+    RepairAllItems     = RepairAllItems,
+}
+
+local function Portable()
+    return State.owned.vendor and MerchantFrame and MerchantFrame:IsShown() and Service.IsPortableMerchant()
+end
+
+function CanMerchantRepair(...)
+    if Portable() then return 1 end
+    return Stock.CanMerchantRepair(...)
+end
+
+function CanGuildBankRepair(...)
+    if Portable() then return nil end
+    return Stock.CanGuildBankRepair(...)
+end
+
+function GetRepairAllCost(...)
+    if Portable() then
+        local cost = Stock.GetRepairAllCost(...) or 0
+        cost = math.max(cost, State.repairCost or 0)
+        return cost, cost > 0 and 1 or nil
+    end
+    return Stock.GetRepairAllCost(...)
+end
+
+function RepairAllItems(...)
+    if Portable() then
+        Service.Repair()
+        return
+    end
+    return Stock.RepairAllItems(...)
+end
+
+local function HidePerItemRepair()
+    if Portable() then
+        if MerchantRepairItemButton then MerchantRepairItemButton:Hide() end
+        if MerchantGuildBankRepairButton then MerchantGuildBankRepairButton:Hide() end
+    end
+end
+
+if MerchantFrame_UpdateRepairButtons then
+    hooksecurefunc("MerchantFrame_UpdateRepairButtons", HidePerItemRepair)
+end
+
+-- Redraws the repair row once the server's repair cost changed.
+function Service.RefreshMerchantRepair()
+    if not Portable() then return end
+    if MerchantFrame_UpdateRepairButtons then MerchantFrame_UpdateRepairButtons() end
+    if MerchantFrame_UpdateCanRepairAll then MerchantFrame_UpdateCanRepairAll() end
+end
+
+local merchantWatch = CreateFrame("Frame")
+merchantWatch:RegisterEvent("MERCHANT_SHOW")
+merchantWatch:RegisterEvent("MERCHANT_CLOSED")
+merchantWatch:SetScript("OnEvent", function(self, event)
+    if event == "MERCHANT_SHOW" then
+        portableMerchantOpen = Service.IsPortableMerchant()
+        merchantRequestedAt = nil
+        if portableMerchantOpen then
+            -- the server sends the state (repair cost) with the list: nothing to ask here,
+            -- the buttons redraw when it arrives
+            Service.RefreshMerchantRepair()
+        end
+    else
+        portableMerchantOpen = false
+    end
+end)
+
+Service.OnChange(function() Service.RefreshMerchantRepair() end)
 
 _G.ToolbeltService = Service
 ProjectEbonhold.ToolbeltService = Service

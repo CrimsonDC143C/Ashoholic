@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Character Progression
 -- Extends the NATIVE Collections window (CollectionsJournal) with more tabs
 -- instead of building a separate frame: Echo Journal's own sub-tabs (merged
@@ -132,6 +133,98 @@ local NATIVE_W, NATIVE_H = CollectionsJournal:GetWidth(), CollectionsJournal:Get
 -- revert to native size).
 local function ResizeCollectionsJournal(w, h)
     CollectionsJournal:SetSize(w or NATIVE_W, h or NATIVE_H)
+end
+
+-- Skill Tree maximize ------------------------------------------------------------------
+-- A button beside the close button grows the window to the whole screen while the
+-- Skill Tree tab is showing (a player report: zoomed in far enough to read the nodes,
+-- the normal 1100x600 view meant dragging all the time). Saved account-wide; the other
+-- tabs keep their own size and the window goes back where it was.
+local MAX_MARGIN_X = 20       -- the portrait ring pokes 14 past the left edge
+local MAX_MARGIN_TOP = 20     -- ... and 11 above the top edge
+local MAX_MARGIN_BOTTOM = 40  -- the tab row hangs below the window
+
+local function IsSkillTreeMaximized()
+    return ProjectEbonholdDB and ProjectEbonholdDB.skillTreeMaximized and true or false
+end
+
+-- Where the window sat before it was maximized (nil while it is not).
+local savedJournalPoint
+
+local function PlaceMaximizedJournal()
+    local x, y = MAX_MARGIN_X, -MAX_MARGIN_TOP
+    local point, rel, relPoint, px, py = CollectionsJournal:GetPoint(1)
+    local alreadyOurs = point == "TOPLEFT" and (rel == nil or rel == UIParent) and relPoint == "TOPLEFT"
+        and px and py and math.abs(px - x) < 0.5 and math.abs(py - y) < 0.5
+    if alreadyOurs then return end
+    savedJournalPoint = point and { point, rel, relPoint, px, py } or nil
+    CollectionsJournal:ClearAllPoints()
+    CollectionsJournal:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
+end
+
+local function RestoreJournalPoint()
+    if not savedJournalPoint then return end
+    local p = savedJournalPoint
+    savedJournalPoint = nil
+    CollectionsJournal:ClearAllPoints()
+    CollectionsJournal:SetPoint(p[1], p[2] or UIParent, p[3], p[4], p[5])
+end
+
+-- Sizes the Skill Tree frame (normal or screen-filling) and the window around it.
+local function ApplySkillTreeLayout(f)
+    local w, h = f.normalW or f:GetWidth(), f.normalH or f:GetHeight()
+    if IsSkillTreeMaximized() then
+        -- Screen size in the window's own units (UI scale and the window's scale differ).
+        local s = UIParent:GetEffectiveScale() / CollectionsJournal:GetEffectiveScale()
+        local sw, sh = UIParent:GetWidth() * s, UIParent:GetHeight() * s
+        w = math.max(w, sw - 2 * MAX_MARGIN_X - SKILLTREE_SIDE_PADDING)
+        h = math.max(h, sh - MAX_MARGIN_TOP - MAX_MARGIN_BOTTOM - SKILLTREE_TOP_CLEARANCE - SKILLTREE_BOTTOM_PADDING)
+        PlaceMaximizedJournal()
+    else
+        RestoreJournalPoint()
+    end
+    f:SetSize(w, h)
+    ResizeCollectionsJournal(w + SKILLTREE_SIDE_PADDING, h + SKILLTREE_TOP_CLEARANCE + SKILLTREE_BOTTOM_PADDING)
+    if f.maximizeButton then f.maximizeButton:UpdateLook() end
+end
+
+local function CreateSkillTreeMaximizeButton(f)
+    if f.maximizeButton then return end
+    local btn = CreateFrame("Button", "skillTreeMaximizeButton", f)
+    btn:SetSize(32, 32)
+    btn:SetHitRectInsets(5, 5, 5, 5)
+    local close = CollectionsJournal.CloseButton or _G.CollectionsJournalCloseButton
+    if close then
+        btn:SetPoint("RIGHT", close, "LEFT", 8, 0)
+    else
+        btn:SetPoint("TOPRIGHT", CollectionsJournal, "TOPRIGHT", -26, 5)
+    end
+    btn:SetFrameLevel(f:GetFrameLevel() + 20)
+    btn:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight", "ADD")
+    function btn:UpdateLook()
+        if IsSkillTreeMaximized() then
+            self:SetNormalTexture("Interface\\Buttons\\UI-Panel-SmallerButton-Up")
+            self:SetPushedTexture("Interface\\Buttons\\UI-Panel-SmallerButton-Down")
+        else
+            self:SetNormalTexture("Interface\\Buttons\\UI-Panel-BiggerButton-Up")
+            self:SetPushedTexture("Interface\\Buttons\\UI-Panel-BiggerButton-Down")
+        end
+    end
+    btn:SetScript("OnClick", function(self)
+        ProjectEbonholdDB = ProjectEbonholdDB or {}
+        ProjectEbonholdDB.skillTreeMaximized = not IsSkillTreeMaximized()
+        PlaySound("igMainMenuOptionCheckBoxOn")
+        ApplySkillTreeLayout(f)
+        if GameTooltip:IsOwned(self) then self:GetScript("OnEnter")(self) end
+    end)
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(IsSkillTreeMaximized() and L["Restore size"] or L["Maximize"])
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    btn:UpdateLook()
+    f.maximizeButton = btn
 end
 
 local ICONS = {
@@ -326,10 +419,12 @@ function CollectionsJournal_UpdateSelectedTab(self)
         local f = EmbedSkillTree()
         if f then
             f:Show()
-            ResizeCollectionsJournal(f:GetWidth() + SKILLTREE_SIDE_PADDING, f:GetHeight() + SKILLTREE_TOP_CLEARANCE + SKILLTREE_BOTTOM_PADDING)
+            CreateSkillTreeMaximizeButton(f)
+            ApplySkillTreeLayout(f)
         end
-    elseif _G.skillTreeFrame then
-        _G.skillTreeFrame:Hide()
+    else
+        if _G.skillTreeFrame then _G.skillTreeFrame:Hide() end
+        RestoreJournalPoint()
     end
 
     if (selected == 6) then
@@ -348,12 +443,12 @@ function CollectionsJournal_UpdateSelectedTab(self)
     end
 
     local icon, title
-    if (selected == 1) then icon, title = ICONS.echoes, "Echoes"
-    elseif (selected == 2) then icon, title = ICONS.skilltree, "Skill Tree"
-    elseif (selected == 3) then icon, title = ICONS.transmog, "Transmogrify"
+    if (selected == 1) then icon, title = ICONS.echoes, L["Echoes"]
+    elseif (selected == 2) then icon, title = ICONS.skilltree, L["Skill Tree"]
+    elseif (selected == 3) then icon, title = ICONS.transmog, L["Transmogrification"]
     elseif (selected == 4) then icon, title = ICONS.mounts, MOUNTS
     elseif (selected == 5) then icon, title = ICONS.companions, COMPANIONS
-    elseif (selected == 6) then icon, title = ICONS.prestige, "Prestige"
+    elseif (selected == 6) then icon, title = ICONS.prestige, L["Prestige"]
     end
     if title then CollectionsJournalTitleText:SetText(title) end
     if icon then SetPortraitToTexture(CollectionsJournalPortrait, icon) end
@@ -370,6 +465,16 @@ NeutralizePortraitButtons()
 NeutralizeHelpBoxes()
 FixTabHeights()
 
+-- Tab labels: Blizzard_Collections.xml writes them as English literals (text="Echoes"...), so they are
+-- set here through L (MOUNTS / COMPANIONS are the client's own global strings), each refitted to its text.
+for i, label in ipairs({ L["Echoes"], L["Skill Tree"], L["Transmogrification"], MOUNTS, COMPANIONS }) do
+    local tab = _G["CollectionsJournalTab" .. i]
+    if tab then
+        tab:SetText(label)
+        PanelTemplates_TabResize(tab, 0)
+    end
+end
+
 -- Tab 6 = Prestige. The XML tab row stops at 5, so the extra tab is created
 -- here from the same virtual template and CollectionsJournal's tab count
 -- (set to 5 in Blizzard_Collections.xml's OnLoad) is bumped to 6. The frame
@@ -380,7 +485,7 @@ FixTabHeights()
 local prestigeTab = CreateFrame("Button", "CollectionsJournalTab6",
     CollectionsJournal, "CollectionsJournalTabCutoff")
 prestigeTab:SetID(6)
-prestigeTab:SetText("Prestige")
+prestigeTab:SetText(L["Prestige"])
 prestigeTab:SetPoint("LEFT", CollectionsJournalTab5, "RIGHT", -16, 0)
 PanelTemplates_SetNumTabs(CollectionsJournal, 6)
 PanelTemplates_TabResize(prestigeTab, 0)
@@ -401,6 +506,22 @@ for i = 1, 6 do
         end)
     end
 end
+
+-- The panel manager re-anchors CollectionsJournal (it is a "left" UI panel) whenever a
+-- panel opens or closes; a maximized Skill Tree takes its screen-filling spot back, and
+-- a resolution or UI scale change re-fits it.
+local function RefitMaximizedSkillTree()
+    local f = _G.skillTreeFrame
+    if not (f and f:IsShown() and CollectionsJournal:IsShown() and IsSkillTreeMaximized()) then return end
+    ApplySkillTreeLayout(f)
+end
+if UpdateUIPanelPositions then
+    hooksecurefunc("UpdateUIPanelPositions", RefitMaximizedSkillTree)
+end
+local refitEvents = CreateFrame("Frame")
+refitEvents:RegisterEvent("DISPLAY_SIZE_CHANGED")
+refitEvents:RegisterEvent("UI_SCALE_CHANGED")
+refitEvents:SetScript("OnEvent", RefitMaximizedSkillTree)
 
 SLASH_PECHARPROGRESSION1 = "/progression"
 SLASH_PECHARPROGRESSION2 = "/charprogression"

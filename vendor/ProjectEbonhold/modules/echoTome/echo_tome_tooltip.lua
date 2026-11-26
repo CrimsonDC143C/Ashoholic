@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- Echo Tome item tooltips
@@ -38,23 +39,21 @@ local function AddEchoLines(tooltip)
     local echoId, data = GetEchoForItem(itemId)
     if not echoId then return end
 
-    local echoName = GetSpellInfo(echoId) or ("Spell " .. echoId)
+    local echoName = GetSpellInfo(echoId) or (T("Spell {echoId}", { echoId = echoId }))
     local qc = qualityColors[data.quality or 0] or qualityColors[0]
 
     tooltip:AddLine(" ")
     tooltip:AddDoubleLine(
-        "Unlocks Echo:",
-        string.format("|cff%02x%02x%02x%s|r",
-            math.floor(qc.r * 255), math.floor(qc.g * 255), math.floor(qc.b * 255),
-            echoName),
+        L["Unlocks Echo:"],
+        T("|cff{r}{g}{b}{echoName}|r", { r = string.format("%02x", math.floor(qc.r * 255)), g = string.format("%02x", math.floor(qc.g * 255)), b = string.format("%02x", math.floor(qc.b * 255)), echoName = echoName }),
         1, 0.82, 0)
 
     -- Embed the echo spell's full description, with stat formulas computed
     -- from the player's current stats (white, no truncation)
     if utils and utils.GetSpellDescription then
         local desc = utils.GetSpellDescription(echoId, 4000, 1)
-        if desc and desc ~= "" and desc ~= "Click for details" then
-            tooltip:AddLine(desc, 1, 1, 1, true)
+        if desc and desc ~= "" and desc ~= "Click for details" and desc ~= L["Click for details"] then
+            tooltip:AddLine(desc, 1, 0.82, 0, true)
         end
     end
 
@@ -62,10 +61,16 @@ local function AddEchoLines(tooltip)
     -- (same source as the journal's tome state)
     local svc = ProjectEbonhold.PerkService
     local discovered = svc and svc.GetDiscoveredEchoes and svc.GetDiscoveredEchoes() or {}
+    tooltip:AddLine(" ")
     if discovered[echoId] then
-        tooltip:AddLine("Already learned", 0.1, 1, 0.1)
+        tooltip:AddLine(L["Already learned"], 0.1, 1, 0.1)
     else
-        tooltip:AddLine("Use to add this echo to your collection", 0.6, 0.6, 0.6)
+        tooltip:AddLine(L["Use to add this echo to your collection"], 0.6, 0.6, 0.6)
+    end
+    -- the Shift redraw only reaches GameTooltip; a pinned ItemRefTooltip never
+    -- changes, so it gets no hint that would promise more
+    if tooltip == GameTooltip and utils and utils.AddShiftHint then
+        utils.AddShiftHint(tooltip, echoId)
     end
 
     tooltip:Show() -- resize to fit the appended lines

@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ============================================================================
 -- Prestige UI: the /progression hub's Prestige tab.
 --
@@ -116,8 +117,7 @@ local function BuildUI()
     -- column says "on EVERY character". Keep all of it in agreement with
     -- PrestigeHandler::HandleDoPrestige.
     descText:SetText(
-        "Resets your Skill Tree and consumes every Soul Ash on the account," .. "\n" ..
-        "banked or spent, on every character. Banked Shards return as Soul Essence, up to a limit.")
+        L["Resets your Skill Tree and consumes every Soul Ash on the account,\nbanked or spent, on every character. Banked Shards return as Soul Essence, up to a limit."])
     descText:SetTextColor(0.9, 0.9, 0.9)
     descText:SetSpacing(3)
 
@@ -127,7 +127,7 @@ local function BuildUI()
     capText:SetPoint("TOP", descText, "BOTTOM", 0, -8)
     capText:SetWidth(430)
     capText:SetJustifyH("CENTER")
-    capText:SetText("|cffFFCC00Soul Essence|r buys the Prestige branch, and no prestige takes it back.")
+    capText:SetText(L["|cffFFCC00Soul Essence|r buys the Prestige branch, and no prestige takes it back."])
     capText:SetTextColor(0.75, 0.75, 0.75)
 
     local dealFrame = CreateFrame("Frame", nil, frame)
@@ -182,9 +182,7 @@ local function BuildUI()
         dealSep:Hide()
         dealEssence:ClearAllPoints()
         dealEssence:SetPoint("CENTER", dealFrame, "CENTER", 0, 0)
-        dealEssence:SetText(SHARD_ICON .. " |cffFF6060" .. FormatThousands(shards) ..
-            "|r Soul Shards |TInterface\\CHATFRAME\\ChatFrameExpandArrow:14:14|t " ..
-            ESSENCE_ICON .. " |cff33FF33+" .. FormatThousands(essence) .. "|r Soul Essence")
+        dealEssence:SetText(T("{SHARDICON} |cffFF6060{shards}|r Soul Shards |TInterface\\CHATFRAME\\ChatFrameExpandArrow:14:14|t {ESSENCEICON} |cff33FF33+{essence}|r Soul Essence", { SHARDICON = SHARD_ICON, shards = FormatThousands(shards), ESSENCEICON = ESSENCE_ICON, essence = FormatThousands(essence) }))
         dealEssence:Show()
         dealFrame:SetHeight(42)
     end
@@ -196,24 +194,23 @@ local function BuildUI()
     dealFrame:EnableMouse(true)
     dealFrame:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Prestige reward", 1, 0.82, 0)
+        GameTooltip:AddLine(L["Prestige reward"], 1, 0.82, 0)
         GameTooltip:AddLine(
-            "Every Soul Ash you have committed is destroyed. Your banked Soul Shards are " ..
-            "consumed and mint Soul Essence, the only currency a prestige never takes back.",
+            L["Every Soul Ash you have committed is destroyed. Your banked Soul Shards are consumed and mint Soul Essence, the only currency a prestige never takes back."],
             1, 1, 1, true)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddDoubleLine("Soul Ashes destroyed",
+        GameTooltip:AddDoubleLine(L["Soul Ashes destroyed"],
             FormatThousands(self.destroyed or 0), 0.9, 0.9, 0.9, 1, 0.4, 0.4)
         do
             local banked, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
             local shards = ProjectEbonhold.PrestigeService.GetShardsConsumed()
-            GameTooltip:AddDoubleLine("Soul Shards consumed",
+            GameTooltip:AddDoubleLine(L["Soul Shards consumed"],
                 FormatThousands(shards), 0.9, 0.9, 0.9, 1, 0.4, 0.4)
             if banked > shards then
-                GameTooltip:AddDoubleLine("Soul Shards staying banked",
+                GameTooltip:AddDoubleLine(L["Soul Shards staying banked"],
                     FormatThousands(banked - shards), 0.9, 0.9, 0.9, 0.2, 1, 0.2)
             end
-            GameTooltip:AddDoubleLine("Soul Essence (" .. FormatThousands(ProjectEbonhold.PrestigeService.GetShardsPerEssence()) .. " shards each)",
+            GameTooltip:AddDoubleLine(T("Soul Essence ({shards} shards each)", { shards = FormatThousands(ProjectEbonhold.PrestigeService.GetShardsPerEssence()) }),
                 "+" .. FormatThousands(essence), 0.9, 0.9, 0.9, 0.2, 1, 0.2)
         end
         GameTooltip:Show()
@@ -248,7 +245,7 @@ local function BuildUI()
 
     local cTitle = confirm:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     cTitle:SetPoint("TOP", confirm, "TOP", 0, -16)
-    cTitle:SetText("Prestige now?")
+    cTitle:SetText(L["Prestige now?"])
 
     -- The trade in numbers, right under the title: burning a bigger pool buys a
     -- bigger permanent bonus, so the player sees exactly what this reset is worth
@@ -260,7 +257,7 @@ local function BuildUI()
 
     local eraseHeader = confirm:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     eraseHeader:SetPoint("TOPLEFT", confirm, "TOPLEFT", 28, -78)
-    eraseHeader:SetText("This will ERASE")
+    eraseHeader:SetText(L["This will ERASE"])
     eraseHeader:SetTextColor(1, 0.25, 0.25)
 
     local eraseList = confirm:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -269,13 +266,11 @@ local function BuildUI()
     eraseList:SetJustifyH("LEFT")
     eraseList:SetSpacing(4)
     eraseList:SetText(
-        "\226\128\162 ALL Soul Ashes, banked or spent,\n   on EVERY character\n" ..
-        "\226\128\162 Your banked Soul Shards\n   (turned into Soul Essence)\n" ..
-        "\226\128\162 Skill Tree nodes without\n   Carry over Prestige")
+        L["\226\128\162 ALL Soul Ashes, banked or spent,\n   on EVERY character\n\226\128\162 Your banked Soul Shards\n   (turned into Soul Essence)\n\226\128\162 Skill Tree nodes without\n   Carry over Prestige"])
 
     local keepHeader = confirm:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     keepHeader:SetPoint("TOPLEFT", confirm, "TOPLEFT", 258, -78)
-    keepHeader:SetText("You KEEP")
+    keepHeader:SetText(L["You KEEP"])
     keepHeader:SetTextColor(0.3, 1, 0.3)
 
     local keepList = confirm:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -284,15 +279,7 @@ local function BuildUI()
     keepList:SetJustifyH("LEFT")
     keepList:SetSpacing(4)
     keepList:SetText(
-        "\226\128\162 Your level and your current run\n" ..
-        "\226\128\162 Your gear, talents and professions\n" ..
-        "\226\128\162 ALL your Echoes,\n   permanent or not\n" ..
-        "\226\128\162 Your learned Tomes of Echo\n" ..
-        "\226\128\162 Carry over Prestige nodes,\n   kept and permanently free\n" ..
-        "\226\128\162 Endless nodes and all their ranks\n" ..
-        "\226\128\162 Your Echo builds, untouched\n" ..
-        "\226\128\162 Your Soul Essence and Artisan Souls\n" ..
-        "\226\128\162 Milestone rewards earned")
+        L["\226\128\162 Your level and your current run\n\226\128\162 Your gear, talents and professions\n\226\128\162 ALL your Echoes,\n   permanent or not\n\226\128\162 Your learned Tomes of Echo\n\226\128\162 Carry over Prestige nodes,\n   kept and permanently free\n\226\128\162 Endless nodes and all their ranks\n\226\128\162 Your Echo builds, untouched\n\226\128\162 Your Soul Essence and Artisan Souls\n\226\128\162 Milestone rewards earned"])
 
     -- "I confirm" gate: the red button stays locked until the box is ticked,
     -- re-armed unchecked every time the dialog opens.
@@ -301,16 +288,16 @@ local function BuildUI()
     cCheck:SetPoint("BOTTOM", confirm, "BOTTOM", -52, 54)
     local cCheckLabel = _G["EbonholdPrestigeConfirmCheckText"]
     cCheckLabel:SetFontObject(GameFontNormalLarge)
-    cCheckLabel:SetText("I confirm")
+    cCheckLabel:SetText(L["I confirm"])
 
-    local cConfirmBtn = utils.CreateSimpleCustomButton(confirm, "Prestige",
+    local cConfirmBtn = utils.CreateSimpleCustomButton(confirm, L["Prestige"],
         function()
             EbonholdPrestigeConfirmFrame:Hide()
             ProjectEbonhold.PrestigeService.DoPrestige()
         end, 170, 34)
     cConfirmBtn:SetPoint("BOTTOMRIGHT", confirm, "BOTTOM", -10, 14)
 
-    local cCancelBtn = utils.CreateSimpleCustomButton(confirm, "Cancel",
+    local cCancelBtn = utils.CreateSimpleCustomButton(confirm, CANCEL,
         function() EbonholdPrestigeConfirmFrame:Hide() end, 130, 34,
         "Interface\\AddOns\\ProjectEbonhold\\assets\\128redbutton9sliced_blue")
     cCancelBtn:SetPoint("BOTTOMLEFT", confirm, "BOTTOM", 10, 14)
@@ -333,10 +320,9 @@ local function BuildUI()
         if destroyed > 0 then
             local _, essence = ProjectEbonhold.PrestigeService.GetPendingEssence()
             local shards = ProjectEbonhold.PrestigeService.GetShardsConsumed()
-            cDeal:SetText("|cffFF4444" .. FormatThousands(destroyed) .. "|r Soul Ashes destroyed" ..
-                (shards > 0 and ("\n|cffFF4444" .. FormatThousands(shards) ..
+            cDeal:SetText(T("|cffFF4444{destroyed}|r Soul Ashes destroyed{Essence}", { destroyed = FormatThousands(destroyed), Essence = (shards > 0 and ("\n|cffFF4444" .. FormatThousands(shards) ..
                     "|r Soul Shards consumed, |cff33FF33+" .. FormatThousands(essence) ..
-                    "|r Soul Essence") or ""))
+                    L["|r Soul Essence"]) or "") }))
         else
             cDeal:SetText("")
         end
@@ -344,7 +330,7 @@ local function BuildUI()
 
     -- The addon's 9-sliced red button (normal/pushed/disabled states baked into
     -- the texture), same as the perks/shop buttons.
-    local prestigeButton = utils.CreateSimpleCustomButton(frame, "Prestige",
+    local prestigeButton = utils.CreateSimpleCustomButton(frame, L["Prestige"],
         function() confirm:Show() end, 170, 34)
     prestigeButton:SetPoint("TOP", capText, "BOTTOM", 0, -14)
 
@@ -387,23 +373,20 @@ local function BuildUI()
     buttonOverlay:SetScript("OnEnter", function(self)
         local svc = ProjectEbonhold.PrestigeService
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Prestige locked", 1, 0.2, 0.2)
+        GameTooltip:AddLine(L["Prestige locked"], 1, 0.2, 0.2)
         -- Deux portes : les cendres engagees, et de quoi frapper une Soul Essence. On nomme
         -- celle qui manque, et on montre les deux compteurs pour situer l'autre.
         local missingShards = svc.GetMissingShards and svc.GetMissingShards() or 0
         if svc.GetGateProgress() < svc.GetGateThreshold() then
             GameTooltip:AddLine(
-                "Commit enough Soul Ashes to your Skill Tree to unlock prestige.",
+                L["Commit enough Soul Ashes to your Skill Tree to unlock prestige."],
                 1, 1, 1, true)
         else
             GameTooltip:AddLine(
-                "Bank enough Soul Shards first: a prestige has to mint at least one " ..
-                "Soul Essence, or it would give you nothing at all.", 1, 1, 1, true)
+                L["Bank enough Soul Shards first: a prestige has to mint at least one Soul Essence, or it would give you nothing at all."], 1, 1, 1, true)
         end
         GameTooltip:AddLine(
-            "Committed Soul Ashes: " ..
-            FormatThousands(svc.GetGateProgress()) ..
-            " / " .. FormatThousands(svc.GetGateThreshold()),
+            T("Committed Soul Ashes: {GetGateProgress} / {GetGateThreshold}", { GetGateProgress = FormatThousands(svc.GetGateProgress()), GetGateThreshold = FormatThousands(svc.GetGateThreshold()) }),
             0.8, 0.8, 0.8)
         GameTooltip:AddLine(
             "Banked Soul Shards: " ..
@@ -421,10 +404,7 @@ local function BuildUI()
     buttonOverlay:SetScript("OnMouseDown", function()
         local svc = ProjectEbonhold.PrestigeService
         DEFAULT_CHAT_FRAME:AddMessage(
-            "|cffFF9900[Prestige] Locked: " ..
-            FormatThousands(svc.GetGateProgress()) .. " / " ..
-            FormatThousands(svc.GetGateThreshold()) ..
-            " Soul Ashes committed to the Skill Tree.|r")
+            T("|cffFF9900[Prestige] Locked: {GetGateProgress} / {GetGateThreshold} Soul Ashes committed to the Skill Tree.|r", { GetGateProgress = FormatThousands(svc.GetGateProgress()), GetGateThreshold = FormatThousands(svc.GetGateThreshold()) }))
         svc.RequestPrestigeData()
     end)
 
@@ -443,7 +423,7 @@ local function BuildUI()
     local alert = CreateFrame("Frame", "EbonholdPrestigeAlert", CollectionsJournal,
         "MicroButtonAlertTemplate")
     alert:SetFrameStrata("DIALOG") -- over the journal (HIGH), like the shell's own help boxes
-    alert.label = "You have enough Soul Ashes to Prestige! Open the Prestige tab to claim it."
+    alert.label = L["You have enough Soul Ashes to Prestige! Open the Prestige tab to claim it."]
     -- The template's OnLoad already ran inside CreateFrame (before .label was
     -- set), so the text must be applied explicitly.
     MicroButtonAlert_SetText(alert, alert.label)
@@ -562,60 +542,55 @@ local function BuildUI()
         for i, item in ipairs(rewards) do
             if i > MAX_REWARD_LINES then
                 GameTooltip:AddLine(
-                    "...and " .. (#rewards - MAX_REWARD_LINES) ..
-                    " more (browse them in the preview)", 0.6, 0.6, 0.6)
+                    T("...and {MAXREWARDLINES} more (browse them in the preview)", { MAXREWARDLINES = (#rewards - MAX_REWARD_LINES) }), 0.6, 0.6, 0.6)
                 break
             end
             if item.type == "mount" and (item.itemID or 0) > 0 then
                 local name = item.name
                 if not name or name == "" then
-                    name = GetItemInfo(item.itemID) or ("Item #" .. item.itemID)
+                    name = GetItemInfo(item.itemID) or (T("Item #{itemID}", { itemID = item.itemID }))
                 end
                 local icon = GetItemIcon and GetItemIcon(item.itemID)
                 GameTooltip:AddLine(
-                    (icon and ("|T" .. icon .. ":16:16|t ") or "") ..
-                    "Mount: " .. name, 0.4, 0.8, 1)
+                    T("{t}Mount: {name}", { t = (icon and ("|T" .. icon .. ":16:16|t ") or ""), name = L[name] }), 0.4, 0.8, 1)
                 hasAny = true
             elseif item.type == "weapon" and (item.itemID or 0) > 0 then
                 local name = item.name
                 if not name or name == "" then
-                    name = GetItemInfo(item.itemID) or ("Item #" .. item.itemID)
+                    name = GetItemInfo(item.itemID) or (T("Item #{itemID}", { itemID = item.itemID }))
                 end
                 local icon = GetItemIcon and GetItemIcon(item.itemID)
                 GameTooltip:AddLine(
-                    (icon and ("|T" .. icon .. ":16:16|t ") or "") ..
-                    "Weapon: " .. name, 1, 0.6, 0.2)
+                    T("{t}Weapon: {name}", { t = (icon and ("|T" .. icon .. ":16:16|t ") or ""), name = L[name] }), 1, 0.6, 0.2)
                 hasAny = true
             elseif item.type == "transmogSet" and item.items and #item.items > 0 then
                 local name = item.name
-                if not name or name == "" then name = "Transmog set" end
+                if not name or name == "" then name = L["Transmog set"] end
                 local icon = GetItemIcon and GetItemIcon(item.items[1])
                 GameTooltip:AddLine(
-                    (icon and ("|T" .. icon .. ":16:16|t ") or "") ..
-                    "Full set: " .. name ..
-                    " |cffaaaaaa(" .. #item.items .. " pieces)|r", 0.4, 0.8, 1)
+                    T("{t}Full set: {name} |cffaaaaaa({items} pieces)|r", { t = (icon and ("|T" .. icon .. ":16:16|t ") or ""), name = L[name], items = #item.items }), 0.4, 0.8, 1)
                 hasAny = true
             end
         end
 
         if ms.title and ms.title.name and ms.title.name ~= "" then
-            GameTooltip:AddLine("Title: " .. ms.title.name, 0.9, 0.6, 1)
+            GameTooltip:AddLine(T("Title: {name}", { name = L[ms.title.name] }), 0.9, 0.6, 1)
             hasAny = true
         end
 
         if ms.rankIcon then
             GameTooltip:AddLine(
-                "|T" .. ms.rankIcon .. ":16:16|t Chat rank icon", 1, 0.82, 0)
+                T("|T{rankIcon}:16:16|t Chat rank icon", { rankIcon = ms.rankIcon }), 1, 0.82, 0)
             hasAny = true
         end
 
         if ms.unlock then
-            GameTooltip:AddLine("Also unlocks: " .. ms.unlock, 1, 0.82, 0)
+            GameTooltip:AddLine(T("Also unlocks: {unlock}", { unlock = ms.unlock }), 1, 0.82, 0)
             hasAny = true
         end
 
         if not hasAny then
-            GameTooltip:AddLine("Rewards to be announced.", 0.6, 0.6, 0.6)
+            GameTooltip:AddLine(L["Rewards to be announced."], 0.6, 0.6, 0.6)
         end
     end
 
@@ -819,7 +794,7 @@ local function BuildUI()
         shownIncomplete = false
 
         if isMount then
-            preview.title:SetText(item.name ~= "" and item.name or "Mount")
+            preview.title:SetText(item.name ~= "" and L[item.name] or L["Mount"])
             dressModel:ClearModel()
             dressModel:Hide()
             -- SetCreature on this client takes the CREATURE id (resolved through
@@ -841,7 +816,7 @@ local function BuildUI()
                 mountModel:Hide()
             end
         elseif isWeapon then
-            preview.title:SetText(item.name ~= "" and item.name or "Weapon")
+            preview.title:SetText(item.name ~= "" and L[item.name] or L["Weapon"])
             mountModel:ClearModel()
             mountModel:Hide()
             dressModel:Show()
@@ -857,7 +832,7 @@ local function BuildUI()
             end
             dressModel:SetFacing(0.4)
         elseif isSet then
-            preview.title:SetText(item.name ~= "" and item.name or "Transmog set")
+            preview.title:SetText(item.name ~= "" and L[item.name] or L["Transmog set"])
             mountModel:ClearModel()
             mountModel:Hide()
             dressModel:Show()
@@ -874,7 +849,7 @@ local function BuildUI()
             end
             dressModel:SetFacing(0.4)
         else
-            preview.title:SetText("Rewards to be announced")
+            preview.title:SetText(L["Rewards to be announced"])
             mountModel:ClearModel()
             mountModel:Hide()
             dressModel:ClearModel()
@@ -909,7 +884,7 @@ local function BuildUI()
         shownMilestoneIndex = index
         shownRewards = PrestigeData.GetRewardItems(ms)
         shownPage = page
-        preview.header:SetText("Prestige " .. index .. " reward")
+        preview.header:SetText(T("Prestige {index} reward", { index = index }))
         RenderPreviewReward()
     end
 
@@ -1033,14 +1008,14 @@ local function BuildUI()
             -- the translucent tooltip never sits on top of the preview models.
             GameTooltip:SetOwner(self, "ANCHOR_NONE")
             GameTooltip:SetPoint("TOPRIGHT", preview, "TOPLEFT", -8, 0)
-            GameTooltip:AddLine("Prestige " .. i, 1, 0.82, 0)
+            GameTooltip:AddLine(T("Prestige {i}", { i = i }), 1, 0.82, 0)
             if total >= ms.totalPrestiges then
-                GameTooltip:AddLine("|TInterface\\RaidFrame\\ReadyCheck-Ready:14:14|t Unlocked", 0.2, 1, 0.2)
+                GameTooltip:AddLine(L["|TInterface\\RaidFrame\\ReadyCheck-Ready:14:14|t Unlocked"], 0.2, 1, 0.2)
             else
-                GameTooltip:AddLine("Progress: " .. total .. " / " .. ms.totalPrestiges .. " prestiges", 0.9, 0.9, 0.9)
+                GameTooltip:AddLine(T("Progress: {total} / {totalPrestiges} prestiges", { total = total, totalPrestiges = ms.totalPrestiges }), 0.9, 0.9, 0.9)
             end
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Rewards", 1, 0.82, 0)
+            GameTooltip:AddLine(L["Rewards"], 1, 0.82, 0)
             AddRewardLinesToTooltip(ms)
             GameTooltip:Show()
             -- Opaque dark backdrop + gold border, matching the preview panel
@@ -1094,7 +1069,7 @@ local function BuildUI()
         countText:SetText(total)
 
         if rank > 0 then
-            rankText:SetText("Prestige Rank " .. rank)
+            rankText:SetText(T("Prestige Rank {rank}", { rank = rank }))
             rankIconTex:SetTexture(PrestigeData.GetRankIcon(rank))
             rankText:Show()
             rankIconTex:Show()
@@ -1207,73 +1182,50 @@ local function BuildUI()
         steps = function()
             return {
                 {
-                    title = "Prestige",
-                    text = "This counter shows how many times you have prestiged. A prestige " ..
-                        "is a trade: you give up everything your Skill Tree was built on, and " ..
-                        "you keep one thing forever.",
+                    title = L["Prestige"],
+                    text = L["This counter shows how many times you have prestiged. A prestige is a trade: you give up everything your Skill Tree was built on, and you keep one thing forever."],
                     zone = function() return circle end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
-                    title = "What it costs",
-                    text = "Your Skill Tree is reset, and every Soul Ash on the account is " ..
-                        "destroyed: the ones you banked and the ones already spent, on every " ..
-                        "character. The Ashes buy nothing back. Only |cff00FF00Carry over " ..
-                        "Prestige|r nodes survive the reset, and they become free for good. " ..
-                        "Every |cff00FF00Endless|r node is one of them: all its ranks stay.",
+                    title = L["What it costs"],
+                    text = L["Your Skill Tree is reset, and every Soul Ash on the account is destroyed: the ones you banked and the ones already spent, on every character. The Ashes buy nothing back. Only |cff00FF00Carry over Prestige|r nodes survive the reset, and they become free for good. Every |cff00FF00Endless|r node is one of them: all its ranks stay."],
                     zone = function() return dealFrame end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
-                    title = "What it pays",
-                    text = "Your banked Soul Shards are consumed with the Ashes and come back " ..
-                        "as |cffFFCC00Soul Essence|r: one for every 50 Shards on your first Prestige, " ..
-                        "50 Shards more each time, up to 750. Your first Prestige mints at most 50 " ..
-                        "Soul Essence, the next 100, up to 750 on the 15th, then there is no limit. " ..
-                        "Shards above the limit stay banked. This card " ..
-                        "shows the exchange you would make right now." .. "\n\n" ..
-                        "Soul Essence buys the Prestige branch of the Skill Tree, and it is the " ..
-                        "only currency a prestige never takes back: it only ever grows.",
+                    title = L["What it pays"],
+                    text = L["Your banked Soul Shards are consumed with the Ashes and come back as |cffFFCC00Soul Essence|r: one for every 50 Shards on your first Prestige, 50 Shards more each time, up to 750. Your first Prestige mints at most 50 Soul Essence, the next 100, up to 750 on the 15th, then there is no limit. Shards above the limit stay banked. This card shows the exchange you would make right now.\n\nSoul Essence buys the Prestige branch of the Skill Tree, and it is the only currency a prestige never takes back: it only ever grows."],
                     zone = function() return dealFrame end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
-                    title = "What you keep",
-                    text = "Everything else is untouched. Your level and your current run, your " ..
-                        "Echoes, permanent or not, your saved builds, your gear, your talents " ..
-                        "and professions, your Tomes, and every milestone reward you have earned.",
+                    title = L["What you keep"],
+                    text = L["Everything else is untouched. Your level and your current run, your Echoes, permanent or not, your saved builds, your gear, your talents and professions, your Tomes, and every milestone reward you have earned."],
                     zone = function() return preview end,
                     boxAnchor = { "RIGHT", "LEFT", -16, 0 },
                 },
                 {
-                    title = "Two locks",
-                    text = "The button opens when both are met: enough Soul Ashes committed to " ..
-                        "your Skill Tree, and enough banked Soul Shards for one Soul Essence, so the " ..
-                        "reset always pays at least one Soul Essence." .. "\n\n" ..
-                        "Hover the locked button to see which one is still missing.",
+                    title = L["Two locks"],
+                    text = L["The button opens when both are met: enough Soul Ashes committed to your Skill Tree, and enough banked Soul Shards for one Soul Essence, so the reset always pays at least one Soul Essence.\n\nHover the locked button to see which one is still missing."],
                     zone = function() return prestigeButton end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
-                    title = "When to do it",
-                    text = "Nothing forces you the moment the locks open. Shards keep piling up " ..
-                        "from the dungeons, raids and Call Board contracts you clear, and what one " ..
-                        "Prestige cannot convert waits in your bank for the next.",
+                    title = L["When to do it"],
+                    text = L["Nothing forces you the moment the locks open. Shards keep piling up from the dungeons, raids and Call Board contracts you clear, and what one Prestige cannot convert waits in your bank for the next."],
                     zone = function() return prestigeButton end,
                     boxAnchor = { "LEFT", "RIGHT", 16, 0 },
                 },
                 {
-                    title = "Milestones",
-                    text = "Each prestige fills this bar. Milestones grant rewards: mounts, full " ..
-                        "transmog sets, titles and an exclusive chat rank icon. Hover a milestone " ..
-                        "for its details.",
+                    title = L["Milestones"],
+                    text = L["Each prestige fills this bar. Milestones grant rewards: mounts, full transmog sets, titles and an exclusive chat rank icon. Hover a milestone for its details."],
                     zone = function() return bubbles[1], barFrame end,
                     boxAnchor = { "BOTTOM", "TOP", 0, 14 },
                 },
                 {
-                    title = "Reward Preview",
-                    text = "Your next milestone reward is previewed here. Hover any milestone to " ..
-                        "preview its mount or transmog set.",
+                    title = L["Reward Preview"],
+                    text = L["Your next milestone reward is previewed here. Hover any milestone to preview its mount or transmog set."],
                     zone = function() return preview end,
                     boxAnchor = { "RIGHT", "LEFT", -16, 0 },
                 },

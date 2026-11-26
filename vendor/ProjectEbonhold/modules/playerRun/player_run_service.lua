@@ -143,15 +143,15 @@ local function AnimateDataChanges(newData, oldData, uiElements)
     local stats = {
         {
             key = "soulPoints",
-            name = "Soul Ashes",
-            short = "Soul Ashe(s)",
+            name = ProjectEbonhold.L["Soul Ashes"],
+            short = ProjectEbonhold.L["Soul Ashe(s)"],
             uiKey = "soulPointsText"
         },
         -- Run Soul Shards (field 20, 2026-09-12): earned at final encounters, banked at run end
         {
             key = "soulShards",
-            name = "Soul Shards",
-            short = "Soul Shard(s)",
+            name = ProjectEbonhold.L["Soul Shards"],
+            short = ProjectEbonhold.L["Soul Shard(s)"],
             uiKey = "soulShardsText"
         },
     }

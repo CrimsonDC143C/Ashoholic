@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 ProjectEbonhold = ProjectEbonhold or {}
@@ -321,16 +322,16 @@ local function AnnounceNewlyUnlocked(newlyUnlockedIds)
         for _, id in ipairs(newlyUnlockedIds) do
             local def = FindCheckpointDefinition(id)
             local name = def and def.name or ("Waystone #" .. id)
-            RaidNotice_AddMessage(RaidBossEmoteFrame, "Waystone discovered: " .. name, ChatTypeInfo["RAID_WARNING"])
+            RaidNotice_AddMessage(RaidBossEmoteFrame, "Waystone discovered: " .. L[name], ChatTypeInfo["RAID_WARNING"])
         end
     end
     if DEFAULT_CHAT_FRAME then
         for _, id in ipairs(newlyUnlockedIds) do
             local def = FindCheckpointDefinition(id)
             local name = def and def.name or ("Waystone #" .. id)
-            DEFAULT_CHAT_FRAME:AddMessage("Waystone discovered: |cffffd200" .. name .. "|r", 1, 1, 1)
+            DEFAULT_CHAT_FRAME:AddMessage(T("Waystone discovered: |cffffd200{name}|r", { name = L[name] }), 1, 1, 1)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("Open your world map to travel to your waystones.", 1, 1, 1)
+        DEFAULT_CHAT_FRAME:AddMessage(L["Open your world map to travel to your waystones."], 1, 1, 1)
     end
 end
 

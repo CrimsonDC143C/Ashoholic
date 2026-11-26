@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Module: Loot Bind
 -- Skips the "Looting X will bind it to you" confirmation (StaticPopup
 -- LOOT_BIND) when the "autoConfirmLootBind" option is on: the dialog is
@@ -58,7 +59,7 @@ local function CreateOptionCheckbox()
     else
         cb:SetPoint("TOPLEFT", 16, -182)
     end
-    _G[cb:GetName() .. "Text"]:SetText("Skip the \"will bind it to you\" loot confirmation")
+    _G[cb:GetName() .. "Text"]:SetText(L["Skip the \"will bind it to you\" loot confirmation"])
     cb:SetScript("OnClick", function(self)
         if ProjectEbonholdOptionsService then
             ProjectEbonholdOptionsService:SetSetting(SETTING, self:GetChecked() and true or false)

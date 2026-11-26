@@ -1,4 +1,5 @@
 local perkMainFrame = nil
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Forward declarations: the souvenir-stage and card-entrance helpers are
 -- defined further down but used by handlers registered earlier (card
 -- buttons, the reveal buttons). A closure only sees a local declared above it.
@@ -37,9 +38,9 @@ end
 
 local function GetSelectLabel(count)
     if IsPerkShowSelectCountEnabled() and count then
-        return "Select (" .. count .. ")"
+        return T("Select ({count})", { count = count })
     end
-    return "Select"
+    return L["Select"]
 end
 
 -- Spec draw (level 10 / 20 / ... 80). perks_service keeps the server's tag in
@@ -109,41 +110,41 @@ local function BestRating(names)
             bestRating, bestBonus = rating, bonus
         end
     end
-    return string.format("%d rating (+%.2f%%)", bestRating, bestBonus)
+    return string.format(L["%d rating (+%.2f%%)"], bestRating, bestBonus)
 end
 
 local ECHO_STAT_VALUE = {
-    STR = { "Strength", function() return select(2, UnitStat("player", 1)) end },
-    AGI = { "Agility", function() return select(2, UnitStat("player", 2)) end },
-    STA = { "Stamina", function() return select(2, UnitStat("player", 3)) end },
-    INT = { "Intellect", function() return select(2, UnitStat("player", 4)) end },
-    SPI = { "Spirit", function() return select(2, UnitStat("player", 5)) end },
-    ARMOR = { "Armor", function() return select(2, UnitArmor("player")) end },
-    AP = { "Attack Power", function() local b, p, n = UnitAttackPower("player"); return b + p + n end },
-    RAP = { "Ranged Attack Power", function() local b, p, n = UnitRangedAttackPower("player"); return b + p + n end },
-    SP = { "Spell Power", function()
+    STR = { L["Strength"], function() return select(2, UnitStat("player", 1)) end },
+    AGI = { L["Agility"], function() return select(2, UnitStat("player", 2)) end },
+    STA = { L["Stamina"], function() return select(2, UnitStat("player", 3)) end },
+    INT = { L["Intellect"], function() return select(2, UnitStat("player", 4)) end },
+    SPI = { L["Spirit"], function() return select(2, UnitStat("player", 5)) end },
+    ARMOR = { L["Armor"], function() return select(2, UnitArmor("player")) end },
+    AP = { L["Attack Power"], function() local b, p, n = UnitAttackPower("player"); return b + p + n end },
+    RAP = { L["Ranged Attack Power"], function() local b, p, n = UnitRangedAttackPower("player"); return b + p + n end },
+    SP = { L["Spell Power"], function()
         local best = GetSpellBonusHealing() or 0
         for school = 2, 7 do best = math.max(best, GetSpellBonusDamage(school) or 0) end
         return best
     end },
-    CRIT = { "Crit Chance", function()
+    CRIT = { L["Crit Chance"], function()
         local best = math.max(GetCritChance() or 0, GetRangedCritChance() or 0)
         for school = 2, 7 do best = math.max(best, GetSpellCritChance(school) or 0) end
         return string.format("%.2f%%", best)
     end },
-    HASTE = { "Haste", function() return BestRating({ { "CR_HASTE_MELEE", 18 }, { "CR_HASTE_RANGED", 19 }, { "CR_HASTE_SPELL", 20 } }) end },
-    HIT = { "Hit", function() return BestRating({ { "CR_HIT_MELEE", 6 }, { "CR_HIT_RANGED", 7 }, { "CR_HIT_SPELL", 8 } }) end },
-    EXPERTISE = { "Expertise", function() return (GetExpertise()) end },
-    ARPEN = { "Armor Penetration", function() return BestRating({ { "CR_ARMOR_PENETRATION", 25 } }) end },
-    DEFENSE = { "Defense", function() local b, m = UnitDefense("player"); return b + m end },
-    DODGE = { "Dodge", function() return string.format("%.2f%%", GetDodgeChance() or 0) end },
-    PARRY = { "Parry", function() return string.format("%.2f%%", GetParryChance() or 0) end },
-    BLOCK = { "Block", function() return string.format("%.2f%%", GetBlockChance() or 0) end },
-    HEALTH = { "Max Health", function() return UnitHealthMax("player") end },
-    MANA = { "Max Mana", function() local m = UnitPowerMax("player", 0); return (m and m > 0) and m or nil end },
-    MP5 = { "Mana Regen", function()
+    HASTE = { L["Haste"], function() return BestRating({ { "CR_HASTE_MELEE", 18 }, { "CR_HASTE_RANGED", 19 }, { "CR_HASTE_SPELL", 20 } }) end },
+    HIT = { L["Hit"], function() return BestRating({ { "CR_HIT_MELEE", 6 }, { "CR_HIT_RANGED", 7 }, { "CR_HIT_SPELL", 8 } }) end },
+    EXPERTISE = { L["Expertise"], function() return (GetExpertise()) end },
+    ARPEN = { L["Armor Penetration"], function() return BestRating({ { "CR_ARMOR_PENETRATION", 25 } }) end },
+    DEFENSE = { L["Defense"], function() local b, m = UnitDefense("player"); return b + m end },
+    DODGE = { L["Dodge"], function() return string.format("%.2f%%", GetDodgeChance() or 0) end },
+    PARRY = { L["Parry"], function() return string.format("%.2f%%", GetParryChance() or 0) end },
+    BLOCK = { L["Block"], function() return string.format("%.2f%%", GetBlockChance() or 0) end },
+    HEALTH = { L["Max Health"], function() return UnitHealthMax("player") end },
+    MANA = { L["Max Mana"], function() local m = UnitPowerMax("player", 0); return (m and m > 0) and m or nil end },
+    MP5 = { L["Mana Regen"], function()
         local base = GetManaRegen()
-        return base and string.format("%d per 5 sec", math.floor(base * 5 + 0.5)) or nil
+        return base and string.format(L["%d per 5 sec"], math.floor(base * 5 + 0.5)) or nil
     end },
 }
 
@@ -170,11 +171,18 @@ local function GetEchoStats(spellId, description)
 end
 
 -- The amount the description gives a stat ("Intellect by 39", "Armor by 10%"): number, isPercent.
+-- Negative when the words just before say the stat goes down (bug #4525: Glass Canon "reduces your
+-- maximum health by 30%" read as a +30% gain).
 local function EchoStatAmount(text, key)
     for _, kw in ipairs(ECHO_STAT_KEYWORDS) do
         if kw[2] == key then
-            local n, pct = text:match(kw[1] .. " by (%d+)(%%?)")
-            if n then return tonumber(n), pct == "%" end
+            local s, _, n, pct = text:find(kw[1] .. " by (%d+)(%%?)")
+            if n then
+                local before = text:sub(math.max(1, s - 24), s - 1)
+                local down = before:find("reduc", 1, true) or before:find("decreas", 1, true)
+                    or before:find("lower", 1, true)
+                return (down and -1 or 1) * tonumber(n), pct == "%"
+            end
         end
     end
 end
@@ -213,10 +221,44 @@ local function EchoNumbers(text)
     return list
 end
 
-local function AddEchoStackLine(tooltip, spellId, owned)
-    if not spellId or not owned or owned < 1 then return false end
-    local now = EchoNumbers(utils.GetSpellDescription(spellId, 500, owned))
-    local after = EchoNumbers(utils.GetSpellDescription(spellId, 500, owned + 1))
+-- The copies owned of one echo NAME, one row per rarity ({ spellId, quality, stacks }), rendered as the
+-- server pays them: a single row is the plain render; several rarities are summed row by row, each at
+-- its own per-copy value (bug #4444: a Rare Dewfall owned and a Common offered read "2 » 4", the Common
+-- row at 1 and 2 copies, instead of "20 » 22"). The offered rarity's row leads (its wording), else the best.
+local function RenderOwnedRows(rows)
+    if #rows == 1 then
+        return utils.GetSpellDescription(rows[1].spellId, 500, rows[1].stacks)
+    end
+    return utils.GetStackedSpellDescription(rows, 500)
+end
+
+local function SortOwnedRows(rows, leadSpellId)
+    table.sort(rows, function(a, b)
+        local la, lb = a.spellId == leadSpellId, b.spellId == leadSpellId
+        if la ~= lb then return la end
+        if (a.quality or 0) ~= (b.quality or 0) then return (a.quality or 0) > (b.quality or 0) end
+        return a.spellId < b.spellId
+    end)
+    return rows
+end
+
+local function AddEchoStackLine(tooltip, spellId, ownedRows)
+    if not spellId or not ownedRows or #ownedRows == 0 then return false end
+    local nowRows, afterRows, found = {}, {}, false
+    for _, r in ipairs(ownedRows) do
+        nowRows[#nowRows + 1] = r
+        local copy = { spellId = r.spellId, quality = r.quality, stacks = r.stacks }
+        if r.spellId == spellId then
+            copy.stacks = copy.stacks + 1
+            found = true
+        end
+        afterRows[#afterRows + 1] = copy
+    end
+    if not found then
+        afterRows[#afterRows + 1] = { spellId = spellId, stacks = 1 }
+    end
+    local now = EchoNumbers(RenderOwnedRows(SortOwnedRows(nowRows, spellId)))
+    local after = EchoNumbers(RenderOwnedRows(SortOwnedRows(afterRows, spellId)))
     for i, a in ipairs(now) do
         local b = after[i]
         if b and a[1] and b[1] and b[1] ~= a[1] and a[1] > 0 then
@@ -246,7 +288,7 @@ end
 -- parry reduction (0.25 % a point), defense stays in skill points, everything else is a percentage.
 local function EchoRatingGain(idx, gain)
     if idx == 24 then return string.format("+%.2f%%", gain * 0.25) end
-    if idx == 2 then return string.format("+%d defense", math.floor(gain + 0.5)) end
+    if idx == 2 then return string.format(L["+%d defense"], math.floor(gain + 0.5)) end
     return string.format("+%.2f%%", gain)
 end
 
@@ -265,9 +307,8 @@ local function EchoRatingLine(text, key, label)
             local perRating = (rating > 0 and bonus > 0) and (bonus / rating)
                 or 1 / (ECHO_RATING_BASE[bestIdx] * EchoRatingLevelFactor(UnitLevel("player") or 1))
             local gain = tonumber(n)
-            if key == "CRIT" then label = "Critical Strike" end -- "Crit Chance rating" reads wrong
-            return label .. " rating " .. rating .. " |cff40ff40" .. ECHO_STAT_CHEVRON .. " " .. (rating + gain)
-                .. " (" .. EchoRatingGain(bestIdx, gain * perRating) .. ")|r"
+            if key == "CRIT" then label = L["Critical Strike"] end -- "Crit Chance rating" reads wrong
+            return T("{stat} rating {rating} |cff40ff40{chevron} {after} ({gain})|r", { stat = label, rating = rating, chevron = ECHO_STAT_CHEVRON, after = rating + gain, gain = EchoRatingGain(bestIdx, gain * perRating) })
         end
     end
 end
@@ -292,7 +333,7 @@ local function AddEchoStatLines(tooltip, spellId, description)
                     local amount, isPercent = EchoStatAmount(text, key)
                     if amount then
                         local after = isPercent and value * (1 + amount / 100) or value + amount
-                        line = line .. " |cff40ff40" .. ECHO_STAT_CHEVRON .. " " .. math.floor(after + 0.5) .. "|r"
+                        line = line .. (amount < 0 and " |cffff5050" or " |cff40ff40") .. ECHO_STAT_CHEVRON .. " " .. math.floor(after + 0.5) .. "|r"
                     end
                 end
                 if first then tooltip:AddLine(" "); first = false end
@@ -390,8 +431,8 @@ local function ShowSpecDrawWidgets(shown)
     if not specBanner then return end
 
     if draw.chosen == 0 then
-        specBanner.title:SetText("Choose your Echo Specialization")
-        specBanner.sub:SetText("Each card is one specialization (small icon on the echo's corner). Every 10 levels of this run, you will get three echoes of the one you take")
+        specBanner.title:SetText(L["Choose your Echo Specialization"])
+        specBanner.sub:SetText(L["Each card is one specialization (small icon on the echo's corner). Every 10 levels of this run, you will get three echoes of the one you take"])
     else
         local specName
         for _, f in ipairs(perkFramePool) do
@@ -400,8 +441,8 @@ local function ShowSpecDrawWidgets(shown)
                 if specName then break end
             end
         end
-        specBanner.title:SetText(specName and (specName .. " Specialization") or "Specialization Echoes")
-        specBanner.sub:SetText("Three echoes of the specialization you chose at level 10")
+        specBanner.title:SetText(specName and T("{spec} Specialization", { spec = L[specName] }) or L["Specialization Echoes"])
+        specBanner.sub:SetText(L["Three echoes of the specialization you chose at level 10"])
     end
     specBanner:Show()
     specBanner.breath:Play()
@@ -459,11 +500,11 @@ end
 
 local qualityInfo = {
     -- rim = the card's frame and glow; text = the name on the card (the plain blue and purple are too dark on it)
-    [0] = { name = "Common", color = { 1, 1, 1 }, border = 0, rim = { 0.72, 0.70, 0.66 } },
-    [1] = { name = "Uncommon", color = { 0.1, 1.0, 0.1 }, border = 1, rim = { 0.1, 1.0, 0.1 } },
-    [2] = { name = "Rare", color = { 0.0, 0.4, 1.0 }, border = 2, rim = { 0.15, 0.5, 1.0 }, text = { 0.3, 0.59, 1.0 } },
-    [3] = { name = "Epic", color = { 0.6, 0.2, 1.0 }, border = 3, rim = { 0.6, 0.2, 1.0 }, text = { 0.74, 0.49, 1.0 } },
-    [4] = { name = "Legendary", color = { 1.0, 0.5, 0.0 }, border = 4, rim = { 1.0, 0.5, 0.0 } }
+    [0] = { name = L["Common"], color = { 1, 1, 1 }, border = 0, rim = { 0.72, 0.70, 0.66 } },
+    [1] = { name = L["Uncommon"], color = { 0.1, 1.0, 0.1 }, border = 1, rim = { 0.1, 1.0, 0.1 } },
+    [2] = { name = L["Rare"], color = { 0.0, 0.4, 1.0 }, border = 2, rim = { 0.15, 0.5, 1.0 }, text = { 0.3, 0.59, 1.0 } },
+    [3] = { name = L["Epic"], color = { 0.6, 0.2, 1.0 }, border = 3, rim = { 0.6, 0.2, 1.0 }, text = { 0.74, 0.49, 1.0 } },
+    [4] = { name = L["Legendary"], color = { 1.0, 0.5, 0.0 }, border = 4, rim = { 1.0, 0.5, 0.0 } }
 }
 
 
@@ -503,8 +544,9 @@ local function GetRerollInfo()
     return availableRerolls, totalRerolls
 end
 
+-- Banish and freeze apply to orb offers too since 2026-11-19 (server rule): only the run's
+-- reroll is closed there, so these two no longer look at IsOrbOfferPending.
 local function GetBanishInfo()
-    if IsOrbOfferPending() then return 0 end
     if not ProjectEbonhold.Constants or not ProjectEbonhold.Constants.ENABLE_BANISH_SYSTEM then
         return 0
     end
@@ -513,7 +555,6 @@ local function GetBanishInfo()
 end
 
 local function GetFreezeInfo()
-    if IsOrbOfferPending() then return 0, 0 end
     local runData = ProjectEbonhold.PlayerRunService and ProjectEbonhold.PlayerRunService.GetCurrentData() or _emptyTable
     local usedFreezes = runData.usedFreezes or 0
     local totalFreezes = runData.totalFreezes or 0
@@ -684,14 +725,26 @@ local function RefreshRerollButton()
     if not rerollButton or not rerollButton.text then return end
 
     local count
+    local orb = ProjectEbonhold.OrbService
     if IsOrbOfferPending() then
         rerollButton._orbMode = true
         count = GetOrbCharges()
-        rerollButton.text:SetText("Use Orbs (" .. count .. ")")
+        rerollButton.text:SetText(T("Use Orbs ({count})", { count = count }))
+        -- The per-click spend sits on its own button beside Reroll, so the cost of a click is
+        -- always on screen: "x20" reads as twenty orbs per reroll.
+        if rerollButton._spendButton then
+            local spend = (orb and orb.GetRerollSpend and orb.GetRerollSpend()) or 1
+            rerollButton._spendButton:SetText("x" .. spend)
+            rerollButton._spendButton:Show()
+        end
     else
         rerollButton._orbMode = false
         count = GetRerollInfo()
-        rerollButton.text:SetText("Reroll (" .. count .. ")")
+        rerollButton.text:SetText(T("Reroll ({count})", { count = count }))
+        if rerollButton._spendButton then
+            rerollButton._spendButton:Hide()
+            if orb and orb.HideRerollSpendPopup then orb.HideRerollSpendPopup() end
+        end
     end
 
     if count > 0 then
@@ -762,29 +815,20 @@ local perkTour = ProjectEbonhold.GuidedTour.Create({
     steps = function()
         return {
             {
-                title = "Echo Choices",
-                text = "Every level up during a run offers a draw of echoes: " ..
-                    "temporary powers that last until the run ends. Click " ..
-                    "a |cffffd700card|r to claim it; the card's color shows its " ..
-                    "quality.\n\n|cffffd700Freeze|r holds a card for your next " ..
-                    "draw, |cffffd700Banish|r removes it from this run's pool.",
+                title = L["Echo Choices"],
+                text = L["Every level up during a run offers a draw of echoes: temporary powers that last until the run ends. Click a |cffffd700card|r to claim it; the card's color shows its quality.\n\n|cffffd700Freeze|r holds a card for your next draw, |cffffd700Banish|r removes it from this run's pool."],
                 zone = GetCardsZone,
                 boxAnchor = { "CENTER", "CENTER", 0, 0 },
             },
             {
-                title = "Reroll",
-                text = "Not happy with the draw? |cffffd700Reroll|r swaps every " ..
-                    "card for a fresh set. The number shows how many rerolls " ..
-                    "you have left this run.",
+                title = L["Reroll"],
+                text = L["Not happy with the draw? |cffffd700Reroll|r swaps every card for a fresh set. The number shows how many rerolls you have left this run."],
                 zone = function() return rerollButton end,
                 boxAnchor = { "LEFT", "RIGHT", 14, 0 },
             },
             {
-                title = "Wishlist Highlights",
-                text = "Playing toward a |cffa080e0wishlist|r or a " ..
-                    "|cff60a0e0build|r (Echo Journal, Loadouts menu)? Cards " ..
-                    "that belong to it wear a |cffffd700golden glow and " ..
-                    "star|r. Pick those to grow into your dream build.",
+                title = L["Wishlist Highlights"],
+                text = L["Playing toward a |cffa080e0wishlist|r or a |cff60a0e0build|r (Echo Journal, Loadouts menu)? Cards that belong to it wear a |cffffd700golden glow and star|r. Pick those to grow into your dream build."],
                 zone = GetWishlistZone,
                 boxAnchor = { "CENTER", "CENTER", 0, 0 },
             },
@@ -984,7 +1028,7 @@ do
         flag:SetFont("Fonts\\FRIZQT__.TTF", 11)
         flag:SetPoint("TOPLEFT", visual, "TOPLEFT", 12, -10)
         flag:SetTextColor(0.56, 0.82, 1)
-        flag:SetText("Frozen")
+        flag:SetText(L["Frozen"])
         flag:Hide()
         frame.frozenFlag = flag
 
@@ -1103,35 +1147,42 @@ do
         end
         GameTooltip:ClearLines()
         local sName = GetSpellInfo(self._spellId or 0)
-        GameTooltip:AddLine(sName or ("Spell " .. tostring(self._spellId)), qd.color[1], qd.color[2], qd.color[3])
+        GameTooltip:AddLine(sName or T("Spell {id}", { id = tostring(self._spellId) }), qd.color[1], qd.color[2], qd.color[3])
         GameTooltip:AddLine(qd.name, 0.5, 0.5, 0.5)
-        if self._perkData and self._perkData.isGuaranteed then
-            -- The choice itself is spelled out under the cards (memoryHint)
-            GameTooltip:AddLine("Souvenir from your previous build", 1, 0.82, 0.1)
-        end
-        local svcRule = ProjectEbonhold.PerkService
-            and ProjectEbonhold.PerkService.GetActiveEchoLoadoutRule
-        local rule = svcRule and svcRule(self._spellId)
-        if rule == "avoid" then
-            GameTooltip:AddLine("Your build refuses this echo", 1, 0.25, 0.25)
-            GameTooltip:AddLine("It is never taken for you. Take it yourself if you changed your mind.", 0.8, 0.6, 0.6, true)
-        elseif rule == "want" then
-            GameTooltip:AddLine("Wanted by your build", 0.1, 1, 0.1)
-        end
+        -- Same order as every echo tooltip: name, rarity, description, what it
+        -- adds to you, its state, then the Shift line
         local st = self._stacks or 1
         local ms = self._maxStacks or 1
-        if st > 1 then
-            GameTooltip:AddLine("Stacks: " .. st .. "/" .. ms, 1, 1, 1)
-        end
         GameTooltip:AddLine(" ")
         local description = utils.GetSpellDescription(self._spellId, 500, st)
         GameTooltip:AddLine(description, 1, 0.82, 0, true)
         -- stat echoes have their stat line instead (owner 2026-10-23)
         local okStats, stats = pcall(GetEchoStats, self._spellId, description)
         if (self._ownedCount or 0) >= 1 and not (okStats and stats and next(stats)) then
-            pcall(AddEchoStackLine, GameTooltip, self._spellId, self._ownedCount)
+            pcall(AddEchoStackLine, GameTooltip, self._spellId, self._ownedRows)
         end
         AddEchoStatLines(GameTooltip, self._spellId, description)
+        local svcRule = ProjectEbonhold.PerkService
+            and ProjectEbonhold.PerkService.GetActiveEchoLoadoutRule
+        local rule = svcRule and svcRule(self._spellId)
+        local isSouvenir = self._perkData and self._perkData.isGuaranteed
+        if isSouvenir or rule == "avoid" or rule == "want" or st > 1 then
+            GameTooltip:AddLine(" ")
+        end
+        if st > 1 then
+            GameTooltip:AddLine(T("Stacks: {current}/{max}", { current = st, max = ms }), 1, 1, 1)
+        end
+        if isSouvenir then
+            -- The choice itself is spelled out under the cards (memoryHint)
+            GameTooltip:AddLine(L["Souvenir from your previous build"], 1, 0.82, 0.1)
+        end
+        if rule == "avoid" then
+            GameTooltip:AddLine(L["Your build refuses this echo"], 1, 0.25, 0.25)
+            GameTooltip:AddLine(L["It is never taken for you. Take it yourself if you changed your mind."], 0.8, 0.6, 0.6, true)
+        elseif rule == "want" then
+            GameTooltip:AddLine(L["Wanted by your build"], 0.1, 1, 0.1)
+        end
+        utils.AddShiftHint(GameTooltip, self._spellId)
         GameTooltip:Show()
     end
 
@@ -1542,12 +1593,11 @@ local function UpdateBanishButtons()
     local rem = GetBanishInfo()
     local remChanged = (rem ~= _lastBanishRem)
     _lastBanishRem = rem
-    local banishLabel = remChanged and ("Banish (" .. rem .. ")") or nil
+    local banishLabel = remChanged and T("Banish ({count})", { count = rem }) or nil
     for _, frame in ipairs(perkFramePool) do
         if frame.inUse and frame.banishCardButton then
             local btn = frame.banishCardButton
-            -- Orb offer: banish is refused server-side, so the button is not shown at all.
-            if (perkMainFrame and perkMainFrame.perksHidden) or IsOrbOfferPending() then
+            if perkMainFrame and perkMainFrame.perksHidden then
                 btn:Hide()
             elseif IsCardGuaranteed(frame) then
                 btn:Hide() -- the souvenir card carries no run action at all
@@ -1556,7 +1606,7 @@ local function UpdateBanishButtons()
                 btn:Disable()
                 btn:EnableMouse(true) -- swallows the click: the card under it is a button too
                 if btn.text then
-                    btn.text:SetText("Banish")
+                    btn.text:SetText(L["Banish"])
                     btn.text:SetTextColor(0.5, 0.5, 0.5)
                 end
             elseif rem > 0 then
@@ -1572,7 +1622,7 @@ local function UpdateBanishButtons()
                 btn:EnableMouse(true)
                 btn:Disable()
                 if btn.text then
-                    if banishLabel then btn.text:SetText("Banish (0)") end
+                    if banishLabel then btn.text:SetText(L["Banish (0)"]) end
                     btn.text:SetTextColor(0.5, 0.5, 0.5)
                 end
             end
@@ -1582,12 +1632,11 @@ end
 
 local function UpdateFreezeButtons()
     local availFreezes = GetFreezeInfo()
-    local freezeLabel = "Freeze (" .. availFreezes .. ")"
+    local freezeLabel = T("Freeze ({count})", { count = availFreezes })
     for _, frame in ipairs(perkFramePool) do
         if frame.inUse and frame.freezeCardButton then
             local btn = frame.freezeCardButton
-            -- Orb offer: freeze is refused server-side, so the button is not shown at all.
-            if (perkMainFrame and perkMainFrame.perksHidden) or IsOrbOfferPending() then
+            if perkMainFrame and perkMainFrame.perksHidden then
                 btn:Hide()
             elseif IsCardGuaranteed(frame) then
                 btn:Hide() -- the souvenir card carries no run action at all
@@ -1596,7 +1645,7 @@ local function UpdateFreezeButtons()
                 btn:Disable()
                 btn:EnableMouse(true) -- swallows the click: the card under it is a button too
                 if btn.text then
-                    btn.text:SetText("Freeze")
+                    btn.text:SetText(L["Freeze"])
                     btn.text:SetTextColor(0.5, 0.5, 0.5)
                 end
                 if btn.SetBackdropColor then
@@ -1609,7 +1658,7 @@ local function UpdateFreezeButtons()
                 btn:EnableMouse(true) -- swallows the click: the card under it is a button too
                 ApplyFreezeVisual(frame)
                 if btn.text then
-                    btn.text:SetText("Freeze")
+                    btn.text:SetText(L["Freeze"])
                     btn.text:SetTextColor(0.5, 0.5, 0.5)
                 end
                 if btn.SetBackdropColor then
@@ -1633,7 +1682,7 @@ local function UpdateFreezeButtons()
                 btn:EnableMouse(true)
                 btn:Disable()
                 if btn.text then
-                    btn.text:SetText("Freeze (0)")
+                    btn.text:SetText(L["Freeze (0)"])
                     btn.text:SetTextColor(0.5, 0.5, 0.5)
                 end
                 if btn.SetBackdropColor then
@@ -1817,8 +1866,8 @@ local function AcquirePerkFrame(parent)
     specBadge:SetScript("OnEnter", function(self)
         if not self.specName then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
-        GameTooltip:SetText(self.specName .. " Specialization", unpack(SPEC_GOLD))
-        GameTooltip:AddLine("This echo belongs to the " .. self.specName .. " specialization.", 1, 1, 1, true)
+        GameTooltip:SetText(T("{spec} Specialization", { spec = L[self.specName] }), unpack(SPEC_GOLD))
+        GameTooltip:AddLine(T("This echo belongs to the {spec} specialization.", { spec = L[self.specName] }), 1, 1, 1, true)
         GameTooltip:Show()
     end)
     specBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1828,7 +1877,7 @@ local function AcquirePerkFrame(parent)
     -- The whole card is the Select button: invisible and stretched over the card, so every rule of a pick
     -- (the grace time, the spec question, the EnableMouse switches below) stays where it was. Its mouse
     -- also covers the frame, so the frame's right-click (chat link) has to be passed down.
-    local selectButton = utils.CreateSimpleCustomButton(frame, "Select", nil, CARD_W, CARD_H)
+    local selectButton = utils.CreateSimpleCustomButton(frame, L["Select"], nil, CARD_W, CARD_H)
     selectButton:ClearAllPoints()
     selectButton:SetAllPoints(frame)
     selectButton:SetFrameLevel(frame:GetFrameLevel() + 3)
@@ -1841,7 +1890,7 @@ local function AcquirePerkFrame(parent)
     frame.selectButton = selectButton
 
     -- Freeze and Banish: side by side at the bottom of the card, shown on hover (CardFx sets their alpha)
-    local freezeCardButton = utils.CreateSimpleCustomButton(visual, "Freeze", nil, 96, 24,
+    local freezeCardButton = utils.CreateSimpleCustomButton(visual, L["Freeze"], nil, 96, 24,
         "Interface\\AddOns\\ProjectEbonhold\\assets\\128redbutton9sliced_blue")
     freezeCardButton:SetPoint("BOTTOMRIGHT", visual, "BOTTOM", -2, 9)
     freezeCardButton:SetFrameLevel(visual:GetFrameLevel() + 8)
@@ -1850,8 +1899,8 @@ local function AcquirePerkFrame(parent)
     freezeCardButton:Hide()
     freezeCardButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Freeze", 1, 1, 1)
-        GameTooltip:AddLine("Freeze this perk so it carries over to your next selection.", nil, nil, nil, true)
+        GameTooltip:SetText(L["Freeze"], 1, 1, 1)
+        GameTooltip:AddLine(L["Freeze this perk so it carries over to your next selection."], nil, nil, nil, true)
         GameTooltip:Show()
     end)
     freezeCardButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1860,7 +1909,7 @@ local function AcquirePerkFrame(parent)
         freezeCardButton.text = freezeCardButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         freezeCardButton.text:SetPoint("CENTER", freezeCardButton, "CENTER", 0, 0)
     end
-    freezeCardButton.text:SetText("Freeze")
+    freezeCardButton.text:SetText(L["Freeze"])
     freezeCardButton.text:SetTextColor(1, 1, 1)
 
     freezeCardButton:SetScript("OnClick", function()
@@ -1883,26 +1932,42 @@ local function AcquirePerkFrame(parent)
     frame.freezeCardButton = freezeCardButton
 
     -- Per-card Banish button (next to freeze, purple texture)
-    local banishCardButton = utils.CreateSimpleCustomButton(visual, "Banish", nil, 96, 24,
+    local banishCardButton = utils.CreateSimpleCustomButton(visual, L["Banish"], nil, 96, 24,
         "Interface\\AddOns\\ProjectEbonhold\\assets\\128redbutton9sliced_purple")
     banishCardButton:SetPoint("BOTTOMLEFT", visual, "BOTTOM", 2, 9)
     banishCardButton:SetFrameLevel(visual:GetFrameLevel() + 8)
     banishCardButton:SetAlpha(0)
     banishCardButton._card = frame
     banishCardButton:Hide()
-    banishCardButton:SetScript("OnEnter", function(self)
+    -- Kept in a local: the transparent design replaces OnEnter for its hover colour and must call it too.
+    local function ShowBanishTooltip(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Banish", 1, 1, 1)
-        GameTooltip:AddLine("Banish this perk so it won't appear again this run.", nil, nil, nil, true)
+        GameTooltip:SetText(L["Banish"], 1, 1, 1)
+        GameTooltip:AddLine(L["Banish this perk so it won't appear again this run."], nil, nil, nil, true)
+        -- The list is per loadout: without it a switch looked like the banishes were lost.
+        local svc = ProjectEbonhold.PerkService
+        local banished = (svc and svc.GetBanishedPerks) and svc.GetBanishedPerks() or {}
+        GameTooltip:AddLine(" ")
+        if #banished == 0 then
+            GameTooltip:AddLine(L["No echo banished on this loadout yet."], 0.7, 0.7, 0.7, true)
+        else
+            GameTooltip:AddLine(L["Banished on this loadout:"], 1, 0.82, 0)
+            for _, spellId in ipairs(banished) do
+                local name = GetSpellInfo(spellId)
+                GameTooltip:AddLine("- " .. (name or tostring(spellId)), 0.85, 0.85, 0.85)
+            end
+        end
+        GameTooltip:AddLine(L["Each loadout keeps its own banishes."], 0.7, 0.7, 0.7, true)
         GameTooltip:Show()
-    end)
+    end
+    banishCardButton:SetScript("OnEnter", ShowBanishTooltip)
     banishCardButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     if not banishCardButton.text then
         banishCardButton.text = banishCardButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         banishCardButton.text:SetPoint("CENTER", banishCardButton, "CENTER", 0, 0)
     end
-    banishCardButton.text:SetText("Banish")
+    banishCardButton.text:SetText(L["Banish"])
     banishCardButton.text:SetTextColor(1, 1, 1)
 
     frame.banishCardButton = banishCardButton
@@ -1954,8 +2019,10 @@ local function AcquirePerkFrame(parent)
                 self:SetBackdropBorderColor(0, 0, 0, 1)
                 self:SetBackdropColor(0.48, 0.16, 0.14, 0.98)
             end
+            ShowBanishTooltip(self)
         end)
         banishCardButton:SetScript("OnLeave", function(self)
+            GameTooltip:Hide()
             if self.SetBackdropBorderColor then
                 local rem = GetBanishInfo()
                 if rem > 0 then
@@ -1997,7 +2064,7 @@ local function AcquirePerkFrame(parent)
         if button == "RightButton" and IsShiftKeyDown() and self._spellId then
             local link = GetSpellLink(self._spellId)
             if not link or link == "" then
-                local name = GetSpellInfo(self._spellId) or ("Spell " .. self._spellId)
+                local name = GetSpellInfo(self._spellId) or T("Spell {id}", { id = self._spellId })
                 link = ("|cff71d5ff|Hspell:%d|h[%s]|h|r"):format(self._spellId, name)
             end
             local edit = ChatEdit_ChooseBoxForSend()
@@ -2025,7 +2092,7 @@ local function AcquirePerkFrame(parent)
         if draw and draw.chosen == 0 and not (frame._perkData and frame._perkData.isGuaranteed) then
             local specName = GetEchoSpecName(frame._spellId)
             if specName then
-                local dialog = StaticPopup_Show("PROJECTEBONHOLD_SPEC_CONFIRM", specName, GetSpellInfo(frame._spellId) or "this echo")
+                local dialog = StaticPopup_Show("PROJECTEBONHOLD_SPEC_CONFIRM", L[specName], GetSpellInfo(frame._spellId) or L["this echo"])
                 if dialog then
                     dialog.data = { frame = frame, spellId = frame._spellId }
                     -- Same lift as the souvenir popup: the cards and the gold banner sit on the
@@ -2253,9 +2320,9 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
     else
         frame.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
     end
-    frame.nameText:SetText(spellName or ("Spell " .. spellId))
+    frame.nameText:SetText(spellName or T("Spell {id}", { id = spellId }))
     frame.nameText:SetTextColor(unpack(qualityData.text or qualityData.color))
-    frame.rarityText:SetText(string.upper(qualityData.name))
+    frame.rarityText:SetText(ProjectEbonhold.Upper(qualityData.name))
     frame._fxHiddenUntil = nil
     -- Reset locally-frozen flag; will be re-applied below if still frozen
     frame._locallyFrozen = false
@@ -2293,21 +2360,50 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
     -- Show how many of this echo you already have (text only, below main icon)
     local granted = (ProjectEbonhold and ProjectEbonhold.PerkService and ProjectEbonhold.PerkService.GetGrantedPerks) and
         ProjectEbonhold.PerkService.GetGrantedPerks() or {}
-    local count = 0
-    if spellName and granted[spellName] then count = #granted[spellName] end
-    if count == 0 and spellId and granted then
+    -- Copies owned of this echo, every rarity and the permanent ones included (the server sums them
+    -- all), one row per rarity for the tooltip's "now » after" line.
+    local owned = spellName and granted[spellName]
+    if not owned and spellId and granted then
         for name, arr in pairs(granted) do
             if arr and #arr > 0 and arr[1].spellId == spellId then
-                count = #arr
+                owned = arr
                 break
             end
         end
     end
+    local rows, rowById, count = {}, {}, 0
+    local function addOwned(id, quality, n)
+        local row = rowById[id]
+        if not row then
+            row = { spellId = id, quality = quality or 0, stacks = 0 }
+            rowById[id] = row
+            rows[#rows + 1] = row
+        end
+        row.stacks = row.stacks + n
+        count = count + n
+    end
+    for _, inst in ipairs(owned or {}) do
+        addOwned(inst.spellId, inst.quality, inst.stack or 1)
+    end
+    local lockedList = (ProjectEbonhold.PerkService and ProjectEbonhold.PerkService.GetLockedPerks)
+        and ProjectEbonhold.PerkService.GetLockedPerks() or {}
+    for _, lp in ipairs(lockedList) do
+        if lp.spellId and spellName and GetSpellInfo(lp.spellId) == spellName then
+            addOwned(lp.spellId, lp.quality, lp.stack or 1)
+        end
+    end
+    frame._ownedRows = rows
     frame._ownedCount = count
     frame._spellId = spellId
-    -- The "x2" badge is gone (owner 2026-10-23): the tooltip's stack line says it, with the values.
+    -- The "x2" badge above the icon stays gone (owner 2026-10-23). The copies already owned are told
+    -- on the rarity line instead ("EPIC - Stacks: 2"), so a player who wants one of each echo (Adaptive
+    -- power) sees which cards he already has without hovering them. No line for a first copy.
     if frame.ownedCountFrame then
         frame.ownedCountFrame:Hide()
+    end
+    if count > 0 then
+        frame.rarityText:SetText(ProjectEbonhold.Upper(qualityData.name) .. "  |cffe6d880-  "
+            .. T("Stacks: {count}", { count = count }) .. "|r")
     end
 
     local rollsCount = (ProjectEbonhold.PerkService and ProjectEbonhold.PerkService.GetPendingRollsCount and ProjectEbonhold.PerkService.GetPendingRollsCount()) or
@@ -2330,7 +2426,7 @@ local function UpdatePerkFrame(frame, perkData, perkIndex)
     do
         local rem = GetBanishInfo()
         if frame.banishCardButton.text then
-            frame.banishCardButton.text:SetText("Banish (" .. rem .. ")")
+            frame.banishCardButton.text:SetText(T("Banish ({count})", { count = rem }))
             if rem > 0 then
                 frame.banishCardButton.text:SetTextColor(1, 1, 1)
             else
@@ -2437,7 +2533,7 @@ local function InitializePerkUI()
         end
     end)
 
-    rerollButton = utils.CreateSimpleCustomButton(perkMainFrame, "Reroll", nil, 160, 35)
+    rerollButton = utils.CreateSimpleCustomButton(perkMainFrame, L["Reroll"], nil, 160, 35)
     rerollButton:SetPoint("CENTER", perkMainFrame, "CENTER", 0, 310)
     if IsTransparentDesign() then
         -- Red hover glow (manual overlay so it never gets lost; match banish darkness)
@@ -2490,16 +2586,16 @@ local function InitializePerkUI()
         local availableRerolls, totalRerolls = GetRerollInfo()
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:ClearLines()
-        GameTooltip:AddLine("Reroll Echoes", 1, 0.82, 0)
+        GameTooltip:AddLine(L["Reroll Echoes"], 1, 0.82, 0)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(
-            "Reroll current echoes. These echoes won't appear in your next choice, but may return in future selections. Decreases the odds of drawing echoes in the families of your current selection",
+            L["Reroll current echoes. These echoes won't appear in your next choice, but may return in future selections. Decreases the odds of drawing echoes in the families of your current selection"],
             1, 1, 1, true)
         GameTooltip:AddLine(" ")
         if availableRerolls > 0 then
-            GameTooltip:AddLine("Rerolls remaining: " .. availableRerolls .. "/" .. totalRerolls, 0, 1, 0)
+            GameTooltip:AddLine(T("Rerolls remaining: {current}/{total}", { current = availableRerolls, total = totalRerolls }), 0, 1, 0)
         else
-            GameTooltip:AddLine("No rerolls remaining", 1, 0, 0)
+            GameTooltip:AddLine(L["No rerolls remaining"], 1, 0, 0)
         end
         GameTooltip:Show()
     end)
@@ -2515,7 +2611,7 @@ local function InitializePerkUI()
             -- Comms.ThrottleRules entry on 1221/1222, so it holds for a forged packet too.
             local orb = ProjectEbonhold.OrbService
             if not (orb and orb.CanRerollOffer and orb.CanRerollOffer()) then
-                DEFAULT_CHAT_FRAME:AddMessage("|cffff0000No Orb of Lost Memories left to spend.|r")
+                DEFAULT_CHAT_FRAME:AddMessage(L["|cffff0000No Orb of Lost Memories left to spend.|r"])
                 return
             end
             orb.RerollOffer()
@@ -2527,11 +2623,73 @@ local function InitializePerkUI()
 
         local availableRerolls = GetRerollInfo()
         if availableRerolls <= 0 then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000No rerolls remaining! Rerolls are restored upon death.|r")
+            DEFAULT_CHAT_FRAME:AddMessage(L["|cffff0000No rerolls remaining! Rerolls are restored upon death.|r"])
             return
         end
         ProjectEbonhold.PerkService.RequestReroll()
     end)
+
+    -- Orb offers only: how many orbs EACH reroll click spends (OrbService.SetRerollSpend). A
+    -- child of the Reroll button, so every path that hides it hides this too; RefreshRerollButton
+    -- shows it in orb mode and writes the count on it.
+    do
+        -- A round orb badge, the same art as the orb bubble on the journal bar, rather than a
+        -- stock red panel button: it sits against the mauve orb plate and has to read as the
+        -- same currency. The count is a stack count in the corner, as on an item.
+        local SIZE = 30
+        local spendButton = CreateFrame("Button", nil, rerollButton)
+        spendButton:SetSize(SIZE, SIZE)
+        spendButton:SetPoint("LEFT", rerollButton, "RIGHT", 10, 0)
+
+        local icon = spendButton:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(SIZE, SIZE)
+        icon:SetPoint("CENTER", spendButton, "CENTER", 0, 0)
+        SetPortraitToTexture(icon, "Interface\\Icons\\inv_112_arcane_orb")
+
+        -- The skill tree's gold node ring, at its node proportion (skillTree.lua, ring = 1.16 x)
+        local border = spendButton:CreateTexture(nil, "OVERLAY")
+        -- class_ring_mauve.tga: the gold ring recoloured to the orb's mauve (hue moved, light kept)
+        border:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\class_ring_mauve")
+        border:SetSize(SIZE * 1.16, SIZE * 1.16)
+        border:SetPoint("CENTER", icon, "CENTER", 0, 0)
+
+        local glow = spendButton:CreateTexture(nil, "BACKGROUND")
+        glow:SetTexture("Interface\\Cooldown\\star4")
+        glow:SetBlendMode("ADD")
+        glow:SetSize(SIZE * 1.9, SIZE * 1.9)
+        glow:SetPoint("CENTER", icon, "CENTER", 0, 0)
+        glow:SetVertexColor(0.72, 0.36, 1, 0.9)
+        glow:Hide()
+
+        local count = spendButton:CreateFontString(nil, "OVERLAY", nil, 2)
+        count:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+        count:SetPoint("BOTTOMRIGHT", spendButton, "BOTTOMRIGHT", 8, -4)
+        count:SetTextColor(1, 0.85, 0.2)
+        spendButton.SetText = function(self, text) count:SetText(text) end
+        spendButton:SetText("x1")
+
+        spendButton:SetScript("OnMouseDown", function() icon:SetPoint("CENTER", spendButton, "CENTER", 1, -1) end)
+        spendButton:SetScript("OnMouseUp", function() icon:SetPoint("CENTER", spendButton, "CENTER", 0, 0) end)
+        spendButton:SetScript("OnClick", function(self)
+            local orb = ProjectEbonhold.OrbService
+            -- The popup opens over the Reroll plate, centred, not over this small badge
+            if orb and orb.ToggleRerollSpendPopup then orb.ToggleRerollSpendPopup(rerollButton) end
+        end)
+        spendButton:SetScript("OnEnter", function(self)
+            glow:Show()
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:ClearLines()
+            GameTooltip:AddLine(L["Orbs per reroll"], 1, 0.82, 0)
+            GameTooltip:AddLine(L["Set how many orbs each reroll spends. With more than one, each orb adds 1% chance of a higher quality; 100 makes it certain."], 1, 1, 1, true)
+            GameTooltip:Show()
+        end)
+        spendButton:SetScript("OnLeave", function() glow:Hide(); GameTooltip:Hide() end)
+        spendButton:Hide()
+        rerollButton._spendButton = spendButton
+
+        local orb = ProjectEbonhold.OrbService
+        if orb then orb.onRerollSpendChanged = RefreshRerollButton end
+    end
     rerollButton:Hide()
 
     hideButton = CreateFrame("Button", "PerkHideButton", perkMainFrame)
@@ -2596,7 +2754,7 @@ local function InitializePerkUI()
 
         local chooseButtonText = chooseButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         chooseButtonText:SetPoint("CENTER", chooseButton, "CENTER", 0, 0)
-        chooseButtonText:SetText("Select an Echo")
+        chooseButtonText:SetText(L["Select an Echo"])
         chooseButtonText:SetTextColor(0.9, 0.9, 0.9)
         chooseButton.text = chooseButtonText
 
@@ -2635,7 +2793,7 @@ local function InitializePerkUI()
 
         local chooseButtonText = chooseButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         chooseButtonText:SetPoint("CENTER", chooseButton, "CENTER", 0, 10)
-        chooseButtonText:SetText("Select an Echo")
+        chooseButtonText:SetText(L["Select an Echo"])
         chooseButtonText:SetTextColor(1, 1, 1)
         chooseButton.text = chooseButtonText
 
@@ -2763,7 +2921,7 @@ local function InitializePerkUI()
         _lastBanishRem = nil
         UpdateFreezeButtons()
         UpdateBanishButtons()
-        hideButton.text:SetText("Hide")
+        hideButton.text:SetText(L["Hide"])
         hideButton.text:SetTextColor(0.7, 0.7, 0.7)
         if _G.EbonholdAutoShowCheck then _G.EbonholdAutoShowCheck:Show() end
 
@@ -2812,7 +2970,7 @@ local function InitializePerkUI()
                 frame:SetAlpha(0)
                 frame:Hide()
             end
-            hideButton.text:SetText("Show")
+            hideButton.text:SetText(L["Show"])
             hideButton.text:SetTextColor(0.7, 0.7, 0.7)
             if _G.EbonholdAutoShowCheck then _G.EbonholdAutoShowCheck:Hide() end
             rerollButton:Hide()
@@ -2843,7 +3001,7 @@ local function InitializePerkUI()
             _lastBanishRem = nil
             UpdateFreezeButtons()
             UpdateBanishButtons()
-            hideButton.text:SetText("Hide")
+            hideButton.text:SetText(L["Hide"])
             hideButton.text:SetTextColor(0.7, 0.7, 0.7)
             if _G.EbonholdAutoShowCheck then _G.EbonholdAutoShowCheck:Show() end
             perkCardsGraceUntil = GetTime() + PERK_CARDS_GRACE_SEC
@@ -2933,7 +3091,7 @@ ShowPerkFamilyHint = function()
         hintText:SetJustifyV("TOP")
         hintText:SetSize(210, 0)
         hintText:SetPoint("TOPLEFT", perkFamilyHintFrame, "TOPLEFT", 18, -36)
-        hintText:SetText("Picking an echo from a family boosts chances of more from that same family.")
+        hintText:SetText(L["Picking an echo from a family boosts chances of more from that same family."])
         perkFamilyHintFrame.hintText = hintText
     end
 
@@ -3047,9 +3205,9 @@ function GetMemoryDeckCard(i)
     f:SetScript("OnEnter", function(self)
         swirl:SetVertexColor(0.7, 0.8, 1, 0.7)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Hidden echo", 1, 1, 1)
-        GameTooltip:AddLine("Click to draw 3 random echoes and pick one.", 1, 1, 1, true)
-        GameTooltip:AddLine("|cffff6060You lose the souvenir until you finish the build again.|r", 1, 1, 1, true)
+        GameTooltip:SetText(L["Hidden echo"], 1, 1, 1)
+        GameTooltip:AddLine(L["Click to draw 3 random echoes and pick one."], 1, 1, 1, true)
+        GameTooltip:AddLine(L["|cffff6060You lose the souvenir until you finish the build again.|r"], 1, 1, 1, true)
         GameTooltip:Show()
     end)
     f:SetScript("OnLeave", function()
@@ -3191,16 +3349,16 @@ end
 function SouvenirOnTableName()
     for _, f in ipairs(perkFramePool) do
         if f.inUse and f._perkData and f._perkData.isGuaranteed then
-            return GetSpellInfo(f._spellId or 0) or "your souvenir"
+            return GetSpellInfo(f._spellId or 0) or L["your souvenir"]
         end
     end
-    return "your souvenir"
+    return L["your souvenir"]
 end
 
 -- The spec choice holds for the whole run: confirm it. data = { frame, spellId }; a card
 -- rerolled while the popup was open is not selected.
 StaticPopupDialogs["PROJECTEBONHOLD_SPEC_CONFIRM"] = {
-    text = "You are choosing your |cffffd100echo specialization|r.\n\nPick |cffffd100%s|r with |cffffd100%s|r?\n\nThen, every 10 levels, you will be offered three echoes of this specialization. Your talents are not changed.\n\nThis cannot be changed until you accept death.",
+    text = L["You are choosing your |cffffd100echo specialization|r.\n\nPick |cffffd100%s|r with |cffffd100%s|r?\n\nThen, every 10 levels, you will be offered three echoes of this specialization. Your talents are not changed.\n\nThis cannot be changed until you accept death."],
     button1 = ACCEPT,
     button2 = CANCEL,
     -- The popup's own background lets the gold banner and rays show through: dim the whole
@@ -3235,7 +3393,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_SPEC_CONFIRM"] = {
 -- Clicking a face-down card asks before revealing: the player has to know the
 -- souvenir is the price.
 StaticPopupDialogs["PROJECTEBONHOLD_MEMORY_DRAW"] = {
-    text = "Reveal the three random echoes?\n\nYour souvenir |cffffd700%s|r is |cffff6060lost for this climb|r: it only comes back once this build is finished again.\n\nYou will then pick one of the three revealed echoes.",
+    text = L["Reveal the three random echoes?\n\nYour souvenir |cffffd700%s|r is |cffff6060lost for this climb|r: it only comes back once this build is finished again.\n\nYou will then pick one of the three revealed echoes."],
     button1 = YES,
     button2 = NO,
     OnAccept = function() RequestMemoryDraw() end,
@@ -3282,8 +3440,7 @@ function LayoutMemoryStage(choices)
     end
 
     -- Always visible, no hover needed: what the fourth card is and what the choice costs
-    memoryHint:SetText("Souvenir from your previous build" ..
-        "\n|cffffffffTake it, or give it up to draw 3 random echoes.|r")
+    memoryHint:SetText(L["Souvenir from your previous build\n|cffffffffTake it, or give it up to draw 3 random echoes.|r"])
 end
 
 function ShowMemoryStageWidgets(shown)
@@ -3406,7 +3563,7 @@ local function ShowPerkUI(choices, isRerollRepopulate)
         UpdateFreezeButtons()
         ApplyRankGlows()
 
-        hideButton.text:SetText("Show")
+        hideButton.text:SetText(L["Show"])
         hideButton.text:SetTextColor(0.7, 0.7, 0.7)
         perkMainFrame.perksHidden = true
 
@@ -3414,10 +3571,10 @@ local function ShowPerkUI(choices, isRerollRepopulate)
         local specDraw = GetSpecDraw()
         if chooseButton.text then
             if specDraw then
-                chooseButton.text:SetText(specDraw.chosen == 0 and "Choose Echo Spec" or "Specialization Echoes")
+                chooseButton.text:SetText(specDraw.chosen == 0 and L["Choose Echo Spec"] or L["Specialization Echoes"])
                 chooseButton.text:SetTextColor(unpack(SPEC_GOLD))
             else
-                chooseButton.text:SetText("Select an Echo")
+                chooseButton.text:SetText(L["Select an Echo"])
                 chooseButton.text:SetTextColor(IsTransparentDesign() and 0.9 or 1, IsTransparentDesign() and 0.9 or 1, IsTransparentDesign() and 0.9 or 1)
             end
         end

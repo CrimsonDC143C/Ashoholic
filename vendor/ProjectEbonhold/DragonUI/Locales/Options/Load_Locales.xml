@@ -1,0 +1,9 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- Ashendor: the strings of the (removed) options panel, kept because the Edit Mode's
+	     settings beside each frame (core\editor_settings.lua) read them through addon.LO. -->
+	<Script file="enUS.lua"/>
+	<Script file="esES.lua"/>
+	<Script file="deDE.lua"/>
+	<Script file="frFR.lua"/>
+	<Script file="options_locale.lua"/>
+</Ui>

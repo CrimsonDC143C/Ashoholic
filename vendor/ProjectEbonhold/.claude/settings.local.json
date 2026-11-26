@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -nE \"SetGradient|WHITE8X8|ASSETS =|ROW_ICON_PITCH|MAX_ROW_ICONS|ROW_HEIGHT|ICONS_PER_LINE|SetColorTexture|SetTexture\\\\\\(\\\\\"Interface\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\Buttons\" modules/perks/echo_journal.lua)",
+      "Bash(cd c:/Updater/ebonhold-addon && grep -n \"REQUEST_RETRIEVE_VOID_STORAGE_ITEM\\\\|REQUEST_SET_USING_VOID_STORAGE\\\\|REQUEST_RETRIEVE_ITEMS_FROM_TAB\\\\|REQUEST_STORE\" ProjectEbonhold/projectebonhold.lua)",
+      "Read(//c/Updater/ebonhold-addon/**)"
+    ]
+  }
+}

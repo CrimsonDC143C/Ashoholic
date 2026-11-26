@@ -140,3 +140,9 @@ SlashCmdList["PECOLLECTIONS"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[Collections]|r shell not loaded.")
     end
 end
+
+-- The list scroll bars are DragonUI's (utils.UseDragonScrollBar), in the column the trim bars of
+-- the XML used: 20 px above the list, 11 px (8 for the sets) above its bottom.
+utils.UseDragonScrollBar(_G.MountJournalListScrollFrame, nil, -27, 14, 4)
+utils.UseDragonScrollBar(_G.PetJournalListScrollFrame, nil, -27, 14, 4)
+utils.UseDragonScrollBar(_G.WardrobeCollectionFrameSetsCollectionFrameScrollFrame, nil, -27, 14, 1)

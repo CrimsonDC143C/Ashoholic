@@ -1,17 +1,18 @@
 local addonName, addon = ...
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 
 -- ── The Toolbelt UI ──────────────────────────────────────────────────────────
 -- A micro button on the Blizzard bar (slot owned by skillTreeMicroButton.lua's
 -- getCoreMicroButtons) opening a menu upward: Waystones on top, then Bank,
 -- Guild Bank, Mailbox, Auction House, Call Board, Portable Affix-Anvil, Portable
--- Forge, Vendor and Scavenger's Eye. Each entry is a panel, except the six that open
--- a window right away and the Forge, which sets one up. Locked entries stay
--- visible, greyed, with a lock.
+-- Forge, Vendor and Scavenger's Eye. Waystones opens a submenu of the ten shortcuts;
+-- the Vendor (right-click) and the Eye open a panel; the six others open a window
+-- right away and the Forge sets one up. Locked entries stay visible, greyed, with a lock.
 --
--- The client's own look throughout: the menu is a dropdown list (dark dialog box,
--- quest-title highlight, closes itself once the mouse has left it), the panels are
--- the professions window's portrait frame and marble inset (ezCollections templates,
--- as talent_frame.lua and contracts.lua build them). Those templates load after this
+-- The menu and its submenu wear the stock Blizzard dropdown look (see the menu section),
+-- closing themselves once the mouse has left them. The panels are the professions
+-- window's portrait frame and marble inset (ezCollections templates, as
+-- talent_frame.lua and contracts.lua build them). Those templates load after this
 -- file, so each panel builds its chrome and its content on first show.
 
 local Service = ProjectEbonhold.ToolbeltService
@@ -23,7 +24,7 @@ local RULE = { 0.72, 0.58, 0.25 }
 local QUALITY_COLOR = {
     [0] = "|cff9d9d9d", [1] = "|cffffffff", [2] = "|cff1eff00", [3] = "|cff0070dd", [4] = "|cffa335ee", [5] = "|cffff8000",
 }
-local QUALITY_NAME = { [0] = "Poor", [1] = "Common", [2] = "Uncommon", [3] = "Rare", [4] = "Epic", [5] = "Legendary" }
+local QUALITY_NAME = { [0] = L["Poor"], [1] = L["Common"], [2] = L["Uncommon"], [3] = L["Rare"], [4] = L["Epic"], [5] = L["Legendary"] }
 
 local ICON_WAYSTONES = "Interface\\Icons\\Spell_Arcane_PortalDalaran"
 local ICON_VENDOR    = "Interface\\Icons\\INV_Misc_Coin_02"
@@ -285,9 +286,8 @@ local function TogglePanel(panel)
     if panel:IsShown() then panel:Hide() else panel:Show() end
 end
 
--- ── Waystones panel ──────────────────────────────────────────────────────────
+-- ── Waystones (their submenu is built with the menu, below) ───────────────────
 local MAX_WAYSTONES = 10
-local WAY_ROW_H = 34
 
 local function FindCheckpoint(id)
     if not (ProjectEbonhold.CheckpointService and ProjectEbonhold.CheckpointService.GetCheckpoints) then return nil end
@@ -297,9 +297,9 @@ local function FindCheckpoint(id)
 end
 
 local function CheckpointKindText(cp)
-    if cp and cp.kind == "MEETINGSTONE" then return "Dungeon" end
-    if cp and cp.kind == "MEETINGSTONE_RAID" then return "Raid" end
-    return "Town"
+    if cp and cp.kind == "MEETINGSTONE" then return L["Dungeon"] end
+    if cp and cp.kind == "MEETINGSTONE_RAID" then return L["Raid"] end
+    return L["Town"]
 end
 
 local function CheckpointIcon(cp)
@@ -358,10 +358,10 @@ end
 -- waystone is not in the checkpoint list yet, so a slow list never renames a button.
 local function WaystoneMacroLook(slot)
     local id = Service.GetState().waystones[slot]
-    if not id then return "Shortcut " .. (slot + 1), EMPTY_ICON end
+    if not id then return T("Shortcut {n}", { n = slot + 1 }), EMPTY_ICON end
     local cp = FindCheckpoint(id)
     if not cp then return nil end
-    return string.sub(cp.name or ("Waystone " .. (slot + 1)), 1, 16), CheckpointIcon(cp)
+    return string.sub(cp.name or T("Waystone {n}", { n = slot + 1 }), 1, 16), CheckpointIcon(cp)
 end
 
 local function SyncWaystoneMacros()
@@ -397,7 +397,7 @@ end
 -- Puts the slot's macro on the cursor, making it first if needed.
 local function PickupWaystoneMacro(slot)
     if InCombatLockdown() then
-        ChatMessage("You cannot make an action bar button in combat.")
+        ChatMessage(L["You cannot make an action bar button in combat."])
         return
     end
     if not WaystoneMacros()[slot] then
@@ -406,11 +406,11 @@ local function PickupWaystoneMacro(slot)
         if numCharacter < MAX_CHARACTER then
             perCharacter = 1
         elseif numAccount >= MAX_ACCOUNT then
-            ChatMessage("Your macro list is full. Delete a macro to place this waystone on an action bar.")
+            ChatMessage(L["Your macro list is full. Delete a macro to place this waystone on an action bar."])
             return
         end
         local name, icon = WaystoneMacroLook(slot)
-        CreateMacro(name or ("Waystone " .. (slot + 1)), MacroIcon(icon or ICON_WAYSTONES), string.format(MACRO_BODY, slot + 1), perCharacter)
+        CreateMacro(name or T("Waystone {n}", { n = slot + 1 }), MacroIcon(icon or ICON_WAYSTONES), string.format(MACRO_BODY, slot + 1), perCharacter)
     end
     SyncWaystoneMacros()
     local index = WaystoneMacros()[slot]
@@ -429,17 +429,17 @@ SLASH_EBONHOLDWAYSTONE1 = "/waystone"
 SlashCmdList["EBONHOLDWAYSTONE"] = function(msg)
     local n = tonumber(string.match(msg or "", "(%d+)"))
     if not n or n < 1 or n > MAX_WAYSTONES then
-        ChatMessage("Usage: /waystone 1-" .. MAX_WAYSTONES .. " (a shortcut of the Toolbelt's Waystones).")
+        ChatMessage(T("Usage: /waystone 1-{max} (a shortcut of the Toolbelt's Waystones).", { max = MAX_WAYSTONES }))
         return
     end
     local state = Service.GetState()
     if not state.received then
         Service.Request()
-        ChatMessage("The Toolbelt is still loading. Try again in a moment.")
+        ChatMessage(L["The Toolbelt is still loading. Try again in a moment."])
         return
     end
     if not state.waystones[n - 1] then
-        ChatMessage("Shortcut " .. n .. " is empty. Choose a waystone for it in the Toolbelt.")
+        ChatMessage(T("Shortcut {n} is empty. Choose a waystone for it in the Toolbelt.", { n = n }))
         return
     end
     Service.UseWaystone(n - 1)
@@ -460,15 +460,15 @@ local function RefreshWaystones()
             local cp = FindCheckpoint(id)
             row.icon:SetTexture(CheckpointIcon(cp))
             row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-            row.name:SetText(cp and cp.name or ("Checkpoint #" .. id))
+            row.name:SetText(cp and L[cp.name] or T("Checkpoint #{id}", { id = id }))
             row.name:SetFontObject(GameFontNormal)
             row.sub:SetText(CheckpointKindText(cp))
         else
             row.icon:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
             row.icon:SetTexCoord(0, 1, 0, 1)
-            row.name:SetText("Empty slot")
+            row.name:SetText(L["Empty slot"])
             row.name:SetFontObject(GameFontDisable)
-            row.sub:SetText("Click to choose a waystone.")
+            row.sub:SetText("+")
         end
         if Picker and Picker:IsShown() and Picker.slot == slot then row:LockHighlight() else row:UnlockHighlight() end
     end
@@ -503,7 +503,7 @@ local function RefreshPicker()
             row.id = cp.id
             row.icon:SetTexture(CheckpointIcon(cp))
             row.icon:Show()
-            row.name:SetText(cp.name)
+            row.name:SetText(L[cp.name])   -- display only; sorted and filtered on the English
             row.name:SetFontObject(GameFontHighlight)
             row.sub:SetText(CheckpointKindText(cp))
             row:Enable()
@@ -517,7 +517,7 @@ local function RefreshPicker()
         local row = Picker.rows[1]
         row.id = nil
         row.icon:Hide()
-        row.name:SetText("No discovered waystone matches.")
+        row.name:SetText(L["No discovered waystone matches."])
         row.name:SetFontObject(GameFontDisable)
         row.sub:SetText("")
         row:Disable()
@@ -526,11 +526,12 @@ local function RefreshPicker()
 end
 
 -- The waystone picker: every waystone this account discovered, with a search box. A
--- dialog box (dark parchment, 32 px border, banner header) beside the panel.
-local function BuildPicker(panel)
-    Picker = CreateFrame("Frame", "ProjectEbonholdWaystonePicker", panel)
+-- dialog box (dark parchment, 32 px border, banner header) left of the waystone submenu.
+local function BuildPicker(anchor)
+    Picker = CreateFrame("Frame", "ProjectEbonholdWaystonePicker", UIParent)
     Picker:SetSize(280, 400)
-    Picker:SetPoint("TOPLEFT", panel, "TOPRIGHT", 2, -24)
+    Picker:SetFrameStrata("DIALOG")
+    Picker:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMLEFT", -16, 0)
     Picker:SetClampedToScreen(true)
     Picker:EnableMouse(true)
     Picker:SetBackdrop(DIALOG_BACKDROP)
@@ -542,7 +543,8 @@ local function BuildPicker(panel)
     banner:SetPoint("TOP", 0, 12)
     local title = Picker:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", banner, "TOP", 0, -14)
-    title:SetText("Choose a Waystone")
+    title:SetText(L["Choose a Waystone"])
+    Picker.banner, Picker.title = banner, title
 
     Picker.slotText = Picker:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     Picker.slotText:SetPoint("TOP", 0, -30)
@@ -568,6 +570,7 @@ local function BuildPicker(panel)
     Picker.search = box
 
     Picker.scroll = CreateFrame("ScrollFrame", "ProjectEbonholdWaystonePickerScroll", Picker, "FauxScrollFrameTemplate")
+    utils.UseDragonScrollBar(Picker.scroll)  -- DragonUI's scroll bar (utils.lua)
     Picker.scroll:SetPoint("TOPLEFT", 14, -74)
     Picker.scroll:SetPoint("BOTTOMRIGHT", -36, 14)
     Picker.scroll:SetScript("OnVerticalScroll", function(self, offset)
@@ -608,7 +611,7 @@ end
 
 local function OpenPicker(slot)
     Picker.slot = slot
-    Picker.slotText:SetText("For shortcut " .. (slot + 1))
+    Picker.slotText:SetText(T("For shortcut {n}", { n = slot + 1 }))
     Picker.search:SetText("")
     if ProjectEbonhold.CheckpointService then ProjectEbonhold.CheckpointService.RequestCheckpoints() end
     RefreshPicker()
@@ -616,179 +619,87 @@ local function OpenPicker(slot)
     RefreshWaystones()
 end
 
-local function BuildWaystones(panel, c)
-    panel.count = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    panel.count:SetPoint("TOPRIGHT", -14, -30)
-
-    panel.rows = {}
-    for slot = 0, MAX_WAYSTONES - 1 do
-        local row = CreateFrame("Button", "ProjectEbonholdWaystoneRow" .. slot, c)
-        row:SetSize(312, WAY_ROW_H)
-        row:SetPoint("TOPLEFT", 10, -65 - slot * WAY_ROW_H)
-        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        row:RegisterForDrag("LeftButton")
-        row.slot = slot
-
-        -- striped like the character sheet's stat lines
-        if slot % 2 == 0 then
-            local stripe = row:CreateTexture(nil, "BACKGROUND")
-            stripe:SetAllPoints()
-            stripe:SetTexture(1, 1, 1, 0.05)
-        end
-
-        row.icon = row:CreateTexture(nil, "ARTWORK")
-        row.icon:SetSize(28, 28)
-        row.icon:SetPoint("LEFT", 4, 0)
-
-        row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        row.name:SetPoint("TOPLEFT", 40, -4)
-        row.name:SetPoint("TOPRIGHT", -28, -4)
-        row.name:SetHeight(14)
-        row.name:SetJustifyH("LEFT")
-
-        row.sub = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        row.sub:SetPoint("TOPLEFT", 40, -19)
-        row.sub:SetTextColor(unpack(GREY))
-
-        row.num = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-        row.num:SetPoint("RIGHT", -8, 0)
-        row.num:SetText(tostring(slot + 1))
-
-        row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-
-        row:SetScript("OnClick", function(self, button)
-            -- a drag released back over the row: not a click
-            if GetCursorInfo() then return end
-            local id = Service.GetState().waystones[self.slot]
-            if button == "RightButton" then
-                if id then
-                    PlaySound("igMainMenuOptionCheckBoxOff")
-                    Service.ClearWaystone(self.slot)
-                end
-                return
-            end
-            if id then
-                Service.UseWaystone(self.slot)
-                panel:Hide()
-            else
-                OpenPicker(self.slot)
-            end
-        end)
-        -- onto an action bar: the slot's "/waystone N" macro (see Waystone macros above)
-        row:SetScript("OnDragStart", function(self)
-            if Service.GetState().waystones[self.slot] then PickupWaystoneMacro(self.slot) end
-        end)
-        row:SetScript("OnEnter", function(self)
-            local id = Service.GetState().waystones[self.slot]
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            if id then
-                local cp = FindCheckpoint(id)
-                GameTooltip:SetText(cp and cp.name or ("Checkpoint #" .. id), 1, 1, 1)
-                GameTooltip:AddLine(CheckpointKindText(cp), nil, nil, nil)
-                GameTooltip:AddLine("Click to travel there.", 0.1, 1, 0.1)
-                GameTooltip:AddLine("Right-click to free this slot.", 0.1, 1, 0.1)
-                GameTooltip:AddLine("Drag onto an action bar to make a button.", 0.1, 1, 0.1)
-                GameTooltip:AddLine("Not in combat, not in flight.", GREY[1], GREY[2], GREY[3])
-            else
-                GameTooltip:SetText("Shortcut " .. (self.slot + 1), 1, 1, 1)
-                GameTooltip:AddLine("Click to choose one of the waystones you discovered.", 0.1, 1, 0.1, true)
-            end
-            GameTooltip:Show()
-        end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        panel.rows[slot] = row
-    end
-
-    BuildPicker(panel)
-end
-
-Waystones = MakePanel({
-    name = "ProjectEbonholdWaystonesPanel",
-    title = "Waystones",
-    icon = ICON_WAYSTONES,
-    height = 414,
-    subtitle = "Click to travel. Right-click to free a slot.",
-    subtitleRight = -60,
-    build = BuildWaystones,
-    refresh = RefreshWaystones,
-    onHide = function() if Picker then Picker:Hide() end end,
-})
-
 -- ── Vendor panel ─────────────────────────────────────────────────────────────
 local Peddler
 
 local weapon, armor, _, consumable, glyph, tradeGoods, _, _, recipe, gem, misc = GetAuctionItemClasses()
 
 local SELL_QUALITIES = {
-    { key = "sellQualityPoor",     label = QUALITY_COLOR[0] .. "Poor|r",     tip = "All poor quality (junk) items, whatever their type." },
-    { key = "sellQualityCommon",   label = QUALITY_COLOR[1] .. "Common|r",   tip = "Common items whose type is also ticked." },
-    { key = "sellQualityUncommon", label = QUALITY_COLOR[2] .. "Uncommon|r", tip = "Uncommon items whose type is also ticked." },
-    { key = "sellQualityRare",     label = QUALITY_COLOR[3] .. "Rare|r",     tip = "Rare items whose type is also ticked." },
+    { key = "sellQualityPoor",     label = QUALITY_COLOR[0] .. L["Poor"] .. "|r",     tip = L["All poor quality (junk) items, whatever their type."] },
+    { key = "sellQualityCommon",   label = QUALITY_COLOR[1] .. L["Common"] .. "|r",   tip = L["Common items whose type is also ticked."] },
+    { key = "sellQualityUncommon", label = QUALITY_COLOR[2] .. L["Uncommon"] .. "|r", tip = L["Uncommon items whose type is also ticked."] },
+    { key = "sellQualityRare",     label = QUALITY_COLOR[3] .. L["Rare"] .. "|r",     tip = L["Rare items whose type is also ticked."] },
 }
 
 local SELL_TYPES = {
-    { key = "sellTypeWeapon",     label = weapon or "Weapon" },
-    { key = "sellTypeArmor",      label = armor or "Armor" },
-    { key = "sellTypeConsumable", label = consumable or "Consumable" },
-    { key = "sellTypeTradeGoods", label = tradeGoods or "Trade Goods" },
-    { key = "sellTypeRecipe",     label = recipe or "Recipe" },
-    { key = "sellTypeGem",        label = gem or "Gem" },
-    { key = "sellTypeGlyph",      label = glyph or "Glyph" },
-    { key = "sellTypeMisc",       label = misc or "Miscellaneous" },
+    { key = "sellTypeWeapon",     label = weapon or L["Weapon"] },
+    { key = "sellTypeArmor",      label = armor or L["Armor"] },
+    { key = "sellTypeConsumable", label = consumable or L["Consumable"] },
+    { key = "sellTypeTradeGoods", label = tradeGoods or L["Trade Goods"] },
+    { key = "sellTypeRecipe",     label = recipe or L["Recipe"] },
+    { key = "sellTypeGem",        label = gem or L["Gem"] },
+    { key = "sellTypeGlyph",      label = glyph or L["Glyph"] },
+    { key = "sellTypeMisc",       label = misc or L["Miscellaneous"] },
 }
 
 local function BuildPeddler(panel, c)
     local function Sell() if Service.Sell() then PlaySound("LOOTWINDOWCOINSOUND") end end
     local function Repair() PlaySound("ITEM_REPAIR"); Service.Repair() end
 
-    panel.sell = SlotButton(c, "ProjectEbonholdPeddlerSell", "Interface\\Icons\\INV_Misc_Coin_01", 16, -70, "Sell", Sell,
-        "Sell", "Sells everything matching the rules below. Nothing to open, no vendor needed. Sold items sit in any vendor's buyback tab.")
-    panel.repair = SlotButton(c, "ProjectEbonholdPeddlerRepair", "Interface\\Icons\\Trade_BlackSmithing", 174, -70, "Repair", Repair,
-        "Repair", "Repairs everything you carry at full price.")
+    panel.sell = SlotButton(c, "ProjectEbonholdPeddlerSell", "Interface\\Icons\\INV_Misc_Coin_01", 16, -70, L["Sell"], Sell,
+        L["Sell"], L["Sells everything matching the rules below. Nothing to open, no vendor needed. Sold items sit in any vendor's buyback tab."])
+    panel.repair = SlotButton(c, "ProjectEbonholdPeddlerRepair", "Interface\\Icons\\Trade_BlackSmithing", 174, -70, L["Repair"], Repair,
+        L["Repair"], L["Repairs everything you carry at full price."])
 
-    SectionHeader(c, "Automatic", -120)
-    panel.autoSell = MakeCheck(c, "ProjectEbonholdPeddlerAutoSell", "Sell when combat ends", 12, -142,
+    SectionHeader(c, L["Automatic"], -120)
+    -- the merchant window, with no creature: for what the rules never sell (epics...)
+    panel.merchant = SlotButton(c, "ProjectEbonholdPeddlerMerchant", "Interface\\Icons\\INV_Misc_Bag_10", 174, -138, L["Merchant"],
+        function() Service.OpenMerchant() end,
+        L["Merchant"], L["Opens a merchant window right here. Buy trade goods, sell any item by hand, buy back, repair."])
+    panel.merchant.line1:SetText(L["Buy, sell any item,"])
+    panel.merchant.line2:SetText(L["buyback"])
+    panel.autoSell = MakeCheck(c, "ProjectEbonholdPeddlerAutoSell", L["Sell when combat ends"], 12, -142,
         function(checked) SetSetting("vendorAutoSell", checked) end,
-        "Automatic sale", "Each time you leave combat, everything matching the rules below is sold.")
-    panel.autoRepair = MakeCheck(c, "ProjectEbonholdPeddlerAutoRepair", "Repair when combat ends", 12, -164,
+        L["Automatic sale"], L["Each time you leave combat, everything matching the rules below is sold."])
+    panel.autoRepair = MakeCheck(c, "ProjectEbonholdPeddlerAutoRepair", L["Repair when combat ends"], 12, -164,
         function(checked) SetSetting("vendorAutoRepair", checked) end,
-        "Automatic repair", "Each time you leave combat, your gear is repaired if it took damage.")
+        L["Automatic repair"], L["Each time you leave combat, your gear is repaired if it took damage."])
 
-    SectionHeader(c, "What Gets Sold", -196)
+    SectionHeader(c, L["What Gets Sold"], -196)
     panel.qualityChecks = {}
     for i, q in ipairs(SELL_QUALITIES) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         panel.qualityChecks[q.key] = MakeCheck(c, "ProjectEbonholdPeddlerQuality" .. i, q.label, 12 + col * 158, -218 - row * 22,
-            function(checked) SetSetting(q.key, checked); panel.Refresh() end, "Sell " .. q.label, q.tip)
+            function(checked) SetSetting(q.key, checked); panel.Refresh() end, T("Sell {label}", { label = q.label }), q.tip)
     end
     panel.typeChecks = {}
     for i, t in ipairs(SELL_TYPES) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         panel.typeChecks[t.key] = MakeCheck(c, "ProjectEbonholdPeddlerType" .. i, t.label, 12 + col * 158, -268 - row * 22,
             function(checked) SetSetting(t.key, checked); panel.Refresh() end,
-            "Sell " .. t.label, "Items of this type are sold when their quality is ticked above.")
+            T("Sell {label}", { label = t.label }), L["Items of this type are sold when their quality is ticked above."])
     end
 
-    Note(c, "Alt-click a bag item to always sell it, or never. Epic and better is never sold.", -364)
+    Note(c, L["Alt-click a bag item to always sell it, or never. Epics: sell them by hand to the Merchant."], -364)
 
     -- the button bar: your money on the left, the two actions against the right edge
     local ok, money = pcall(CreateFrame, "Frame", "ProjectEbonholdPeddlerMoney", c, "SmallMoneyFrameTemplate")
     if ok and money then
         money:SetPoint("BOTTOMLEFT", c, "BOTTOMLEFT", 14, 9)
     end
-    panel.repairButton = BarButton(c, "ProjectEbonholdPeddlerRepairButton", "Repair", 90, Repair)
+    panel.repairButton = BarButton(c, "ProjectEbonholdPeddlerRepairButton", L["Repair"], 90, Repair)
     panel.repairButton:SetPoint("BOTTOMRIGHT", c, "BOTTOMRIGHT", -6, 4)
-    panel.sellButton = BarButton(c, "ProjectEbonholdPeddlerSellButton", "Sell", 90, Sell)
+    panel.sellButton = BarButton(c, "ProjectEbonholdPeddlerSellButton", L["Sell"], 90, Sell)
     panel.sellButton:SetPoint("RIGHT", panel.repairButton, "LEFT", 0, 0)
 end
 
 local function RefreshPeddler()
     local state = Service.GetState()
     local count, value = Service.GetSellPreview()
-    Peddler.sell.line1:SetText(string.format("%d item%s", count, count == 1 and "" or "s"))
+    Peddler.sell.line1:SetText(T("{count} item{s}", { count = count, s = (count == 1 and "" or "s") }))
     Peddler.sell.line2:SetText(Money(value))
     local pct = Service.GetDurabilityPct()
-    Peddler.repair.line1:SetText("Durability " .. (pct and (pct .. "%") or "n/a"))
+    Peddler.repair.line1:SetText(T("Durability {pct}", { pct = pct and (pct .. "%") or L["n/a"] }))
     Peddler.repair.line2:SetText(Money(state.repairCost))
 
     if count > 0 then Peddler.sellButton:Enable() else Peddler.sellButton:Disable() end
@@ -802,11 +713,11 @@ end
 
 Peddler = MakePanel({
     name = "ProjectEbonholdPeddlerPanel",
-    title = "Vendor",
+    title = L["Vendor"],
     icon = ICON_VENDOR,
     height = 424,
     buttonBar = true,
-    subtitle = "Sell your loot and repair your gear from anywhere.",
+    subtitle = L["Sell your loot and repair your gear from anywhere."],
     build = BuildPeddler,
     refresh = RefreshPeddler,
 })
@@ -829,32 +740,32 @@ local Eye
 -- ITEM_CLASS ids (3.3.5): Consumable 0, Container 1, Weapon 2, Gem 3, Armor 4, Reagent 5,
 -- Projectile 6, Trade Goods 7, Recipe 9, Quiver 11, Miscellaneous 15, Glyph 16.
 local LOOT_TYPES = {
-    { class = 2,  label = weapon or "Weapon" },
-    { class = 4,  label = armor or "Armor" },
-    { class = 0,  label = consumable or "Consumable" },
-    { class = 7,  label = tradeGoods or "Trade Goods" },
-    { class = 3,  label = gem or "Gem" },
-    { class = 9,  label = recipe or "Recipe" },
-    { class = 16, label = glyph or "Glyph" },
-    { class = 1,  label = "Container" },
-    { class = 6,  label = "Projectile" },
-    { class = 11, label = "Quiver" },
-    { class = 5,  label = "Reagent" },
-    { class = 15, label = misc or "Miscellaneous" },
+    { class = 2,  label = weapon or L["Weapon"] },
+    { class = 4,  label = armor or L["Armor"] },
+    { class = 0,  label = consumable or L["Consumable"] },
+    { class = 7,  label = tradeGoods or L["Trade Goods"] },
+    { class = 3,  label = gem or L["Gem"] },
+    { class = 9,  label = recipe or L["Recipe"] },
+    { class = 16, label = glyph or L["Glyph"] },
+    { class = 1,  label = L["Container"] },
+    { class = 6,  label = L["Projectile"] },
+    { class = 11, label = L["Quiver"] },
+    { class = 5,  label = L["Reagent"] },
+    { class = 15, label = misc or L["Miscellaneous"] },
 }
 
 local function BuildEye(panel, c)
-    panel.master = MakeCheck(c, "ProjectEbonholdEyeMasterCheck", "Enable remote looting", 12, -68,
+    panel.master = MakeCheck(c, "ProjectEbonholdEyeMasterCheck", L["Enable remote looting"], 12, -68,
         function(checked) Service.SetLoot({ on = checked }) end,
-        "Remote looting", "The loot of everything that dies near you is picked up for you, filtered by the rules below.")
+        L["Remote looting"], L["The loot of everything that dies near you is picked up for you, filtered by the rules below."])
     panel.master.text:SetFontObject(GameFontNormal)
 
-    SectionHeader(c, "What Gets Picked Up", -98)
+    SectionHeader(c, L["What Gets Picked Up"], -98)
     local minQLabel = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     minQLabel:SetPoint("TOPLEFT", 16, -128)
-    minQLabel:SetText("Minimum quality")
+    minQLabel:SetText(L["Minimum quality"])
     panel.qualityDropDown = MakeDropDown(c, "ProjectEbonholdEyeQualityDropDown", 136, -118, 120,
-        "Minimum quality", "Items below this quality stay on the corpse. Quest items are always picked up.")
+        L["Minimum quality"], L["Items below this quality stay on the corpse. Quest items are always picked up."])
     UIDropDownMenu_Initialize(panel.qualityDropDown, function(self)
         QualityItems(self, 0, 4, Service.GetState().loot.minQuality, function(q) Service.SetLoot({ minQuality = q }) end)
     end)
@@ -864,24 +775,24 @@ local function BuildEye(panel, c)
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         panel.typeChecks[t.class] = MakeCheck(c, "ProjectEbonholdEyeType" .. i, t.label, 12 + col * 158, -152 - row * 22,
             function() Service.SetLoot({ classMask = ToggleBit(Service.GetState().loot.classMask, t.class) }) end,
-            "Pick up " .. t.label, "Untick to leave this type on the corpse for manual looting.")
+            T("Pick up {label}", { label = t.label }), L["Untick to leave this type on the corpse for manual looting."])
     end
-    Note(c, "Quest items and gold are always picked up.", -288)
+    Note(c, L["Quest items and gold are always picked up."], -288)
 
-    SectionHeader(c, "Destroy on Pickup", -312)
-    panel.destroy = MakeCheck(c, "ProjectEbonholdEyeDestroy", "Destroy junk instead of keeping it", 12, -334,
+    SectionHeader(c, L["Destroy on Pickup"], -312)
+    panel.destroy = MakeCheck(c, "ProjectEbonholdEyeDestroy", L["Destroy junk instead of keeping it"], 12, -334,
         function(checked) Service.SetLoot({ destroy = checked }) end,
-        "Destroy on pickup", "Matching drops are removed from the corpse without ever entering your bags. Never quest items, bind-on-pickup items or items that cannot be destroyed.")
+        L["Destroy on pickup"], L["Matching drops are removed from the corpse without ever entering your bags. Never quest items, bind-on-pickup items or items that cannot be destroyed."])
     panel.destroyLabel = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     panel.destroyLabel:SetPoint("TOPLEFT", 16, -368)
-    panel.destroyLabel:SetText("Up to quality")
+    panel.destroyLabel:SetText(L["Up to quality"])
     panel.destroyDropDown = MakeDropDown(c, "ProjectEbonholdEyeDestroyDropDown", 136, -358, 120,
-        "Destroy up to", "Drops of this quality or lower are destroyed.")
+        L["Destroy up to"], L["Drops of this quality or lower are destroyed."])
     UIDropDownMenu_Initialize(panel.destroyDropDown, function(self)
         QualityItems(self, 0, 1, Service.GetState().loot.destroyMaxQuality, function(q) Service.SetLoot({ destroyMaxQuality = q }) end)
     end)
 
-    Note(c, "In a group, only loot that is yours is picked up. Master loot is left to the loot window.", -398)
+    Note(c, L["In a group, only loot that is yours is picked up. Master loot is left to the loot window."], -398)
 end
 
 local function RefreshEye()
@@ -902,40 +813,51 @@ end
 
 Eye = MakePanel({
     name = "ProjectEbonholdScavengersEyePanel",
-    title = "Scavenger's Eye",
+    title = L["Scavenger's Eye"],
     icon = ICON_EYE,
     height = 440,
-    subtitle = "The loot of everything that dies near you, picked up for you.",
+    subtitle = L["The loot of everything that dies near you, picked up for you."],
     build = BuildEye,
     refresh = RefreshEye,
 })
 
 -- ── The menu (a dropdown list opening upward from the micro button) ──────────
-local MENU_W = 210
-local MENU_BORDER = 15   -- UIDROPDOWNMENU_BORDER_HEIGHT
-local ROW_H = 18
+-- Drawn as a stock Blizzard dropdown list (owner, 2026-11-16: back to Blizzard's original look,
+-- no more WoW Forever art): DropDownList's own backdrop below, gold section titles, the quest-log
+-- hover bar and the chat expand arrow. Hovering (or clicking) Waystones opens a submenu on the
+-- left with the ten shortcuts; the waystone picker opens left of it.
+local MENU_W = 240
+local MENU_BORDER = 12
+local ROW_H = 22
+local SUB_W = 270
+local SUB_ROW_H = 24
+
+-- the stock DropDownList backdrop (UIDropDownMenuTemplates.xml, its $parentBackdrop)
+local MENU_BACKDROP = {
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 9 },
+}
 
 local Menu = CreateFrame("Frame", "ProjectEbonholdToolbeltMenu", UIParent)
 Menu:SetSize(MENU_W, 10)
 Menu:SetFrameStrata("DIALOG")
 Menu:EnableMouse(true)
 Menu:SetClampedToScreen(true)
-Menu:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 32, edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 9 },
-})
+Menu:SetBackdrop(MENU_BACKDROP)
 Menu:Hide()
 tinsert(UISpecialFrames, "ProjectEbonholdToolbeltMenu")
 
 local menuRows = {}
+local menuHeaders = {}
 local y = -MENU_BORDER
 
 local function MenuHeader(text)
-    local fs = Menu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    fs:SetPoint("TOPLEFT", MENU_BORDER + 2, y - 3)
+    local fs = Menu:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("TOPLEFT", MENU_BORDER + 2, y - 4)
     fs:SetText(text)
+    menuHeaders[#menuHeaders + 1] = fs
     y = y - ROW_H
 end
 
@@ -943,17 +865,21 @@ local function MenuSpacer()
     y = y - 6
 end
 
-local function MenuRow(key, label, iconPath, onClick, tipText)
+local ShowWaystoneMenu, HideWaystoneMenu   -- the submenu, built below the rows
+
+-- opts.keepOpen: a click leaves the menu open (Waystones opens its submenu).
+local function MenuRow(key, label, iconPath, onClick, tipText, opts)
+    opts = opts or {}
     local row = CreateFrame("Button", "ProjectEbonholdToolbeltMenu" .. key, Menu)
     row:SetSize(MENU_W - 2 * MENU_BORDER, ROW_H)
     row:SetPoint("TOPLEFT", MENU_BORDER, y)
     row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetSize(16, 16)
+    row.icon:SetSize(18, 18)
     row.icon:SetPoint("LEFT", 2, 0)
     row.icon:SetTexture(iconPath)
     row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.label:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+    row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    row.label:SetPoint("LEFT", row.icon, "RIGHT", 7, 0)
     row.label:SetText(label)
     row.right = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.right:SetPoint("RIGHT", -2, 0)
@@ -970,84 +896,224 @@ local function MenuRow(key, label, iconPath, onClick, tipText)
     row.lock:SetTexCoord(0, 0.72, 0, 0.72)
     row.lock:Hide()
     row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnEnter", function(self)
+        if opts.submenu then ShowWaystoneMenu() else HideWaystoneMenu() end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(label, 1, 1, 1)
         if tipText then GameTooltip:AddLine(tipText, nil, nil, nil, true) end
-        if self.locked then GameTooltip:AddLine("Not unlocked on this character. Sold in the shop.", 1, 0.125, 0.125, true) end
+        if self.locked then GameTooltip:AddLine(L["Not unlocked on this character. Sold in the shop."], 1, 0.125, 0.125, true) end
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    row:SetScript("OnClick", function(self)
+    row:SetScript("OnClick", function(self, button)
         PlaySound("UChatScrollButton")
         if self.locked then
-            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. label .. " is not unlocked on this character. It is sold in the shop.")
+            DEFAULT_CHAT_FRAME:AddMessage(CHAT_PREFIX .. T("{label} is not unlocked on this character. It is sold in the shop.", { label = label }))
             return
         end
-        Menu:Hide()
-        onClick()
+        if not opts.keepOpen then Menu:Hide() end
+        onClick(button)
     end)
     menuRows[key] = row
     y = y - ROW_H
     return row
 end
 
-MenuHeader("Travel")
-MenuRow("Waystones", "Waystones", ICON_WAYSTONES, function()
-    TogglePanel(Waystones)
-end, "Ten shortcuts to waystones you already discovered. Click one to travel there.")
+MenuHeader(L["Travel"])
+MenuRow("Waystones", L["Waystones"], ICON_WAYSTONES, function()
+    if Waystones:IsShown() then HideWaystoneMenu() else ShowWaystoneMenu() end
+end, L["Ten shortcuts to waystones you already discovered. Click one to travel there."],
+    { keepOpen = true, submenu = true })
 MenuSpacer()
-MenuHeader("Conveniences")
-MenuRow("Vault", "Bank", "Interface\\MINIMAP\\TRACKING\\Banker", function()
+MenuHeader(L["Conveniences"])
+MenuRow("Vault", L["Bank"], "Interface\\MINIMAP\\TRACKING\\Banker", function()
     ClosePanels()
     Service.OpenBank()
-end, "Opens your personal bank right here, wherever you are.")
-MenuRow("GuildBank", "Guild Bank", "Interface\\Icons\\INV_Misc_Bag_EnchantedMageweave", function()
+end, L["Opens your personal bank right here, wherever you are."])
+MenuRow("GuildBank", L["Guild Bank"], "Interface\\Icons\\INV_Misc_Bag_EnchantedMageweave", function()
     ClosePanels()
     Service.OpenGuildBank()
-end, "Opens your guild's bank right here, wherever you are.")
-MenuRow("Mailbox", "Mailbox", "Interface\\Icons\\INV_Letter_15", function()
+end, L["Opens your guild's bank right here, wherever you are."])
+MenuRow("Mailbox", L["Mailbox"], "Interface\\Icons\\INV_Letter_15", function()
     ClosePanels()
     Service.OpenMailbox()
-end, "Opens your mailbox right here: read, take and send mail.")
-MenuRow("Auction", "Auction House", "Interface\\MINIMAP\\TRACKING\\Auctioneer", function()
+end, L["Opens your mailbox right here: read, take and send mail."])
+MenuRow("Auction", L["Auction House"], "Interface\\MINIMAP\\TRACKING\\Auctioneer", function()
     ClosePanels()
     Service.OpenAuctionHouse()
-end, "Opens the auction house right here: browse, bid and sell.")
-MenuRow("Callboard", "Hero's Call Board", "Interface\\Icons\\INV_Misc_Note_02", function()
+end, L["Opens the auction house right here: browse, bid and sell."])
+MenuRow("Callboard", L["Hero's Call Board"], "Interface\\Icons\\INV_Misc_Note_02", function()
     ClosePanels()
     -- callboard_ui.lua loads after this file: resolve it at click time.
     local board = ProjectEbonhold.CallboardUI
     if board then board.Show() end
-end, "Opens the Hero's Call Board right here: take contracts and claim their rewards.")
-MenuRow("AffixAnvil", "Portable Affix-Anvil", "Interface\\Icons\\Trade_Engraving", function()
+end, L["Opens the Hero's Call Board right here: take contracts and claim their rewards."])
+MenuRow("AffixAnvil", L["Portable Affix-Anvil"], "Interface\\Icons\\Trade_Engraving", function()
     ClosePanels()
     -- extraction.lua loads after this file: resolve it at click time.
     if ExtractionUI and ExtractionUI.Toggle then ExtractionUI.Toggle() end
-end, "Opens the Enchanted Anvil right here: extract affixes, engrave them and upgrade to Torment.")
-MenuRow("Forge", "Portable Forge", "Interface\\Icons\\Trade_BlackSmithing", function()
+end, L["Opens the Enchanted Anvil right here: extract affixes, engrave them and upgrade to Torment."])
+MenuRow("Forge", L["Portable Forge"], "Interface\\Icons\\Trade_BlackSmithing", function()
     ClosePanels()
     Service.PlaceForge()
-end, "Sets up a forge and an anvil beside you for five minutes. Opening Blacksmithing, Mining, Engineering or Jewelcrafting does it by itself.")
-MenuRow("Peddler", "Vendor", ICON_VENDOR, function()
-    TogglePanel(Peddler)
-end, "Sell your loot and repair your gear from anywhere, by hand or automatically when combat ends.")
-MenuRow("Eye", "Scavenger's Eye", ICON_EYE, function()
+end, L["Sets up a forge and an anvil beside you for five minutes. Opening Blacksmithing, Mining, Engineering or Jewelcrafting does it by itself."])
+-- Click: the merchant window opens right here (no creature). Right-click: the sell rules panel.
+MenuRow("Peddler", L["Vendor"], ICON_VENDOR, function(button)
+    if button == "RightButton" then
+        TogglePanel(Peddler)
+        return
+    end
+    ClosePanels()
+    Service.OpenMerchant()
+end, L["Click to open a merchant window right here: buy, sell, buy back, repair.|nRight-click for the automatic sell and repair rules."])
+MenuRow("Eye", L["Scavenger's Eye"], ICON_EYE, function()
     TogglePanel(Eye)
-end, "The loot of everything that dies near you is picked up for you. Filter what you keep.")
+end, L["The loot of everything that dies near you is picked up for you. Filter what you keep."])
 
 Menu:SetHeight(-y + MENU_BORDER - 3)
+
+-- the Waystones row opens a submenu: an arrow at its right, the count left of it
+local wayArrow = menuRows.Waystones:CreateTexture(nil, "OVERLAY")
+wayArrow:SetSize(14, 14)
+wayArrow:SetPoint("RIGHT", -2, 0)
+wayArrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+menuRows.Waystones.right:ClearAllPoints()
+menuRows.Waystones.right:SetPoint("RIGHT", wayArrow, "LEFT", -4, 0)
+
+-- ── The waystone submenu: the ten shortcuts ───────────────────────────────────
+Waystones = CreateFrame("Frame", "ProjectEbonholdToolbeltWaystones", Menu)
+Waystones:SetSize(SUB_W, 2 * MENU_BORDER + (MAX_WAYSTONES + 2) * SUB_ROW_H)
+Waystones:SetPoint("BOTTOMRIGHT", Menu, "BOTTOMLEFT", -16, 0)
+Waystones:SetClampedToScreen(true)
+Waystones:EnableMouse(true)
+Waystones:SetBackdrop(MENU_BACKDROP)
+Waystones:Hide()
+
+do
+    local title = Waystones:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", MENU_BORDER + 2, -MENU_BORDER - 4)
+    title:SetText(L["Waystones"])
+    Waystones.title = title
+    Waystones.count = Waystones:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    Waystones.count:SetPoint("TOPRIGHT", -MENU_BORDER - 2, -MENU_BORDER - 6)
+    Waystones.count:SetTextColor(unpack(GREY))
+    local hint = Waystones:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("BOTTOMLEFT", MENU_BORDER + 2, MENU_BORDER + 2)
+    hint:SetPoint("BOTTOMRIGHT", -MENU_BORDER - 2, MENU_BORDER + 2)
+    hint:SetJustifyH("LEFT")
+    hint:SetText(L["Click to travel. Right-click to free a slot."])
+end
+
+Waystones.rows = {}
+for slot = 0, MAX_WAYSTONES - 1 do
+    local row = CreateFrame("Button", "ProjectEbonholdWaystoneRow" .. slot, Waystones)
+    row:SetSize(SUB_W - 2 * MENU_BORDER, SUB_ROW_H)
+    row:SetPoint("TOPLEFT", MENU_BORDER, -MENU_BORDER - (slot + 1) * SUB_ROW_H)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row:RegisterForDrag("LeftButton")
+    row.slot = slot
+
+    row.num = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    row.num:SetPoint("LEFT", 2, 0)
+    row.num:SetWidth(16)
+    row.num:SetJustifyH("RIGHT")
+    row.num:SetText(tostring(slot + 1))
+
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(20, 20)
+    row.icon:SetPoint("LEFT", 24, 0)
+
+    row.sub = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.sub:SetPoint("RIGHT", -2, 0)
+    row.sub:SetJustifyH("RIGHT")
+    row.sub:SetTextColor(unpack(GREY))
+
+    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    row.name:SetPoint("LEFT", row.icon, "RIGHT", 7, 0)
+    row.name:SetPoint("RIGHT", row.sub, "LEFT", -6, 0)
+    row.name:SetJustifyH("LEFT")
+
+    row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+
+    row:SetScript("OnClick", function(self, button)
+        -- a drag released back over the row: not a click
+        if GetCursorInfo() then return end
+        local id = Service.GetState().waystones[self.slot]
+        if button == "RightButton" then
+            if id then
+                PlaySound("igMainMenuOptionCheckBoxOff")
+                Service.ClearWaystone(self.slot)
+            end
+            return
+        end
+        if id then
+            Service.UseWaystone(self.slot)
+            Menu:Hide()
+        else
+            OpenPicker(self.slot)
+        end
+    end)
+    -- onto an action bar: the slot's "/waystone N" macro (see Waystone macros above)
+    row:SetScript("OnDragStart", function(self)
+        if Service.GetState().waystones[self.slot] then PickupWaystoneMacro(self.slot) end
+    end)
+    row:SetScript("OnEnter", function(self)
+        local id = Service.GetState().waystones[self.slot]
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        if id then
+            local cp = FindCheckpoint(id)
+            GameTooltip:SetText(cp and L[cp.name] or T("Checkpoint #{id}", { id = id }), 1, 1, 1)
+            GameTooltip:AddLine(CheckpointKindText(cp), nil, nil, nil)
+            GameTooltip:AddLine(L["Click to travel there."], 0.1, 1, 0.1)
+            GameTooltip:AddLine(L["Right-click to free this slot."], 0.1, 1, 0.1)
+            GameTooltip:AddLine(L["Drag onto an action bar to make a button."], 0.1, 1, 0.1)
+            GameTooltip:AddLine(L["Not in combat, not in flight."], GREY[1], GREY[2], GREY[3])
+        else
+            GameTooltip:SetText(T("Shortcut {n}", { n = self.slot + 1 }), 1, 1, 1)
+            GameTooltip:AddLine(L["Click to choose one of the waystones you discovered."], 0.1, 1, 0.1, true)
+        end
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    Waystones.rows[slot] = row
+end
+
+BuildPicker(Waystones)
+
+Waystones.Refresh = function()
+    if Waystones:IsShown() then RefreshWaystones() end
+end
+Waystones:SetScript("OnShow", function()
+    if ProjectEbonhold.CheckpointService then ProjectEbonhold.CheckpointService.RequestCheckpoints() end
+    RefreshWaystones()
+    menuRows.Waystones:LockHighlight()
+end)
+Waystones:SetScript("OnHide", function()
+    menuRows.Waystones:UnlockHighlight()
+    if Picker then Picker:Hide() end
+end)
+
+function ShowWaystoneMenu()
+    if not Waystones:IsShown() then Waystones:Show() end
+end
+
+-- the picker open on the side keeps the submenu up (its rows are being chosen for)
+function HideWaystoneMenu()
+    if Picker and Picker:IsShown() then return end
+    Waystones:Hide()
+end
 
 local function SetRowLocked(row, locked)
     row.locked = locked
     if locked then
-        row.label:SetFontObject(GameFontDisableSmall)
+        row.label:SetFontObject(GameFontDisable)
         row.icon:SetDesaturated(true)
         row.icon:SetAlpha(0.6)
         row.lock:Show()
         row.dot:Hide()
     else
-        row.label:SetFontObject(GameFontHighlightSmall)
+        row.label:SetFontObject(GameFontHighlight)
         row.icon:SetDesaturated(false)
         row.icon:SetAlpha(1)
         row.lock:Hide()
@@ -1081,11 +1147,15 @@ Menu:SetScript("OnShow", function(self)
     Service.Request()
     RefreshMenu()
 end)
+Menu:SetScript("OnHide", function()
+    if Picker then Picker:Hide() end
+end)
 
--- As a dropdown list: once the mouse has been over it and left, it closes itself after
--- UIDROPDOWNMENU_SHOW_TIME; a click in the world closes it at once.
+-- As a dropdown list: once the mouse has been over it (or its submenu, or the picker) and left,
+-- it closes itself after UIDROPDOWNMENU_SHOW_TIME; a click in the world closes it at once.
 Menu:SetScript("OnUpdate", function(self, elapsed)
-    if MouseIsOver(self) then
+    if MouseIsOver(self) or (Waystones:IsShown() and MouseIsOver(Waystones))
+        or (Picker and Picker:IsShown() and MouseIsOver(Picker)) then
         self.wasOver, self.idle = true, 0
         return
     end
@@ -1108,8 +1178,8 @@ microIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 microIcon:SetSize(18, 18)
 microIcon:SetPoint("BOTTOM", microButton, "BOTTOM", 0, 9)
 
-microButton.tooltipText = "Toolbelt"
-microButton.newbieText = "Waystones, Bank, Guild Bank, Mailbox, Auction House, Call Board, Affix-Anvil, Forge, Vendor and Scavenger's Eye."
+microButton.tooltipText = L["Toolbelt"]
+microButton.newbieText = L["Waystones, Bank, Guild Bank, Mailbox, Auction House, Call Board, Affix-Anvil, Forge, Vendor and Scavenger's Eye."]
 
 Menu:SetPoint("BOTTOM", microButton, "TOP", 0, 4)
 
@@ -1135,7 +1205,7 @@ Service.OnChange(function()
 end)
 
 -- The checkpoint list is answered asynchronously (SEND_CHECKPOINTS_DATA has one
--- handler, owned by checkpoint_service.lua), so while the Waystones panel is
+-- handler, owned by checkpoint_service.lua), so while the waystone submenu is
 -- open it re-reads names and the picker list once a second.
 Waystones:SetScript("OnUpdate", function(self, elapsed)
     self.t = (self.t or 0) + elapsed

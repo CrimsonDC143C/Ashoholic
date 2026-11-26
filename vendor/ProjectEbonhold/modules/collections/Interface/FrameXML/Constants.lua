@@ -144,16 +144,16 @@ INSTANCE_TYPE_BG = 3;
 INSTANCE_TYPE_ARENA = 4;
 
 PET_TYPE_SUFFIX = {
-[1] = "Humanoid",
-[2] = "Dragon",
-[3] = "Flying",
-[4] = "Undead",
-[5] = "Critter",
-[6] = "Magical",
-[7] = "Elemental",
-[8] = "Beast",
-[9] = "Water",
-[10] = "Mechanical",
+[1] = ProjectEbonhold.L["Humanoid"],
+[2] = ProjectEbonhold.L["Dragon"],
+[3] = ProjectEbonhold.L["Flying"],
+[4] = ProjectEbonhold.L["Undead"],
+[5] = ProjectEbonhold.L["Critter"],
+[6] = ProjectEbonhold.L["Magical"],
+[7] = ProjectEbonhold.L["Elemental"],
+[8] = ProjectEbonhold.L["Beast"],
+[9] = ProjectEbonhold.L["Water"],
+[10] = ProjectEbonhold.L["Mechanical"],
 };
 
 -- TRANSMOG

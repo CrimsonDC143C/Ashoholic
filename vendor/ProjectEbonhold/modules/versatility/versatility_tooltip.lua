@@ -15,42 +15,85 @@
 -- Rating" / "resilience rating" and the stand-alone stat word of "+20 Resilience" become
 -- Mastery; any other "Resilience" (a spell or item name) is left alone.
 
+--
+-- Other client languages (2026-11-13): a French / German / Spanish client prints its own words
+-- ("score de défense", "Abhärtungswertung", "índice de temple"), which the English rules never
+-- matched, so those players saw Defense and Resilience everywhere. The client's own words get
+-- their own pairs below; the English pairs run on every client, since custom DBC text can be
+-- English whatever the language. Plain find + gsub pairs: { find, pattern, replacement }.
+
+local L = ProjectEbonhold.L
+
+local ENGLISH = {
+  { "efense Rating",    "Defense Rating",    "Versatility" },
+  { "efense rating",    "Defense rating",    "Versatility" },
+  { "efense rating",    "defense rating",    "versatility" },
+  { "esilience Rating", "Resilience Rating", "Mastery" },
+  { "esilience rating", "Resilience rating", "Mastery" },
+  { "esilience rating", "resilience rating", "mastery" },
+  { "Resilience",       "(%+%d+ )Resilience%f[%A]", "%1Mastery" },
+}
+
+local NATIVE = {
+  frFR = {
+    { "core de défense",    "score de défense",    "score de polyvalence" },
+    { "core de défense",    "Score de défense",    "Score de polyvalence" },
+    { "core de résilience", "score de résilience", "score de maîtrise" },
+    { "core de résilience", "Score de résilience", "Score de maîtrise" },
+    { "ésilience",          "(%+%d+ )[Rr]ésilience", "%1maîtrise" },
+    { "ésilience",          "(%+%d+ à la )résilience", "%1maîtrise" },
+    { "ésilience",          "(%+%d+ en )résilience", "%1maîtrise" },
+  },
+  deDE = {
+    { "Verteidigungswertung", "Verteidigungswertung", "Vielseitigkeitswertung" },
+    { "Abhärtungswertung",    "Abhärtungswertung",    "Meisterschaftswertung" },
+    { "Abhärtung",            "(%+%d+ )Abhärtung",    "%1Meisterschaft" },
+  },
+  esES = {
+    { "ndice de defensa", "índice de defensa", "índice de versatilidad" },
+    { "ndice de defensa", "Índice de defensa", "Índice de versatilidad" },
+    { "ndice de temple",  "índice de temple",  "índice de maestría" },
+    { "ndice de temple",  "Índice de temple",  "Índice de maestría" },
+    { "emple",            "(%+%d+ )[Tt]emple", "%1maestría" },
+    { "emple",            "(%+%d+ de )temple", "%1maestría" },
+  },
+}
+NATIVE.esMX = NATIVE.esES
+
+local RULES = {}
+for _, rule in ipairs(NATIVE[GetLocale()] or {}) do table.insert(RULES, rule) end
+for _, rule in ipairs(ENGLISH) do table.insert(RULES, rule) end
+
 -- Returns the rewritten text, or nil when nothing changed.
 local function ToNewStats(text)
   if not text then return nil end
   local original = text
-  local hasDefense = text:find("efense [Rr]ating")
-  local hasResilience = text:find("esilience")
-  if not hasDefense and not hasResilience then return nil end
-  if hasDefense then
-    text = text:gsub("Defense Rating", "Versatility")
-               :gsub("Defense rating", "Versatility")
-               :gsub("defense rating", "versatility")
-  end
-  if hasResilience then
-    text = text:gsub("Resilience Rating", "Mastery")
-               :gsub("Resilience rating", "Mastery")
-               :gsub("resilience rating", "mastery")
-               :gsub("(%+%d+ )Resilience%f[%A]", "%1Mastery")
+  for _, rule in ipairs(RULES) do
+    if text:find(rule[1], 1, true) then
+      text = text:gsub(rule[2], rule[3])
+    end
   end
   if text == original then return nil end
   return text
 end
 
 -- GlobalStrings: rewrite in place so the format specifiers (%d, %s) are kept as they are.
-for _, key in ipairs({ "ITEM_MOD_DEFENSE_SKILL_RATING", "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT",
-                       "COMBAT_RATING_NAME2",
-                       "ITEM_MOD_RESILIENCE_RATING", "ITEM_MOD_RESILIENCE_RATING_SHORT" }) do
+for _, key in ipairs({ "ITEM_MOD_DEFENSE_SKILL_RATING", "ITEM_MOD_RESILIENCE_RATING" }) do
   local rewritten = ToNewStats(_G[key])
   if rewritten then _G[key] = rewritten end
 end
--- COMBAT_RATING_NAME15..17 are the three CR_CRIT_TAKEN_* ratings; their name is the bare
--- word "Resilience", which the item-line rule above leaves alone, so it is swapped whole.
-for _, key in ipairs({ "COMBAT_RATING_NAME15", "COMBAT_RATING_NAME16", "COMBAT_RATING_NAME17" }) do
-  local value = _G[key]
-  if type(value) == "string" then
-    _G[key] = ToNewStats(value) or (value == "Resilience" and "Mastery") or value
-  end
+-- The bare stat names (the short item-mod names, the combat rating names: COMBAT_RATING_NAME2 =
+-- CR_DEFENSE_SKILL, 15..17 = the three CR_CRIT_TAKEN_* resilience ratings) are swapped whole for
+-- the add-on's own translated name, so they follow the client's language without a word list.
+for key, name in pairs({
+  ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = L["Versatility"],
+  COMBAT_RATING_NAME2                 = L["Versatility"],
+  ITEM_MOD_RESILIENCE_RATING_SHORT    = L["Mastery"],
+  COMBAT_RATING_NAME15                = L["Mastery"],
+  COMBAT_RATING_NAME16                = L["Mastery"],
+  COMBAT_RATING_NAME17                = L["Mastery"],
+}) do
+  if type(_G[key]) == "string" then _G[key] = name end
 end
 
 local function RewriteTooltip(tooltip)

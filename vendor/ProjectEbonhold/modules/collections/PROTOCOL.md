@@ -32,6 +32,7 @@ protocol (`ProjectEbonhold.sendToServer(CS.*, body)` /
 | `REQUEST_SUMMON_MOUNT` | 1110 | `spellId` (phase 2) |
 | `REQUEST_SUMMON_PET` | 1111 | `spellId` (phase 2) |
 | `REQUEST_APPLY_TRANSMOG` | 1112 | `slot:item slot:item …` (phase 2) |
+| `REQUEST_UNLOCK_APPEARANCE` | 1116 | `itemId` - unlock that look from the wardrobe: Coins of Forgotten Appearances (190225, taken), or for an Archive Torment piece the raid's Tormented Trophy in the bags (kept). The server checks `world.transmog_unlock`, class / faction and the price, then answers `SEND_APPEARANCE_LEARNED`, or a chat line saying why not. Prices and the Collector's / Torment filter lists ship in `Data/transmog_unlock_data.lua`, generated with the table by `tools/transmog/emit_unlock.py` (server repo) |
 | `REQUEST_CLEAR_TRANSMOG` | 1113 | `slot` or `""` (phase 2) |
 | `REQUEST_FORM_LOOK_SET` | 1115 | `1` = show transmog in Shadowform / druid combat forms, `0` = form look |
 

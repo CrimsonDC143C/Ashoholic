@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- ── Level 15: yellow alert bubble on the Dungeon Finder button ───────────────
@@ -59,8 +60,8 @@ local function Refresh(level)
     end
     local onButton = LFDMicroButton:IsVisible()
     Alert.Text:SetText(onButton
-        and "You can now join dungeons! Click this button to open the Dungeon Finder."
-        or "You can now join dungeons! Click here to open the Dungeon Finder.")
+        and L["You can now join dungeons! Click this button to open the Dungeon Finder."]
+        or L["You can now join dungeons! Click here to open the Dungeon Finder."])
     Alert:SetHeight(math.max(85, Alert.Text:GetStringHeight() + 40))
 
     -- A UI addon can hide the micro bar: no button to point at, top of the screen, no arrow.

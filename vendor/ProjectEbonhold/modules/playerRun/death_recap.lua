@@ -31,12 +31,12 @@ local MELEE_ICON = "Interface\\Icons\\INV_Sword_04"
 local INSTAKILL_ICON = "Interface\\Icons\\Spell_Shadow_DeathCoil"
 
 local ENVIRONMENT_INFO = {
-    DROWNING = { name = "Drowning", icon = "Interface\\Icons\\Spell_Shadow_DemonBreath" },
-    FALLING  = { name = "Falling", icon = "Interface\\Icons\\Ability_Rogue_QuickRecovery" },
-    FATIGUE  = { name = "Fatigue", icon = "Interface\\Icons\\Spell_Shadow_Haunting" },
-    FIRE     = { name = "Fire", icon = "Interface\\Icons\\Spell_Fire_Fire" },
-    LAVA     = { name = "Lava", icon = "Interface\\Icons\\Spell_Fire_Volcano" },
-    SLIME    = { name = "Slime", icon = "Interface\\Icons\\INV_Misc_Slime_01" }
+    DROWNING = { name = ProjectEbonhold.L["Drowning"], icon = "Interface\\Icons\\Spell_Shadow_DemonBreath" },
+    FALLING  = { name = ProjectEbonhold.L["Falling"], icon = "Interface\\Icons\\Ability_Rogue_QuickRecovery" },
+    FATIGUE  = { name = ProjectEbonhold.L["Fatigue"], icon = "Interface\\Icons\\Spell_Shadow_Haunting" },
+    FIRE     = { name = ProjectEbonhold.L["Fire"], icon = "Interface\\Icons\\Spell_Fire_Fire" },
+    LAVA     = { name = ProjectEbonhold.L["Lava"], icon = "Interface\\Icons\\Spell_Fire_Volcano" },
+    SLIME    = { name = ProjectEbonhold.L["Slime"], icon = "Interface\\Icons\\INV_Misc_Slime_01" }
 }
 
 -- Spell school bitmask -> tint used on the amount text.
@@ -409,6 +409,7 @@ local function CreateRecapFrame()
 
     local scrollFrame = CreateFrame("ScrollFrame", "ProjectEbonholdDeathRecapScrollFrame",
         frame, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scrollFrame)  -- DragonUI's scroll bar (utils.lua)
     scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", CONTENT_LEFT, -HEADER_HEIGHT)
     scrollFrame:SetSize(ROW_WIDTH, VISIBLE_ROWS * ROW_HEIGHT)
     frame.scrollFrame = scrollFrame

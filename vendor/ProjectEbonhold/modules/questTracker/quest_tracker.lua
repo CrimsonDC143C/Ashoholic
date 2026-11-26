@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- quest_tracker.lua -- Dragonflight-style Objective Tracker, retroported to 3.3.5.
 --
 -- Replaces the default WatchFrame quest/achievement display with the retail
@@ -21,21 +22,39 @@ ProjectEbonhold.QuestTracker = QT
 -- -------------------------------------------------------------- tunables ----
 local WIDTH          = 235
 local MAX_HEIGHT     = 560       -- stop adding blocks past this
-local BLOCK_SPACING  = 8
+-- Look = DragonUI's objective tracker (owner, 12/11): its header bar and chevron art, the quest POI
+-- badge hanging left of the title, the dash column, WatchFrame's own spacing and colours.
+local BLOCK_SPACING  = 10        -- WATCHFRAME_QUEST_OFFSET
 local LINE_SPACING   = 2
-local PIN_SIZE       = 17
-local ITEM_SIZE      = 26
+local HEADER_GAP     = 8         -- header to the first module label, clear of the bar art
+local BADGE_SIZE     = 29        -- QuestPOI_DisplayButton's 0.9 of 32
+local BADGE_LIFT     = 5
+local ICON_SIZE      = 16        -- achievement icon in place of the badge
+local ITEM_SIZE      = 26        -- WatchFrameItemButtonTemplate
+local ITEM_WIDTH     = 33        -- WATCHFRAME_ITEM_WIDTH: room kept right of the text for it
 local MAX_ACH_LINES  = 4
 
 local FONT           = "Fonts\\FRIZQT__.TTF"
-local ASSETS         = "Interface\\AddOns\\ProjectEbonhold\\assets\\"
+local FONT_SIZE      = 12        -- GameFontNormal / GameFontHighlight
+
+-- DragonUI's QuestTracker sheet (1024x512), coords from DragonUI\utils\atlas.lua.
+local QT_SHEET = "Interface\\AddOns\\ProjectEbonhold\\DragonUI\\Textures\\UI\\QuestTracker"
+local ART = {
+    header          = { 11/1024, 571/1024, 247/512, 317/512 },
+    collapse        = { 951/1024, 987/1024, 59/512, 97/512 },
+    collapsePressed = { 905/1024, 941/1024, 121/512, 159/512 },
+    expand          = { 905/1024, 941/1024, 161/512, 199/512 },
+    expandPressed   = { 905/1024, 941/1024, 201/512, 239/512 },
+    highlight       = { 943/1024, 979/1024, 161/512, 199/512 },
+}
 
 local C_HEADER       = { 1.00, 0.82, 0.00 }
 local C_MODULE       = { 0.75, 0.61, 0.00 }
-local C_TITLE        = { 1.00, 0.82, 0.00 }
-local C_TITLE_HOVER  = { 1.00, 1.00, 0.50 }
-local C_TITLE_SUPER  = { 1.00, 0.95, 0.55 }   -- super-tracked block title
-local C_LINE         = { 0.86, 0.86, 0.86 }
+local C_TITLE        = { 0.75, 0.61, 0.00 }   -- WatchFrame link idle
+local C_TITLE_HOVER  = { 1.00, 0.82, 0.00 }   -- NORMAL_FONT_COLOR
+local C_TITLE_SUPER  = { 1.00, 0.82, 0.00 }   -- super-tracked block title
+local C_LINE         = { 0.80, 0.80, 0.80 }
+local C_LINE_HOVER   = { 1.00, 1.00, 1.00 }   -- HIGHLIGHT_FONT_COLOR
 local C_LINE_DONE    = { 0.50, 0.50, 0.50 }
 local C_COMPLETE     = { 0.40, 0.85, 0.40 }
 local C_FAILED       = { 1.00, 0.30, 0.30 }
@@ -92,9 +111,9 @@ end
 QT.IsEnabled = IsEnabled
 
 StaticPopupDialogs["EBONHOLD_QT_RELOAD"] = {
-    text = "Restoring the default quest tracker requires a UI reload.",
-    button1 = "Reload Now",
-    button2 = "Later",
+    text = L["Restoring the default quest tracker requires a UI reload."],
+    button1 = L["Reload Now"],
+    button2 = L["Later"],
     OnAccept = function() ReloadUI() end,
     timeout = 0,
     whileDead = true,
@@ -125,50 +144,52 @@ local function CreateTracker()
     if tracker then return tracker end
 
     tracker = CreateFrame("Frame", "EbonholdQuestTracker", UIParent)
+    -- Edit Mode's Objective Tracker size scales WatchFrame and this column together; made later, take it
+    if WatchFrame then tracker:SetScale(WatchFrame:GetScale()) end
     tracker:SetWidth(WIDTH)
     tracker:SetHeight(30)
     -- WatchFrame keeps its addon-managed position (playerRun pins it); ride it.
     -- AnchorTracker (each render) moves it under the instance tracker while that one is shown.
     tracker:SetPoint("TOPRIGHT", WatchFrame or UIParent, "TOPRIGHT", 0, 0)
 
-    -- ---- main header: "Objectives" + gradient underline + collapse chevron
+    -- ---- main header: DragonUI's bar art, "Objectives (n)" and its red chevron
     local header = CreateFrame("Frame", nil, tracker)
-    header:SetHeight(22)
+    header:SetHeight(16)
     header:SetPoint("TOPLEFT", tracker, "TOPLEFT", 0, 0)
     header:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", 0, 0)
     tracker.header = header
 
-    local headerText = header:CreateFontString(nil, "OVERLAY")
-    headerText:SetFont(FONT, 16)
-    headerText:SetShadowOffset(1, -1)
-    headerText:SetShadowColor(0, 0, 0, 1)
-    headerText:SetPoint("LEFT", header, "LEFT", 2, 0)
-    headerText:SetTextColor(unpack(C_HEADER))
-    headerText:SetText("Objectives")
-    tracker.headerText = headerText
-
-    local underline = header:CreateTexture(nil, "ARTWORK")
-    underline:SetTexture("Interface\\Buttons\\WHITE8X8")
-    underline:SetHeight(1)
-    underline:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 0)
-    underline:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -20, 0)
-    underline:SetGradientAlpha("HORIZONTAL", 1, 0.82, 0, 0.55, 1, 0.82, 0, 0)
-
     local collapse = CreateFrame("Button", nil, header)
-    collapse:SetSize(16, 16)
-    collapse:SetPoint("RIGHT", header, "RIGHT", -2, -1)
-    collapse.tex = collapse:CreateTexture(nil, "ARTWORK")
-    collapse.tex:SetTexture("Interface\\Buttons\\UI-Panel-QuestHideButton")
-    collapse.tex:SetAllPoints(collapse)
-    collapse:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
+    collapse:SetSize(13, 14)
+    collapse:SetPoint("TOPRIGHT", header, "TOPRIGHT", -12, 1)
+    collapse:SetNormalTexture(QT_SHEET)
+    collapse:SetPushedTexture(QT_SHEET)
+    collapse:SetHighlightTexture(QT_SHEET, "ADD")
+    collapse:GetHighlightTexture():SetTexCoord(unpack(ART.highlight))
     tracker.collapse = collapse
 
+    -- The bar ends on the chevron's right edge and is centred on it, as DragonUI lays it.
+    local bar = header:CreateTexture(nil, "BACKGROUND")
+    bar:SetTexture(QT_SHEET)
+    bar:SetTexCoord(unpack(ART.header))
+    bar:SetSize(WIDTH, WIDTH / 8)
+    bar:SetAlpha(0.9)
+    bar:SetPoint("RIGHT", collapse, "RIGHT", 0, 0)
+    tracker.headerBar = bar
+
+    local headerText = header:CreateFontString(nil, "OVERLAY")
+    headerText:SetFont(FONT, FONT_SIZE)
+    headerText:SetShadowOffset(1, -1)
+    headerText:SetShadowColor(0, 0, 0, 1)
+    headerText:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 0)
+    headerText:SetTextColor(unpack(C_HEADER))
+    headerText:SetText(L["Objectives"])
+    tracker.headerText = headerText
+
     local function UpdateChevron()
-        if DB().collapsed then
-            collapse.tex:SetTexCoord(0, 0.5, 0.5, 1)     -- "+" (expand)
-        else
-            collapse.tex:SetTexCoord(0, 0.5, 0, 0.5)     -- "-" (collapse)
-        end
+        local collapsed = DB().collapsed
+        collapse:GetNormalTexture():SetTexCoord(unpack(collapsed and ART.expand or ART.collapse))
+        collapse:GetPushedTexture():SetTexCoord(unpack(collapsed and ART.expandPressed or ART.collapsePressed))
     end
     collapse:SetScript("OnClick", function()
         DB().collapsed = not DB().collapsed
@@ -179,21 +200,19 @@ local function CreateTracker()
 
     -- ---- module sub-headers ("Quests" / "Achievements"), created on demand
     tracker.moduleHeaders = {}
+    tracker.blocks = blocks                      -- the block pool, read by skins
     tracker.GetModuleHeader = function(i)
         local mh = tracker.moduleHeaders[i]
         if not mh then
             mh = CreateFrame("Frame", nil, tracker)
-            mh:SetHeight(16)
+            -- plain dim-gold label lined up with the titles: the bar art is the main header's only
+            mh:SetHeight(14)
             mh:SetWidth(WIDTH)
-            mh.bg = mh:CreateTexture(nil, "BACKGROUND")
-            mh.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-            mh.bg:SetAllPoints(mh)
-            mh.bg:SetGradientAlpha("HORIZONTAL", 0.30, 0.24, 0, 0.45, 0.30, 0.24, 0, 0)
             mh.text = mh:CreateFontString(nil, "OVERLAY")
-            mh.text:SetFont(FONT, 13)
+            mh.text:SetFont(FONT, FONT_SIZE)
             mh.text:SetShadowOffset(1, -1)
             mh.text:SetShadowColor(0, 0, 0, 1)
-            mh.text:SetPoint("LEFT", mh, "LEFT", 4, 0)
+            mh.text:SetPoint("LEFT", mh, "LEFT", 0, 0)
             mh.text:SetTextColor(unpack(C_MODULE))
             tracker.moduleHeaders[i] = mh
         end
@@ -207,10 +226,24 @@ end
 local function IsJourneyBlock(block)
     return block.kind == "quest" and IsJourneyQuest(block.questID)
 end
+-- WatchFrame's link highlight, as DragonUI does it: the title goes gold and the plain objective
+-- lines go white; finished / ready / failed lines keep their own colour.
+local function SetLinesHover(self, hover)
+    for _, line in ipairs(self.lines) do
+        if line:IsShown() and line.idle == C_LINE then
+            local c = hover and C_LINE_HOVER or C_LINE
+            line:SetTextColor(c[1], c[2], c[3])
+            line.dash:SetTextColor(c[1], c[2], c[3])
+        end
+    end
+end
 local function OnBlockEnter(self)
+    if not self.kind then return end
     self.title:SetTextColor(unpack(IsJourneyBlock(self) and C_JOURNEY_HOVER or C_TITLE_HOVER))
+    SetLinesHover(self, true)
 end
 local function OnBlockLeave(self)
+    if not self.kind then return end
     if IsJourneyBlock(self) then
         self.title:SetTextColor(unpack(C_JOURNEY))
     elseif self.isSuper then
@@ -218,6 +251,7 @@ local function OnBlockLeave(self)
     else
         self.title:SetTextColor(unpack(C_TITLE))
     end
+    SetLinesHover(self, false)
 end
 
 local function OnBlockMouseUp(self, button)
@@ -227,7 +261,11 @@ local function OnBlockMouseUp(self, button)
             if self.questIndex then RemoveQuestWatch(self.questIndex) end
             QT.MarkDirty()
         elseif self.questIndex then
-            if QuestLog_OpenToQuest then
+            -- The quest log is DragonUI's map panel (DragonUI\modules\worldmap\questlog_redirect.lua)
+            local map = DragonUI and DragonUI.WorldMap
+            if map and map.OpenQuestLogTo and map.OpenQuestLogTo(self.questIndex) then
+                -- opened there
+            elseif QuestLog_OpenToQuest then
                 QuestLog_OpenToQuest(self.questIndex)
             else
                 QuestLog_SetSelection(self.questIndex)
@@ -267,18 +305,55 @@ local function OnPinClick(self)
 end
 
 local function OnPinEnter(self)
+    local block = self:GetParent()
+    OnBlockEnter(block)                          -- the badge lights its quest, as DragonUI's does
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     local ST = ProjectEbonhold.SuperTracker
-    local block = self:GetParent()
     if ST and ST.GetQuest() == block.questID then
-        GameTooltip:AddLine("Stop tracking this waypoint", 1, 0.82, 0)
+        GameTooltip:AddLine(L["Stop tracking this waypoint"], 1, 0.82, 0)
     else
-        GameTooltip:AddLine("Track waypoint on screen", 1, 0.82, 0)
+        GameTooltip:AddLine(L["Track waypoint on screen"], 1, 0.82, 0)
     end
     if ST and block.questID and not ST.HasPOI(block.questID) then
-        GameTooltip:AddLine("No location data in this zone", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["No location data in this zone"], 0.7, 0.7, 0.7)
     end
     GameTooltip:Show()
+end
+
+-- DragonUI's shared QuestPOI widget (DragonUI\utils\questpoi.lua, loaded after this file, so it is
+-- looked up when the first block is made, not at load). Without it: the stock ring and a number.
+local POI_SHEET = "Interface\\WorldMap\\UI-QuestPoi-NumberIcons"
+local function DragonQP()
+    local dui = _G.DragonUI
+    return dui and dui.QuestPOI
+end
+
+local function CreateBadge(block)
+    local QP = DragonQP()
+    if QP then return QP.Create(block, BADGE_SIZE) end
+    local badge = CreateFrame("Button", nil, block)
+    badge:SetSize(BADGE_SIZE, BADGE_SIZE)
+    badge:SetNormalTexture(POI_SHEET)
+    badge:GetNormalTexture():SetTexCoord(0.875, 1, 0.875, 1)
+    badge:SetHighlightTexture(POI_SHEET, "ADD")
+    badge:GetHighlightTexture():SetTexCoord(0.625, 0.750, 0.875, 1)
+    badge.number = badge:CreateFontString(nil, "OVERLAY")
+    badge.number:SetFont(FONT, FONT_SIZE, "OUTLINE")
+    badge.number:SetPoint("CENTER", badge, "CENTER", 0, 0)
+    return badge
+end
+
+-- style: "numeric" (in progress, numbered) or "complete" (ready to hand in).
+local function StyleBadge(badge, style, number, selected)
+    local QP = DragonQP()
+    if QP and QP.SetStyle and not badge.number then
+        QP.SetStyle(badge, style, number, selected and true or false)
+        return
+    end
+    badge.number:SetText(style == "complete" and "?" or tostring(number or ""))
+    badge.number:SetTextColor(selected and 0 or 1, selected and 0 or 0.82, 0)
+    badge:GetNormalTexture():SetTexCoord(selected and 0.5 or 0.875, selected and 0.625 or 1,
+        selected and 0.375 or 0.875, selected and 0.5 or 1)
 end
 
 local function GetBlock(i)
@@ -291,36 +366,37 @@ local function GetBlock(i)
         block:SetScript("OnLeave", OnBlockLeave)
         block:SetScript("OnMouseUp", OnBlockMouseUp)
 
-        -- waypoint pin button (quests only)
-        local pin = CreateFrame("Button", nil, block)
-        pin:SetSize(PIN_SIZE, PIN_SIZE)
-        pin:SetPoint("TOPLEFT", block, "TOPLEFT", 0, -1)
-        pin.plate = pin:CreateTexture(nil, "BACKGROUND")
-        pin.plate:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-        pin.plate:SetAllPoints(pin)
-        pin.plate:SetVertexColor(0, 0, 0, 0.7)
-        pin.ring = pin:CreateTexture(nil, "BORDER")
-        pin.ring:SetTexture(ASSETS .. "roundborder")
-        pin.ring:SetSize(PIN_SIZE + 13, PIN_SIZE + 13)
-        pin.ring:SetPoint("CENTER")
-        pin.icon = pin:CreateTexture(nil, "ARTWORK")
-        pin.icon:SetSize(11, 11)
-        pin.icon:SetPoint("CENTER")
-        pin:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomInButton-Highlight", "ADD")
-        pin:SetScript("OnClick", OnPinClick)
-        pin:SetScript("OnEnter", OnPinEnter)
-        pin:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        block.pin = pin
-
+        -- The title column IS the block's left edge; the badge and the achievement icon hang
+        -- outside it, left of the title (DragonUI's layout).
         local title = block:CreateFontString(nil, "OVERLAY")
-        title:SetFont(FONT, 13)
+        title:SetFont(FONT, FONT_SIZE)
         title:SetShadowOffset(1, -1)
         title:SetShadowColor(0, 0, 0, 1)
         title:SetJustifyH("LEFT")
-        title:SetPoint("TOPLEFT", block, "TOPLEFT", PIN_SIZE + 5, 0)
-        title:SetWidth(WIDTH - PIN_SIZE - 5)
+        title:SetPoint("TOPLEFT", block, "TOPLEFT", 0, 0)
+        title:SetWidth(WIDTH)
         title:SetHeight(0)
         block.title = title
+
+        -- waypoint pin button (quests only), drawn as the quest POI badge: numbered ring, "?"
+        -- once ready to hand in, the selected ring + glow while it drives the waypoint
+        local pin = CreateBadge(block)
+        pin:SetPoint("TOPRIGHT", title, "TOPLEFT", 0, BADGE_LIFT)
+        pin:RegisterForClicks("LeftButtonUp")
+        pin:SetScript("OnClick", OnPinClick)
+        pin:SetScript("OnEnter", OnPinEnter)
+        pin:SetScript("OnLeave", function(self)
+            GameTooltip:Hide()
+            OnBlockLeave(self:GetParent())
+        end)
+        block.pin = pin
+
+        local icon = block:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(ICON_SIZE, ICON_SIZE)
+        icon:SetPoint("RIGHT", title, "LEFT", -4, 0)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        icon:Hide()
+        block.icon = icon
 
         -- super-track emphasis: gold wash over the whole block + left accent
         -- bar, shown while this block's quest drives the on-screen waypoint
@@ -370,12 +446,19 @@ local function GetLine(block, j)
     local line = block.lines[j]
     if not line then
         line = block:CreateFontString(nil, "OVERLAY")
-        line:SetFont(FONT, 12)
+        line:SetFont(FONT, FONT_SIZE)
         line:SetShadowOffset(1, -1)
         line:SetShadowColor(0, 0, 0, 1)
         line:SetJustifyH("LEFT")
-        line:SetWidth(WIDTH - PIN_SIZE - 15)
         line:SetHeight(0)
+        -- the dash sits on the title's left edge, the text (and its wrap) in a column after it
+        local dash = block:CreateFontString(nil, "OVERLAY")
+        dash:SetFont(FONT, FONT_SIZE)
+        dash:SetShadowOffset(1, -1)
+        dash:SetShadowColor(0, 0, 0, 1)
+        dash:SetJustifyH("LEFT")
+        dash:SetText(QUEST_DASH or "- ")
+        line.dash = dash
         block.lines[j] = line
     end
     return line
@@ -387,21 +470,33 @@ local function GetItemButton(i)
     if not btn then
         btn = CreateFrame("Button", "EbonholdQTItem" .. i, tracker, "SecureActionButtonTemplate")
         btn:SetSize(ITEM_SIZE, ITEM_SIZE)
+        -- it now sits over its block's corner: above the block so the click lands on it
+        btn:SetFrameLevel(tracker:GetFrameLevel() + 5)
         btn:SetAttribute("type", "item")
         btn:RegisterForClicks("AnyUp")
-        btn.icon = btn:CreateTexture(nil, "ARTWORK")
+        -- WatchFrameItemButtonTemplate's look (the button DragonUI's tracker wears): full icon,
+        -- 42px quickslot frame, depress on push, square highlight.
+        btn.icon = btn:CreateTexture(nil, "BORDER")
         btn.icon:SetAllPoints(btn)
-        btn.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-        btn.border = btn:CreateTexture(nil, "OVERLAY")
-        btn.border:SetTexture("Interface\\Buttons\\UI-Quickslot2")
-        btn.border:SetPoint("TOPLEFT", btn, "TOPLEFT", -12, 12)
-        btn.border:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 12, -12)
-        btn.count = btn:CreateFontString(nil, "OVERLAY")
-        btn.count:SetFont(FONT, 11, "OUTLINE")
-        btn.count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
+        btn:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
+        local normal = btn:GetNormalTexture()
+        normal:ClearAllPoints()
+        normal:SetSize(42, 42)
+        normal:SetPoint("CENTER", btn, "CENTER", 0, -1)
+        btn:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
+        btn.count = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        btn.count:SetJustifyH("RIGHT")
+        btn.count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -3, 2)
         btn.cooldown = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
         btn.cooldown:SetAllPoints(btn)
         btn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+        -- hovering the item lights its quest, as DragonUI's does (block set at layout time)
+        btn:SetScript("OnEnter", function(self)
+            if self.block and self.block:IsShown() then OnBlockEnter(self.block) end
+        end)
+        btn:SetScript("OnLeave", function(self)
+            if self.block then OnBlockLeave(self.block) end
+        end)
         btn:Hide()
         itemButtons[i] = btn
     end
@@ -463,9 +558,9 @@ local function CollectQuests()
             do
                 local objectives = {}
                 if isComplete and isComplete > 0 then
-                    table.insert(objectives, { text = "Ready for turn-in", color = C_COMPLETE })
+                    table.insert(objectives, { text = L["Ready for turn-in"], color = C_COMPLETE })
                 elseif isComplete and isComplete < 0 then
-                    table.insert(objectives, { text = "Failed", color = C_FAILED })
+                    table.insert(objectives, { text = L["Failed"], color = C_FAILED })
                 else
                     for j = 1, GetNumQuestLeaderBoards(questIndex) do
                         local text, _, finished = GetQuestLogLeaderBoard(j, questIndex)
@@ -477,12 +572,13 @@ local function CollectQuests()
                         end
                     end
                     if #objectives == 0 then
-                        table.insert(objectives, { text = "- In progress", color = C_LINE })
+                        table.insert(objectives, { text = L["- In progress"], color = C_LINE })
                     end
                 end
                 table.insert(out, {
                     kind = "quest", title = title, questIndex = questIndex,
                     questID = questID, objectives = objectives,
+                    complete = isComplete and isComplete > 0 or false,
                 })
             end
         end
@@ -521,7 +617,7 @@ local function CollectAchievements()
     local out = {}
     if not GetTrackedAchievements then return out end
     for _, achID in ipairs({ GetTrackedAchievements() }) do
-        local ok, _, name, _, completed = pcall(GetAchievementInfo, achID)
+        local ok, _, name, _, completed, _, _, _, _, _, icon = pcall(GetAchievementInfo, achID)
         if ok and name and not completed then
             local objectives, shown, total = {}, 0, 0
             local num = GetAchievementNumCriteria and GetAchievementNumCriteria(achID) or 0
@@ -541,15 +637,15 @@ local function CollectAchievements()
             end
             if total > shown then
                 table.insert(objectives, {
-                    text = string.format("- ... and %d more", total - shown), color = C_LINE_DONE,
+                    text = T("- ... and {shown} more", { shown = string.format("%d", total - shown) }), color = C_LINE_DONE,
                 })
             end
             if #objectives == 0 then
-                table.insert(objectives, { text = "- In progress", color = C_LINE })
+                table.insert(objectives, { text = L["- In progress"], color = C_LINE })
             end
             table.insert(out, {
                 kind = "achievement", title = name, achievementID = achID,
-                objectives = objectives,
+                objectives = objectives, icon = icon,
             })
         end
     end
@@ -601,7 +697,7 @@ local function Render()
 
     local total = #quests + #achievements
     if total == 0 then
-        tracker.headerText:SetText("Objectives")
+        tracker.headerText:SetText(L["Objectives"])
         for _, b in pairs(blocks) do b:Hide() end
         for _, m in pairs(tracker.moduleHeaders) do m:Hide() end
         if canSecure then for _, ib in pairs(itemButtons) do ib:Hide() end end
@@ -612,18 +708,20 @@ local function Render()
     tracker.header:Show()
 
     if db.collapsed then
-        tracker.headerText:SetText(string.format("Objectives (%d)", total))
+        tracker.headerText:SetText(T("Objectives ({total})", { total = string.format("%d", total) }))
         for _, b in pairs(blocks) do b:Hide() end
         for _, m in pairs(tracker.moduleHeaders) do m:Hide() end
         if canSecure then for _, ib in pairs(itemButtons) do ib:Hide() end end
         tracker:SetHeight(tracker.header:GetHeight())
         return
     end
-    tracker.headerText:SetText("Objectives")
+    -- DragonUI's header always carries the count
+    tracker.headerText:SetText(T("Objectives ({total})", { total = string.format("%d", total) }))
 
-    local yOff = -(tracker.header:GetHeight() + 4)
+    local yOff = -(tracker.header:GetHeight() + HEADER_GAP)
     local blockIdx, moduleIdx = 0, 0
     local overflow = 0
+    local numbered = 0                           -- badge numbers, in-progress quests only
 
     local function LayoutModule(headerLabel, entries)
         if #entries == 0 then return end
@@ -633,7 +731,8 @@ local function Render()
         mh:ClearAllPoints()
         mh:SetPoint("TOPLEFT", tracker, "TOPLEFT", 0, yOff)
         mh:Show()
-        yOff = yOff - mh:GetHeight() - 4
+        -- room for the badge lifted above the first title
+        yOff = yOff - mh:GetHeight() - 4 - BADGE_LIFT
 
         for _, entry in ipairs(entries) do
             if -yOff > MAX_HEIGHT then
@@ -646,31 +745,42 @@ local function Render()
                 block.questID = entry.questID
                 block.achievementID = entry.achievementID
 
+                -- a quest with a usable item keeps WATCHFRAME_ITEM_WIDTH free on the right of its
+                -- first rows for the button (Blizzard / DragonUI narrow the first two rows)
+                local itemLink, itemTex, itemCharges
+                if entry.kind == "quest" and GetQuestLogSpecialItemInfo then
+                    itemLink, itemTex, itemCharges = GetQuestLogSpecialItemInfo(entry.questIndex)
+                end
+                local itemPad = itemLink and ITEM_WIDTH or 0
+
+                block.title:SetWidth(WIDTH - itemPad)
                 block.title:SetText(entry.title)
                 block.title:SetTextColor(unpack(C_TITLE))
-                local h = block.title:GetStringHeight() or 13
+                local h = block.title:GetStringHeight() or FONT_SIZE
 
-                -- waypoint pin: quests only; gold ring when super-tracked
+                -- waypoint pin: quests only, drawn as the quest POI badge; the selected ring
+                -- and glow while it is super-tracked (auto or manual)
                 if entry.kind == "quest" then
-                    block.pin:Show()
                     local isSuper = ST and ST.GetQuest() == entry.questID
                     local isManual = ST and ST.GetManualQuest() == entry.questID
                     block.isSuper = (isSuper or isManual) and true or false
-                    if entry.objectives[1] and entry.objectives[1].color == C_COMPLETE then
-                        block.pin.icon:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon")
+                    if entry.complete then
+                        StyleBadge(block.pin, "complete", nil, block.isSuper)
                     else
-                        block.pin.icon:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
+                        numbered = numbered + 1
+                        StyleBadge(block.pin, "numeric", numbered, block.isSuper)
                     end
-                    if isManual then
-                        block.pin.ring:SetVertexColor(0.95, 0.78, 0.25, 1)
-                    elseif isSuper then
-                        block.pin.ring:SetVertexColor(0.80, 0.66, 0.25, 0.8)
-                    else
-                        block.pin.ring:SetVertexColor(0.35, 0.35, 0.35, 0.8)
-                    end
+                    block.pin:Show()
+                    block.icon:Hide()
                 else
                     block.isSuper = false
                     block.pin:Hide()
+                    if entry.icon then
+                        block.icon:SetTexture(entry.icon)
+                        block.icon:Show()
+                    else
+                        block.icon:Hide()
+                    end
                 end
 
                 -- tracked quest stands out: gold wash + accent + brighter title
@@ -697,40 +807,54 @@ local function Render()
 
                 for j, obj in ipairs(entry.objectives) do
                     local line = GetLine(block, j)
-                    line:SetText(obj.text)
+                    local dash = line.dash
+                    -- the dash is its own column now: a "- " the text already carries is dropped
+                    local text = obj.text
+                    if string.sub(text, 1, 2) == "- " then text = string.sub(text, 3) end
+                    local dashWidth = math.max(dash:GetStringWidth() or 0, 8)
+                    local pad = (h < ITEM_SIZE + 2) and itemPad or 0
+                    dash:SetTextColor(unpack(obj.color))
+                    dash:ClearAllPoints()
+                    dash:SetPoint("TOPLEFT", block, "TOPLEFT", 0, -(h + LINE_SPACING))
+                    dash:Show()
+                    line:SetWidth(WIDTH - dashWidth - pad)
+                    line:SetText(text)
                     line:SetTextColor(unpack(obj.color))
+                    line.idle = obj.color
                     line:ClearAllPoints()
-                    line:SetPoint("TOPLEFT", block, "TOPLEFT", PIN_SIZE + 10, -(h + LINE_SPACING))
+                    line:SetPoint("TOPLEFT", block, "TOPLEFT", dashWidth, -(h + LINE_SPACING))
                     line:Show()
-                    h = h + LINE_SPACING + (line:GetStringHeight() or 12)
+                    h = h + LINE_SPACING + (line:GetStringHeight() or FONT_SIZE)
                 end
                 for j = #entry.objectives + 1, #block.lines do
                     block.lines[j]:Hide()
+                    block.lines[j].dash:Hide()
                 end
 
-                block:SetHeight(h + 2)
+                -- never shorter than the badge hanging off the title
+                local minH = (entry.kind == "quest") and (BADGE_SIZE - BADGE_LIFT) or 0
+                if itemLink then minH = math.max(minH, ITEM_SIZE + 2) end
+                block:SetHeight(math.max(h + 2, minH))
                 block:ClearAllPoints()
                 block:SetPoint("TOPLEFT", tracker, "TOPLEFT", 0, yOff)
                 block:Show()
 
-                -- quest item button, left of the block (secure: skip in combat)
+                -- quest item button, in the block's top-right corner like WatchFrame / DragonUI
+                -- (secure: skip in combat)
                 if canSecure then
                     local btn = GetItemButton(blockIdx)
-                    local link, item
-                    if entry.kind == "quest" and GetQuestLogSpecialItemInfo then
-                        link, item = GetQuestLogSpecialItemInfo(entry.questIndex)
-                    end
-                    if link then
+                    if itemLink then
                         btn.questIndex = entry.questIndex
-                        btn:SetAttribute("item", link)
-                        btn.icon:SetTexture(item)
-                        local _, _, charges = GetQuestLogSpecialItemInfo(entry.questIndex)
-                        btn.count:SetText((charges and charges > 1) and charges or "")
+                        btn.block = block
+                        btn:SetAttribute("item", itemLink)
+                        btn.icon:SetTexture(itemTex)
+                        btn.count:SetText((itemCharges and itemCharges > 1) and itemCharges or "")
                         btn:ClearAllPoints()
-                        btn:SetPoint("TOPRIGHT", block, "TOPLEFT", -6, -1)
+                        btn:SetPoint("TOPRIGHT", block, "TOPRIGHT", -2, -2)
                         btn:Show()
                     else
                         btn.questIndex = nil
+                        btn.block = nil
                         btn:Hide()
                     end
                 end
@@ -741,8 +865,8 @@ local function Render()
         yOff = yOff - 2
     end
 
-    LayoutModule("Quests", quests)
-    LayoutModule("Achievements", achievements)
+    LayoutModule(L["Quests"], quests)
+    LayoutModule(L["Achievements"], achievements)
 
     for i = blockIdx + 1, #blocks do blocks[i]:Hide() end
     for i = moduleIdx + 1, #tracker.moduleHeaders do tracker.moduleHeaders[i]:Hide() end
@@ -758,13 +882,15 @@ local function Render()
         block.kind = nil
         block.isSuper = false
         block.pin:Hide()
+        block.icon:Hide()
         block.superBg:Hide()
         block.superBar:Hide()
         block.journeyBg:Hide()
         block.journeyBar:Hide()
-        block.title:SetText(string.format("+ %d more objectives", overflow))
+        block.title:SetWidth(WIDTH)
+        block.title:SetText(T("+ {overflow} more objectives", { overflow = string.format("%d", overflow) }))
         block.title:SetTextColor(unpack(C_LINE_DONE))
-        for _, l in ipairs(block.lines) do l:Hide() end
+        for _, l in ipairs(block.lines) do l:Hide(); l.dash:Hide() end
         block:SetHeight(14)
         block:ClearAllPoints()
         block:SetPoint("TOPLEFT", tracker, "TOPLEFT", 0, yOff)

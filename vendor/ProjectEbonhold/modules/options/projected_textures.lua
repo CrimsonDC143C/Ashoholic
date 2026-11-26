@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- File: projected_textures.lua
 -- Keeps the "Projected Textures" video option on. Boss telegraphs (ground marks)
 -- are drawn as projected textures: with the option off - which the Low graphics
@@ -12,7 +13,7 @@ local function EnsureProjectedTextures()
     SetCVar(CVAR, "1")
     if not warned then
         warned = true
-        DEFAULT_CHAT_FRAME:AddMessage("|cffff9900[ProjectEbonhold]|r Projected Textures re-enabled: boss telegraphs need it to be visible.")
+        DEFAULT_CHAT_FRAME:AddMessage(L["|cffff9900[ProjectEbonhold]|r Projected Textures re-enabled: boss telegraphs need it to be visible."])
     end
 end
 

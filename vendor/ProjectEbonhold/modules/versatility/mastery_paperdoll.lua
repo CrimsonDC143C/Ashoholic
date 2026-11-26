@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Resilience is Mastery -- character sheet.
 --
 -- The "Resilience" row of the Defenses stat category (PaperDollFrame_SetResilience, 3.3.5
@@ -20,9 +21,8 @@ hooksecurefunc("PaperDollFrame_SetResilience", function(statFrame, unit)
   local text = _G[frameName .. "StatText"]
   local rating = GetCombatRating(CR_CRIT_TAKEN_SPELL or 17) or 0
 
-  if label then label:SetText(format(STAT_FORMAT or "%s:", "Mastery")) end
+  if label then label:SetText(format(STAT_FORMAT or "%s:", L["Mastery"])) end
   if text then text:SetText(HIGHLIGHT_FONT_COLOR_CODE .. rating .. FONT_COLOR_CODE_CLOSE) end
-  statFrame.tooltip = HIGHLIGHT_FONT_COLOR_CODE .. "Mastery " .. rating .. FONT_COLOR_CODE_CLOSE
-  statFrame.tooltip2 = format("Mastery rating %d: +%.2f%% to the power of your echoes (damage, healing, absorbs and their passive effects).",
-                              rating, MasteryPct(rating))
+  statFrame.tooltip = T("{HIGHLIGHTFONTCOLORCODE}Mastery {rating}{FONTCOLORCODECLOSE}", { HIGHLIGHTFONTCOLORCODE = HIGHLIGHT_FONT_COLOR_CODE, rating = rating, FONTCOLORCODECLOSE = FONT_COLOR_CODE_CLOSE })
+  statFrame.tooltip2 = T("Mastery rating {rating}: +{rating2}% to the power of your echoes (damage, healing, absorbs and their passive effects).", { rating = string.format("%d", rating), rating2 = string.format("%.2f", MasteryPct(rating)) })
 end)

@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ==============================================================================
 -- Death contracts (server: ContractMgr): the Spirit Healer window.
 --
@@ -165,14 +166,14 @@ end
 
 -- An instance is done when every boss is dead, in any order (2026-10-05).
 function CT.ExecutionGoal()
-    return "Kill every boss of "
+    return L["Kill every boss of "]
 end
 
 -- "Kill 50 creatures in Icecrown, Torment 4 or higher"
 function CT.Describe(c)
-    local where = c.level80 and (c.name .. " at level 80") or c.name
-    local t = (c.torment or 0) > 0 and (", Torment " .. c.torment .. " or higher") or ""
-    if c.kind == 1 then return "Kill " .. c.required .. " creatures in " .. where .. t end
+    local where = c.level80 and (T("{name} at level 80", { name = c.name })) or c.name
+    local t = (c.torment or 0) > 0 and (T(", Torment {torment} or higher", { torment = c.torment })) or ""
+    if c.kind == 1 then return T("Kill {required} creatures in {where}", { required = c.required, where = where }) .. t end
     if c.kind == 2 then return CT.ExecutionGoal(c) .. where .. t end
     return where
 end
@@ -185,13 +186,13 @@ end
 
 function CT.LevelText(c)
     if (c.levelMax or 0) == 0 or c.levelMax >= 80 then return "" end
-    return "Level " .. c.levelMax .. " max"
+    return T("Level {levelMax} max", { levelMax = c.levelMax })
 end
 
 -- "[18-34] Ashenvale": the content's level window, then its name ("[72]" when the window
 -- ends at the level cap); the window turns red once the character is past it
 function CT.Heading(c)
-    local name = c.name ~= "" and c.name or (c.title ~= "" and c.title or "Contract")
+    local name = c.name ~= "" and c.name or (c.title ~= "" and c.title or L["Contract"])
     if (c.level or 0) == 0 then return name end
     local range = tostring(c.level)
     if CT.LevelText(c) ~= "" and c.levelMax > c.level then range = range .. "-" .. c.levelMax end
@@ -206,7 +207,7 @@ end
 
 function CT.DurationText(c)
     if not CT.HasHourglass(c) then return "" end
-    return math.floor(c.duration / 60 + 0.5) .. " min"
+    return T("{duration} min", { duration = math.floor(c.duration / 60 + 0.5) })
 end
 
 -- the hourglass: running once the first kill counted, until its time is out
@@ -261,12 +262,12 @@ end
 
 -- one colour per state: available in the healer's blue, in progress in amber, done in green
 function CT.StateText(c)
-    if c.state == 2 then return "|cff80d6a0Completed - bonus added|r" end
+    if c.state == 2 then return L["|cff80d6a0Completed - bonus added|r"] end
     if c.state == 1 then
-        if c.kind == 1 then return "|cffe0a040In progress - " .. c.progress .. " / " .. c.required .. "|r" end
-        return "|cffe0a040In progress|r"
+        if c.kind == 1 then return T("|cffe0a040In progress - {progress} / {required}|r", { progress = c.progress, required = c.required }) end
+        return L["|cffe0a040In progress|r"]
     end
-    return "|cff9fd6ffAvailable|r"
+    return L["|cff9fd6ffAvailable|r"]
 end
 
 function CT.ActiveCount()
@@ -480,7 +481,7 @@ local function CreateCard(parent, index)
     timeLeft:Hide()
     card.timeLeft = timeLeft
 
-    local ret = RedButton(card, "Cancel", function()
+    local ret = RedButton(card, CANCEL, function()
         local c = card.data
         if c and c.state == 1 then CT.ConfirmCancel(c) end
     end, 70, 25, 10)
@@ -496,40 +497,44 @@ local function CreateCard(parent, index)
         -- short on purpose: the goal, then label / value pairs, then one line saying what now
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(CT.Heading(c), 1, 0.82, 0)
-        local where = c.level80 and (c.name .. " at level 80") or c.name
-        GameTooltip:AddLine(c.kind == 1 and ("Kill " .. c.required .. " creatures in " .. where) or (CT.ExecutionGoal(c) .. where), 1, 1, 1, true)
+        local where = c.level80 and (T("{name} at level 80", { name = c.name })) or c.name
+        GameTooltip:AddLine(c.kind == 1 and T("Kill {required} creatures in {where}", { required = c.required, where = where }) or (CT.ExecutionGoal(c) .. where), 1, 1, 1, true)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddDoubleLine("Bonus", "+" .. c.bonus .. "%", 0.7, 0.7, 0.7, 1, 0.82, 0)
+        GameTooltip:AddDoubleLine(L["Bonus"], "+" .. c.bonus .. "%", 0.7, 0.7, 0.7, 1, 0.82, 0)
         if (c.torment or 0) > 0 then
-            GameTooltip:AddDoubleLine("Torment", c.torment .. " or higher", 0.7, 0.7, 0.7, 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Torment"], T("{torment} or higher", { torment = c.torment }), 0.7, 0.7, 0.7, 1, 1, 1)
         end
         if CT.LevelText(c) ~= "" then
             if CT.Outgrown(c) then
-                GameTooltip:AddDoubleLine("Level", c.levelMax .. " max", 0.7, 0.7, 0.7, 0.89, 0.23, 0.23)
+                GameTooltip:AddDoubleLine(LEVEL, T("{levelMax} max", { levelMax = c.levelMax }), 0.7, 0.7, 0.7, 0.89, 0.23, 0.23)
             else
-                GameTooltip:AddDoubleLine("Level", c.levelMax .. " max", 0.7, 0.7, 0.7, 1, 1, 1)
+                GameTooltip:AddDoubleLine(LEVEL, T("{levelMax} max", { levelMax = c.levelMax }), 0.7, 0.7, 0.7, 1, 1, 1)
             end
         end
         if c.state == 1 and c.kind == 1 then
-            GameTooltip:AddDoubleLine("Progress", c.progress .. " / " .. c.required, 0.7, 0.7, 0.7, 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Progress"], c.progress .. " / " .. c.required, 0.7, 0.7, 0.7, 1, 1, 1)
+        end
+        -- the server checks the Torment of every boss kill (ContractMgr::EveryBossAtTorment, 2026-11-17)
+        if c.kind ~= 1 and c.state ~= 2 then
+            GameTooltip:AddLine(L["Every boss must die at this Torment or higher. If a boss dies at a lower Torment, the contract no longer counts in that instance."], 1, 0.82, 0, true)
         end
         if CT.IsRunning(c) then
             local tc = CT.TimeColor(c)
-            GameTooltip:AddDoubleLine("Time left", CT.FormatTime(CT.TimeLeft(c)), 0.7, 0.7, 0.7, tc[1], tc[2], tc[3])
+            GameTooltip:AddDoubleLine(L["Time left"], CT.FormatTime(CT.TimeLeft(c)), 0.7, 0.7, 0.7, tc[1], tc[2], tc[3])
         elseif c.state ~= 2 and CT.HasHourglass(c) then
-            GameTooltip:AddDoubleLine("Time", CT.DurationText(c) .. " from your first kill", 0.7, 0.7, 0.7, 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Time"], T("{c} from your first kill", { c = CT.DurationText(c) }), 0.7, 0.7, 0.7, 1, 1, 1)
         end
         GameTooltip:AddLine(" ")
         if c.state == 2 then
-            GameTooltip:AddLine("Fulfilled", 0.5, 0.84, 0.63)
+            GameTooltip:AddLine(L["Fulfilled"], 0.5, 0.84, 0.63)
         elseif c.state == 1 and CT.Outgrown(c) then
-            GameTooltip:AddLine("You are past its level: nothing counts any more", 0.89, 0.23, 0.23, true)
+            GameTooltip:AddLine(L["You are past its level: nothing counts any more"], 0.89, 0.23, 0.23, true)
         elseif c.state == 1 then
-            GameTooltip:AddLine(CT.HasHourglass(c) and "Lost if you die or if the hourglass runs out" or "Lost if you die", 0.89, 0.23, 0.23, true)
+            GameTooltip:AddLine(CT.HasHourglass(c) and L["Lost if you die or if the hourglass runs out"] or L["Lost if you die"], 0.89, 0.23, 0.23, true)
         elseif CT.ActiveCount() >= MAX_ACTIVE then
-            GameTooltip:AddLine("You already hold a contract: fulfil or cancel it first", 0.89, 0.23, 0.23, true)
+            GameTooltip:AddLine(L["You already hold a contract: fulfil or cancel it first"], 0.89, 0.23, 0.23, true)
         else
-            GameTooltip:AddLine("Click to take it", 0.1, 1, 0.1)
+            GameTooltip:AddLine(L["Click to take it"], 0.1, 1, 0.1)
         end
         GameTooltip:Show()
     end)
@@ -557,11 +562,11 @@ local function CreateChrome()
         })
         local head = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         head:SetPoint("TOP", frame, "TOP", 0, -16)
-        head:SetText("Death Contracts")
+        head:SetText(L["Death Contracts"])
         return
     end
     chrome:SetAllPoints(frame)
-    chrome.TitleText:SetText("Death Contracts")
+    chrome.TitleText:SetText(L["Death Contracts"])
     frame.chrome = chrome
     local ok2, inset = pcall(CreateFrame, "Frame", nil, chrome, "InsetFrameTemplate")
     if ok2 and inset then
@@ -618,18 +623,13 @@ local function CreateContractsFrame()
 
     -- the list: a scroll frame inside the inset, the rows on its child
     local scroll = CreateFrame("ScrollFrame", "EbonholdContractsScroll", frame, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scroll)  -- DragonUI's scroll bar (utils.lua)
     scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 8, -(HEADER_H + 4))
     scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -32, BOTTOM_H + 4)
     local child = CreateFrame("Frame", nil, scroll)
     child:SetSize(FRAME_W - 40, 1)
     scroll:SetScrollChild(child)
     frame.scroll, frame.child = scroll, child
-    local bar = _G["EbonholdContractsScrollScrollBar"]
-    if bar then
-        bar:ClearAllPoints()
-        bar:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 4, -16)
-        bar:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 4, 16)
-    end
 
     -- the placeholder of an empty list: nothing taken, nothing done, nothing offered (levels 1-2,
     -- where no content sits above the character yet, ContentCatalogueMgr::GetContentsFor)
@@ -637,12 +637,12 @@ local function CreateContractsFrame()
     empty:SetAllPoints(scroll)
     local emptyTitle = empty:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     emptyTitle:SetPoint("BOTTOM", empty, "CENTER", 0, 6)
-    emptyTitle:SetText("No contract for you yet")
+    emptyTitle:SetText(L["No contract for you yet"])
     local emptyHint = empty:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     emptyHint:SetPoint("TOP", empty, "CENTER", 0, -6)
     emptyHint:SetWidth(FRAME_W - 120)
     emptyHint:SetTextColor(0.75, 0.75, 0.75)
-    emptyHint:SetText("The spirit offers contracts on zones and dungeons a few levels above yours. Gain a level or two and come back.")
+    emptyHint:SetText(L["The spirit offers contracts on zones and dungeons a few levels above yours. Gain a level or two and come back."])
     empty:Hide()
     frame.empty = empty
     frame.emptyTitle = emptyTitle
@@ -656,21 +656,21 @@ local function CreateContractsFrame()
     frame.info = info
 
     -- placed as the talent window's Apply / Cancel: against the right edge, 8 from the bottom
-    local offer = RedButton(frame, "Offer your soul", function() CT.Bank() end, 170, 33)
+    local offer = RedButton(frame, L["Offer your soul"], function() CT.Bank() end, 170, 33)
     offer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 8)
     frame.offer = offer
 
-    local anchor = RedButton(frame, "Anchor your soul", function() CT.Anchor() end, 170, 33)
+    local anchor = RedButton(frame, L["Anchor your soul"], function() CT.Anchor() end, 170, 33)
     anchor:SetPoint("RIGHT", offer, "LEFT", -10, 0)
     anchor:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Soul anchor", 1, 0.82, 0)
+        GameTooltip:SetText(L["Soul anchor"], 1, 0.82, 0)
         if CT.anchorState == 1 then
-            GameTooltip:AddLine("Your soul is anchored to this spirit. Releasing it is free.", 1, 1, 1, true)
+            GameTooltip:AddLine(L["Your soul is anchored to this spirit. Releasing it is free."], 1, 1, 1, true)
         elseif CT.anchorState == 2 and CT.anchorPlace ~= "" then
-            GameTooltip:AddLine("Your soul is anchored to " .. CT.anchorPlace .. ". Move it here for the run's Soul Ashes.", 1, 1, 1, true)
+            GameTooltip:AddLine(T("Your soul is anchored to {anchorPlace}. Move it here for the run's Soul Ashes.", { anchorPlace = CT.anchorPlace }), 1, 1, 1, true)
         else
-            GameTooltip:AddLine("Pay the run's Soul Ashes and death sends you back to this spirit, wherever you die.", 1, 1, 1, true)
+            GameTooltip:AddLine(L["Pay the run's Soul Ashes and death sends you back to this spirit, wherever you die."], 1, 1, 1, true)
         end
         GameTooltip:Show()
     end)
@@ -764,7 +764,7 @@ function CT.Refresh()
             card.desc:SetTextColor(1, 1, 1)
             card.bonus:SetTextColor(unpack(C_BONUS))
         end
-        card.state:SetText(c.state == 1 and (c.kind == 1 and (c.progress .. " / " .. c.required) or "in progress") or "")
+        card.state:SetText(c.state == 1 and (c.kind == 1 and (c.progress .. " / " .. c.required) or L["in progress"]) or "")
         Shown(card.stripe, c.state ~= 1 and i % 2 == 0)
         Shown(card.wash, c.state == 1)
         Shown(card.check, done)
@@ -781,11 +781,11 @@ function CT.Refresh()
     Shown(frame.empty, #list == 0)
     if #list == 0 then
         if CT.FulfilledCount() > 0 then
-            frame.emptyTitle:SetText("Every contract fulfilled")
-            frame.emptyHint:SetText("You fulfilled every contract the spirit offers you on this run. Gain a level and new ones come.")
+            frame.emptyTitle:SetText(L["Every contract fulfilled"])
+            frame.emptyHint:SetText(L["You fulfilled every contract the spirit offers you on this run. Gain a level and new ones come."])
         else
-            frame.emptyTitle:SetText("No contract for you yet")
-            frame.emptyHint:SetText("The spirit offers contracts on zones and dungeons a few levels above yours. Gain a level or two and come back.")
+            frame.emptyTitle:SetText(L["No contract for you yet"])
+            frame.emptyHint:SetText(L["The spirit offers contracts on zones and dungeons a few levels above yours. Gain a level or two and come back."])
         end
     end
 
@@ -794,11 +794,11 @@ function CT.Refresh()
     local shards = math.floor(CT.shards * mult + 0.5)
     -- the icons say what the numbers are: ashes, then shards
     frame.run:SetText(ASH_ICON .. " " .. fmtNumber(CT.ashes) .. "   " .. SHARD_ICON .. " " .. fmtNumber(CT.shards))
-    frame.total:SetText("offered now  " .. ASH_ICON .. " " .. fmtNumber(ashes) .. "   " .. SHARD_ICON .. " " .. fmtNumber(shards))
+    frame.total:SetText(T("offered now  {ASHICON} {ashes}   {SHARDICON} {shards}", { ASHICON = ASH_ICON, ashes = fmtNumber(ashes), SHARDICON = SHARD_ICON, shards = fmtNumber(shards) }))
     local left = math.max(0, (CT.max or 0) - (CT.used or 0))
-    frame.info:SetText(left .. " of " .. (CT.max or 0) .. " offerings left")
+    frame.info:SetText(T("{left} of {CT} offerings left", { left = left, CT = (CT.max or 0) }))
     -- the price rides in the button, the way a trainer or a vendor shows one
-    frame.offer:SetText("Offer your soul  " .. fmtMoney(CT.price))
+    frame.offer:SetText(T("Offer your soul  {price}", { price = fmtMoney(CT.price) }))
     frame.offer:SetUsable(left > 0 and (CT.ashes > 0 or CT.shards > 0))
     CT.RefreshAnchor()
 end
@@ -809,10 +809,10 @@ function CT.RefreshAnchor()
     if not frame or not frame.anchor then return end
     local price = "|TInterface\\Icons\\inv_soulash:12:12:0:0|t " .. fmtNumber(CT.anchorPrice or 0)
     if CT.anchorState == 1 then
-        frame.anchor:SetText("Release your soul")
+        frame.anchor:SetText(L["Release your soul"])
         frame.anchor:SetUsable(true)
     else
-        frame.anchor:SetText((CT.anchorState == 2 and "Move your anchor  " or "Anchor your soul  ") .. price)
+        frame.anchor:SetText((CT.anchorState == 2 and L["Move your anchor  "] or L["Anchor your soul  "]) .. price)
         frame.anchor:SetUsable((CT.ashes or 0) >= (CT.anchorPrice or 0))
     end
 end
@@ -830,67 +830,50 @@ local function ContractsTour()
         steps = function()
             return {
                 {
-                    title = "Death contracts",
-                    text = "Death pays for risk. Fulfil a contract and your |cffffd700contract bonus|r " ..
-                        "rises: the bar on your run frame. That bonus multiplies everything your run " ..
-                        "has earned when you offer your soul here.",
+                    title = L["Death contracts"],
+                    text = L["Death pays for risk. Fulfil a contract and your |cffffd700contract bonus|r rises: the bar on your run frame. That bonus multiplies everything your run has earned when you offer your soul here."],
                     zone = function() return frame.scroll end,
                     boxAnchor = { "TOPLEFT", "TOPRIGHT", 14, 0 },
                 },
                 {
-                    title = "Two kinds",
-                    text = "|cffffd700The Cull|r: kill 50 creatures in a zone. " ..
-                        "|cffffd700The Execution|r: kill every boss of a dungeon or a raid. " ..
-                        "A contract pays for the time it asks: the longer its hourglass, the bigger its bonus, " ..
-                        "and the newest raids pay best. At level 80 the spirit offers them at the highest " ..
-                        "Torment you have unlocked: a contract only counts at that Torment or higher, once per run.",
+                    title = L["Two kinds"],
+                    text = L["|cffffd700The Cull|r: kill 50 creatures in a zone. |cffffd700The Execution|r: kill every boss of a dungeon or a raid. A contract pays for the time it asks: the longer its hourglass, the bigger its bonus, and the newest raids pay best. At level 80 the spirit picks their Torment from your gear: the higher your best item level against the open raid phase, the higher the Torment, never above what you have unlocked. A contract only counts at that Torment or higher, once per run."],
                     zone = function() return cards[1] end,
                     boxAnchor = { "TOPLEFT", "TOPRIGHT", 14, 0 },
                 },
                 {
-                    title = "Take one",
-                    text = "Click a row to take it. You hold |cffffd700one at a time|r. " ..
-                        "Each one is fulfilled once per run. Your |cffffd700first kill|r " ..
-                        "turns its hourglass: each contract shows its time next to its name. " ..
-                        "|cffffd700Cancel|r frees the place and puts the contract back on the list.",
+                    title = L["Take one"],
+                    text = L["Click a row to take it. You hold |cffffd700one at a time|r. Each one is fulfilled once per run. Your |cffffd700first kill|r turns its hourglass: each contract shows its time next to its name. |cffffd700Cancel|r frees the place and puts the contract back on the list."],
                     zone = function() return cards[1] end,
                     boxAnchor = { "TOPLEFT", "TOPRIGHT", 14, 0 },
                 },
                 {
-                    title = "Death keeps its due",
-                    text = "If you |cffff4040die|r while holding contracts, they are lost. Fulfilled ones " ..
-                        "are safe: their bonus is already in the bar, and it stays until you offer your " ..
-                        "soul or accept death.",
+                    title = L["Death keeps its due"],
+                    text = L["If you |cffff4040die|r, the contract you hold is lost and the bonus in the bar drops to zero. Fulfilled contracts stay fulfilled: you cannot take them again this run. Win the Wintergrasp siege to get the |cffffd700Reaper's Reprieve|r: for 2 hours, dying keeps your bonus."],
                     zone = function() return cards[1] and cards[1].bonus end,
                     boxAnchor = { "TOPLEFT", "TOPRIGHT", 14, 0 },
                 },
                 {
-                    title = "What your run is worth",
-                    text = "Top line: the Soul Ashes and Soul Shards your run holds. Below: what they " ..
-                        "become on your account if you offer your soul now, with the bonus applied.",
+                    title = L["What your run is worth"],
+                    text = L["Top line: the Soul Ashes and Soul Shards your run holds. Below: what they become on your account if you offer your soul now, with the bonus applied."],
                     zone = function() return frame.run, frame.total end,
                     boxAnchor = { "TOPLEFT", "TOPRIGHT", 14, 0 },
                 },
                 {
-                    title = "Offer your soul",
-                    text = "A |cffffd70012 second|r channel toward the spirit, out of combat, without moving. " ..
-                        "Your run's Ashes and Shards then go to your account with the bonus, the bonus " ..
-                        "starts over, and your run goes on. |cffff4040Accepting death|r banks them " ..
-                        "without the bonus.",
+                    title = L["Offer your soul"],
+                    text = L["A |cffffd70012 second|r channel toward the spirit, out of combat, without moving. Your run's Ashes and Shards then go to your account with the bonus, the bonus starts over, and your run goes on. |cffff4040Accepting death|r banks them without the bonus."],
                     zone = function() return frame.offer end,
                     boxAnchor = { "TOPLEFT", "TOPRIGHT", 14, 0 },
                 },
                 {
-                    title = "Anchor your soul",
-                    text = "Pay the run's |cffffd700Soul Ashes|r and this spirit becomes the place death " ..
-                        "sends you back to, wherever you die. It holds until you move it; releasing it is free.",
+                    title = L["Anchor your soul"],
+                    text = L["Pay the run's |cffffd700Soul Ashes|r and this spirit becomes the place death sends you back to, wherever you die. It holds until you move it; releasing it is free."],
                     zone = function() return frame.anchor end,
                     boxAnchor = { "TOPLEFT", "TOPRIGHT", 14, 0 },
                 },
                 {
-                    title = "Five a week",
-                    text = "Five offerings a week; Skill Tree nodes add more. The first of the week costs " ..
-                        "5 silver, the next ones 5 gold. Offerings and contracts come back on the weekly reset.",
+                    title = L["Five a week"],
+                    text = L["Five offerings a week; Skill Tree nodes add more. The first of the week costs 5 silver, the next ones 5 gold. Offerings and contracts come back on the weekly reset."],
                     zone = function() return frame.info end,
                     boxAnchor = { "BOTTOMLEFT", "TOPRIGHT", 14, 0 },
                 },
@@ -942,7 +925,7 @@ ticker:SetScript("OnUpdate", function(self, elapsed)
             if left <= 60 and left > 0 and not c.warned then
                 c.warned = true
                 if RaidNotice_AddMessage and RaidWarningFrame then
-                    RaidNotice_AddMessage(RaidWarningFrame, "|T" .. HOURGLASS .. ":26:26:0:0|t One minute left: " .. CT.Heading(c), ChatTypeInfo["RAID_WARNING"])
+                    RaidNotice_AddMessage(RaidWarningFrame, T("|T{HOURGLASS}:26:26:0:0|t One minute left: {c}", { HOURGLASS = HOURGLASS, c = CT.Heading(c) }), ChatTypeInfo["RAID_WARNING"])
                 end
                 PlaySound("RaidWarning")
             end
@@ -978,16 +961,16 @@ end
 
 StaticPopupDialogs["EBONHOLD_CONTRACT_TAKE"] = {
     text = "%s",
-    button1 = "Take it",
-    button2 = "Not now",
+    button1 = L["Take it"],
+    button2 = L["Not now"],
     OnAccept = function(self, key) CT.Act(key, "accept") end,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 }
 
 StaticPopupDialogs["EBONHOLD_CONTRACT_CANCEL"] = {
     text = "%s",
-    button1 = "Cancel it",
-    button2 = "Keep it",
+    button1 = L["Cancel it"],
+    button2 = L["Keep it"],
     OnAccept = function(self, key) CT.Act(key, "abandon") end,
     timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
 }
@@ -995,17 +978,15 @@ StaticPopupDialogs["EBONHOLD_CONTRACT_CANCEL"] = {
 -- Short on purpose (owner, 2026-10-17): the contract and what it pays, no explanation of the feature.
 function CT.ConfirmTake(c)
     local time = CT.HasHourglass(c) and ("   |T" .. HOURGLASS .. ":16:16:0:0|t " .. CT.DurationText(c) ..
-        "\n|cffa0a0a0The timer starts at your first kill.|r") or ""
-    local text = "|cffffd700Take this contract?|r\n\n" .. CT.Heading(c) .. "\n" .. CT.Describe(c) .. "\n\n" ..
-        "|cffffd100+" .. c.bonus .. "%|r" .. time
+        L["\n|cffa0a0a0The timer starts at your first kill.|r"]) or ""
+    local text = T("|cffffd700Take this contract?|r\n\n{c}\n{c2}\n\n|cffffd100+{bonus}%|r{time}", { c = CT.Heading(c), c2 = CT.Describe(c), bonus = c.bonus, time = time })
     local dialog = StaticPopup_Show("EBONHOLD_CONTRACT_TAKE", text)
     if dialog then dialog.data = c.key end
 end
 
 function CT.ConfirmCancel(c)
-    local progress = (c.kind == 1 and c.progress > 0) and ("Your progress (" .. c.progress .. " / " .. c.required .. ") is lost. ") or ""
-    local text = "|cffffd700Cancel this contract?|r\n\n" .. CT.Heading(c) .. "\n" .. CT.Describe(c) ..
-        (progress ~= "" and ("\n\n" .. progress) or "")
+    local progress = (c.kind == 1 and c.progress > 0) and T("Your progress ({progress} / {required}) is lost. ", { progress = c.progress, required = c.required }) or ""
+    local text = T("|cffffd700Cancel this contract?|r\n\n{c}\n{c2}{progress}", { c = CT.Heading(c), c2 = CT.Describe(c), progress = (progress ~= "" and ("\n\n" .. progress) or "") })
     local dialog = StaticPopup_Show("EBONHOLD_CONTRACT_CANCEL", text)
     if dialog then dialog.data = c.key end
 end
@@ -1042,12 +1023,12 @@ function CT.Lines()
                 local tc = CT.TimeColor(c)
                 right = right .. string.format("  |cff%02x%02x%02x%s|r", tc[1] * 255, tc[2] * 255, tc[3] * 255, CT.FormatTime(CT.TimeLeft(c)))
             end
-            if c.state == 1 and CT.Outgrown(c) then right = "|cffe23b3bpast level " .. c.levelMax .. "|r" end
+            if c.state == 1 and CT.Outgrown(c) then right = T("|cffe23b3bpast level {levelMax}|r", { levelMax = c.levelMax }) end
             table.insert(lines, { mark .. CT.Describe(c) .. "|r", 1, 1, 1, "|cffffd100+" .. c.bonus .. "%|r  " .. right })
         end
     end
     if #lines == 0 then
-        table.insert(lines, { "None yet. Talk to a Spirit Healer at any graveyard to take one.", 0.6, 0.6, 0.6 })
+        table.insert(lines, { L["None yet. Talk to a Spirit Healer at any graveyard to take one."], 0.6, 0.6, 0.6 })
     end
     return lines
 end
@@ -1055,7 +1036,7 @@ end
 SLASH_EBONHOLDCONTRACTS1 = "/contracts"
 SlashCmdList["EBONHOLDCONTRACTS"] = function(msg)
     if msg and msg:match("^%s*tut") then CT.Tutorial() return end
-    DEFAULT_CHAT_FRAME:AddMessage("|cff9fd6ffDeath contracts|r  bonus +" .. math.floor((CT.gauge or 0) + 0.5) .. "%")
+    DEFAULT_CHAT_FRAME:AddMessage(T("|cff9fd6ffDeath contracts|r  bonus +{bonus}%", { bonus = math.floor((CT.gauge or 0) + 0.5) }))
     for _, l in ipairs(CT.Lines()) do
         DEFAULT_CHAT_FRAME:AddMessage("  " .. l[1] .. (l[5] and ("  " .. l[5]) or ""), l[2], l[3], l[4])
     end

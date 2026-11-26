@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- ── Guild bank: 16 tabs, pages, search ───────────────────────────────────────
@@ -87,7 +88,14 @@ end
 -- ── Page navigation ──────────────────────────────────────────────────────────
 -- The spellbook's own paging, at the right end of the title band:
 -- "Page 2" then its round previous / next buttons.
-local nav
+-- With DragonUI on, the stock frame is never loaded: its bag module draws its own
+-- guild bank window (DragonUI_BagsterFrame3), which gets the same arrows (dragonNav).
+local nav, dragonNav
+
+local function DragonFrame()
+    local f = _G.DragonUI_BagsterFrame3
+    if f and f:IsShown() then return f end
+end
 
 local function LastUsablePage()
     local last = 0
@@ -109,27 +117,32 @@ local function MatchesBeyond(step)
     return total
 end
 
-local function UpdatePageButtons()
-    if not nav then return end
+local function UpdateNav(bar)
+    if not bar then return end
     if not GuildBankSetPage then
-        nav:Hide()   -- client without the guild bank part of ebonhold.dll
+        bar:Hide()   -- client without the guild bank part of ebonhold.dll
         return
     end
 
     local last = LastUsablePage()
     if last == 0 and State.page == 0 then
-        nav:Hide()   -- a single page: nothing to turn
+        bar:Hide()   -- a single page: nothing to turn
         return
     end
 
-    nav:Show()
-    nav.text:SetFormattedText(PAGE_NUMBER, State.page + 1)
-    for _, arrow in ipairs({ nav.prev, nav.next }) do
+    bar:Show()
+    bar.text:SetFormattedText(PAGE_NUMBER, State.page + 1)
+    for _, arrow in ipairs({ bar.prev, bar.next }) do
         local target = State.page + arrow.step
         if target >= 0 and target <= last then arrow:Enable() else arrow:Disable() end
         -- searching: the arrow towards matches on other pages glows
         if Search.text ~= "" and MatchesBeyond(arrow.step) > 0 then arrow:LockHighlight() else arrow:UnlockHighlight() end
     end
+end
+
+local function UpdatePageButtons()
+    UpdateNav(nav)
+    UpdateNav(dragonNav)
 end
 
 local function RequestPage(page)
@@ -139,6 +152,8 @@ local function RequestPage(page)
         GuildBankInfoSaveButton:Click()
     end
     if GuildBankPopupFrame then GuildBankPopupFrame:Hide() end
+    local dragon = DragonFrame()
+    if dragon and dragon.tabEditor then dragon.tabEditor:Hide() end
     if GuildBankSetPage then GuildBankSetPage(page) end
 end
 
@@ -149,19 +164,19 @@ local function PageTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(string.format(PAGE_NUMBER, page + 1), 1, 1, 1)
     if State.purchased > FirstTab(page) then
-        GameTooltip:AddLine(string.format("Tabs %d - %d", first, math.min(last, State.purchased)), NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+        GameTooltip:AddLine(T("Tabs {first} - {purchased}", { first = string.format("%d", first), purchased = string.format("%d", math.min(last, State.purchased)) }), NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
     else
-        GameTooltip:AddLine(string.format("Buy tab %d here.", first), NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+        GameTooltip:AddLine(T("Buy tab {first} here.", { first = string.format("%d", first) }), NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
     end
     local found = Search.text ~= "" and MatchesBeyond(self.step) or 0
     if found > 0 then
-        GameTooltip:AddLine(string.format("%d search result%s that way.", found, found > 1 and "s" or ""), GREEN_FONT_COLOR.r, GREEN_FONT_COLOR.g, GREEN_FONT_COLOR.b)
+        GameTooltip:AddLine(T("{found} search result{s} that way.", { found = string.format("%d", found), s = found > 1 and "s" or "" }), GREEN_FONT_COLOR.r, GREEN_FONT_COLOR.g, GREEN_FONT_COLOR.b)
     end
     GameTooltip:Show()
 end
 
-local function CreatePageArrow(name, direction, step)
-    local button = CreateFrame("Button", name, nav)
+local function CreatePageArrow(parent, name, direction, step)
+    local button = CreateFrame("Button", name, parent)
     button:SetSize(26, 26)
     button:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. direction .. "Page-Up")
     button:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. direction .. "Page-Down")
@@ -298,9 +313,9 @@ local function CreatePageButtons()
     nav:SetPoint("TOPRIGHT", GuildBankFrame, "TOPRIGHT", -16, -25)
     nav:SetFrameLevel(GuildBankFrame:GetFrameLevel() + 5)
 
-    nav.next = CreatePageArrow("ProjectEbonholdGuildBankNextPage", "Next", 1)
+    nav.next = CreatePageArrow(nav, "ProjectEbonholdGuildBankNextPage", "Next", 1)
     nav.next:SetPoint("RIGHT", nav, "RIGHT", 0, 0)
-    nav.prev = CreatePageArrow("ProjectEbonholdGuildBankPrevPage", "Prev", -1)
+    nav.prev = CreatePageArrow(nav, "ProjectEbonholdGuildBankPrevPage", "Prev", -1)
     nav.prev:SetPoint("RIGHT", nav.next, "LEFT", -1, 0)
     nav.text = nav:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     nav.text:SetPoint("RIGHT", nav.prev, "LEFT", -5, 0)
@@ -327,6 +342,166 @@ local function CreatePageButtons()
     UpdatePageButtons()
 end
 
+-- DragonUI's guild bank window: created on its first opening, so this runs on
+-- every GUILDBANKFRAME_OPENED until it finds it. Arrows left of its close button;
+-- in a narrow window the "Page N" text goes so they never cover its search box.
+-- Its own search filters the shown tab only (ours, on the server, stays stock-only).
+local function DragonHideBuyTabPastMax(f)
+    if not State.received or not f.tabButtons then return end
+    local numTabs = GetNumGuildBankTabs()
+    if numTabs < PAGE_TABS and FirstTab(State.page) + numTabs >= State.maxTabs then
+        local tab = f.tabButtons[numTabs + 1]
+        if tab and tab.buyTab then tab:Hide() end
+    end
+end
+
+local function FitDragonNav()
+    local f = _G.DragonUI_BagsterFrame3
+    if not (dragonNav and f) then return end
+    if f:GetWidth() < 440 then dragonNav.text:Hide() else dragonNav.text:Show() end
+end
+
+local function AttachDragonFrame()
+    local f = _G.DragonUI_BagsterFrame3
+    if dragonNav or not f then return end
+
+    dragonNav = CreateFrame("Frame", "ProjectEbonholdDragonGuildBankPages", f)
+    dragonNav:SetSize(110, 26)
+    local close = _G.DragonUI_BagsterFrame3CloseButton
+    if close then
+        dragonNav:SetPoint("RIGHT", close, "LEFT", -40, -30)
+    else
+        dragonNav:SetPoint("TOPRIGHT", f, "TOPRIGHT", -92, -54)
+    end
+    dragonNav:SetFrameLevel(f:GetFrameLevel() + 5)
+
+    dragonNav.next = CreatePageArrow(dragonNav, "ProjectEbonholdDragonGuildBankNextPage", "Next", 1)
+    dragonNav.next:SetPoint("RIGHT", dragonNav, "RIGHT", 0, 0)
+    dragonNav.prev = CreatePageArrow(dragonNav, "ProjectEbonholdDragonGuildBankPrevPage", "Prev", -1)
+    dragonNav.prev:SetPoint("RIGHT", dragonNav.next, "LEFT", -1, 0)
+    dragonNav.text = dragonNav:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    dragonNav.text:SetPoint("RIGHT", dragonNav.prev, "LEFT", -5, 0)
+    dragonNav:Hide()
+
+    if f.UpdateTabs then hooksecurefunc(f, "UpdateTabs", DragonHideBuyTabPastMax) end
+    f:HookScript("OnShow", UpdatePageButtons)
+    f:HookScript("OnSizeChanged", FitDragonNav)
+    FitDragonNav()
+    DragonHideBuyTabPastMax(f)
+    UpdatePageButtons()
+end
+
+-- A new page while DragonUI's window is open: same steps as the stock frame below,
+-- with its own tab selection (SetTab + the side tab check marks).
+local function DragonShowPage(f)
+    QueryGuildBankTab(1)
+    local numTabs = GetNumGuildBankTabs()
+    local tab = GetCurrentGuildBankTab() or 1
+    if tab < 1 or tab > numTabs then tab = 1 end
+    SetCurrentGuildBankTab(tab)
+    QueryGuildBankTab(tab)
+    if f.itemFrame then f.itemFrame:SetTab(tab) end
+    if f.UpdateTabs then f:UpdateTabs() end
+    if f.mode and f.mode ~= "bank" and f.RefreshMode then f:RefreshMode() end
+end
+
+-- ── Guild Control: bank rights of tabs 7-16 (PTR 4223) ──────────────────────
+-- The stock window has six tab-rights rows; the server fills and saves them for the
+-- tabs of the member's current bank page. Its page could only be turned from the bank,
+-- so the rights of tabs 7-16 could not be found. Same arrows here. The window is closed
+-- and opened again on the new page: its OnShow reloads the rank from the fresh rights,
+-- so nothing of the old page can be saved onto the new one (unsaved changes drop).
+local controlNav
+local reopenControl = false
+
+local function LastRightsPage()
+    local last = 0
+    for page = 0, NumPages() - 1 do
+        if State.purchased > FirstTab(page) then last = page end
+    end
+    return last
+end
+
+local function UpdateControlPage()
+    if not controlNav then return end
+    if not GuildBankSetPage then
+        -- client without the guild bank part of ebonhold.dll: say why tabs 7+ are missing
+        if GetNumGuildBankTabs and GetNumGuildBankTabs() >= PAGE_TABS then
+            controlNav.text:SetText(L["Tabs 7+: update the client"])
+            controlNav.prev:Hide(); controlNav.next:Hide()
+            controlNav:Show()
+        else
+            controlNav:Hide()
+        end
+        return
+    end
+    local last = LastRightsPage()
+    if not State.received or (last == 0 and State.page == 0) then
+        controlNav:Hide()
+        return
+    end
+    controlNav.prev:Show(); controlNav.next:Show()
+    local first = FirstTab(State.page)
+    controlNav.text:SetText(T("Bank tabs {first} - {last}", { first = first + 1, last = math.min(first + PAGE_TABS, State.purchased) }))
+    for _, arrow in ipairs({ controlNav.prev, controlNav.next }) do
+        local target = State.page + arrow.step
+        if target >= 0 and target <= last then arrow:Enable() else arrow:Disable() end
+    end
+    controlNav:Show()
+end
+
+local function CreateControlPageButtons()
+    if controlNav or not GuildControlPopupFrame then return end
+    controlNav = CreateFrame("Frame", "ProjectEbonholdGuildControlPages", GuildControlPopupFrame)
+    controlNav:SetSize(190, 34)
+    controlNav:SetPoint("TOPRIGHT", GuildControlPopupFrame, "BOTTOMRIGHT", -6, 6)
+    controlNav:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    controlNav:SetBackdropColor(0, 0, 0, 0.8)
+
+    local function arrow(direction, step)
+        local button = CreateFrame("Button", nil, controlNav)
+        button:SetSize(24, 24)
+        button:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. direction .. "Page-Up")
+        button:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. direction .. "Page-Down")
+        button:SetDisabledTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. direction .. "Page-Disabled")
+        button:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+        button.step = step
+        button:SetScript("OnClick", function(self)
+            local target = State.page + self.step
+            if target < 0 or target > LastRightsPage() then return end
+            PlaySound("igAbiliityPageTurn")
+            reopenControl = true
+            GuildControlPopupFrame:Hide()
+            RequestPage(target)
+        end)
+        button:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(L["Rights of the next bank tabs"], 1, 1, 1)
+            GameTooltip:AddLine(L["Changes not accepted yet are dropped."], NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, true)
+            GameTooltip:Show()
+        end)
+        button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        return button
+    end
+    controlNav.next = arrow("Next", 1)
+    controlNav.next:SetPoint("RIGHT", controlNav, "RIGHT", -6, 0)
+    controlNav.prev = arrow("Prev", -1)
+    controlNav.prev:SetPoint("RIGHT", controlNav.next, "LEFT", -1, 0)
+    controlNav.text = controlNav:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    controlNav.text:SetPoint("LEFT", controlNav, "LEFT", 10, 0)
+    controlNav.text:SetPoint("RIGHT", controlNav.prev, "LEFT", -4, 0)
+    controlNav.text:SetJustifyH("LEFT")
+    controlNav:Hide()
+
+    GuildControlPopupFrame:HookScript("OnShow", UpdateControlPage)
+    UpdateControlPage()
+end
+
 -- ── Server ───────────────────────────────────────────────────────────────────
 local function OnPageInfo(page, purchased, maxTabs, nextCost)
     local previousPage = State.page
@@ -337,6 +512,22 @@ local function OnPageInfo(page, purchased, maxTabs, nextCost)
     State.received = true
 
     UpdatePageButtons()
+    UpdateControlPage()
+    -- the server sent this page's rank rights before this packet: reopen Guild Control on them
+    if reopenControl then
+        reopenControl = false
+        if GuildControlPopupFrame and GuildFrame and GuildFrame:IsShown() then GuildControlPopupFrame:Show() end
+    end
+
+    local dragon = DragonFrame()
+    if dragon then
+        if State.page ~= previousPage then
+            DragonShowPage(dragon)
+        elseif dragon.UpdateTabs then
+            dragon:UpdateTabs()
+        end
+        return
+    end
 
     if not (GuildBankFrame and GuildBankFrame:IsShown()) then return end
 
@@ -396,12 +587,17 @@ end
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_ENTERING_WORLD")
+loader:RegisterEvent("GUILDBANKFRAME_OPENED")
 loader:SetScript("OnEvent", function(self, event, name)
-    if event == "ADDON_LOADED" then
+    if event == "GUILDBANKFRAME_OPENED" then
+        -- DragonUI builds its window in its own handler of this event: look once it ran.
+        if not dragonNav then C_Timer.After(0, AttachDragonFrame) end
+    elseif event == "ADDON_LOADED" then
         if name == "Blizzard_GuildBankUI" then CreatePageButtons() end
     elseif event == "PLAYER_ENTERING_WORLD" then
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
         if IsAddOnLoaded("Blizzard_GuildBankUI") then CreatePageButtons() end
+        CreateControlPageButtons()
         -- After a /reload the server may still show another page: ask which one.
         if IsInGuild() and GuildBankSetPage then
             GuildBankSetPage(-1)

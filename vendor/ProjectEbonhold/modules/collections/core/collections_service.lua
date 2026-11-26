@@ -219,8 +219,104 @@ local function send(op, body)
     if PE and PE.sendToServer and PE.CS and PE.CS[op] then PE.sendToServer(PE.CS[op], body or "") end
 end
 function ez:SetFormLookHiddenOnServer(hidden) send("REQUEST_FORM_LOOK_SET", hidden and "1" or "0") end
+
+--=============================================================================
+-- Wardrobe unlocks: a look of Data/transmog_unlock_data.lua (the server's
+-- world.transmog_unlock) can be added to the collection without the item:
+-- for Coins of Forgotten Appearances (taken), or, for the Archive's Torment
+-- pieces, with the raid's Tormented Trophy in the bags (asked, never taken -
+-- the vendor's rule). The server checks everything again and answers with
+-- SEND_APPEARANCE_LEARNED (or a chat line saying why not).
+--=============================================================================
+ez.UnlockCoinItem = 190225
+local unlockPrice, collectors, torment
+local function BuildUnlock()
+    if unlockPrice then return end
+    unlockPrice, collectors, torment = {}, {}, {}
+    local E = _G.Ebonhold or {}
+    local flat = E.TransmogUnlockFlat or {}
+    for i = 1, #flat - 2, 3 do unlockPrice[flat[i]] = { coins = flat[i + 1], req = flat[i + 2] } end
+    for _, item in ipairs(E.TransmogCollectorsFlat or {}) do collectors[item] = true end
+    for _, item in ipairs(E.TransmogTormentFlat or {}) do torment[item] = true end
+    E.TransmogUnlockFlat, E.TransmogCollectorsFlat, E.TransmogTormentFlat = nil, nil, nil
+end
+
+-- coins, itemID, reqItem of the unlock offered for this visual (the cheapest coin
+-- price first, else an item-gated one); nil when collected or not unlockable.
+-- coins is 0 for an item-gated unlock (reqItem asked, not taken).
+function ez:GetVisualUnlock(visualID)
+    BuildUnlock()
+    if not visualID or ez:IsVisualCollected(visualID) then return nil end
+    local best, bestItem
+    for _, item in ipairs(ez:GetVisualSourceItems(visualID) or { visualID }) do
+        local p = unlockPrice[item]
+        if p and (not best or (p.req == 0 and (best.req ~= 0 or p.coins < best.coins))) then best, bestItem = p, item end
+    end
+    if best then return best.coins, bestItem, best.req end
+end
+
+local function sourcesIn(set, visualID)
+    BuildUnlock()
+    for _, item in ipairs(ez:GetVisualSourceItems(visualID) or { visualID }) do
+        if set[item] then return true end
+    end
+    return false
+end
+-- "Collector's": the Archive's coin cosmetics. "Torment": the Archive's Torment pieces.
+function ez:IsCollectorsVisual(visualID) return sourcesIn(collectors, visualID) end
+function ez:IsTormentVisual(visualID) return sourcesIn(torment, visualID) end
+
+-- Name (or link) of the item an unlock asks for; queries the item cache when it is unknown.
+function ez:GetUnlockReqName(reqItem, asLink)
+    local name, link = GetItemInfo(reqItem)
+    if not name then ez:QueryItem(reqItem) end
+    return (asLink and link) or name or ProjectEbonhold.L["Tormented Trophy"]
+end
+
+-- Short price text: "12 Coins" or "Tormented Trophy of Ragnaros (kept)".
+function ez:GetUnlockPriceText(coins, reqItem)
+    if reqItem and reqItem ~= 0 then
+        return ProjectEbonhold.T("{item} (kept)", { item = ez:GetUnlockReqName(reqItem) })
+    end
+    return format(ProjectEbonhold.L["%d |4Coin:Coins;"], coins)
+end
+
+function ez:UnlockAppearanceOnServer(itemID) send("REQUEST_UNLOCK_APPEARANCE", tostring(itemID)) end
+
+StaticPopupDialogs["EBONHOLD_UNLOCK_APPEARANCE"] = {
+    text = ProjectEbonhold.L["Unlock this appearance?|n|n%s|n|nCost: %s"],
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(self, itemID) ez:UnlockAppearanceOnServer(itemID) end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+}
+
+-- Confirm, then ask the server. Refuses early (chat line) when the bags lack the price.
+function ez:PromptUnlockAppearance(visualID)
+    local coins, itemID, reqItem = ez:GetVisualUnlock(visualID)
+    if not coins then return end
+    if reqItem ~= 0 then
+        if (GetItemCount(reqItem) or 0) < 1 then
+            DEFAULT_CHAT_FRAME:AddMessage(ProjectEbonhold.T("|cffff2020You need {item} in your bags to unlock this appearance.|r", { item = ez:GetUnlockReqName(reqItem, true) }))
+            return
+        end
+    else
+        local have = GetItemCount(ez.UnlockCoinItem) or 0
+        if have < coins then
+            DEFAULT_CHAT_FRAME:AddMessage(ProjectEbonhold.T("|cffff2020You need {cost} Coins of Forgotten Appearances to unlock this appearance (you have {have}).|r", { cost = coins, have = have }))
+            return
+        end
+    end
+    local name, link = GetItemInfo(itemID)
+    local price = reqItem ~= 0 and ProjectEbonhold.T("{item} in your bags (kept)", { item = ez:GetUnlockReqName(reqItem, true) })
+        or format(ProjectEbonhold.L["%d |4Coin:Coins; of Forgotten Appearances"], coins)
+    local dialog = StaticPopup_Show("EBONHOLD_UNLOCK_APPEARANCE", link or name or ProjectEbonhold.T("item {id}", { id = itemID }), price)
+    if dialog then dialog.data = itemID end
+end
 -- id present -> overwrite that outfit; 255 -> new. Body: "id|name|slot:entry,..."
-function ez:SaveOutfitToServer(id, name, sourcesCsv) send("REQUEST_OUTFIT_SAVE", tostring(id or 255) .. "|" .. (name or "Outfit") .. "|" .. (sourcesCsv or "")) end
+function ez:SaveOutfitToServer(id, name, sourcesCsv) send("REQUEST_OUTFIT_SAVE", tostring(id or 255) .. "|" .. (name or ProjectEbonhold.L["Outfit"]) .. "|" .. (sourcesCsv or "")) end
 function ez:RenameOutfitOnServer(id, name)       send("REQUEST_OUTFIT_RENAME", tostring(id) .. "|" .. (name or "")) end
 function ez:DeleteOutfitOnServer(id)             send("REQUEST_OUTFIT_DELETE", tostring(id)) end
 function ez:ApplyOutfitOnServer(id)              send("REQUEST_OUTFIT_APPLY", tostring(id)) end

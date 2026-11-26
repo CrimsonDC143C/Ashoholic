@@ -1,0 +1,175 @@
+-- Copyright (c) 2026 NeticSoul. Licensed under the MIT License; see LICENSE.
+
+local addon = DragonUI
+local NP = addon.Nameplates
+local C = NP.const
+
+-- Nameplates raid marker layout.
+
+local function IsComboVisible(plateData)
+    local host = plateData and plateData._comboHost
+    return host and host.IsShown and host:IsShown() or false
+end
+
+-- On the region, not plateData: plateData is rebuilt on re-apply.
+local function RememberNativeRaidIconAnchor(native)
+    if native._duiOrigPoints then
+        return
+    end
+    local points = {}
+    for i = 1, (native.GetNumPoints and native:GetNumPoints()) or 0 do
+        points[i] = { native:GetPoint(i) }
+    end
+    native._duiOrigPoints = points
+    native._duiOrigParent = native.GetParent and native:GetParent() or nil
+    local w, h = native:GetWidth(), native:GetHeight()
+    if w and w > 0.01 and h and h > 0.01 then
+        native._duiOrigW, native._duiOrigH = w, h
+    end
+end
+
+-- Undo ReflowTopOverlays reparent/alpha; Blizzard chrome has no other restore path.
+function NP.widgets.RestoreNativeRaidIcon(plateData)
+    local native = plateData and plateData.raidIcon
+    if not native then
+        return
+    end
+    if native._duiOrigParent and native.SetParent then
+        native:SetParent(native._duiOrigParent)
+    end
+    local points = native._duiOrigPoints
+    if points and #points > 0 then
+        native:ClearAllPoints()
+        for i = 1, #points do
+            native:SetPoint(unpack(points[i], 1, 5))
+        end
+    end
+    if native._duiOrigW and native._duiOrigH then
+        native:SetSize(native._duiOrigW, native._duiOrigH)
+    end
+    if native.SetAlpha then
+        native:SetAlpha(1)
+    end
+end
+
+-- Shared by the aura row and its preview box, so the box always shows where the icons go.
+function NP.widgets.GetDebuffHostAnchor(plateData)
+    local cfg = NP.config.GetCfg()
+    local comboVisible = IsComboVisible(plateData)
+    local anchorTo = plateData.minaNameRow or plateData.minaName
+    local y = comboVisible and C.DEBUFF_HOST_OFFSET_Y_WITH_COMBO or C.DEBUFF_HOST_OFFSET_Y
+    -- Retail anchors auras to the name row only above the bar; a row inside it would put them on the bar.
+    if NP.config.IsNameOverlayBar() and plateData.minaHp then
+        anchorTo = plateData.minaHp
+        if not comboVisible then
+            y = C.DEBUFF_HOST_OFFSET_Y_OVERLAY
+        end
+        -- Retail's padding is measured from a bare bar; ours has the capsule on top of it.
+        if NP.retail_chrome and NP.retail_chrome.GetTopInset then
+            y = y + NP.retail_chrome.GetTopInset()
+        end
+    end
+    return anchorTo, cfg.debuffOffsetX or 0, y + (cfg.debuffOffsetY or 0)
+end
+
+function NP.widgets.ReflowTopOverlays(plateData)
+    if not plateData then return end
+
+    local cfg = NP.config.GetCfg()
+    local comboVisible = IsComboVisible(plateData)
+
+    local debuffHost = plateData.minaDebuffHost
+    if debuffHost and plateData.minaNameRow then
+        local anchorTo, x, y = NP.widgets.GetDebuffHostAnchor(plateData)
+        debuffHost:ClearAllPoints()
+        debuffHost:SetPoint("BOTTOMLEFT", anchorTo, "TOPLEFT", x, y)
+    end
+
+    local native = plateData.raidIcon
+    local hp = plateData.minaHp
+    if native and hp then
+        -- Reparent to hp for depth ordering with visual stack. In headline mode
+        -- hp itself is hidden (SyncHealth), which would hide the marker too
+        -- since it inherits its parent's visibility — keep it on visualRoot
+        -- instead, which is never hidden, while still anchoring to hp's position.
+        local headline = NP.gather.IsHeadlineActive and NP.gather.IsHeadlineActive(plateData)
+        RememberNativeRaidIconAnchor(native)
+        if native.SetParent then
+            native:SetParent((headline and plateData.visualRoot) or hp)
+        end
+        local reaction = select(1, NP.native_style.GetPlateReaction(plateData))
+        local isFriendly = (reaction == "FRIENDLY")
+        local markerX = C.RAID_MARKER_OFFSET_X or 0
+        local markerY = C.RAID_MARKER_OFFSET_Y
+
+        -- Override: beside bar on all plates. Else hostile+debuffs. Else Y adjusts for combo.
+        if cfg.raidMarkerDebuffLayout or ((not isFriendly) and cfg.showDebuffs) then
+            local barW = (hp.GetWidth and hp:GetWidth()) or select(1, NP.config.GetBarRefSize())
+            local markerSize = C.RAID_MARKER_SIZE or 24
+            local sideGap = C.RAID_MARKER_SIDE_GAP or 8
+            -- CENTER-anchored bar; offset from TOP-center.
+            markerX = (barW * 0.5) + (markerSize * 0.5) + sideGap
+            markerY = C.RAID_MARKER_OFFSET_Y_WITH_DEBUFFS or 0
+        elseif comboVisible then
+            markerY = C.RAID_MARKER_OFFSET_Y_WITH_COMBO
+        end
+        native:ClearAllPoints()
+        if headline and plateData.minaName then
+            -- Headline hides the bar, so neither beside nor above it lines up with the name.
+            native:SetPoint("BOTTOM", plateData.minaName, "TOP", 0, 2)
+        else
+            native:SetPoint("TOP", hp, "TOP", markerX, markerY)
+        end
+        native:SetSize(C.RAID_MARKER_SIZE, C.RAID_MARKER_SIZE)
+    end
+end
+
+function NP.widgets.LayoutRaidMarker(plateData)
+    local native = plateData.raidIcon
+    if not native then return false end
+    -- A missing visual stack is not a reason to hide: widgets.Sync turns any false into
+    -- alpha 0, and RAID_TARGET_UPDATE sweeps every plate, including ones discovered before
+    -- their bars exist. Leaving it on Blizzard's own anchor beats blanking it until the
+    -- next full refresh.
+    if not plateData.minaHp then return true end
+    NP.widgets.ReflowTopOverlays(plateData)
+    return true
+end
+
+function NP.widgets.SyncRaidMarker(plateData)
+    local cfg = NP.config.GetCfg()
+    local native = plateData.raidIcon
+    if not native then return end
+    if cfg.showRaidMarkers == false then
+        if native.SetAlpha then native:SetAlpha(0) end
+        return
+    end
+    -- Layout already reflowed via widgets.Sync; alpha only here. Do NOT gate on IsShown:
+    -- toggling plates with the game's own key re-shows the plate before Blizzard re-shows
+    -- this region, so a sync landing in that gap latched alpha 0 and the marker stayed
+    -- invisible until the next full refresh -- which is why targeting brought it back.
+    -- The texture's own shown flag already gates it, so alpha 1 costs nothing when hidden.
+    if native.SetAlpha then
+        native:SetAlpha(1)
+    end
+end
+
+NP.widgets.Register("RaidMarker", {
+    Ensure = function(plateData)
+        return plateData and plateData.raidIcon ~= nil
+    end,
+    Layout = function(plateData)
+        return NP.widgets.LayoutRaidMarker(plateData)
+    end,
+    Sync = function(plateData)
+        NP.widgets.SyncRaidMarker(plateData)
+    end,
+    Hide = function(plateData)
+        local native = plateData and plateData.raidIcon
+        if not native then return end
+        -- Alpha 0 only; :Hide() breaks persistence on camera rotate.
+        if native.SetAlpha then
+            native:SetAlpha(0)
+        end
+    end,
+})

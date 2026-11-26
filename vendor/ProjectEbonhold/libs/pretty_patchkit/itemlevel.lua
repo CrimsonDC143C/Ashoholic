@@ -303,8 +303,35 @@ local function updateInspect()
 	findItemInfo(InspectFrame.unit);
 end
 
+-- The inspected player's gear reaches the client AFTER the inspect window opens (NotifyInspect
+-- answers later), and an item the client has never seen comes back without its item level
+-- until it is cached. Scanning once at OnShow left the box at 0 or at a partial average:
+-- scan again when the gear arrives and a few times shortly after, while the window is open.
+local INSPECT_RESCANS = { 0.3, 1, 2.5 };
+local inspectRescan = CreateFrame("Frame");
+inspectRescan:Hide();
+inspectRescan:SetScript("OnUpdate", function(self, elapsed)
+	self.t = self.t + elapsed;
+	if (self.t < INSPECT_RESCANS[self.n]) then return; end
+	if (ilvlFrame.inspectVisible and InspectFrame.unit) then updateInspect(); end
+	self.n = self.n + 1;
+	if (not INSPECT_RESCANS[self.n] or not ilvlFrame.inspectVisible) then self:Hide(); end
+end);
+local function scheduleInspectRescans()
+	inspectRescan.t, inspectRescan.n = 0, 1;
+	inspectRescan:Show();
+end
+
 local function eventHandler(self,event,...)
 	if (_data.enableConfig) then
+		if (event == "INSPECT_TALENT_READY" or (event == "UNIT_INVENTORY_CHANGED" and InspectFrame.unit
+				and (...) and UnitIsUnit((...), InspectFrame.unit) and not UnitIsUnit((...), "player"))) then
+			if (ilvlFrame.inspectVisible and _data.enableInspect and InspectFrame.unit) then
+				updateInspect();
+				scheduleInspectRescans();
+			end
+			return;
+		end
 		if (event == "PLAYER_TARGET_CHANGED" and ilvlFrame.inspectVisible and _data.enableInspect) then
 			if (InspectFrame.unit and InspectFrame.unit == "target") then
 				updateInspect();
@@ -513,12 +540,17 @@ local function setupEventHandler(self,event)
 		ilvlFrame:RegisterEvent("SOCKET_INFO_UPDATE");
 		ilvlFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
 		ilvlFrame:RegisterEvent("PLAYER_TARGET_CHANGED");
+		ilvlFrame:RegisterEvent("INSPECT_TALENT_READY");
 		
-		InspectFrame:SetScript("OnShow", function(self)
+		-- HookScript: the window's own OnShow / OnHide (portrait, name, tabs) must still run.
+		InspectFrame:HookScript("OnShow", function(self)
 			ilvlFrame.inspectVisible = true;
-			updateInspect();
+			if (_data.enableInspect) then
+				updateInspect();
+				scheduleInspectRescans();
+			end
 		end);
-		InspectFrame:SetScript("OnHide", function(self)
+		InspectFrame:HookScript("OnHide", function(self)
 			ilvlFrame.inspectVisible = false;
 		end);
 		

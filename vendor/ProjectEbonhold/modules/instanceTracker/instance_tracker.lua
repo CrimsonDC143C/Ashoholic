@@ -1,3 +1,10 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
+
+-- The server sends English names, some with a stray trailing space (world.instance_clear_boss):
+-- look them up trimmed, so both spellings share one French entry.
+local function Localized(name)
+    return L[(name or ""):match("^%s*(.-)%s*$")]
+end
 -- ==============================================================================
 -- Instance tracker (2026-10-05): inside a dungeon or a raid, which bosses are dead and alive,
 -- and what clearing the place (every boss dead, in any order) gives this character.
@@ -60,7 +67,7 @@ end
 -- written like the run frame's own "Torment 30"
 local function TormentText(t)
     if not t or t <= 0 then return "" end
-    return "Torment " .. t
+    return T("Torment {t}", { t = t })
 end
 
 local function Text(parent, size, color)
@@ -71,6 +78,40 @@ local function Text(parent, size, color)
     fs:SetJustifyH("LEFT")
     if color then fs:SetTextColor(unpack(color)) end
     return fs
+end
+
+-- On Blizzard's own quest tracker (Quest Tracker or the whole interface on Old) the stock title and
+-- lines start at WatchFrame's top, where this frame sits: while it is shown they are pushed down
+-- under it, as our tracker does (bug 2026-11-19, the two texts drawn over each other). Out of combat
+-- only (WatchFrameLines holds the secure quest-item buttons); IT.Refresh already waits for that.
+local STOCK_PIECES = { "WatchFrameHeader", "WatchFrameCollapseExpandButton", "WatchFrameLines" }
+local stockShift = 0
+
+local function PushStockWatchFrame()
+    local QT = ProjectEbonhold.QuestTracker
+    if not WatchFrame or (QT and QT.IsEnabled and QT.IsEnabled()) then return end
+    local shift = 0
+    if frame and frame:IsShown() then
+        shift = (frame:GetHeight() + 10) * frame:GetEffectiveScale() / WatchFrame:GetEffectiveScale()
+    end
+    if math.abs(shift - stockShift) < 0.5 then return end
+    for _, n in ipairs(STOCK_PIECES) do
+        local g = _G[n]
+        if g and g:GetParent() == WatchFrame then
+            -- read where they are while unshifted: a skin (ElvUI) may have re-anchored them
+            if stockShift == 0 or not g.ebhStockPoints then
+                g.ebhStockPoints = {}
+                for i = 1, g:GetNumPoints() do g.ebhStockPoints[i] = { g:GetPoint(i) } end
+            end
+            g:ClearAllPoints()
+            for _, pt in ipairs(g.ebhStockPoints) do
+                local p, rel, relP, x, y = unpack(pt)
+                if p:find("TOP") then y = (y or 0) - shift end
+                g:SetPoint(p, rel, relP, x, y)
+            end
+        end
+    end
+    stockShift = shift
 end
 
 -- the objectives tracker moves under this frame while it is shown
@@ -101,14 +142,13 @@ end
 local function Build()
     if frame then return end
     frame = CreateFrame("Frame", "ProjectEbonholdInstanceTracker", UIParent)
+    -- Edit Mode's Objective Tracker size scales WatchFrame and this column together; made later, take it
+    if WatchFrame then frame:SetScale(WatchFrame:GetScale()) end
     frame:SetWidth(WIDTH)
     frame:SetHeight(22)
-    local run = _G["ProjectEbonholdPlayerRunFrame"]
-    if run then
-        frame:SetPoint("TOPRIGHT", run, "BOTTOMRIGHT", 0, -6)
-    else
-        frame:SetPoint("TOPRIGHT", WatchFrame or UIParent, "TOPRIGHT", 0, 0)
-    end
+    -- On WatchFrame like the quest tracker, so Edit Mode's Objective Tracker box moves it (owner
+    -- 2026-11-16: it hung under the run tracker, which is dragged freely and has no Edit Mode box).
+    frame:SetPoint("TOPRIGHT", WatchFrame or UIParent, "TOPRIGHT", 0, 0)
 
     -- header: instance name + gradient underline + Torment + collapse chevron
     header = CreateFrame("Frame", nil, frame)
@@ -144,6 +184,10 @@ local function Build()
     underline:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 0)
     underline:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", -20, 0)
     underline:SetGradientAlpha("HORIZONTAL", 1, 0.82, 0, 0.55, 1, 0.82, 0, 0)
+
+    -- the pieces and pools, read by skins
+    frame.header, frame.title, frame.torment, frame.collapse, frame.underline = header, title, torment, collapse, underline
+    frame.moduleHeaders, frame.bossLines, frame.rewardRows = moduleHeaders, bossLines, rewardRows
 end
 
 -- "Bosses" / "Rewards" bands, as the objectives tracker's "Quests" / "Achievements"
@@ -175,7 +219,7 @@ local function BossLine(i)
     line.lock = Text(line, 11, C_LOOTED)
     line.lock:SetPoint("RIGHT", line, "RIGHT", 0, 0)
     line.lock:SetJustifyH("RIGHT")
-    line.lock:SetText("looted")
+    line.lock:SetText(L["looted"])
     line.name = Text(line, 12)
     line.name:SetPoint("LEFT", line, "LEFT", 0, 0)
     line.name:SetPoint("RIGHT", line.lock, "LEFT", -4, 0)
@@ -235,11 +279,32 @@ local itemRetry, itemTries = 0, 0
 local events -- created below; drives the item-cache redraw
 local deferred = false -- a redraw asked in combat, done at PLAYER_REGEN_ENABLED
 
+-- In combat only the texts of the lines already shown change (font strings are not protected):
+-- a boss dies in combat, and a player kept in combat would else see him alive until a /reload
+-- (bug "Nexus Boss kill credit", 2026-11-19). The layout waits for PLAYER_REGEN_ENABLED.
+local function RefreshTexts()
+    if not state or not frame:IsShown() or DB().collapsed then return end
+    title:SetText(Localized(state.name))
+    torment:SetText(TormentText(state.torment))
+    local dead = 0
+    for i, boss in ipairs(state.bosses) do
+        if boss.dead then dead = dead + 1 end
+        local line = bossLines[i]
+        if line and line:IsShown() then
+            line.name:SetText("- " .. Localized(boss.name))
+            line.name:SetTextColor(unpack(boss.dead and C_LINE_DONE or C_LINE))
+            if boss.locked then line.lock:Show() else line.lock:Hide() end
+        end
+    end
+    if moduleHeaders[1] then moduleHeaders[1].right:SetText(dead .. " / " .. #state.bosses) end
+end
+
 function IT.Refresh()
     -- The objectives tracker (secure item buttons) anchors under this frame, which makes it
     -- protected: SetHeight/Show/Hide from here are blocked in combat (taint.log 2026-11-03).
     if frame and InCombatLockdown() then
         deferred = true
+        RefreshTexts()
         return
     end
     deferred = false
@@ -248,12 +313,13 @@ function IT.Refresh()
             frame:Hide()
             NotifyQuestTracker()
         end
+        PushStockWatchFrame()
         return
     end
     Build()
     UpdateChevron()
 
-    title:SetText(state.name)
+    title:SetText(Localized(state.name)) -- the server sends the English name; display only
     torment:SetText(TormentText(state.torment))
 
     local wasShown = frame:IsShown()
@@ -272,7 +338,7 @@ function IT.Refresh()
             if boss.dead then dead = dead + 1 end
         end
         local mh = ModuleHeader(1)
-        mh.text:SetText("Bosses")
+        mh.text:SetText(L["Bosses"])
         mh.right:SetText(dead .. " / " .. #state.bosses)
         mh:ClearAllPoints()
         mh:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y)
@@ -281,7 +347,7 @@ function IT.Refresh()
 
         for i, boss in ipairs(state.bosses) do
             local line = BossLine(i)
-            line.name:SetText("- " .. boss.name)
+            line.name:SetText("- " .. Localized(boss.name)) -- the server sends the English name; display only
             line.name:SetTextColor(unpack(boss.dead and C_LINE_DONE or C_LINE))
             if boss.locked then line.lock:Show() else line.lock:Hide() end
             line:ClearAllPoints()
@@ -295,7 +361,7 @@ function IT.Refresh()
         local rewards = {}
         if state.cleared then
             local line = BossLine(#state.bosses + 1)
-            line.name:SetText("All bosses defeated")
+            line.name:SetText(L["All bosses defeated"])
             line.name:SetTextColor(unpack(C_COMPLETE))
             line.lock:Hide()
             line:ClearAllPoints()
@@ -304,16 +370,16 @@ function IT.Refresh()
             y = y - 2 - LINE_H
         else
             if state.shards > 0 then
-                table.insert(rewards, { icon = ICON_SHARDS, label = "Soul Shards", value = Thousands(state.shards),
-                    color = C_SHARDS, hint = "Added to your run when every boss is dead." })
+                table.insert(rewards, { icon = ICON_SHARDS, label = L["Soul Shards"], value = Thousands(state.shards),
+                    color = C_SHARDS, hint = L["Added to your run when every boss is dead."] })
             elseif state.shards < 0 then
                 -- -1: this raid's clear was already paid to this character this week (server clear lock)
-                table.insert(rewards, { icon = ICON_SHARDS, label = "Soul Shards", value = "earned this week",
-                    color = C_LOOTED, hint = "You already cleared this raid this week. Its Soul Shards come back after the weekly reset (Tuesday 03:00 UTC)." })
+                table.insert(rewards, { icon = ICON_SHARDS, label = L["Soul Shards"], value = L["earned this week"],
+                    color = C_LOOTED, hint = L["You already cleared this raid this week. Its Soul Shards come back after the weekly reset (Tuesday 03:00 UTC)."] })
             end
             if state.orbs > 0 then
-                table.insert(rewards, { icon = ICON_ORBS, label = "Orbs of Lost Memories", value = Thousands(state.orbs),
-                    color = C_ORBS, hint = "Reroll an echo in the Echo Journal." })
+                table.insert(rewards, { icon = ICON_ORBS, label = L["Orbs of Lost Memories"], value = Thousands(state.orbs),
+                    color = C_ORBS, hint = L["Reroll an echo in the Echo Journal."] })
             end
             if state.cacheItem > 0 then
                 local name, _, quality, _, _, _, _, _, _, texture = GetItemInfo(state.cacheItem)
@@ -328,7 +394,7 @@ function IT.Refresh()
                     end
                 end
                 table.insert(rewards, { icon = texture or GetItemIcon(state.cacheItem) or ICON_NONE,
-                    label = name or "Reward cache", value = "ilvl " .. state.cacheItemLevel,
+                    label = name or L["Reward cache"], value = T("ilvl {cacheItemLevel}", { cacheItemLevel = state.cacheItemLevel }),
                     color = { r, g, b }, labelColor = { r, g, b }, item = state.cacheItem })
             end
         end
@@ -336,7 +402,7 @@ function IT.Refresh()
         if #rewards > 0 then
             y = y - 6
             local rh = ModuleHeader(2)
-            rh.text:SetText("Rewards")
+            rh.text:SetText(L["Rewards"])
             rh.right:SetText("")
             rh:ClearAllPoints()
             rh:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y)
@@ -366,6 +432,7 @@ function IT.Refresh()
     if not wasShown or math.abs(oldHeight - frame:GetHeight()) > 0.5 then
         NotifyQuestTracker()
     end
+    PushStockWatchFrame()
 end
 
 -- ------------------------------------------------------------------ wire

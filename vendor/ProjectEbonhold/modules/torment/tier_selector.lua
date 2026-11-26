@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ==============================================================================
 -- Torment tier selector, shared by the Torment frame (hardmode.lua) and the Dungeon
 -- Finder (dungeon_finder.lua).
@@ -119,8 +120,8 @@ function TS.Create(parent, cfg)
   wheel:EnableMouseWheel(true)
   wheel:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Mouse wheel: previous / next Torment", 1, 1, 1)
-    GameTooltip:AddLine("Shift-click the arrows: Normal / highest unlocked", 0.7, 0.7, 0.7)
+    GameTooltip:SetText(L["Mouse wheel: previous / next Torment"], 1, 1, 1)
+    GameTooltip:AddLine(L["Shift-click the arrows: Normal / highest unlocked"], 0.7, 0.7, 0.7)
     GameTooltip:Show()
   end)
   wheel:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -226,11 +227,11 @@ function TS.Create(parent, cfg)
       btn.lock:Hide()
 
       if locked then
-        btn:SetRestingFace(viewed and "Down" or "Disabled")
+        btn:SetRestingFace(viewed and L["Down"] or "Disabled")
         btn:SetNormalFontObject(tinyRung and TinyFont("disable") or GameFontDisableSmall)
         btn.lock:Show()
       elseif viewed then
-        btn:SetRestingFace("Down")
+        btn:SetRestingFace(L["Down"])
         btn:SetNormalFontObject(tinyRung and TinyFont("highlight") or GameFontHighlightSmall)
       end
       -- A font-object swap only takes on the next text set.

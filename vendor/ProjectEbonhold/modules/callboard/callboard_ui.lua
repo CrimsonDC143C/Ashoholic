@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- callboard_ui.lua -- Hero's Call Board window.
 --
 -- Opened by interacting with the summoned board (GO 600600, gossip name "Hero's
@@ -26,19 +27,19 @@ local Callboard = ProjectEbonhold.Callboard
 local UI = {}
 ProjectEbonhold.CallboardUI = UI
 
-local BOARD_GOSSIP_NAME = "Hero's Call Board"
+local BOARD_GOSSIP_NAME = L["Hero's Call Board"]
 -- The client caches gameobject names (Cache\WDB): a client that saw the board under its old
 -- name keeps showing "Objectives Board" in the gossip frame until the cache is refreshed.
 -- Both names open the window.
-local BOARD_GOSSIP_NAMES = { [BOARD_GOSSIP_NAME] = true, ["Objectives Board"] = true }
+local BOARD_GOSSIP_NAMES = { [BOARD_GOSSIP_NAME] = true, ["Hero's Call Board"] = true, ["Objectives Board"] = true }
 
 local FRAME_NAME         = "EbonholdCallboardFrame"
-local FRAME_W, FRAME_H   = 900, 560
+local FRAME_W, FRAME_H   = 1052, 560   -- 900 + the weekly reward rail column (RAIL_COL_W 153 over the panel's last px), 2026-11-23
 local LIST_W, LIST_H     = 300, 444
 local ROW_W, ROW_H       = 292, 46
 local ROW_GAP            = 4
 local GROUP_H            = 20
-local PANEL_W, PANEL_H   = 546, 448
+local PANEL_W, PANEL_H   = 546, 458   -- 458: down to the bottom bar (was 448, owner asked +5 then +5)
 local ART_W, ART_H       = 502, 176
 -- a zone map is 1002 x 668 px of 4 x 3 tiles of 256, drawn at the picture's width
 local MAP_TILE           = 256 * ART_W / 1002
@@ -173,6 +174,7 @@ local CATEGORY_ART = {
     [4] = { "LoadScreenDalaranPrison", BANDED, "Interface\\Icons\\INV_Misc_Gear_01" },
     [6] = { "LoadScreenNorthrendWide", WIDE, ICON_BOARD },
     [7] = { "LoadScreenRaid", BANDED, "Interface\\Icons\\Spell_Shadow_SoulLeech_3" },
+    [8] = { "LoadScreenNorthrendWide", WIDE, "Interface\\Icons\\INV_Holiday_Christmas_Present_01" },
 }
 
 -- Profession contracts name their guild ("The tailoring guild of the capital...").
@@ -188,7 +190,34 @@ local PROFESSION_ICONS = {
     { "cooking",        "Interface\\Icons\\INV_Misc_Food_15" },
 }
 
+-- The zone of an open-world contract, from its camp's WorldMapArea id (server field 25), in the
+-- client's language: walked once through the world map (GetCurrentMapAreaID = WorldMapArea id + 1).
+-- Never from the objectives text: " in <zone>." is English only, and a French / German / Spanish
+-- client put every card under one "Today" header (2026-11-13). Not built while the world map is
+-- open (the walk would move it); the English parse is the fallback until then.
+local mapAreaZone   -- WorldMapArea id -> { name, continent }
+local function MapAreaZones()
+    if mapAreaZone then return mapAreaZone end
+    if WorldMapFrame and WorldMapFrame:IsShown() then return nil end
+    mapAreaZone = {}
+    for c = 1, 4 do
+        for i, name in ipairs({ GetMapZones(c) }) do
+            SetMapZoom(c, i)
+            mapAreaZone[GetCurrentMapAreaID() - 1] = { name = name, continent = c }
+        end
+    end
+    SetMapToCurrentZone()
+    return mapAreaZone
+end
+
+local function ZoneInfo(q)
+    local zones = (q.poiArea or 0) > 0 and MapAreaZones()
+    return zones and zones[q.poiArea]
+end
+
 local function ZoneOf(q)
+    local info = ZoneInfo(q)
+    if info then return info.name end
     return string.match(q.objectives or "", " in (.-)%.?%s*$")
 end
 
@@ -203,6 +232,13 @@ local function ContinentOfZone(zone)
     return zoneContinent[zone]
 end
 
+-- The WorldMapArea id the player stands in, nil while the world map is open.
+local function HereArea()
+    if WorldMapFrame and WorldMapFrame:IsShown() then return nil end
+    SetMapToCurrentZone()
+    return GetCurrentMapAreaID() - 1
+end
+
 -- Picture (file, slice start) and row icon of a contract, worked out once per quest.
 local artCache = {}
 local function ArtOf(q)
@@ -212,8 +248,9 @@ local function ArtOf(q)
     local fallback = CATEGORY_ART[q.category] or CATEGORY_ART[1]
     local art = { file = LOADSCREENS .. fallback[1], v0 = fallback[2], icon = fallback[3] }
     if q.category == Callboard.CATEGORY.OPEN_WORLD then
+        local info = ZoneInfo(q)
         local zone = ZoneOf(q)
-        local cont = CONTINENT_ART[zone and ContinentOfZone(zone) or 0]
+        local cont = CONTINENT_ART[info and info.continent or (zone and ContinentOfZone(zone)) or 0]
         if cont then art.file, art.v0, art.icon = LOADSCREENS .. cont[1], cont[2], cont[3] end
     elseif q.category == Callboard.CATEGORY.PROFESSION then
         local lower = string.lower((q.description or "") .. " " .. text)
@@ -243,6 +280,9 @@ local selectedCategory = Callboard.CATEGORY.OPEN_WORLD   -- the first tab
 local selectedQuest = {}      -- category -> questId shown in the panel
 local rows, groups = {}, {}
 local tabs = {}
+-- the Starting Zone tab (not a contract category): selectedCategory takes this value
+local STARTZONE_TAB = "startzone"
+local startZoneTab
 
 local function FormatThousands(n)
     n = math.floor(tonumber(n) or 0)
@@ -441,11 +481,11 @@ end
 
 -- Same words as the Skill Tree's currency bar (ProjectEbonhold.CurrencyHelp).
 local REWARD_HELP = {
-    ash     = { "Soul Ashes", "ash", "The currency of the Soul Ash Tree: every ordinary node, the flat stats, the mechanics and the infinite wells." },
-    shard   = { "Soul Shards", "shard", "The Milestones of the tree: the percentage bonuses on the stats of your gear." },
-    artisan = { "Artisan Soul", "artisan", "The Professions sector of the tree: gathering, crafting and the Torment recipes." },
-    orb     = { "Orb of Lost Memories", nil, "Spent in the Echo Journal: forget one stack of an Echo and draw a new choice in its place." },
-    xp      = { "experience", nil, "Experience for your character, as a quest would give." },
+    ash     = { L["Soul Ashes"], "ash", L["The currency of the Soul Ash Tree: every ordinary node, the flat stats, the mechanics and the infinite wells."] },
+    shard   = { L["Soul Shards"], "shard", L["The Milestones of the tree: the percentage bonuses on the stats of your gear."] },
+    artisan = { L["Artisan Soul"], "artisan", L["The Professions sector of the tree: gathering, crafting and the Torment recipes."] },
+    orb     = { L["Orb of Lost Memories"], nil, L["Spent in the Echo Journal: forget one stack of an Echo and draw a new choice in its place."] },
+    xp      = { "experience", nil, L["Experience for your character, as a quest would give."] },
 }
 
 -- ---------------------------------------------------------------- rows ----
@@ -565,9 +605,9 @@ end
 -- A server older than 2026-10-11 paid nothing there, and says so.
 local function OutleveledText(q)
     if q.paysNothing then
-        return string.format("|cffff4040Pays nothing: you are above level %d|r", q.outleveledAbove)
+        return string.format(L["|cffff4040Pays nothing: you are above level %d|r"], q.outleveledAbove)
     end
-    return string.format("|cffffd100%s XP|r", FormatThousands(q.xp or 0))
+    return string.format(L["|cffffd100%s XP|r"], FormatThousands(q.xp or 0))
 end
 
 -- The contract's level (server field 22; -1 = the player's own level), nil from an older server.
@@ -587,19 +627,19 @@ local function LevelTag(q)
 end
 
 local function RowSubText(q)
-    local count = string.format("%s %d/%d", q.cadence == Callboard.CADENCE.WEEKLY and "Weekly" or "Daily", q.done, q.max)
+    local count = string.format("%s %d/%d", q.cadence == Callboard.CADENCE.WEEKLY and L["Weekly"] or L["Daily"], q.done, q.max)
     -- outleveled: the XP it still gives in place of the counter; no XP left (level 80) = the usual line
     if (q.outleveledAbove or 0) > 0 and (q.paysNothing or (q.xp or 0) > 0) then
-        local state = q.state == Callboard.STATE.COMPLETE and "|cff1eff00Ready to claim|r  -  "
-            or q.state == Callboard.STATE.ACCEPTED and "|cff6fa8ffIn progress|r  -  " or ""
+        local state = q.state == Callboard.STATE.COMPLETE and L["|cff1eff00Ready to claim|r  -  "]
+            or q.state == Callboard.STATE.ACCEPTED and L["|cff6fa8ffIn progress|r  -  "] or ""
         return state .. OutleveledText(q)
     end
-    if q.state == Callboard.STATE.COMPLETE then return "|cff1eff00Ready to claim|r" end
+    if q.state == Callboard.STATE.COMPLETE then return L["|cff1eff00Ready to claim|r"] end
     if q.state == Callboard.STATE.ACCEPTED then
-        return "|cff6fa8ffIn progress|r" .. (q.cadence == Callboard.CADENCE.ONCE and "" or ("  -  " .. count))
+        return T("|cff6fa8ffIn progress|r{count}", { count = (q.cadence == Callboard.CADENCE.ONCE and "" or ("  -  " .. count)) })
     end
-    if q.cadence == Callboard.CADENCE.ONCE then return "Once per account" end
-    return count .. (q.accountWide and "  -  account" or "")
+    if q.cadence == Callboard.CADENCE.ONCE then return L["Once per account"] end
+    return count .. (q.accountWide and L["  -  account"] or "")
 end
 
 local function RefreshRow(row, q)
@@ -679,8 +719,32 @@ local function CreateTab(index, cat)
         for _, q in ipairs(list) do if q.state == Callboard.STATE.COMPLETE then ready = ready + 1 end end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(cat.name, 1, 1, 1)
-        GameTooltip:AddLine(#list .. " contract" .. (#list == 1 and "" or "s") .. " posted", 0.8, 0.8, 0.8)
-        if ready > 0 then GameTooltip:AddLine(ready .. " ready to claim", 0.12, 1, 0) end
+        GameTooltip:AddLine(T("{list} contract{s} posted", { list = #list, s = (#list == 1 and "" or "s") }), 0.8, 0.8, 0.8)
+        if ready > 0 then GameTooltip:AddLine(T("{ready} ready to claim", { ready = ready }), 0.12, 1, 0) end
+        GameTooltip:Show()
+    end)
+    t:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return t
+end
+
+-- The last tab: the create screen's zone choice (callboard_startzone.lua), always shown; Travel
+-- works only inside a start valley (owner, 2026-11-09).
+local function CreateStartZoneTab()
+    local t = CreateFrame("Button", FRAME_NAME .. "TabStartZone", mainFrame, "CharacterFrameTabButtonTemplate")
+    t:SetPoint("LEFT", tabs[#tabs], "RIGHT", -16, 0)
+    t:SetHeight(32)
+    t:SetText(L["Starting Zone"])
+    t:SetScript("OnShow", function(self) ResizeTab(self) end)
+    t:SetScript("OnEvent", function(self) ResizeTab(self) end)
+    t:SetScript("OnClick", function()
+        PlaySound("igCharacterInfoTab")
+        selectedCategory = STARTZONE_TAB
+        UI.Refresh()
+    end)
+    t:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(L["Starting Zone"], 1, 1, 1)
+        GameTooltip:AddLine(L["Move your start to another starting zone, only while you are in a starting zone."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     t:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -716,13 +780,351 @@ local function CreateRewardSlot(strip, index)
             GameTooltip:AddLine(FormatThousands(self.amount) .. " " .. h[1], 1, 0.82, 0)
             GameTooltip:AddLine(text, 1, 1, 1, true)
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Paid at the board when you claim the contract.", 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine(L["Paid at the board when you claim the contract."], 0.6, 0.6, 0.6, true)
         end
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:Hide()
     return b
+end
+
+-- ---- Weekly reward rail (owner, 2026-11-23) ------------------------------------
+-- Every contract claimed this board week (reset Tuesday 03:00 UTC, the weekly reset) moves the
+-- rail up; each step pays its elixirs the moment it is reached (CallboardMgr::GrantWeeklyRewards).
+-- The server sends the count and the steps ("<count>:<entry>+<entry>/..."), so the steps are its
+-- constants, not the add-on's. The rail is a column of the board itself (FRAME_W includes it), on
+-- the Echo Journal's Journeys slate: a dark groove with the cache bar's green rising in it, and a
+-- medallion per step in the skill tree's node ring - orange with a check once received, green with
+-- the turning halo for the next one, grey beyond. Hover = the item and what is left to claim,
+-- shift-click = the item link in chat.
+
+local RAIL_COL_W     = 153   -- the column added to the board, against the contract panel, up to the frame
+local RAIL_TOP       = 74    -- same top as the contract panel
+local RAIL_H         = PANEL_H   -- the contract panel's height: down to the bottom bar
+local RAIL_BAR_X     = 34    -- centre of the bar in the column
+local RAIL_BAR_TOP   = 62    -- px from the column top to the top end of the bar
+local RAIL_BAR_BOT   = 22    -- px from the column bottom to the bottom end of the bar
+local RAIL_GROOVE_W  = 10    -- width of the dark groove the green fill rises in
+local RAIL_STEP_PAD  = 30    -- first / last medallion inside the bar ends
+local RAIL_MAX_STEPS = 10
+local RAIL_MEDAL     = 24    -- icon size of a medallion (the skill tree ring is x 1.16)
+
+local RING_ART = "Interface\\AddOns\\ProjectEbonhold\\assets\\"   -- the skill tree's node rings and halo
+
+-- Icons and names the add-on can show before the client has the item in its cache (a new item
+-- is unknown to GetItemIcon until a tooltip asked the server for it).
+local RAIL_ITEMS = {
+    [600940] = { icon = "Interface\\Icons\\INV_Potion_146", name = L["Elixir of Ashes"] },
+    [600941] = { icon = "Interface\\Icons\\INV_Potion_145", name = L["Elixir of Shards"] },
+    [600944] = { icon = "Interface\\Icons\\INV_Potion_137", name = L["Elixir of Memories"] },
+    [600945] = { icon = "Interface\\Icons\\INV_Potion_150", name = L["Elixir of Renewal"] },
+}
+
+local function RailItemIcon(entry)
+    return GetItemIcon(entry) or (RAIL_ITEMS[entry] and RAIL_ITEMS[entry].icon) or "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+local function RailItemLink(entry)
+    local _, link = GetItemInfo(entry)
+    local name = RAIL_ITEMS[entry] and RAIL_ITEMS[entry].name or tostring(entry)
+    return link or string.format("|cff0070dd|Hitem:%d:0:0:0:0:0:0:0:0|h[%s]|h|r", entry, name)
+end
+
+local function RailStepTooltip(self)
+    if not self.step then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetHyperlink("item:" .. self.entry)
+    GameTooltip:AddLine(" ")
+    -- one gray line under the item that says what resets (owner, 11/24)
+    local n = self.step.count
+    GameTooltip:AddLine(n == 1
+        and L["Given for your first contract claimed this week. Your contract count goes back to 0 at the weekly reset, and every weekly reward can be earned again."]
+        or T("Given when you reach {n} contracts claimed this week. Your contract count goes back to 0 at the weekly reset, and every weekly reward can be earned again.", { n = n }),
+        0.6, 0.6, 0.6, true)
+    GameTooltip:Show()
+    -- an item not in the client cache yet: when its data arrives the tooltip redraws the item alone, without the
+    -- lines above - build it again a moment later while the mouse is still on the medallion
+    self.tipRetry = not GetItemInfo(self.entry) and 0.3 or nil
+end
+
+local function RailStepClick(self)
+    if self.entry and IsModifiedClick("CHATLINK") then
+        ChatEdit_InsertLink(RailItemLink(self.entry))
+    end
+end
+
+-- A medallion: the item round in the skill tree's gold ring.
+local function CreateMedal(parent, size)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetWidth(size)
+    b:SetHeight(size)
+    local icon = b:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints(b)
+    b.icon = icon
+    -- the skill tree node's ring (skillTree.lua, FAMILY_RINGS): assets/class_ring at 1.16 x the icon
+    local ring = b:CreateTexture(nil, "OVERLAY")
+    ring:SetWidth(size * 1.16)
+    ring:SetHeight(size * 1.16)
+    ring:SetPoint("CENTER", b, "CENTER", 0, 0)
+    b.ring = ring
+    b:SetScript("OnEnter", RailStepTooltip)
+    b:SetScript("OnLeave", function(self) self.tipRetry = nil GameTooltip:Hide() end)
+    b:SetScript("OnClick", RailStepClick)
+    b:SetScript("OnUpdate", function(self, elapsed)
+        if not self.tipRetry then return end
+        self.tipRetry = self.tipRetry - elapsed
+        if self.tipRetry <= 0 then
+            self.tipRetry = nil
+            if GameTooltip:IsOwned(self) then RailStepTooltip(self) end
+        end
+    end)
+    return b
+end
+
+local function SetMedalState(b, entry, state)
+    SetPortraitToTexture(b.icon, RailItemIcon(entry))
+    local lit = state ~= "later"
+    b.icon:SetDesaturated(not lit)
+    b.icon:SetAlpha(lit and 1 or 0.7)
+    -- the skill tree's node colours: orange = taken, green = can be taken next, grey ring = not yet
+    if state == "later" then
+        b.ring:SetTexture(RING_ART .. "class_ring_grey")
+        b.ring:SetVertexColor(1, 1, 1)
+    else
+        b.ring:SetTexture(RING_ART .. "class_ring")
+        if state == "done" then b.ring:SetVertexColor(1.00, 0.70, 0.20) else b.ring:SetVertexColor(0.10, 1.00, 0.10) end
+    end
+end
+
+local function CreateRailStep(rail)
+    local s = CreateFrame("Frame", nil, rail)
+    s:SetWidth(RAIL_COL_W - 8)
+    s:SetHeight(RAIL_MEDAL + 14)
+
+    -- the skill tree's turning halo, behind the next step
+    local halo = s:CreateTexture(nil, "BACKGROUND")
+    halo:SetTexture(RING_ART .. "class_ring_glow")   -- the skill tree's start-node halo
+    halo:SetBlendMode("ADD")
+    halo:SetWidth(RAIL_MEDAL * 1.16 * 1.5)
+    halo:SetHeight(RAIL_MEDAL * 1.16 * 1.5)
+    halo:SetPoint("CENTER", s, "LEFT", RAIL_BAR_X, 0)
+    local spin = halo:CreateAnimationGroup()
+    local rot = spin:CreateAnimation("Rotation")
+    rot:SetDegrees(360)
+    rot:SetDuration(8)
+    spin:SetLooping("REPEAT")
+    s.halo, s.spin = halo, spin
+
+    local main = CreateMedal(s, RAIL_MEDAL)
+    main:SetPoint("CENTER", s, "LEFT", RAIL_BAR_X, 0)
+    s.main = main
+
+    -- the second elixir of a pair: a small medallion on the main one's lower right
+    local badge = CreateMedal(s, 12)
+    badge:SetPoint("CENTER", main, "BOTTOMRIGHT", -1, 2)
+    badge:SetFrameLevel(main:GetFrameLevel() + 2)
+    s.badge = badge
+
+    -- the check sits on its own frame above the ring and the badge (3.3.5 has no texture sublevels)
+    local checkFrame = CreateFrame("Frame", nil, s)
+    checkFrame:SetAllPoints(main)
+    checkFrame:SetFrameLevel(main:GetFrameLevel() + 4)
+    local check = checkFrame:CreateTexture(nil, "OVERLAY")
+    check:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+    check:SetWidth(18)
+    check:SetHeight(18)
+    check:SetPoint("CENTER", main, "TOPRIGHT", 0, -2)
+    s.check = check
+
+    local num = s:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    num:SetPoint("LEFT", s, "LEFT", RAIL_BAR_X + RAIL_MEDAL / 2 + 12, 6)
+    num:SetJustifyH("LEFT")
+    s.num = num
+
+    -- one anchor and a fixed size: a second anchor to the step's right edge lost the text of a step
+    local name = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    name:SetPoint("LEFT", s, "LEFT", RAIL_BAR_X + RAIL_MEDAL / 2 + 12, -8)
+    name:SetWidth(RAIL_COL_W - (RAIL_BAR_X + RAIL_MEDAL / 2 + 12) - 6)
+    name:SetHeight(12)
+    name:SetJustifyH("LEFT")
+    s.name = name
+
+    s:Hide()
+    return s
+end
+
+local function CreateRail()
+    -- the Echo Journal's ground (echo_journal.lua, My Run panel): the sunken inset frame, its
+    -- marble hidden, the titan console art in it - a slice of the stone panel as tall as the column
+    local rail = CreateFrame("Frame", nil, mainFrame, "InsetFrameTemplate")
+    rail:SetWidth(RAIL_COL_W)
+    rail:SetHeight(RAIL_H)
+    rail:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 347 + PANEL_W - 1, -RAIL_TOP)
+    if rail.Bg then rail.Bg:Hide() end
+    local art = rail:CreateTexture(nil, "BACKGROUND")
+    art:SetTexture("Interface\\AddOns\\ProjectEbonhold\\assets\\journeysframebackground")
+    local sliceW = 434 * (RAIL_COL_W - 4) / (RAIL_H - 4)
+    art:SetTexCoord(300 / 1024, (300 + sliceW) / 1024, 0, 434 / 512)
+    art:SetPoint("TOPLEFT", rail, "TOPLEFT", 2, -2)
+    art:SetPoint("BOTTOMRIGHT", rail, "BOTTOMRIGHT", -2, 2)
+    rail.art = art
+
+    local title = rail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOP", rail, "TOP", 0, -10)
+    title:SetText(ProjectEbonhold.Upper and ProjectEbonhold.Upper(L["This Week"]) or L["This Week"])
+
+    local count = rail:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+    count:SetPoint("TOP", title, "BOTTOM", 0, -5)
+    rail.countText = count
+
+    -- the bar (owner's pick, 2026-11-23): a dark groove, and the green of the Hero's Call Cache bar at the top of
+    -- the board rising inside it
+    local barLen = RAIL_H - RAIL_BAR_TOP - RAIL_BAR_BOT
+    local bar = rail:CreateTexture(nil, "BORDER")
+    bar:SetTexture(0, 0, 0, 0.85)
+    bar:SetWidth(RAIL_GROOVE_W)
+    bar:SetHeight(barLen)
+    bar:SetPoint("BOTTOM", rail, "BOTTOMLEFT", RAIL_BAR_X, RAIL_BAR_BOT)
+    rail.bar = bar
+
+    rail.fillBottom = RAIL_BAR_BOT
+    rail.fillMax = barLen
+    local fill = rail:CreateTexture(nil, "ARTWORK")
+    fill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    fill:SetVertexColor(0.07, 0.71, 0.11)   -- the cache bar's colour (CreateMainFrame)
+    fill:SetWidth(RAIL_GROOVE_W - 2)
+    fill:SetHeight(1)
+    fill:SetPoint("BOTTOM", rail, "BOTTOMLEFT", RAIL_BAR_X, rail.fillBottom)
+    rail.fill = fill
+
+    rail.steps = {}
+    for i = 1, RAIL_MAX_STEPS do
+        rail.steps[i] = CreateRailStep(rail)
+        rail.steps[i]:SetFrameLevel(rail:GetFrameLevel() + 2)
+    end
+
+    rail.count = 0
+    rail:Hide()
+    return rail
+end
+
+-- A step's short label under its number.
+local function RailStepLabel(entries)
+    if #entries >= 2 then
+        return L["Ashes + Shards"]
+    end
+    if entries[1] == 600944 then return L["Memories"] end
+    if entries[1] == 600945 then return L["Renewal"] end
+    local it = RAIL_ITEMS[entries[1]]
+    return it and it.name or ""
+end
+
+local function RefreshRail(board)
+    local rail = mainFrame.rail
+    local steps = board and board.rail
+    if not steps or #steps == 0 then
+        rail:Hide()
+        return
+    end
+    local count = board.weeklyClaims or 0
+
+    -- a step reached since the last refresh while the board is open: a message and a sound
+    local before = rail.count
+    rail.count = count
+    if rail.seenBoard and count > before then
+        for _, step in ipairs(steps) do
+            if step.count > before and step.count <= count then
+                PlaySound("igQuestListComplete")
+                UIErrorsFrame:AddMessage(T("Weekly reward reached: contract {n}", { n = step.count }), 1.0, 0.82, 0.0, 1.0)
+            end
+        end
+    end
+    rail.seenBoard = true
+
+    -- ask the server for the rewards' item data now, so the tooltips have it by the first hover
+    if not rail.prefetched then
+        rail.prefetched = true
+        for _, step in ipairs(steps) do
+            for _, entry in ipairs(step.entries) do
+                if not GetItemInfo(entry) then
+                    GameTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+                    GameTooltip:SetHyperlink("item:" .. entry)
+                    GameTooltip:Hide()
+                end
+            end
+        end
+    end
+
+    local last = steps[#steps].count
+    rail.countText:SetText(T("{count} / {last}", { count = string.format("%d", count), last = string.format("%d", last) }))
+
+    -- medallions spread evenly along the bar, the first near its bottom end
+    local n = math.min(#steps, RAIL_MAX_STEPS)
+    local y0 = RAIL_BAR_BOT + RAIL_STEP_PAD
+    local span = (RAIL_H - RAIL_BAR_TOP - RAIL_BAR_BOT) - 2 * RAIL_STEP_PAD
+    local gap = n > 1 and span / (n - 1) or 0
+    local nextStep
+    for i = 1, RAIL_MAX_STEPS do
+        local s = rail.steps[i]
+        local step = steps[i]
+        if i > n or not step then
+            s:Hide()
+            s.spin:Stop()
+        else
+            local state = count >= step.count and "done" or (not nextStep and "next" or "later")
+            if state == "next" then nextStep = step end
+            s:ClearAllPoints()
+            s:SetPoint("LEFT", rail, "BOTTOMLEFT", 0, y0 + (i - 1) * gap)
+            s.main.step, s.main.entry = step, step.entries[1]
+            SetMedalState(s.main, step.entries[1], state)
+            if step.entries[2] then
+                s.badge.step, s.badge.entry = step, step.entries[2]
+                SetMedalState(s.badge, step.entries[2], state)
+                s.badge:Show()
+            else
+                s.badge:Hide()
+            end
+            if state == "done" then s.check:Show() else s.check:Hide() end
+            if state == "next" then
+                s.halo:Show()
+                s.spin:Play()
+            else
+                s.halo:Hide()
+                s.spin:Stop()
+            end
+            s.num:SetText(state == "later" and ("|cff808080" .. step.count .. "|r")
+                or state == "done" and ("|cff1eff00" .. step.count .. "|r") or tostring(step.count))
+            s.name:SetText(RailStepLabel(step.entries))
+            if state == "later" then s.name:SetTextColor(0.5, 0.5, 0.5) else s.name:SetTextColor(0.9, 0.86, 0.75) end
+            s:Show()
+        end
+    end
+
+    -- the fill: piecewise between the medallions, so it reaches each one exactly at its count
+    local pos
+    if count >= last then
+        pos = y0 + (n - 1) * gap + RAIL_STEP_PAD
+    elseif count < steps[1].count then
+        pos = y0 * count / math.max(1, steps[1].count)
+    else
+        for i = 1, n - 1 do
+            local a, b = steps[i].count, steps[i + 1].count
+            if count >= a and count < b then
+                pos = y0 + (i - 1) * gap + gap * (count - a) / (b - a)
+                break
+            end
+        end
+    end
+    local h = math.min(rail.fillMax, (pos or 0) - rail.fillBottom)
+    if h < 1 then
+        rail.fill:Hide()
+    else
+        rail.fill:SetHeight(h)
+        rail.fill:Show()
+    end
+
+    rail:Show()
 end
 
 local function CreatePanel()
@@ -785,7 +1187,7 @@ local function CreatePanel()
     end
     map.Pin = Pin
     -- the camp: a soft yellow disc, as the quest log draws an objective area, with a ! on it
-    local camp = Pin(22, "Camp")
+    local camp = Pin(22, L["Camp"])
     camp:SetFrameLevel(child:GetFrameLevel() + 3)
     camp.icon:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
     local blob = camp:CreateTexture(nil, "ARTWORK")
@@ -795,7 +1197,7 @@ local function CreatePanel()
     blob:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
     blob:SetVertexColor(1, 0.82, 0, 0.35)
     map.camp = camp
-    local player = Pin(16, "You are here")
+    local player = Pin(16, L["You are here"])
     player:SetFrameLevel(child:GetFrameLevel() + 4)
     player.icon:SetTexture("Interface\\WorldMap\\WorldMapPartyIcon")
     player.icon:SetVertexColor(0.3, 1, 0.3)
@@ -857,7 +1259,7 @@ local function CreatePanel()
     local objHead = strip:CreateFontString(nil, "OVERLAY")
     SetFont(objHead, 15)
     objHead:SetPoint("TOPLEFT", strip, "TOPLEFT", 24, -8)
-    objHead:SetText("Objectives")
+    objHead:SetText(L["Objectives"])
     objHead:SetTextColor(1, 1, 1)
 
     panel.objectives = {}
@@ -876,7 +1278,7 @@ local function CreatePanel()
     local rewHead = strip:CreateFontString(nil, "OVERLAY")
     SetFont(rewHead, 15)
     rewHead:SetPoint("TOPLEFT", strip, "TOPLEFT", 24, -70)
-    rewHead:SetText("Rewards")
+    rewHead:SetText(L["Rewards"])
     rewHead:SetTextColor(1, 1, 1)
 
     panel.rewards = {}
@@ -889,7 +1291,7 @@ local function CreatePanel()
     action:SetWidth(190)
     action:SetHeight(30)
     action:SetPoint("BOTTOMRIGHT", strip, "BOTTOMRIGHT", -20, 18)
-    action:SetText("Accept")
+    action:SetText(ACCEPT)
     panel.action = action
 
     -- Travel to the waystone nearest to the contract's camp (Callboard.GetWaystone), above the action button.
@@ -898,7 +1300,7 @@ local function CreatePanel()
     travel:SetWidth(190)
     travel:SetHeight(24)
     travel:SetPoint("BOTTOM", action, "TOP", 0, 6)
-    travel:SetText("Travel to Waystone")
+    travel:SetText(L["Travel to Waystone"])
     -- the Toolbelt's Waystones icon, on the left; the label moves right to make room
     local travelIcon = travel:CreateTexture(nil, "OVERLAY")
     travelIcon:SetWidth(18)
@@ -912,11 +1314,11 @@ local function CreatePanel()
     travel:SetScript("OnEnter", function(self)
         if not self.name then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Waystone: " .. self.name, 1, 0.82, 0)
+        GameTooltip:AddLine(T("Waystone: {name}", { name = L[self.name] }), 1, 0.82, 0)
         if self.known then
-            GameTooltip:AddLine("Travel to the waystone nearest to this contract.", 1, 1, 1, true)
+            GameTooltip:AddLine(L["Travel to the waystone nearest to this contract."], 1, 1, 1, true)
         else
-            GameTooltip:AddLine("Undiscovered. Walk onto this waystone to discover it.", 1, 0.35, 0.35, true)
+            GameTooltip:AddLine(L["Undiscovered. Walk onto this waystone to discover it."], 1, 0.35, 0.35, true)
         end
         GameTooltip:Show()
     end)
@@ -984,15 +1386,15 @@ local function CreateMainFrame()
         local b = Callboard.board
         if not b then return end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Hero's Call Cache", 1, 0.82, 0)
-        GameTooltip:AddLine("Every claimed contract counts toward a cache. When the bar fills you receive a Hero's Call Cache: open it to take one piece of gear for your class and spec, above the item level you wear at that moment.", 1, 1, 1, true)
+        GameTooltip:AddLine(L["Hero's Call Cache"], 1, 0.82, 0)
+        GameTooltip:AddLine(L["Every claimed contract counts toward a cache. When the bar fills you receive a Hero's Call Cache: open it to take one piece of gear for your class and spec, above the item level you wear at that moment."], 1, 1, 1, true)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddDoubleLine("Highest item level reached", tostring(b.highestIlvl), 0.8, 0.8, 0.8, 1, 1, 1)
-        GameTooltip:AddDoubleLine("Equipped item level", tostring(b.equippedIlvl), 0.8, 0.8, 0.8, 1, 1, 1)
-        GameTooltip:AddDoubleLine("Contracts per cache", tostring(b.cacheRequired), 0.8, 0.8, 0.8, 1, 1, 1)
-        GameTooltip:AddDoubleLine("Caches opened", tostring(b.cachesOpened), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Highest item level reached"], tostring(b.highestIlvl), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Equipped item level"], tostring(b.equippedIlvl), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Contracts per cache"], tostring(b.cacheRequired), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Caches opened"], tostring(b.cachesOpened), 0.8, 0.8, 0.8, 1, 1, 1)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("The higher the item level you have ever worn, the more contracts a cache asks for.", 0.6, 0.6, 0.6, true)
+        GameTooltip:AddLine(L["The higher the item level you have ever worn, the more contracts a cache asks for."], 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)
     bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1003,6 +1405,9 @@ local function CreateMainFrame()
     cacheInfo:SetJustifyH("LEFT")
     mainFrame.cacheInfo = cacheInfo
 
+    -- the right column: the weekly reward rail (owner, 2026-11-23)
+    mainFrame.rail = CreateRail()
+
     local resets = mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     resets:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -34, -41)
     resets:SetJustifyH("RIGHT")
@@ -1010,6 +1415,7 @@ local function CreateMainFrame()
 
     -- ---- the list
     local scroll = CreateFrame("ScrollFrame", FRAME_NAME .. "Scroll", mainFrame, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scroll)  -- DragonUI's scroll bar (utils.lua)
     scroll:SetWidth(LIST_W)
     scroll:SetHeight(LIST_H)
     scroll:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 19, -76)
@@ -1034,11 +1440,11 @@ local function CreateMainFrame()
     claimAll:SetWidth(302)
     claimAll:SetHeight(24)
     claimAll:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMLEFT", 19, 12)
-    claimAll:SetText("Claim All")
+    claimAll:SetText(L["Claim All"])
     claimAll:SetScript("OnClick", function() Callboard.ClaimAll() end)
     claimAll:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Claim every finished contract of the board, in every tab.", 1, 1, 1, true)
+        GameTooltip:AddLine(L["Claim every finished contract of the board, in every tab."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
     claimAll:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1048,13 +1454,14 @@ local function CreateMainFrame()
     close:SetWidth(80)
     close:SetHeight(22)
     close:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -6, 14)
-    close:SetText("Close")
+    close:SetText(CLOSE)
     close:SetScript("OnClick", CloseBoard)
 
     -- ---- tabs under the window
     for i, cat in ipairs(Callboard.CATEGORIES) do
         tabs[i] = CreateTab(i, cat)
     end
+    startZoneTab = CreateStartZoneTab()
 
     -- Countdown tick.
     local acc = 0
@@ -1084,8 +1491,7 @@ end
 function UI.RefreshTimers()
     if not mainFrame or not mainFrame:IsShown() then return end
     local daily, weekly = Callboard.GetResetTimers()
-    mainFrame.resets:SetText(string.format("Daily reset |cffffffff%s|r\nWeekly reset |cffffffff%s|r",
-        FormatDuration(daily), FormatDuration(weekly)))
+    mainFrame.resets:SetText(T("Daily reset |cffffffff{daily}|r\nWeekly reset |cffffffff{weekly}|r", { daily = FormatDuration(daily), weekly = FormatDuration(weekly) }))
 end
 
 local function RefreshHeader(board)
@@ -1093,20 +1499,46 @@ local function RefreshHeader(board)
     if not board then
         bar:SetMinMaxValues(0, 1)
         bar:SetValue(0)
-        bar.text:SetText(Callboard.enabled and "Loading..." or "Board disabled")
+        bar.text:SetText(Callboard.enabled and L["Loading..."] or L["Board disabled"])
         mainFrame.cacheInfo:SetText("")
+        RefreshRail(nil)
         return
     end
+    RefreshRail(board)
     local required = math.max(1, board.cacheRequired)
     local progress = math.min(board.cacheProgress, required)
     bar:SetMinMaxValues(0, required)
     bar:SetValue(progress)
-    bar.text:SetText(string.format("Hero's Call Cache  %d / %d", progress, required))
-    mainFrame.cacheInfo:SetText(string.format("Equipped item level |cffffffff%d|r\nCaches opened |cffffffff%d|r",
-        board.equippedIlvl or 0, board.cachesOpened or 0))
+    bar.text:SetText(T("Hero's Call Cache  {progress} / {required}", { progress = string.format("%d", progress), required = string.format("%d", required) }))
+    mainFrame.cacheInfo:SetText(T("Equipped item level |cffffffff{equippedIlvl}|r\nCaches opened |cffffffff{cachesOpened}|r", { equippedIlvl = string.format("%d", board.equippedIlvl or 0), cachesOpened = string.format("%d", board.cachesOpened or 0) }))
 end
 
 local function RefreshTabs()
+    -- A hideEmpty category (Frostveil) has a tab only while the server posts something in it; the
+    -- tabs after it close the gap, and a selection left on it falls back to the first tab.
+    local board = Callboard.board
+    local last
+    for i, t in ipairs(tabs) do
+        local cat = Callboard.CATEGORIES[i]
+        local shown = not cat.hideEmpty or (board and #(board.byCategory[cat.id] or {}) > 0)
+        if shown then
+            t:ClearAllPoints()
+            if last then
+                t:SetPoint("LEFT", last, "RIGHT", -16, 0)
+            else
+                t:SetPoint("TOPLEFT", mainFrame, "BOTTOMLEFT", 14, 6)
+            end
+            last = t
+            t:Show()
+        else
+            t:Hide()
+            if selectedCategory == cat.id then selectedCategory = Callboard.CATEGORIES[1].id end
+        end
+    end
+    if last then
+        startZoneTab:ClearAllPoints()
+        startZoneTab:SetPoint("LEFT", last, "RIGHT", -16, 0)
+    end
     for i, t in ipairs(tabs) do
         local cat = Callboard.CATEGORIES[i]
         local ready = 0
@@ -1117,12 +1549,14 @@ local function RefreshTabs()
         ResizeTab(t)
         SetTabSelected(t, cat.id == selectedCategory)
     end
+    ResizeTab(startZoneTab)
+    SetTabSelected(startZoneTab, selectedCategory == STARTZONE_TAB)
 end
 
 local GROUPS = {
-    { cadence = 0, label = "Today" },
-    { cadence = 1, label = "This Week" },
-    { cadence = 2, label = "Once Per Account" },
+    { cadence = 0, label = L["Today"] },
+    { cadence = 1, label = L["This Week"] },
+    { cadence = 2, label = L["Once Per Account"] },
 }
 
 -- Lays out the list; returns the quest the panel shows.
@@ -1138,7 +1572,8 @@ local function RefreshList()
     -- day since 08/10: every zone of the player's level is on the board), lowest level first,
     -- each with its level range. Only the zone the player stands in is open (2026-11-05).
     local sections = {}
-    local here = GetRealZoneText()
+    -- grouped on the camp's map id, not on a name parsed from the (translated) objectives
+    local here, hereArea = GetRealZoneText(), HereArea()
     for _, g in ipairs(GROUPS) do
         local mine = {}
         for _, q in ipairs(list) do
@@ -1149,7 +1584,9 @@ local function RefreshList()
             for _, q in ipairs(mine) do
                 local zone = ZoneOf(q) or ""
                 if not byZone[zone] then
-                    byZone[zone] = { quests = {}, open = zone == here }
+                    local isHere = zone == here
+                        or (hereArea and (q.poiArea or 0) > 0 and q.poiArea == hereArea) or false
+                    byZone[zone] = { quests = {}, open = isHere }
                     table.insert(zones, zone)
                 end
                 local z = byZone[zone]
@@ -1229,9 +1666,9 @@ local function RefreshList()
         if not board then
             mainFrame.emptyText:SetText("")     -- still loading: the bar says so
         elseif #(board.byCategory[selectedCategory] or {}) > 0 then
-            mainFrame.emptyText:SetText("Every " .. catName .. " contract is done for now.\nCome back after the reset.")
+            mainFrame.emptyText:SetText(T("Every {catName} contract is done for now.\nCome back after the reset.", { catName = catName }))
         else
-            mainFrame.emptyText:SetText("No " .. catName .. " contracts posted for your level right now.")
+            mainFrame.emptyText:SetText(T("No {catName} contracts posted for your level right now.", { catName = catName }))
         end
         mainFrame.emptyText:Show()
     else
@@ -1288,7 +1725,7 @@ local function ShowMap(panel, q)
             n = n + 1
             local pin = map.healers[n]
             if not pin then
-                pin = map.Pin(18, "Spirit Healer")
+                pin = map.Pin(18, L["Spirit Healer"])
                 pin.icon:SetTexture("Interface\\WorldMap\\Skull_64Grey")
                 map.healers[n] = pin
             end
@@ -1314,6 +1751,14 @@ local function ShowMap(panel, q)
     return true
 end
 
+-- Gold amount of a contract's cost: "20,000 [gold]" (whole gold, the usual case), the coin string otherwise.
+local function CostText(copper)
+    if copper % 10000 == 0 then
+        return ProjectEbonhold.FormatThousands(copper / 10000) .. "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
+    end
+    return GetCoinTextureString(copper)
+end
+
 local function RefreshPanel(q)
     local panel = mainFrame.panel
     for _, fs in ipairs(panel.objectives) do fs:SetText(""); fs:Hide() end
@@ -1332,10 +1777,10 @@ local function RefreshPanel(q)
         panel.art:Show()
         panel.art:SetTexture(LOADSCREENS .. fallback[1])
         panel.art:SetTexCoord(0, 1, fallback[2], fallback[2] + ART_SLICE)
-        panel.title:SetText(Callboard.board and "Nothing to take here" or BOARD_GOSSIP_NAME)
-        panel.desc:SetText(Callboard.board and "Come back after the reset for new contracts." or "")
+        panel.title:SetText(Callboard.board and L["Nothing to take here"] or BOARD_GOSSIP_NAME)
+        panel.desc:SetText(Callboard.board and L["Come back after the reset for new contracts."] or "")
         panel.meta:SetText("")
-        action:SetText("Accept")
+        action:SetText(ACCEPT)
         action:Disable()
         return
     end
@@ -1349,13 +1794,13 @@ local function RefreshPanel(q)
 
     local meta
     if q.cadence == Callboard.CADENCE.ONCE then
-        meta = "Once per account"
+        meta = L["Once per account"]
     else
-        meta = string.format("%s: |cffffd100%d/%d|r claimed", q.cadence == Callboard.CADENCE.WEEKLY and "This week" or "Today", q.done, q.max)
-        if q.accountWide then meta = meta .. "  -  one character of your account" end
+        meta = string.format(L["%s: |cffffd100%d/%d|r claimed"], q.cadence == Callboard.CADENCE.WEEKLY and L["This week"] or L["Today"], q.done, q.max)
+        if q.accountWide then meta = T("{meta}  -  one character of your account", { meta = meta }) end
     end
     if q.paysNothing then
-        panel.meta:SetText(string.format("|cffff4040You are above level %d, the top of this contract: claiming it pays nothing.|r", q.outleveledAbove))
+        panel.meta:SetText(T("|cffff4040You are above level {outleveledAbove}, the top of this contract: claiming it pays nothing.|r", { outleveledAbove = string.format("%d", q.outleveledAbove) }))
     else
         panel.meta:SetText(meta)
     end
@@ -1398,7 +1843,7 @@ local function RefreshPanel(q)
     if q.copper > 0 then
         panel.money:SetText(GetCoinTextureString(q.copper))
     elseif n == 1 then
-        panel.money:SetText(q.paysNothing and OutleveledText(q) or "|cff888888No reward|r")
+        panel.money:SetText(q.paysNothing and OutleveledText(q) or L["|cff888888No reward|r"])
     end
 
     local waystone = Callboard.GetWaystone(q.questId)
@@ -1415,27 +1860,52 @@ local function RefreshPanel(q)
         travel:Show()
     end
 
-    if q.state == Callboard.STATE.COMPLETE then
-        action:SetText("Claim Reward")
+    -- A contract that costs gold ("The Price of Forgetting") says so on its button, and its claim
+    -- asks first: Claim All leaves it out (server side), so this is the only way it gets paid.
+    local cost = (q.cost or 0) > 0 and CostText(q.cost) or nil
+    if q.state == Callboard.STATE.COMPLETE and cost then
+        action:SetText(T("Pay {cost}", { cost = cost }))
+        action:Enable()
+        action:SetScript("OnClick", function()
+            StaticPopupDialogs["EBONHOLD_CALLBOARD_PAY"].text = T("Pay {cost} to the Call Board for \"{title}\"?\n\nYou have {money}. The gold is not given back.",
+                { cost = cost, title = q.title, money = GetCoinTextureString(GetMoney()) })
+            local popup = StaticPopup_Show("EBONHOLD_CALLBOARD_PAY")
+            if popup then popup.data = q.questId end
+        end)
+    elseif q.state == Callboard.STATE.COMPLETE then
+        action:SetText(L["Claim Reward"])
         action:Enable()
         action:SetScript("OnClick", function() Callboard.Claim(q.questId) end)
     elseif q.state == Callboard.STATE.ACCEPTED then
-        action:SetText("Abandon")
+        action:SetText(L["Abandon"])
         action:Enable()
         action:SetScript("OnClick", function()
             local popup = StaticPopup_Show("EBONHOLD_CALLBOARD_ABANDON", q.title)
             if popup then popup.data = q.questId end
         end)
     else
-        action:SetText("Accept")
+        action:SetText(cost and T("Accept (costs {cost})", { cost = cost }) or ACCEPT)
         action:Enable()
         action:SetScript("OnClick", function() Callboard.Accept(q.questId) end)
     end
 end
 
+-- The text is set by the button just before showing it (cost, title and purse are named fields).
+StaticPopupDialogs["EBONHOLD_CALLBOARD_PAY"] = {
+    text = "",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function(self, data) Callboard.Claim(data) end,
+    timeout = 0,
+    whileDead = 1,
+    exclusive = 1,
+    hideOnEscape = 1,
+    showAlert = 1,
+}
+
 -- Same words as the quest log's own abandon prompt.
 StaticPopupDialogs["EBONHOLD_CALLBOARD_ABANDON"] = {
-    text = "Abandon \"%s\"?",
+    text = L["Abandon \"%s\"?"],
     button1 = YES,
     button2 = NO,
     OnAccept = function(self, data) Callboard.Abandon(data) end,
@@ -1450,14 +1920,23 @@ function UI.Refresh()
     local board = Callboard.board
     RefreshHeader(board)
     RefreshTabs()
-    RefreshPanel(RefreshList())
+    if selectedCategory == STARTZONE_TAB then
+        mainFrame.scroll:Hide()
+        mainFrame.panel:Hide()
+        ProjectEbonhold.CallboardStartZone.Show(mainFrame, board and board.startValley or 0)
+    else
+        ProjectEbonhold.CallboardStartZone.Hide()
+        mainFrame.scroll:Show()
+        mainFrame.panel:Show()
+        RefreshPanel(RefreshList())
+    end
     UI.RefreshTimers()
     local claimable = board and board.claimable or 0
     if claimable > 0 then
-        mainFrame.claimAll:SetText("Claim All (" .. claimable .. ")")
+        mainFrame.claimAll:SetText(T("Claim All ({claimable})", { claimable = claimable }))
         mainFrame.claimAll:Enable()
     else
-        mainFrame.claimAll:SetText("Claim All")
+        mainFrame.claimAll:SetText(L["Claim All"])
         mainFrame.claimAll:Disable()
     end
 end
@@ -1477,16 +1956,16 @@ end
 -- -------------------------------------------------------------- results ----
 
 local FAIL_TEXT = {
-    far         = "You must stand next to the Call Board.",
-    dead        = "You cannot use the Call Board while dead.",
-    unknown     = "That contract is not on the board.",
-    notoffered  = "That contract is not posted for you right now.",
-    inlog       = "You already hold that contract.",
-    exhausted   = "You have completed that contract as many times as allowed for now.",
-    full        = "Your quest log is full.",
-    cannot      = "You cannot take that contract right now.",
-    nothing     = "Nothing to claim: finish a contract first.",
-    notcomplete = "That contract is not finished yet.",
+    far         = L["You must stand next to the Call Board."],
+    dead        = L["You cannot use the Call Board while dead."],
+    unknown     = L["That contract is not on the board."],
+    notoffered  = L["That contract is not posted for you right now."],
+    inlog       = L["You already hold that contract."],
+    exhausted   = L["You have completed that contract as many times as allowed for now."],
+    full        = L["Your quest log is full."],
+    cannot      = L["You cannot take that contract right now."],
+    nothing     = L["Nothing to claim: finish a contract first."],
+    notcomplete = L["That contract is not finished yet."],
 }
 
 local CHAT_ASH     = "|T" .. ICON_ASH .. ":14:14|t"
@@ -1498,10 +1977,10 @@ local CHAT_SHARD   = "|T" .. ICON_SHARD .. ":14:14|t"
 local function AnnounceCache(entry)
     local name, link = GetItemInfo(entry)
     if link then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF66CCFF[Call Board]|r You earn a " .. link .. " - open it to take what it holds.")
+        DEFAULT_CHAT_FRAME:AddMessage(T("|cFF66CCFF[Call Board]|r You earn a {link} - open it to take what it holds.", { link = link }))
         local icon = GetItemIcon(entry)
         if icon and UIErrorsFrame then
-            UIErrorsFrame:AddMessage("You earn a Hero's Call Cache!", 0.4, 0.8, 1.0, 1.0)
+            UIErrorsFrame:AddMessage(L["You earn a Hero's Call Cache!"], 0.4, 0.8, 1.0, 1.0)
         end
     else
         -- Not in the client cache yet: ask for it and retry once it arrives.
@@ -1515,10 +1994,10 @@ local function AnnounceCache(entry)
             local n, l = GetItemInfo(entry)
             if l then
                 self:SetScript("OnUpdate", nil)
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF66CCFF[Call Board]|r You earn a " .. l .. " - open it to take what it holds.")
+                DEFAULT_CHAT_FRAME:AddMessage(T("|cFF66CCFF[Call Board]|r You earn a {l} - open it to take what it holds.", { l = l }))
             elseif tries > 300 then
                 self:SetScript("OnUpdate", nil)
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF66CCFF[Call Board]|r You earn a cache - open it to take what it holds.")
+                DEFAULT_CHAT_FRAME:AddMessage(L["|cFF66CCFF[Call Board]|r You earn a cache - open it to take what it holds."])
             end
         end)
     end
@@ -1529,29 +2008,35 @@ Callboard.OnChanged(function(event, payload)
         UI.Refresh()
     elseif event == "result" then
         local r = payload
+        if r.op == "startzone" then return end   -- callboard_startzone.lua answers it
         if not r.ok then
-            local text = FAIL_TEXT[r.reason] or ("Call Board: " .. tostring(r.reason))
-            UIErrorsFrame:AddMessage(text, 1.0, 0.3, 0.3, 1.0)
+            -- only a known refusal is shown; an unknown or missing reason stays silent
+            local text = r.reason and FAIL_TEXT[r.reason]
+            if text then UIErrorsFrame:AddMessage(text, 1.0, 0.3, 0.3, 1.0) end
             return
         end
         if r.op == "claim" then
             local parts = {}
-            if r.ashes > 0 then table.insert(parts, FormatThousands(r.ashes) .. " Soul Ashes " .. CHAT_ASH) end
+            if r.ashes > 0 then table.insert(parts, T("{ashes} Soul Ashes {CHATASH}", { ashes = FormatThousands(r.ashes), CHATASH = CHAT_ASH })) end
             if r.copper > 0 then table.insert(parts, GetCoinTextureString(r.copper)) end
-            if r.xp > 0 then table.insert(parts, FormatThousands(r.xp) .. " XP") end
-            if r.artisan > 0 then table.insert(parts, r.artisan .. " Artisan Soul" .. (r.artisan > 1 and "s" or "") .. " " .. CHAT_ARTISAN) end
-            if (r.orbs or 0) > 0 then table.insert(parts, r.orbs .. " Orb" .. (r.orbs > 1 and "s" or "") .. " of Lost Memories " .. CHAT_ORB) end
-            if (r.shards or 0) > 0 then table.insert(parts, FormatThousands(r.shards) .. " Soul Shards " .. CHAT_SHARD) end
-            local paid = #parts > 0 and table.concat(parts, "  ") or "no reward"
+            if r.xp > 0 then table.insert(parts, T("{xp} XP", { xp = FormatThousands(r.xp) })) end
+            if r.artisan > 0 then table.insert(parts, T("{artisan} Artisan Soul{s} {CHATARTISAN}", { artisan = r.artisan, s = (r.artisan > 1 and "s" or ""), CHATARTISAN = CHAT_ARTISAN })) end
+            if (r.orbs or 0) > 0 then table.insert(parts, T("{orbs} Orb{s} of Lost Memories {CHATORB}", { orbs = r.orbs, s = (r.orbs > 1 and "s" or ""), CHATORB = CHAT_ORB })) end
+            if (r.shards or 0) > 0 then table.insert(parts, T("{shards} Soul Shards {CHATSHARD}", { shards = FormatThousands(r.shards), CHATSHARD = CHAT_SHARD })) end
+            local paid = #parts > 0 and table.concat(parts, "  ") or L["no reward"]
             -- an outleveled claim (r.outleveled) pays less, with no extra line: the figures say it (his call, 11/10)
-            DEFAULT_CHAT_FRAME:AddMessage(string.format("|cFF66CCFF[Call Board]|r %d contract%s claimed: %s",
-                r.count, r.count > 1 and "s" or "", paid))
+            DEFAULT_CHAT_FRAME:AddMessage(T("|cFF66CCFF[Call Board]|r {count} contract{s} claimed: {paid}", { count = string.format("%d", r.count), s = r.count > 1 and "s" or "", paid = paid }))
             for _, entry in ipairs(r.caches or {}) do
                 AnnounceCache(entry)
             end
             for _, it in ipairs(r.items or {}) do
-                local _, link = GetItemInfo(it.entry)
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF66CCFF[Call Board]|r You receive " .. (link or ("item " .. it.entry)) .. (it.count > 1 and (" x" .. it.count) or "") .. ".")
+                local item = RailItemLink(it.entry)
+                local count = it.count > 1 and (" x" .. it.count) or ""
+                -- yellow like the stock system lines; a weekly-rail elixir says where it comes from (owner, 11/24)
+                local line = RAIL_ITEMS[it.entry]
+                    and T("Weekly contract reward: you receive {item}{count}.", { item = item, count = count })
+                    or T("You receive {item}{count}.", { item = item, count = count })
+                DEFAULT_CHAT_FRAME:AddMessage(line, 1, 1, 0)
             end
         end
     end
@@ -1562,8 +2047,16 @@ end)
 local logWatcher = CreateFrame("Frame")
 logWatcher:RegisterEvent("QUEST_LOG_UPDATE")
 logWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-logWatcher:SetScript("OnEvent", function()
-    if mainFrame and mainFrame:IsShown() then UI.Refresh() end
+logWatcher:RegisterEvent("ZONE_CHANGED")
+logWatcher:SetScript("OnEvent", function(self, event)
+    if not (mainFrame and mainFrame:IsShown()) then return end
+    if event == "QUEST_LOG_UPDATE" then
+        UI.Refresh()
+    else
+        -- a new area: the server says again whether it is a start valley (Starting Zone button)
+        UI.Refresh()
+        Callboard.Request()
+    end
 end)
 
 -- ---------------------------------------------------------------- gossip ----

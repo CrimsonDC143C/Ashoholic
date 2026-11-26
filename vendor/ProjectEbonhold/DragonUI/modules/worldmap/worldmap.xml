@@ -1,0 +1,22 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+    <Script file="core.lua"/>
+    <Script file="zonelevels.lua"/>
+    <Script file="navbar.lua"/>
+    <Script file="pins.lua"/>
+    <Script file="questlog.lua"/>
+    <Script file="questdetail.lua"/>
+    <!-- Ashendor: the stock quest log opens this map's quest panel instead -->
+    <Script file="questlog_redirect.lua"/>
+    <Script file="fogdata.lua"/>
+    <Script file="fog.lua"/>
+    <Script file="entrancedata.lua"/>
+    <!-- Ashendor (2026-11-15): mappins.lua and its data (graveyarddata, flightpointdata, inndata) are not
+         loaded: no DragonUI entrance / graveyard / flight / inn pins, ours draw the map's points
+         (modules\checkpoint, modules\graveyards). entrancedata.lua stays: the quest panel reads it. -->
+    <Script file="coords.lua"/>
+    <Script file="playerarrow.lua"/>
+    <Script file="grouppins.lua"/>
+    <Script file="fade.lua"/>
+    <Script file="zoom.lua"/>
+</Ui>

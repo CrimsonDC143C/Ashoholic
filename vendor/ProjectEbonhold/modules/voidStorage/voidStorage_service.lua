@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 VoidStorageService = VoidStorageService or {}
@@ -56,7 +57,7 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_CONTENT_VOID_STORAGE, fu
         end
     end
     
-    print("Loaded", ((#parts - 1) / 2), "items for tab", tabIndex)
+    print(L["Loaded"], ((#parts - 1) / 2), L["items for tab"], tabIndex)
     
     if VoidStorageFrame and VoidStorageFrame.UpdateDisplay then
         VoidStorageFrame:UpdateDisplay()

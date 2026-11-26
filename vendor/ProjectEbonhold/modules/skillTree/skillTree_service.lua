@@ -103,7 +103,7 @@ local function encodeLoadoutData(loadoutData)
   end
 
   local loadoutId = loadoutData.id or "0"
-  local name = loadoutData.name or "Unnamed"
+  local name = loadoutData.name or ProjectEbonhold.L["Unnamed"]
   local nodesString = table.concat(nodeParts, ",")
 
   local encoded = loadoutId .. "|" .. name .. "|" .. nodesString
@@ -188,7 +188,7 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_UPDATED_COMMITTED
     if prev and ProjectEbonhold.PlayerRunService and ProjectEbonhold.PlayerRunService.ShowChangeAnimation
        and not (ProjectEbonholdOptionsService and not ProjectEbonholdOptionsService:GetSetting("showFloatingText")) then
       local n = 0
-      for _, cur in ipairs({ { "shard", "Soul Shard(s)" }, { "essence", "Soul Essence" }, { "artisan", "Artisan Soul" } }) do
+      for _, cur in ipairs({ { "shard", ProjectEbonhold.L["Soul Shard(s)"] }, { "essence", ProjectEbonhold.L["Soul Essence"] }, { "artisan", ProjectEbonhold.L["Artisan Soul"] } }) do
         local key, label = cur[1], cur[2]
         local gained = (pools[key].banked or 0) - (prev[key] or 0)
         if gained > 0 then

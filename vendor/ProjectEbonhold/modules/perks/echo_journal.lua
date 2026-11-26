@@ -1,4 +1,5 @@
 -- Echo Journal
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- Unified echoes interface with three tabs:
 --   My Echoes  - permanent slots + echoes active in the current run
 --   All Echoes - full catalog, tome-locked echoes folded in (dimmed until the
@@ -41,7 +42,7 @@ local ECHOES_CATALOG_W = 590  -- catalog (right column) width on the Echoes tab 
 local ECHOES_JOURNAL_W = ECHOES_CATALOG_W + MY_RUN_PANEL_W + PANEL_GAP
 
 local TAB_MY_RUN, TAB_ALL, TAB_LOADOUTS = 1, 2, 3
-local TAB_LABELS = { "My Echoes", "All Echoes", "Loadouts" }
+local TAB_LABELS = { L["My Echoes"], L["All Echoes"], L["Loadouts"] }
 
 local ASSETS = "Interface\\AddOns\\ProjectEbonhold\\assets\\"
 
@@ -54,7 +55,7 @@ local qualityColors = {
 }
 
 local QUALITY_NAMES = {
-    [0] = "Common", [1] = "Uncommon", [2] = "Rare", [3] = "Epic", [4] = "Legendary",
+    [0] = L["Common"], [1] = L["Uncommon"], [2] = L["Rare"], [3] = L["Epic"], [4] = L["Legendary"],
 }
 
 -- Owned-per-quality badges ringing an echo icon, same size as the single count
@@ -463,6 +464,16 @@ local function BuildItems(tab)
             local q = quality or 0
             entry.counts[q] = (entry.counts[q] or 0) + stacks
             entry.totalStacks = entry.totalStacks + stacks
+            -- Copies per exact rarity row, for the tooltip: each row carries its own per-copy value
+            -- (Dewfall 2 % / 4 % / 20 %), so a mixed hand is summed row by row, never the best row x
+            -- the total (bug #4444: one Common + one Rare read 40 % instead of 22 %).
+            entry.bySpell = entry.bySpell or {}
+            local row = entry.bySpell[spellId]
+            if not row then
+                row = { spellId = spellId, quality = q, stacks = 0 }
+                entry.bySpell[spellId] = row
+            end
+            row.stacks = row.stacks + stacks
             if q > entry.quality then
                 entry.quality = q
                 entry.spellId = spellId
@@ -583,10 +594,20 @@ local function BuildItems(tab)
                 -- Holding stacks of a tome echo implies its tome is known (the
                 -- catalog draws the same inference from ownership).
                 local isTome = data.isTome == true
+                -- Best rarity first: the tooltip takes its wording from the first row, the one the card shows.
+                local instances = {}
+                for _, row in pairs(entry.bySpell or {}) do
+                    table.insert(instances, row)
+                end
+                table.sort(instances, function(a, b)
+                    if a.quality ~= b.quality then return a.quality > b.quality end
+                    return a.spellId < b.spellId
+                end)
                 table.insert(items, {
                     spellId = entry.spellId, data = data,
                     name = GetSpellInfo(entry.spellId),
                     counts = entry.counts,
+                    instances = instances,
                     orbSpellId = entry.orbSpellId,
                     orbQuality = entry.orbQuality,
                     stacks = entry.totalStacks,
@@ -723,10 +744,8 @@ end
 
 -- ── Tome unlearning (right-click a learned tome in the catalog) ──────────────
 StaticPopupDialogs["PROJECTEBONHOLD_UNLEARN_TOME"] = {
-    text = "Are you sure you want to unlearn |cffffd700%s|r?\n\n" ..
-        "|cffFF4444This is permanent.|r You will lose the tome and will need " ..
-        "to loot it again to relearn it.",
-    button1 = "Yes",
+    text = L["Are you sure you want to unlearn |cffffd700%s|r?\n\n|cffFF4444This is permanent.|r You will lose the tome and will need to loot it again to relearn it."],
+    button1 = L["Yes"],
     button2 = "No",
     OnAccept = function(self)
         local d = self.data
@@ -750,7 +769,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_UNLEARN_TOME"] = {
 -- confirmation popup). Replaces the old destructive unlearning - the tome
 -- knowledge is kept, only its echo's presence in the draw pool toggles.
 StaticPopupDialogs["PROJECTEBONHOLD_TOME_DISABLE"] = {
-    text = "Disable |cffffd700%s|r?\n\nIts echo will no longer appear in your draws this run. You can re-enable it at level 1 anytime. The tome is never lost.",
+    text = L["Disable |cffffd700%s|r?\n\nIts echo will no longer appear in your draws this run. You can re-enable it at level 1 anytime. The tome is never lost."],
     button1 = YES,
     button2 = NO,
     OnAccept = function(self)
@@ -763,7 +782,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_TOME_DISABLE"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_TOME_ENABLE"] = {
-    text = "Enable |cffffd700%s|r?\n\nIts echo can appear in your draws again.",
+    text = L["Enable |cffffd700%s|r?\n\nIts echo can appear in your draws again."],
     button1 = YES,
     button2 = NO,
     OnAccept = function(self)
@@ -781,11 +800,11 @@ local function TryToggleTome(button)
         return
     end
     if (UnitLevel("player") or 1) ~= 1 then
-        UIErrorsFrame:AddMessage("Tomes can be enabled or disabled at level 1 only.", 1, 0.2, 0.2)
+        UIErrorsFrame:AddMessage(L["Tomes can be enabled or disabled at level 1 only."], 1, 0.2, 0.2)
         return
     end
     local svc = GetService()
-    local name = GetSpellInfo(button.spellId) or "this echo"
+    local name = GetSpellInfo(button.spellId) or L["this echo"]
     local which = (svc and svc.IsTomeEchoDisabled and svc.IsTomeEchoDisabled(button.spellId))
         and "PROJECTEBONHOLD_TOME_ENABLE" or "PROJECTEBONHOLD_TOME_DISABLE"
     local dialog = StaticPopup_Show(which, name)
@@ -796,8 +815,8 @@ end
 local function ShowEchoTooltip(button)
     if button.isEmptySlot then
         GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Empty Echo Slot", 0.6, 0.6, 0.6)
-        GameTooltip:AddLine("Level up to roll more echoes this run.", 0.9, 0.9, 0.9, true)
+        GameTooltip:SetText(L["Empty Echo Slot"], 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(L["Level up to roll more echoes this run."], 0.9, 0.9, 0.9, true)
         GameTooltip:Show()
         return
     end
@@ -809,45 +828,73 @@ local function ShowEchoTooltip(button)
     local data = button.perkData
     if spellName and data then
         local color = qualityColors[data.quality] or qualityColors[0]
-        GameTooltip:AddLine(spellName, color.r, color.g, color.b)
+        -- The most stacks of this echo a character can carry, small in the top-right corner.
+        -- The right text of line 1 is the header font: shrunk here, given back on clear.
+        if (data.maxStack or 0) > 0 then
+            GameTooltip:AddDoubleLine(spellName, T("Max {count}", { count = data.maxStack }),
+                color.r, color.g, color.b, 0.6, 0.6, 0.6)
+            GameTooltipTextRight1:SetFontObject(GameFontHighlightSmall)
+            GameTooltipTextRight1:SetTextColor(0.6, 0.6, 0.6)
+            if not GameTooltip._ebonMaxHooked then
+                GameTooltip._ebonMaxHooked = true
+                GameTooltip:HookScript("OnTooltipCleared", function()
+                    GameTooltipTextRight1:SetFontObject(GameTooltipHeaderText)
+                end)
+            end
+        else
+            GameTooltip:AddLine(spellName, color.r, color.g, color.b)
+        end
+        GameTooltip:AddLine(" ")
 
         if utils and utils.GetSpellDescription then
             -- Resolve the stat formulas at everything you own (all qualities
             -- summed), matching the permanent-slot tooltip. Falls back to the
             -- per-stack base value in the catalog, where you own none.
-            local descStacks = (button.ownedStacks or 0) > 0 and button.ownedStacks or 1
-            GameTooltip:AddLine(utils.GetSpellDescription(button.spellId, 4000, descStacks), 1, 1, 1, true)
+            -- Several rarities held: summed row by row, each row at its own copies and per-copy
+            -- value (bug #4444). One rarity: the plain render, unchanged.
+            local instances = button.instances
+            if instances and #instances > 1 and utils.GetStackedSpellDescription then
+                GameTooltip:AddLine(utils.GetStackedSpellDescription(instances, 4000), 1, 0.82, 0, true)
+            else
+                local descStacks = (button.ownedStacks or 0) > 0 and button.ownedStacks or 1
+                GameTooltip:AddLine(utils.GetSpellDescription(button.spellId, 4000, descStacks), 1, 0.82, 0, true)
+            end
         else
             GameTooltip:SetHyperlink("spell:" .. button.spellId)
         end
 
-        GameTooltip:AddLine(" ")
+
         -- no "Perk Family" line any more (owner 2026-10-23)
+        -- the blocks below each open with their own blank line, so none here
+        -- (two blanks in a row otherwise when the echo has no state to show)
         if button.isLocked then
-            GameTooltip:AddLine("Permanent echo (locked between runs)", 1, 0.82, 0)
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(L["Permanent echo (locked between runs)"], 1, 0.82, 0)
         end
         if button.souvenirMissing then
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(string.format(
-                "Souvenir of this loadout's finished build: not reclaimed yet (x%d)", button.souvenirRemaining or 1), 1, 0.82, 0.1)
-            GameTooltip:AddLine("Offered as the fourth card of your draws while you climb.", 0.9, 0.9, 0.9, true)
+                L["Souvenir of this loadout's finished build: not reclaimed yet (x%d)"], button.souvenirRemaining or 1), 1, 0.82, 0.1)
+            GameTooltip:AddLine(L["Offered as the fourth card of your draws while you climb."], 0.9, 0.9, 0.9, true)
         elseif button.souvenirRemaining then
-            GameTooltip:AddDoubleLine("Souvenir stacks still to reclaim", tostring(button.souvenirRemaining), 1, 0.82, 0.1, 1, 1, 1)
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddDoubleLine(L["Souvenir stacks still to reclaim"], tostring(button.souvenirRemaining), 1, 0.82, 0.1, 1, 1, 1)
         end
         if button.buildMissing then
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(string.format(
-                "From your active build: not obtained yet (0/%d)", button.buildTarget or 1), 1, 0.82, 0.1)
-            GameTooltip:AddLine("It will be highlighted when it appears in your draws.", 0.9, 0.9, 0.9, true)
+                L["From your active build: not obtained yet (0/%d)"], button.buildTarget or 1), 1, 0.82, 0.1)
+            GameTooltip:AddLine(L["It will be highlighted when it appears in your draws."], 0.9, 0.9, 0.9, true)
             if button.buildLocked then
-                GameTooltip:AddLine("Saved as a locked echo in this build.", 0.5, 0.75, 1)
+                GameTooltip:AddLine(L["Saved as a locked echo in this build."], 0.5, 0.75, 1)
             end
         elseif button.buildTarget then
-            GameTooltip:AddDoubleLine("Active build target",
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddDoubleLine(L["Active build target"],
                 tostring(button.ownedStacks or 0) .. " / " .. tostring(button.buildTarget),
                 1, 0.82, 0.1, 1, 1, 1)
             if button.buildLocked then
-                GameTooltip:AddLine("Saved as a locked echo in this build.", 0.5, 0.75, 1)
+                GameTooltip:AddLine(L["Saved as a locked echo in this build."], 0.5, 0.75, 1)
             end
         end
 
@@ -864,19 +911,17 @@ local function ShowEchoTooltip(button)
             GameTooltip:AddLine(" ")
             if button.tomeKnown then
                 if button.tomeDisabled then
-                    GameTooltip:AddLine("Tome learned (|cffff5050disabled|r)", 0.1, 1, 0.1)
-                    GameTooltip:AddLine("This echo will not appear in your draws.", 0.9, 0.9, 0.9, true)
-                    GameTooltip:AddLine("Right-click to enable it (level 1 only)", 0.5, 0.5, 0.5)
+                    GameTooltip:AddLine(L["Tome learned (|cffff5050disabled|r)"], 0.1, 1, 0.1)
+                    GameTooltip:AddLine(L["This echo will not appear in your draws."], 0.9, 0.9, 0.9, true)
+                    GameTooltip:AddLine(L["Right-click to enable it (level 1 only)"], 0.5, 0.5, 0.5)
                 else
-                    GameTooltip:AddLine("Tome learned (|cff40ff40enabled|r)", 0.1, 1, 0.1)
-                    GameTooltip:AddLine("Right-click to disable it (level 1 only)", 0.5, 0.5, 0.5)
+                    GameTooltip:AddLine(L["Tome learned (|cff40ff40enabled|r)"], 0.1, 1, 0.1)
+                    GameTooltip:AddLine(L["Right-click to disable it (level 1 only)"], 0.5, 0.5, 0.5)
                 end
             else
-                GameTooltip:AddLine("Requires Tome to unlock", 1, 0.82, 0)
+                GameTooltip:AddLine(L["Requires Tome to unlock"], 1, 0.82, 0)
             end
         end
-
-        GameTooltip:AddLine(" ")
 
         -- While an Orb of Lost Memories is armed, both mouse buttons are taken over: left
         -- forgets this echo now, right queues it into a batch. The hint has to say THAT and
@@ -887,6 +932,12 @@ local function ShowEchoTooltip(button)
         local orbTarget = button.orbSpellId or button.spellId
         local orbMarked = orbArmed and orb.IsMarked and orb.IsMarked(orbTarget)
         local orbBatch = (orbArmed and orb.GetMarkedCount and orb.GetMarkedCount()) or 0
+
+        -- The blank line before the click hints, only when a hint follows: off the dev realm and
+        -- without an armed orb there is none any more (no "Shift-click to link in chat", owner 11/23)
+        if orbArmed or (utils and utils.IsDevRealm and utils.IsDevRealm()) then
+            GameTooltip:AddLine(" ")
+        end
 
         -- Mauve hover while the echo under the cursor is the one an armed selection would act
         -- on: an orb about to forget it, or a permanent slot about to lock it. The stock
@@ -906,16 +957,16 @@ local function ShowEchoTooltip(button)
         if orbArmed and button.isLocked and not button.orbSpellId then
             -- A permanent echo is not a legal target: forgetting one would silently undo a
             -- slot the player paid for, and the server refuses it anyway.
-            GameTooltip:AddLine("|cffFF8080Permanent Echoes cannot be forgotten|r", 1, 0.5, 0.5, true)
-            GameTooltip:AddLine("Free its permanent slot first.", 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine(L["|cffFF8080Permanent Echoes cannot be forgotten|r"], 1, 0.5, 0.5, true)
+            GameTooltip:AddLine(L["Free its permanent slot first."], 0.6, 0.6, 0.6, true)
         elseif orbArmed and (button.ownedStacks or 0) > 0 then
             if orbMarked then
-                GameTooltip:AddLine("|cffCC66FFQueued to be forgotten|r", 1, 1, 1, true)
-                GameTooltip:AddLine("|cffFFD100Right-click to take it back out|r", 1, 1, 1, true)
+                GameTooltip:AddLine(L["|cffCC66FFQueued to be forgotten|r"], 1, 1, 1, true)
+                GameTooltip:AddLine(L["|cffFFD100Right-click to take it back out|r"], 1, 1, 1, true)
             else
-                GameTooltip:AddLine("|cffFFD100Left-click to forget one stack now|r", 1, 1, 1, true)
-                GameTooltip:AddLine("|cffFFD100Right-click to add it to a batch|r", 1, 1, 1, true)
-                GameTooltip:AddLine("Pick as many different Echoes as you like, then confirm from the orb window. One orb each.", 0.6, 0.6, 0.6, true)
+                GameTooltip:AddLine(L["|cffFFD100Left-click to forget one stack now|r"], 1, 1, 1, true)
+                GameTooltip:AddLine(L["|cffFFD100Right-click to add it to a batch|r"], 1, 1, 1, true)
+                GameTooltip:AddLine(L["Pick as many different Echoes as you like, then confirm from the orb window. One orb each."], 0.6, 0.6, 0.6, true)
             end
             -- Which copy goes. Only worth saying on a card holding more than one rarity: with a
             -- single rarity held the badge above already says it, and the line becomes noise.
@@ -926,27 +977,26 @@ local function ShowEchoTooltip(button)
                 end
                 if heldRarities > 1 then
                     local qc = qualityColors[button.orbQuality] or qualityColors[0]
-                    GameTooltip:AddLine("Takes your lowest rarity: " ..
-                        (QUALITY_NAMES[button.orbQuality] or "?"), qc.r, qc.g, qc.b, true)
+                    GameTooltip:AddLine(T("Takes your lowest rarity: {quality}", { quality = QUALITY_NAMES[button.orbQuality] or "?" }), qc.r, qc.g, qc.b, true)
                 end
             end
-            GameTooltip:AddLine("A new Echo choice is offered for each one.", 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine(L["A new Echo choice is offered for each one."], 0.6, 0.6, 0.6, true)
             if orbBatch > 0 then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddDoubleLine("Queued", orbBatch .. " / " .. tostring((orb.GetCharges and orb.GetCharges()) or 0) .. " orbs",
+                GameTooltip:AddDoubleLine(L["Queued"], T("{queued} / {charges} orbs", { queued = orbBatch, charges = tostring((orb.GetCharges and orb.GetCharges()) or 0) }),
                     0.8, 0.5, 1, 1, 1, 1)
             end
         elseif orbArmed then
-            GameTooltip:AddLine("|cffFF8080You do not own this Echo|r", 1, 0.5, 0.5, true)
+            GameTooltip:AddLine(L["|cffFF8080You do not own this Echo|r"], 1, 0.5, 0.5, true)
         else
-            GameTooltip:AddLine("Shift-click to link in chat", 0.4, 0.4, 0.4)
             if utils and utils.IsDevRealm and utils.IsDevRealm() then
-                GameTooltip:AddLine("|cffFF6600Left-click to add stack (DEV)|r", 1, 1, 1, true)
+                GameTooltip:AddLine(L["|cffFF6600Left-click to add stack (DEV)|r"], 1, 1, 1, true)
                 if (button.ownedStacks or 0) > 0 then
-                    GameTooltip:AddLine("|cffFF6600Right-click to remove stack (DEV)|r", 1, 1, 1, true)
+                    GameTooltip:AddLine(L["|cffFF6600Right-click to remove stack (DEV)|r"], 1, 1, 1, true)
                 end
             end
         end
+        if utils and utils.AddShiftHint then utils.AddShiftHint(GameTooltip, button.spellId) end
     end
 
     GameTooltip:Show()
@@ -1167,7 +1217,7 @@ local function CreateGridButton(parent)
             -- into a silent rejection. A grouped card whose stacks are not ALL permanent still
             -- has a legal target (orbSpellId), so only the no-target case is refused.
             if not self.orbSpellId and self.isLocked then
-                UIErrorsFrame:AddMessage("Permanent Echoes cannot be forgotten.", 1, 0.2, 0.2)
+                UIErrorsFrame:AddMessage(L["Permanent Echoes cannot be forgotten."], 1, 0.2, 0.2)
                 return
             end
             if mouseButton == "LeftButton" then
@@ -1201,7 +1251,7 @@ local function CreateGridButton(parent)
                     -- can still be said out loud.
                     if not e and DraftCount() + DraftAvoidCount() >= MAX_DRAFT_ENTRIES then
                         UIErrorsFrame:AddMessage(string.format(
-                            "A wishlist holds at most %d echoes, wanted and refused together.",
+                            L["A wishlist holds at most %d echoes, wanted and refused together."],
                             MAX_DRAFT_ENTRIES), 1, 0.1, 0.1)
                         return
                     end
@@ -1214,7 +1264,7 @@ local function CreateGridButton(parent)
             if mouseButton == "LeftButton" then
                 if DraftTotalStacks() >= MAX_RUN_ECHOES then
                     UIErrorsFrame:AddMessage(
-                        string.format("A wishlist cannot exceed %d echoes.", MAX_RUN_ECHOES), 1, 0.1, 0.1)
+                        string.format(L["A wishlist cannot exceed %d echoes."], MAX_RUN_ECHOES), 1, 0.1, 0.1)
                     return
                 end
                 if e and e.avoid then
@@ -1311,6 +1361,7 @@ local function UpdateGridButton(button, item)
         button.spellId = nil
         button.perkData = nil
         button.counts = nil
+        button.instances = nil
         button.ownedStacks = 0
         button.isLocked = nil
         button.orbSpellId = nil
@@ -1353,6 +1404,7 @@ local function UpdateGridButton(button, item)
     button.spellId = spellId
     button.perkData = data
     button.counts = item.counts
+    button.instances = item.instances
     button.ownedStacks = item.stacks or 0
     button.isLocked = item.locked
     -- Only the grouped "My Echoes" cards carry these; the catalog lists every rarity as its own
@@ -1383,7 +1435,7 @@ local function UpdateGridButton(button, item)
     button.iconBase:SetAlpha(1)
     button.ring:SetTexture(ASSETS .. "perk_border_quality_" .. borderIdx)
     button.ring:SetAlpha(1)
-    button.nameText:SetText(spellName or "Unknown")
+    button.nameText:SetText(spellName or L["Unknown"])
 
     if item.dimmed then
         button.icon:SetDesaturated(true)
@@ -1546,8 +1598,8 @@ local function UpdateMyRunPanel(items)
         if #items == 0 then myRunEmptyState:Show() else myRunEmptyState:Hide() end
         if myRunEmptyState.text then
             myRunEmptyState.text:SetText(currentSearchText ~= ""
-                and "None of your echoes match this search."
-                or "You have no echoes yet.\n\nLevel up during a run to earn new echoes.")
+                and L["None of your echoes match this search."]
+                or L["You have no echoes yet.\n\nLevel up during a run to earn new echoes."])
         end
     end
     local pitch = BUTTON_SIZE + NAME_HEIGHT + BUTTON_SPACING
@@ -1913,21 +1965,26 @@ local function GetRowIcon(row, k)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local sName = GetSpellInfo(self.spellId)
         local qc = qualityColors[self.quality or 0] or qualityColors[0]
-        GameTooltip:SetText(sName or ("Spell " .. tostring(self.spellId)), qc.r, qc.g, qc.b)
+        GameTooltip:SetText(sName or T("Spell {id}", { id = tostring(self.spellId) }), qc.r, qc.g, qc.b)
+        if utils and utils.GetSpellDescription then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(utils.GetSpellDescription(self.spellId, 4000, self.stacks or 1), 1, 0.82, 0, true)
+        end
+        if (self.stacks or 1) > 1 or self.locked or self.avoid or self.notObtained then
+            GameTooltip:AddLine(" ")
+        end
         if (self.stacks or 1) > 1 then
-            GameTooltip:AddLine("Stacks: " .. self.stacks, 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(T("Stacks: {count}", { count = self.stacks }), 0.7, 0.7, 0.7)
         end
         if self.locked then
-            GameTooltip:AddLine("Locked echo (permanent between runs)", 1, 0.82, 0)
+            GameTooltip:AddLine(L["Locked echo (permanent between runs)"], 1, 0.82, 0)
         end
         if self.avoid then
-            GameTooltip:AddLine("Never taken: this build refuses this echo", 1, 0.25, 0.25)
+            GameTooltip:AddLine(L["Never taken: this build refuses this echo"], 1, 0.25, 0.25)
         elseif self.notObtained then
-            GameTooltip:AddLine("Not obtained this run yet", 1, 0.4, 0.4)
+            GameTooltip:AddLine(L["Not obtained this run yet"], 1, 0.4, 0.4)
         end
-        if utils and utils.GetSpellDescription then
-            GameTooltip:AddLine(utils.GetSpellDescription(self.spellId, 4000, self.stacks or 1), 1, 1, 1, true)
-        end
+        if utils and utils.AddShiftHint then utils.AddShiftHint(GameTooltip, self.spellId) end
         GameTooltip:Show()
     end)
     ib:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1988,7 +2045,7 @@ local function ShowLoadoutMenu(row)
         loadoutMenuFrame = CreateFrame("Frame", "ProjectEbonholdLoadoutMenu", UIParent, "UIDropDownMenuTemplate")
     end
     local items = {}
-    local title = (row.loadout.name and row.loadout.name ~= "" and row.loadout.name) or "Build"
+    local title = (row.loadout.name and row.loadout.name ~= "" and row.loadout.name) or L["Build"]
     title = title:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") -- drop inline color codes
     table.insert(items, { text = title, isTitle = true, notCheckable = true })
 
@@ -2005,31 +2062,31 @@ local function ShowLoadoutMenu(row)
     if row.serverSlot then
         if row.serverFilled then
             if row.serverVerified == false then
-                add("Design", row.designBtn)
-                add("Rename", row.renameBuildBtn)
-                add("Share", row.shareBtn)
-                add("Export", row.exportBtn)
-                add("Delete", row.deleteBtn)
+                add(L["Design"], row.designBtn)
+                add(L["Rename"], row.renameBuildBtn)
+                add(L["Share"], row.shareBtn)
+                add(L["Export"], row.exportBtn)
+                add(L["Delete"], row.deleteBtn)
             else
-                add("Switch", row.saveBuildBtn)
-                add("Rename", row.renameBuildBtn)
-                add("Share", row.shareBtn)
-                add("Export", row.exportBtn)
+                add(L["Switch"], row.saveBuildBtn)
+                add(L["Rename"], row.renameBuildBtn)
+                add(L["Share"], row.shareBtn)
+                add(L["Export"], row.exportBtn)
             end
         end
     elseif row.isMine then
-        add("Edit", row.editBtn)
-        add("Share", row.shareBtn)
-        add("Export", row.exportBtn)
-        add("Delete", row.deleteBtn)
+        add(L["Edit"], row.editBtn)
+        add(L["Share"], row.shareBtn)
+        add(L["Export"], row.exportBtn)
+        add(L["Delete"], row.deleteBtn)
     else
-        add("Save to my builds", row.saveBtn)
-        add("Export", row.exportBtn)
+        add(L["Save to my builds"], row.saveBtn)
+        add(L["Export"], row.exportBtn)
         if row.loadout.author == UnitName("player") then
-            add("Unpublish", row.deleteBtn)
+            add(L["Unpublish"], row.deleteBtn)
         end
     end
-    table.insert(items, { text = CANCEL or "Cancel", notCheckable = true })
+    table.insert(items, { text = CANCEL or L["Cancel"], notCheckable = true })
 
     EasyMenu(items, loadoutMenuFrame, row.menuBtn or "cursor", 0, 0, "MENU")
 end
@@ -2137,7 +2194,7 @@ local function GetLoadoutRow(i)
         -- activated before this restriction existed.)
         if not self.isMine and not IsActiveLoadout(self.loadout) then
             UIErrorsFrame:AddMessage(
-                "Save this community build to your own builds first, then activate it from My Builds.",
+                L["Save this community build to your own builds first, then activate it from My Builds."],
                 1, 0.82, 0)
             return
         end
@@ -2151,19 +2208,19 @@ local function GetLoadoutRow(i)
     row:SetScript("OnEnter", function(self)
         if not self.loadout then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(self.loadout.name or "Loadout", 1, 0.82, 0)
+        GameTooltip:SetText(self.loadout.name or L["Loadout"], 1, 0.82, 0)
         if self.serverSlot then
             if self.serverLockedCost then
-                GameTooltip:AddLine("Locked loadout slot.\nThe unlock applies to every character on your account.",
+                GameTooltip:AddLine(L["Locked loadout slot.\nThe unlock applies to every character on your account."],
                     1, 1, 1, true)
-                GameTooltip:AddLine(string.format("Unlock it for |cffffd700%s gold|r.",
+                GameTooltip:AddLine(string.format(L["Unlock it for |cffffd700%s gold|r."],
                     tostring(self.serverLockedCost)), 0.5, 0.5, 0.5, true)
             elseif not self.serverFilled then
                 GameTooltip:AddLine(
-                    "Empty loadout.\nA fresh, independent echo build: its own echoes, locks, banishes, rerolls and freezes.",
+                    L["Empty loadout.\nA fresh, independent echo build: its own echoes, locks, banishes, rerolls and freezes."],
                     1, 1, 1, true)
                 GameTooltip:AddLine(
-                    "Click to switch to it. It starts with every draw your level owes it, so you build it from scratch.",
+                    L["Click to switch to it. It starts with every draw your level owes it, so you build it from scratch."],
                     0.5, 0.5, 0.5, true)
             else
                 local svc = GetService()
@@ -2171,52 +2228,52 @@ local function GetLoadoutRow(i)
                 if isDesigned then
                     local isEnabled = svc.GetServerActiveDesign() == self.serverSlot
                     if isEnabled then
-                        GameTooltip:AddLine("Highlighted", 0.25, 1, 0.25)
+                        GameTooltip:AddLine(L["Highlighted"], 0.25, 1, 0.25)
                     else
-                        GameTooltip:AddLine("Not highlighted", 0.5, 0.5, 0.5)
+                        GameTooltip:AddLine(L["Not highlighted"], 0.5, 0.5, 0.5)
                     end
                     GameTooltip:AddLine(
-                        "Its echoes are |cffffd700highlighted|r in your draws, and picked for you if that option is on.\nHighlights only: it never changes what you are offered.",
+                        L["Its echoes are |cffffd700highlighted|r in your draws, and picked for you if that option is on.\nHighlights only: it never changes what you are offered."],
                         1, 1, 1, true)
-                    GameTooltip:AddLine(isEnabled and "Highlight another wishlist to swap, or clear it from its menu."
-                        or "Click to highlight this wishlist.", 0.5, 0.5, 0.5, true)
+                    GameTooltip:AddLine(isEnabled and L["Highlight another wishlist to swap, or clear it from its menu."]
+                        or L["Click to highlight this wishlist."], 0.5, 0.5, 0.5, true)
                 else
                     local isEnabled = svc.GetServerActiveSlot() == self.serverSlot
                     if isEnabled then
-                        GameTooltip:AddLine("Playing", 0.25, 1, 0.25)
+                        GameTooltip:AddLine(L["Playing"], 0.25, 1, 0.25)
                     else
-                        GameTooltip:AddLine("Dormant", 0.5, 0.5, 0.5)
+                        GameTooltip:AddLine(L["Dormant"], 0.5, 0.5, 0.5)
                     end
                     GameTooltip:AddLine(
-                        "An independent echo build: its own echoes, locked echoes, banishes, rerolls and freezes.",
+                        L["An independent echo build: its own echoes, locked echoes, banishes, rerolls and freezes."],
                         1, 1, 1, true)
                     local missing = self.loadout.missing or 0
                     if not isEnabled and missing > 0 then
                         GameTooltip:AddLine(string.format(
-                            "Switching to it grants |cffffd700%d echo draw%s|r it is still owed.",
+                            L["Switching to it grants |cffffd700%d echo draw%s|r it is still owed."],
                             missing, missing > 1 and "s" or ""), 1, 0.82, 0, true)
                     end
                     local memTotal = self.loadout.memoryTotal or 0
                     if memTotal > 0 then
                         GameTooltip:AddLine(string.format(
-                            "Finished build remembered: |cffa080e0%d echo stacks|r. While climbing, each draw offers one of them as a 4th card (%d still to reclaim).",
+                            L["Finished build remembered: |cffa080e0%d echo stacks|r. While climbing, each draw offers one of them as a 4th card (%d still to reclaim)."],
                             memTotal, self.loadout.memoryRemaining or 0), 1, 1, 1, true)
                     end
-                    GameTooltip:AddLine(isEnabled and "Switch to another loadout to swap."
-                        or "Click to switch to this loadout (a short attunement is cast first).", 0.5, 0.5, 0.5, true)
+                    GameTooltip:AddLine(isEnabled and L["Switch to another loadout to swap."]
+                        or L["Click to switch to this loadout (a short attunement is cast first)."], 0.5, 0.5, 0.5, true)
                 end
             end
         elseif not self.isMine then
-            GameTooltip:AddLine("Community build.", 1, 1, 1, true)
+            GameTooltip:AddLine(L["Community build."], 1, 1, 1, true)
             GameTooltip:AddLine(
-                "Use the |cffffd700...|r menu, |cffffd700Save to my builds|r, then activate it from |cffffd700My Builds|r.",
+                L["Use the |cffffd700...|r menu, |cffffd700Save to my builds|r, then activate it from |cffffd700My Builds|r."],
                 0.5, 0.5, 0.5, true)
         elseif IsActiveLoadout(self.loadout) then
-            GameTooltip:AddLine("This is your active loadout.", 1, 1, 1, true)
-            GameTooltip:AddLine("Click to stop playing with it.", 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(L["This is your active loadout."], 1, 1, 1, true)
+            GameTooltip:AddLine(L["Click to stop playing with it."], 0.5, 0.5, 0.5)
         else
-            GameTooltip:AddLine("Its echoes will be highlighted whenever you pick a new echo.", 1, 1, 1, true)
-            GameTooltip:AddLine("Click to play with this loadout.", 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(L["Its echoes will be highlighted whenever you pick a new echo."], 1, 1, 1, true)
+            GameTooltip:AddLine(L["Click to play with this loadout."], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end)
@@ -2275,13 +2332,13 @@ local function GetLoadoutRow(i)
     row.deleteBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", 2, 2)
     row.deleteBtn:SetFrameLevel(row:GetFrameLevel() + 5)
 
-    row.exportBtn = MakeRowBtn("Export", 62)
+    row.exportBtn = MakeRowBtn(L["Export"], 62)
     row.exportBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 10)
-    row.shareBtn = MakeRowBtn("Share", 58)
+    row.shareBtn = MakeRowBtn(L["Share"], 58)
     row.shareBtn:SetPoint("RIGHT", row.exportBtn, "LEFT", -3, 0)
-    row.saveBtn = MakeRowBtn("Save", 58) -- community: copy into My Loadouts
+    row.saveBtn = MakeRowBtn(L["Save"], 58) -- community: copy into My Loadouts
     row.saveBtn:SetPoint("RIGHT", row.exportBtn, "LEFT", -3, 0)
-    row.editBtn = MakeRowBtn("Edit", 52) -- mine: reopen in the builder
+    row.editBtn = MakeRowBtn(L["Edit"], 52) -- mine: reopen in the builder
     row.editBtn:SetPoint("RIGHT", row.shareBtn, "LEFT", -3, 0)
 
     -- "..." kebab: opens the row's action menu (see ShowLoadoutMenu). Replaces
@@ -2291,16 +2348,16 @@ local function GetLoadoutRow(i)
     row.menuBtn:SetScript("OnClick", function() ShowLoadoutMenu(row) end)
     row.menuBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("More actions", 1, 1, 1)
+        GameTooltip:SetText(L["More actions"], 1, 1, 1)
         GameTooltip:Show()
     end)
     row.menuBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Server rows: switch to an empty (never played) loadout / rename the
     -- loadout. Hidden on library and community rows.
-    row.saveBuildBtn = MakeRowBtn("Switch", 84)
+    row.saveBuildBtn = MakeRowBtn(L["Switch"], 84)
     row.saveBuildBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 10)
-    row.renameBuildBtn = MakeRowBtn("Rename", 64)
+    row.renameBuildBtn = MakeRowBtn(L["Rename"], 64)
     row.renameBuildBtn:SetPoint("RIGHT", row.saveBuildBtn, "LEFT", -3, 0)
 
     row.saveBuildBtn:SetScript("OnClick", function()
@@ -2308,7 +2365,7 @@ local function GetLoadoutRow(i)
         if ServerSlotClickAction(row.serverSlot, true) ~= "switch" then return end
         pendingServerSlot = row.serverSlot
         StaticPopup_Show("PROJECTEBONHOLD_BUILDSLOT_SWITCH",
-            (row.loadout and row.loadout.name) or ("Loadout " .. row.serverSlot),
+            (row.loadout and row.loadout.name) or T("Loadout {n}", { n = row.serverSlot }),
             SwitchOwedText(row.loadout and row.loadout.missing))
     end)
 
@@ -2319,13 +2376,13 @@ local function GetLoadoutRow(i)
     end)
 
     -- Kept as a hidden stub: pooled rows and ShowLoadoutMenu still reference it.
-    row.recoverBtn = MakeRowBtn("Recover", 72)
+    row.recoverBtn = MakeRowBtn(L["Recover"], 72)
     row.recoverBtn:Hide()
 
     -- Design (builder) and Import (EBH1 string) into this server slot.
     -- On a filled DESIGNED row, Design reopens the build in the builder.
-    row.designBtn = MakeRowBtn("Design", 58)
-    row.importBtn = MakeRowBtn("Import", 56)
+    row.designBtn = MakeRowBtn(L["Design"], 58)
+    row.importBtn = MakeRowBtn(L["Import"], 56)
     row.designBtn:SetScript("OnClick", function()
         if not row.serverSlot or not row.serverFilled then return end
         -- Designs in the unlimited pool re-upload in place; a legacy design
@@ -2337,10 +2394,9 @@ local function GetLoadoutRow(i)
     end)
     row.designBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Design a build", 1, 1, 1)
+        GameTooltip:SetText(L["Design a build"], 1, 1, 1)
         GameTooltip:AddLine(
-            "Compose this build echo by echo in All Echoes. Designed builds are " ..
-            "|cffffd700highlighted|r in your draws and can be auto-picked. They never change what you are offered.",
+            L["Compose this build echo by echo in All Echoes. Designed builds are |cffffd700highlighted|r in your draws and can be auto-picked. They never change what you are offered."],
             0.9, 0.9, 0.9, true)
         GameTooltip:Show()
     end)
@@ -2353,7 +2409,7 @@ local function GetLoadoutRow(i)
 
     -- Gold purchase of a locked slot (account-wide); only the NEXT slot is
     -- buyable. Big and centered - it is the locked row's only action.
-    row.unlockBtn = utils.CreateSimpleCustomButton(row, "Unlock", nil, 180, 32)
+    row.unlockBtn = utils.CreateSimpleCustomButton(row, L["Unlock"], nil, 180, 32)
     row.unlockBtn:SetPoint("CENTER", row, "CENTER", 0, -8)
     row.unlockBtn:SetScript("OnClick", function()
         if not row.serverSlot or not row.serverLockedCost or not row.serverPurchasable then return end
@@ -2361,13 +2417,13 @@ local function GetLoadoutRow(i)
     end)
     row.unlockBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Unlock loadout slot", 1, 1, 1)
+        GameTooltip:SetText(L["Unlock loadout slot"], 1, 1, 1)
         if row.serverPurchasable then
             GameTooltip:AddLine(string.format(
-                "Costs |cffffd700%s gold|r. The unlock is |cffffd700account-wide|r: all your characters get this slot.",
+                L["Costs |cffffd700%s gold|r. The unlock is |cffffd700account-wide|r: all your characters get this slot."],
                 tostring(row.serverLockedCost or 0)), 0.9, 0.9, 0.9, true)
         else
-            GameTooltip:AddLine("Unlock the previous slot first.", 0.9, 0.9, 0.9, true)
+            GameTooltip:AddLine(L["Unlock the previous slot first."], 0.9, 0.9, 0.9, true)
         end
         GameTooltip:Show()
     end)
@@ -2449,7 +2505,7 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
         row.classIcon:Hide()
     end
 
-    local label = loadout.name or "Loadout"
+    local label = loadout.name or L["Loadout"]
     local c = RAID_CLASS_COLORS and loadout.class and RAID_CLASS_COLORS[loadout.class]
     if c then
         label = string.format("|cff%02x%02x%02x%s|r",
@@ -2462,17 +2518,17 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
         -- climb may still take back from its finished build
         local parts = {}
         if (loadout.missing or 0) > 0 then
-            table.insert(parts, string.format("|cffffd700%d draw%s waiting|r", loadout.missing,
+            table.insert(parts, string.format(L["|cffffd700%d draw%s waiting|r"], loadout.missing,
                 loadout.missing > 1 and "s" or ""))
         end
         if (loadout.memoryRemaining or 0) > 0 then
-            table.insert(parts, string.format("|cffa080e0%d/%d souvenirs|r", loadout.memoryRemaining,
+            table.insert(parts, string.format(L["|cffa080e0%d/%d souvenirs|r"], loadout.memoryRemaining,
                 loadout.memoryTotal or loadout.memoryRemaining))
         end
         row.author:SetText(table.concat(parts, "  "))
         row.author:Show()
     elseif not isMine and loadout.author and loadout.author ~= "" then
-        row.author:SetText("by " .. loadout.author)
+        row.author:SetText(T("by {author}", { author = loadout.author }))
         row.author:Show()
     else
         row.author:Hide()
@@ -2662,7 +2718,7 @@ local function UpdateLoadoutRow(row, loadout, index, isMine, expandKey, serverSl
             row.menuBtn:Hide()
             -- Empty loadout slot: switching to it starts the build
             row.saveBuildBtn:Show()
-            row.saveBuildBtn.text:SetText("Switch")
+            row.saveBuildBtn.text:SetText(L["Switch"])
             row.saveBuildBtn:ClearAllPoints()
             row.saveBuildBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -10, 10)
         end
@@ -2813,8 +2869,8 @@ local function RenderLoadouts()
             -- (an unlimited pool, ids beyond the loadout slots).
             local DESIGN, LOADOUTS = 1, 2
             local groups = {
-                [DESIGN]   = { key = "design",   label = "|cffa080e0Echo Wishlist|r", items = {} },
-                [LOADOUTS] = { key = "loadouts", label = "|cff60a0e0Your loadouts|r",      items = {} },
+                [DESIGN]   = { key = "design",   label = L["|cffa080e0Echo Wishlist|r"], items = {} },
+                [LOADOUTS] = { key = "loadouts", label = L["|cff60a0e0Your loadouts|r"],      items = {} },
             }
             for slot = 1, maxSlots do
                 local stored = serverSlots[slot]
@@ -2853,13 +2909,13 @@ local function RenderLoadouts()
                             local slot, stored, isSlotLocked = item.slot, item.stored, item.locked
                             local loadout
                             if isSlotLocked then
-                                loadout = { name = "|cff808080Locked slot " .. slot .. "|r", class = classToken, echoes = {} }
+                                loadout = { name = T("|cff808080Locked slot {n}|r", { n = slot }), class = classToken, echoes = {} }
                             elseif stored then
-                                loadout = { name = stored.name ~= "" and stored.name or ("Loadout " .. slot), class = classToken,
+                                loadout = { name = stored.name ~= "" and stored.name or T("Loadout {n}", { n = slot }), class = classToken,
                                     echoes = stored.echoes, missing = stored.missing,
                                     memoryRemaining = stored.memoryRemaining, memoryTotal = stored.memoryTotal }
                             else
-                                loadout = { name = "|cff808080Empty loadout " .. slot .. "|r", class = classToken, echoes = {} }
+                                loadout = { name = T("|cff808080Empty loadout {n}|r", { n = slot }), class = classToken, echoes = {} }
                             end
                             rowCount = rowCount + 1
                             local row = GetLoadoutRow(rowCount)
@@ -2932,11 +2988,11 @@ local function RenderLoadouts()
 
     if #filtered == 0 and not isMine then
         if source == nil then
-            loadoutEmptyText:SetText("Requesting community loadouts from the server...")
+            loadoutEmptyText:SetText(L["Requesting community loadouts from the server..."])
         elseif source and #source > 0 then
-            loadoutEmptyText:SetText("No loadouts match the current filters.")
+            loadoutEmptyText:SetText(L["No loadouts match the current filters."])
         else
-            loadoutEmptyText:SetText("No community loadouts shared yet.")
+            loadoutEmptyText:SetText(L["No community loadouts shared yet."])
         end
         -- Anchor below whatever was already laid out (the server build slots
         -- occupy the top of "My Loadouts")
@@ -2993,12 +3049,12 @@ function Journal.ImportBuildToSlot(text, slot)
     local svc = GetService()
     if not svc or not svc.ImportEchoLoadout or not svc.UploadServerBuildSlot then return end
     if not slot then
-        UIErrorsFrame:AddMessage("No free build slot. Delete a build or unlock another slot first.", 1, 0.2, 0.2)
+        UIErrorsFrame:AddMessage(L["No free build slot. Delete a build or unlock another slot first."], 1, 0.2, 0.2)
         return
     end
     local lo = svc.ImportEchoLoadout(text)
     if not lo then
-        UIErrorsFrame:AddMessage("Invalid loadout string or build link.", 1, 0.2, 0.2)
+        UIErrorsFrame:AddMessage(L["Invalid loadout string or build link."], 1, 0.2, 0.2)
         return
     end
     pendingImport = { slot = slot, name = lo.name, echoes = lo.echoes }
@@ -3006,7 +3062,7 @@ function Journal.ImportBuildToSlot(text, slot)
 end
 
 StaticPopupDialogs["PROJECTEBONHOLD_IMPORT_NAME"] = {
-    text = "Name the imported |cffa080e0Echo Wishlist|r:",
+    text = L["Name the imported |cffa080e0Echo Wishlist|r:"],
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3036,7 +3092,7 @@ function Journal.ImportLoadoutString(text)
 end
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_NAME"] = {
-    text = "Name your new |cffa080e0Echo Wishlist|r, then pick its echoes in All Echoes:",
+    text = L["Name your new |cffa080e0Echo Wishlist|r, then pick its echoes in All Echoes:"],
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3070,11 +3126,11 @@ exportCloser:SetScript("OnUpdate", function(self, elapsed)
     self:Hide()
     if self.dialog and self.dialog:IsShown() then self.dialog:Hide() end
     self.dialog = nil
-    UIErrorsFrame:AddMessage("Build string copied.", 0.1, 1, 0.1)
+    UIErrorsFrame:AddMessage(L["Build string copied."], 0.1, 1, 0.1)
 end)
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_EXPORT"] = {
-    text = "Press |cffffd700Ctrl+C|r to copy the build string:",
+    text = L["Press |cffffd700Ctrl+C|r to copy the build string:"],
     button1 = CLOSE,
     hasEditBox = 1,
     maxLetters = 0, -- the popup editbox is shared and maxLetters is sticky
@@ -3113,7 +3169,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_EXPORT"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_IMPORT"] = {
-    text = "Paste a loadout string or a website build link:",
+    text = L["Paste a loadout string or a website build link:"],
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3136,7 +3192,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_IMPORT"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_DELETE"] = {
-    text = "Delete loadout |cffffd700%s|r?\n\n|cffff5050This is permanent.|r The loadout will be gone for good and |cffff5050cannot be recovered.|r",
+    text = L["Delete loadout |cffffd700%s|r?\n\n|cffff5050This is permanent.|r The loadout will be gone for good and |cffff5050cannot be recovered.|r"],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
@@ -3152,14 +3208,14 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_DELETE"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_UNPUBLISH"] = {
-    text = "Remove \"%s\" from the community loadouts?",
+    text = L["Remove \"%s\" from the community loadouts?"],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
         local svc = GetService()
         if pendingLoadout and svc and svc.UnpublishEchoLoadout then
             svc.UnpublishEchoLoadout(pendingLoadout.loadout)
-            UIErrorsFrame:AddMessage("Loadout removed from the community.", 0.1, 1, 0.1)
+            UIErrorsFrame:AddMessage(L["Loadout removed from the community."], 0.1, 1, 0.1)
             Refresh()
         end
         pendingLoadout = nil
@@ -3175,7 +3231,7 @@ local function RefreshChoiceHighlights()
 end
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_USE"] = {
-    text = "Play with \"%s\"?\n\nIts echoes will be |cffffd700highlighted|r whenever you pick a new echo.",
+    text = L["Play with \"%s\"?\n\nIts echoes will be |cffffd700highlighted|r whenever you pick a new echo."],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
@@ -3192,7 +3248,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_USE"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_UNUSE"] = {
-    text = "Stop playing with \"%s\"?\n\nEcho choices will no longer be highlighted.",
+    text = L["Stop playing with \"%s\"?\n\nEcho choices will no longer be highlighted."],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
@@ -3209,14 +3265,14 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_UNUSE"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_SHARE"] = {
-    text = "Share \"%s\" with the community?",
+    text = L["Share \"%s\" with the community?"],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
         local svc = GetService()
         if pendingLoadout and svc and svc.PublishEchoLoadout then
             svc.PublishEchoLoadout(pendingLoadout.loadout)
-            UIErrorsFrame:AddMessage("Loadout shared with the community.", 0.1, 1, 0.1)
+            UIErrorsFrame:AddMessage(L["Loadout shared with the community."], 0.1, 1, 0.1)
         end
         pendingLoadout = nil
     end,
@@ -3227,7 +3283,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_SHARE"] = {
 -- ── Server build-slot popups ─────────────────────────────────────────────────
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_RENAME"] = {
-    text = "New name for loadout %d:",
+    text = L["New name for loadout %d:"],
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3262,7 +3318,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_RENAME"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_DELETE"] = {
-    text = "Delete wishlist |cffffd700%s|r?\n\n|cffff5050This is permanent.|r It will be gone for good and |cffff5050cannot be recovered.|r",
+    text = L["Delete wishlist |cffffd700%s|r?\n\n|cffff5050This is permanent.|r It will be gone for good and |cffff5050cannot be recovered.|r"],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
@@ -3277,7 +3333,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_DELETE"] = {
 
 -- Designed builds: same action, honest wording (highlight, not guarantee)
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_ACTIVATE_DESIGNED"] = {
-    text = "Follow build \"%s\" this run?\n\nIts echoes will be |cffffd700highlighted|r in your draws (and auto-picked if that option is enabled). They are not guaranteed to appear.%s",
+    text = L["Follow build \"%s\" this run?\n\nIts echoes will be |cffffd700highlighted|r in your draws (and auto-picked if that option is enabled). They are not guaranteed to appear.%s"],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
@@ -3295,12 +3351,12 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_ACTIVATE_DESIGNED"] = {
 function SwitchOwedText(missing)
     missing = tonumber(missing) or 0
     if missing <= 0 then return "" end
-    return string.format("\n\nIt is owed |cffffd700%d echo draw%s|r, granted on arrival.",
+    return string.format(L["\n\nIt is owed |cffffd700%d echo draw%s|r, granted on arrival."],
         missing, missing > 1 and "s" or "")
 end
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_SWITCH"] = {
-    text = "Switch to loadout \"%s\"?\n\nYour current echoes are set aside with their loadout and this one takes over: its own echoes, locked echoes, banishes, rerolls and freezes.%s",
+    text = L["Switch to loadout \"%s\"?\n\nYour current echoes are set aside with their loadout and this one takes over: its own echoes, locked echoes, banishes, rerolls and freezes.%s"],
     button1 = YES,
     button2 = NO,
     OnAccept = function()
@@ -3314,7 +3370,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_SWITCH"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_DESIGN"] = {
-    text = "Name the build for slot %d, then pick its echoes in All Echoes:",
+    text = L["Name the build for slot %d, then pick its echoes in All Echoes:"],
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3339,7 +3395,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_DESIGN"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_IMPORT"] = {
-    text = "Paste a loadout string or a website build link to import into build slot %d:",
+    text = L["Paste a loadout string or a website build link to import into build slot %d:"],
     button1 = ACCEPT,
     button2 = CANCEL,
     hasEditBox = 1,
@@ -3365,7 +3421,7 @@ StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_IMPORT"] = {
 }
 
 StaticPopupDialogs["PROJECTEBONHOLD_BUILDSLOT_UNLOCK"] = {
-    text = "Unlock loadout slot %d for |cffffd700%s gold|r?\n\nThe unlock is account-wide: all your characters get this slot.",
+    text = L["Unlock loadout slot %d for |cffffd700%s gold|r?\n\nThe unlock is account-wide: all your characters get this slot."],
     button1 = ACCEPT,
     button2 = CANCEL,
     OnAccept = function()
@@ -3541,8 +3597,8 @@ local function UpdatePermanentSlots()
                 slot:SetScript("OnClick", nil)
                 slot:SetScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetText("Locked Permanent Slot", 0.6, 0.6, 0.6)
-                    GameTooltip:AddLine("Reach the next Soul Ash milestone to unlock this slot.",
+                    GameTooltip:SetText(L["Locked Permanent Slot"], 0.6, 0.6, 0.6)
+                    GameTooltip:AddLine(L["Reach the next Soul Ash milestone to unlock this slot."],
                         0.9, 0.9, 0.9, true)
                     GameTooltip:Show()
                 end)
@@ -3565,19 +3621,23 @@ local function UpdatePermanentSlots()
                         -- Computed description (stat formulas resolved), like the grid tooltips
                         GameTooltip:ClearLines()
                         local name = GetSpellInfo(lp.spellId)
-                        GameTooltip:AddLine(name or ("Spell " .. lp.spellId), qc.r, qc.g, qc.b)
-                        GameTooltip:AddLine(utils.GetSpellDescription(lp.spellId, 4000, lp.stack or 1), 1, 1, 1, true)
+                        GameTooltip:AddLine(name or T("Spell {id}", { id = lp.spellId }), qc.r, qc.g, qc.b)
+                        GameTooltip:AddLine(" ")
+                        GameTooltip:AddLine(utils.GetSpellDescription(lp.spellId, 4000, lp.stack or 1), 1, 0.82, 0, true)
                     else
                         GameTooltip:SetHyperlink("spell:" .. lp.spellId)
                     end
-                    GameTooltip:AddLine("Permanent echo", 1, 0.82, 0)
-                    GameTooltip:AddLine("Right-click to unlock it.", 0.5, 0.5, 0.5)
+                    GameTooltip:AddLine(" ")
+                    GameTooltip:AddLine(L["Permanent echo"], 1, 0.82, 0)
+                    GameTooltip:AddLine(" ")
+                    GameTooltip:AddLine(L["Right-click to unlock it."], 0.5, 0.5, 0.5)
+                    if utils and utils.AddShiftHint then utils.AddShiftHint(GameTooltip, lp.spellId) end
                     GameTooltip:Show()
                 end)
                 slot:SetScript("OnClick", function(self, mouseButton)
                     if mouseButton == "RightButton" and self.lockedSpellId then
                         StaticPopupDialogs["PROJECTEBONHOLD_JOURNAL_UNLOCK_ECHO"] = {
-                            text = "Unlock this echo from the permanent slot?",
+                            text = L["Unlock this echo from the permanent slot?"],
                             button1 = YES,
                             button2 = NO,
                             OnAccept = function()
@@ -3615,9 +3675,9 @@ local function UpdatePermanentSlots()
                 end
                 slot:SetScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetText("Permanent Echo Slot", 1, 0.82, 0)
-                    GameTooltip:AddLine("Keeps one echo between runs.", 0.9, 0.9, 0.9, true)
-                    GameTooltip:AddLine("Click, then pick one of your echoes on the left.", 0.5, 0.5, 0.5, true)
+                    GameTooltip:SetText(L["Permanent Echo Slot"], 1, 0.82, 0)
+                    GameTooltip:AddLine(L["Keeps one echo between runs."], 0.9, 0.9, 0.9, true)
+                    GameTooltip:AddLine(L["Click, then pick one of your echoes on the left."], 0.5, 0.5, 0.5, true)
                     GameTooltip:Show()
                 end)
                 slot:SetScript("OnClick", function(self, mouseButton)
@@ -3709,16 +3769,14 @@ local function UpdateLockAlert()
         lockAlert.Title:SetPoint("TOPRIGHT", -16, -14)
         lockAlert.Title:SetJustifyH("LEFT")
         lockAlert.Title:SetTextColor(1, 0.82, 0)
-        lockAlert.Title:SetText("Lock an Echo")
+        lockAlert.Title:SetText(L["Lock an Echo"])
 
         lockAlert.Text = lockAlert:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
         lockAlert.Text:SetJustifyV("TOP")
         lockAlert.Text:SetPoint("TOPLEFT", lockAlert.Title, "BOTTOMLEFT", 0, -8)
         lockAlert.Text:SetWidth(188)
         lockAlert.Text:SetText(
-            "Pick one of your echoes from the |cffffd700left|r to lock it into " ..
-            "the slot. It becomes |cffffd700permanent|r and stays across " ..
-            "runs.\n\nClick the slot again to cancel.")
+            L["Pick one of your echoes from the |cffffd700left|r to lock it into the slot. It becomes |cffffd700permanent|r and stays across runs.\n\nClick the slot again to cancel."])
 
         lockAlert:SetHeight(14 + lockAlert.Title:GetStringHeight() + 8
             + lockAlert.Text:GetStringHeight() + 16)
@@ -3773,22 +3831,18 @@ local function UpdateBuilderAlert()
         builderAlert.Text:SetPoint("TOPLEFT", builderAlert.Title, "BOTTOMLEFT", 0, -8)
         builderAlert.Text:SetWidth(188)
         builderAlert.Text:SetText(
-            "Click echoes in the catalog to add them to this wishlist.\n\n" ..
-            "|cffffd700Left-click|r adds a stack.\n|cffffd700Right-click|r removes one.\n" ..
-            "|cffff4040Ctrl-click|r never take this echo.\n\n" ..
-            "Hit |cffffd700Done|r up top when you are finished.")
+            L["Click echoes in the catalog to add them to this wishlist.\n\n|cffffd700Left-click|r adds a stack.\n|cffffd700Right-click|r removes one.\n|cffff4040Ctrl-click|r never take this echo.\n\nHit |cffffd700Done|r up top when you are finished."])
 
         builderAlert.Count = builderAlert:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         builderAlert.Count:SetPoint("TOPLEFT", builderAlert.Text, "BOTTOMLEFT", 0, -10)
     end
 
-    builderAlert.Title:SetText((builderDraft.editIndex and "Editing \"" or "Building \"")
-        .. builderDraft.name .. "\"")
+    builderAlert.Title:SetText(T(builderDraft.editIndex and "Editing \"{name}\"" or "Building \"{name}\"", { name = builderDraft.name }))
     local avoided = DraftAvoidCount()
-    local countText = string.format("|cffffffff%d|r echo(es), |cffffffff%d/%d|r stacks",
+    local countText = string.format(L["|cffffffff%d|r echo(es), |cffffffff%d/%d|r stacks"],
         DraftCount(), DraftTotalStacks(), MAX_RUN_ECHOES)
     if avoided > 0 then
-        countText = countText .. string.format("\n|cffff4040%d|r never taken", avoided)
+        countText = countText .. string.format(L["\n|cffff4040%d|r never taken"], avoided)
     end
     builderAlert.Count:SetText(countText)
     -- both helper bubbles live on the right edge; stack below the lock-mode
@@ -3888,7 +3942,7 @@ local function BuildIntroOverlay(dbKey, iconPath, titleText, bodyText)
     msg:SetTextColor(1, 1, 1)
     msg:SetText(bodyText)
 
-    local okBtn = utils.CreateSimpleCustomButton(o, "Got it", function()
+    local okBtn = utils.CreateSimpleCustomButton(o, L["Got it"], function()
         ProjectEbonholdDB = ProjectEbonholdDB or {}
         ProjectEbonholdDB[dbKey] = true
         o:Hide()
@@ -3899,15 +3953,7 @@ local function BuildIntroOverlay(dbKey, iconPath, titleText, bodyText)
 end
 
 local MY_ECHOES_INTRO =
-    "Every level up during a |cffffd700run|r offers you a new echo. These powers " ..
-    "are temporary: they fade when the run ends.\n\n" ..
-    "The slots above are |cffffd700Permanent Echo Slots|r. Lock one of your echoes " ..
-    "into a slot and it stays with you |cffffd700across runs|r, even through death. " ..
-    "You unlock more slots by reaching |cffffd700Soul Ash milestones|r in your Skill Tree.\n\n" ..
-    "Click an empty slot, then pick one of your echoes below to make it permanent.\n" ..
-    "Right-click a locked echo to free the slot.\n\n" ..
-    "Playing with a |cffffd700build|r (see the Loadouts tab)? Its missing echoes " ..
-    "appear |cff808080greyed out|r below until you collect them."
+    L["Every level up during a |cffffd700run|r offers you a new echo. These powers are temporary: they fade when the run ends.\n\nThe slots above are |cffffd700Permanent Echo Slots|r. Lock one of your echoes into a slot and it stays with you |cffffd700across runs|r, even through death. You unlock more slots by reaching |cffffd700Soul Ash milestones|r in your Skill Tree.\n\nClick an empty slot, then pick one of your echoes below to make it permanent.\nRight-click a locked echo to free the slot.\n\nPlaying with a |cffffd700build|r (see the Loadouts tab)? Its missing echoes appear |cff808080greyed out|r below until you collect them."]
 
 -- ── Guided tour (merged Echoes tab) ──────────────────────────────────────────
 -- Zone-by-zone walkthrough (next/next/got-it) instead of one wall-of-text
@@ -3922,35 +3968,17 @@ local echoesTour = ProjectEbonhold.GuidedTour.Create({
     steps = function()
         return {
             {
-                title = "Permanent Echo Slots",
-                text = "Lock an echo into one of these slots and it stays with you " ..
-                    "|cffffd700across runs|r, even through death. More slots unlock at " ..
-                    "Soul Ash milestones in your Skill Tree.",
+                title = L["Permanent Echo Slots"],
+                text = L["Lock an echo into one of these slots and it stays with you |cffffd700across runs|r, even through death. More slots unlock at Soul Ash milestones in your Skill Tree."],
                 zone = function() return slotButtons[1], slotButtons[#slotButtons] end,
                 boxAnchor = { "TOPLEFT", "BOTTOMLEFT", 0, -12 },
             },
             {
-                title = "Orb of Lost Memories",
-                text = "An |cffffd700Orb of Lost Memories|r lets you forget an echo you " ..
-                    "already own and draw a new choice in its place. Click the orb, then " ..
-                    "click the echo to forget: one stack of it is removed and a fresh " ..
-                    "draw opens." ..
-                    "\n\n" ..
-                    "Your run's |cffff8080reroll, freeze and banish|r do not apply to that " ..
-                    "draw: spending |cffffd700one more orb|r on the choice screen is what " ..
-                    "redraws it. Permanent echoes cannot be forgotten." ..
-                    "\n\n" ..
-                    "Spend |cffffd700more than one orb|r on the same echo to raise the " ..
-                    "chance the replacement comes back at a higher quality." ..
-                    "\n\n" ..
-                    -- The bubble is on screen from the very first orb, long before the player
-                    -- has a build worth refining, so the "what is this for" answer lives here
-                    -- rather than in its tooltip: it is read once, at the right moment.
-                    "|cff9ec8ffWorth keeping for level 80|r: on a build you are refining, " ..
-                    "each orb trades an echo that no longer fits for a fresh draw." ..
-                    "\n\n" ..
-                    "Earned from the |cffffd700Dungeon Finder|r, the |cffffd700Lich King|r " ..
-                    "and the |cffffd700Hero's Call Board|r contracts.",
+                title = L["Orb of Lost Memories"],
+                -- The bubble is on screen from the very first orb, long before the player
+                -- has a build worth refining, so the "what is this for" answer lives here
+                -- rather than in its tooltip: it is read once, at the right moment.
+                text = L["An |cffffd700Orb of Lost Memories|r lets you forget an echo you already own and draw a new choice in its place. Click the orb, then click the echo to forget: one stack of it is removed and a fresh draw opens.\n\nYou can |cffffd700banish|r or |cffffd700freeze|r its cards, but your run's |cffff8080reroll|r does not apply: spending |cffffd700one more orb|r on the choice screen is what redraws it. Permanent echoes cannot be forgotten.\n\nSpend |cffffd700more than one orb|r on the same echo to raise the chance the replacement comes back at a higher quality.\n\n|cff9ec8ffWorth keeping for level 80|r: on a build you are refining, each orb trades an echo that no longer fits for a fresh draw.\n\nEarned from the |cffffd700Dungeon Finder|r, the |cffffd700Lich King|r and the |cffffd700Hero's Call Board|r contracts."],
                 -- Anchored on the bubble itself, which sits just right of the last permanent
                 -- slot. Nil until the orb module has built it, and a step whose zone resolves
                 -- to nil is skipped by the tour rather than stranding the highlight.
@@ -3958,44 +3986,26 @@ local echoesTour = ProjectEbonhold.GuidedTour.Create({
                 boxAnchor = { "TOPLEFT", "BOTTOMLEFT", 0, -12 },
             },
             {
-                title = "My Echoes",
-                text = "Every echo you are holding in the |cffffd700current run|r. " ..
-                    "Echoes are temporary powers picked as you level up; they fade " ..
-                    "when the run ends.\n\nRight-click a locked echo to free its slot.",
+                title = L["My Echoes"],
+                text = L["Every echo you are holding in the |cffffd700current run|r. Echoes are temporary powers picked as you level up; they fade when the run ends.\n\nRight-click a locked echo to free its slot."],
                 zone = function() return myRunInset end,
                 boxAnchor = { "CENTER", "CENTER", 0, 0 },
             },
             {
-                title = "All Echoes",
-                text = "The complete catalog. Echoes you currently hold are not " ..
-                    "repeated here: they already sit on the left.\n\nEchoes with a " ..
-                    "|cffffd700book badge|r are sealed inside Tomes: greyed until you " ..
-                    "loot and learn their tome, then permanently yours.",
+                title = L["All Echoes"],
+                text = L["The complete catalog. Echoes you currently hold are not repeated here: they already sit on the left.\n\nEchoes with a |cffffd700book badge|r are sealed inside Tomes: greyed until you loot and learn their tome, then permanently yours."],
                 zone = function() return catalogInset end,
                 boxAnchor = { "CENTER", "CENTER", 0, 0 },
             },
             {
-                title = "Loadouts",
-                text = "This menu manages your builds. |cff60a0e0Loadouts|r are " ..
-                    "independent echo builds, each with its own echoes, locked echoes, " ..
-                    "banishes, rerolls and freezes. Switch between them at any level: " ..
-                    "the one you arrive on is handed every draw your level owes it. " ..
-                    "Death empties them all, locked echoes excepted.\n\n|cffa080e0Wishlists|r are for |cffffd700designing|r: " ..
-                    "the echoes you wish to collect, assembled into your dream build. " ..
-                    "Create one with |cffffd700New Wishlist|r, pick its echoes in the " ..
-                    "catalog, then |cffffd700Done|r. While it is active, its echoes " ..
-                    "are highlighted in your draws to guide you toward it.",
+                title = L["Loadouts"],
+                text = L["This menu manages your builds. |cff60a0e0Loadouts|r are independent echo builds, each with its own echoes, locked echoes, banishes, rerolls and freezes. Switch between them at any level: the one you arrive on is handed every draw your level owes it. Death empties them all, locked echoes excepted.\n\n|cffa080e0Wishlists|r are for |cffffd700designing|r: the echoes you wish to collect, assembled into your dream build. Create one with |cffffd700New Wishlist|r, pick its echoes in the catalog, then |cffffd700Done|r. While it is active, its echoes are highlighted in your draws to guide you toward it."],
                 zone = function() return loadoutDD end,
                 boxAnchor = { "TOPRIGHT", "BOTTOMRIGHT", 0, -12 },
             },
             {
-                title = "Search & Filters",
-                text = "Search the catalog by name or effect. Filter it by " ..
-                    "|cffffd700quality|r or |cffffd700family|r; the " ..
-                    "|cffffd700Tomes|r submenu narrows it to tome echoes: all " ..
-                    "of them, only the ones you know, or those you have enabled " ..
-                    "or disabled.\n\n|cffffd700My class only|r is on by default. " ..
-                    "Untick it to browse every class's echoes.",
+                title = L["Search & Filters"],
+                text = L["Search the catalog by name or effect. Filter it by |cffffd700quality|r or |cffffd700family|r; the |cffffd700Tomes|r submenu narrows it to tome echoes: all of them, only the ones you know, or those you have enabled or disabled.\n\n|cffffd700My class only|r is on by default. Untick it to browse every class's echoes."],
                 zone = function() return searchBox, filterButton end,
                 boxAnchor = { "TOPRIGHT", "BOTTOMRIGHT", 0, -12 },
             },
@@ -4004,22 +4014,7 @@ local echoesTour = ProjectEbonhold.GuidedTour.Create({
 })
 
 local LOADOUTS_INTRO =
-    "Builds come in two kinds:\n\n" ..
-    "|cff60a0e0Loadouts|r are |cffffd700independent echo builds|r. Each one has its " ..
-    "own echoes, locked echoes, banishes, rerolls and freezes. Switch between them " ..
-    "at any level (alive, out of combat): your current echoes stay with their " ..
-    "loadout, and the one you arrive on is handed every echo draw your level owes " ..
-    "it, so a loadout you start at 60 begins with 59 draws. Death empties every " ..
-    "loadout, locked echoes excepted - but a loadout that was |cffffd700finished|r " ..
-    "(every pick of a level-80 run made) remembers its build: while you climb back, " ..
-    "each draw offers one of its echoes as a |cffffd700fourth card|r. Take it, or " ..
-    "gamble on a random echo and lose that souvenir for the climb. The first slot " ..
-    "is free; nine more can be unlocked with gold, account-wide.\n\n" ..
-    "|cffa080e0Echo Wishlist|r builds are |cffffd700goals|r you design yourself with " ..
-    "|cffffd700New Wishlist|r, paste with |cffffd700Import|r, or copy from the " ..
-    "|cffffd700Community|r view (unlimited). While one is highlighted, its echoes are " ..
-    "|cffffd700highlighted|r in your draws (and can be auto-picked), and the " ..
-    "missing ones show greyed out in My Echoes."
+    L["Builds come in two kinds:\n\n|cff60a0e0Loadouts|r are |cffffd700independent echo builds|r. Each one has its own echoes, locked echoes, banishes, rerolls and freezes. Switch between them at any level (alive, out of combat): your current echoes stay with their loadout, and the one you arrive on is handed every echo draw your level owes it, so a loadout you start at 60 begins with 59 draws. Death empties every loadout, locked echoes excepted - but a loadout that was |cffffd700finished|r (every pick of a level-80 run made) remembers its build: while you climb back, each draw offers one of its echoes as a |cffffd700fourth card|r. Take it, or gamble on a random echo and lose that souvenir for the climb. The first slot is free; nine more can be unlocked with gold, account-wide.\n\n|cffa080e0Echo Wishlist|r builds are |cffffd700goals|r you design yourself with |cffffd700New Wishlist|r, paste with |cffffd700Import|r, or copy from the |cffffd700Community|r view (unlimited). While one is highlighted, its echoes are |cffffd700highlighted|r in your draws (and can be auto-picked), and the missing ones show greyed out in My Echoes."]
 
 local myEchoesIntro, loadoutsIntro
 
@@ -4028,7 +4023,7 @@ local function UpdateIntroOverlays()
 
     if currentTab == TAB_MY_RUN and not ProjectEbonholdDB.seenMyEchoesIntro then
         myEchoesIntro = myEchoesIntro or BuildIntroOverlay("seenMyEchoesIntro",
-            "Interface\\Icons\\Spell_Shadow_SoulGem", "Your Echoes", MY_ECHOES_INTRO)
+            "Interface\\Icons\\Spell_Shadow_SoulGem", L["Your Echoes"], MY_ECHOES_INTRO)
         myEchoesIntro:Show()
     elseif myEchoesIntro then
         myEchoesIntro:Hide()
@@ -4057,7 +4052,7 @@ local function UpdateIntroOverlays()
     -- old library, so players who dismissed the old intro see the new one once
     if currentTab == TAB_LOADOUTS and not ProjectEbonholdDB.seenBuildSlotsIntro then
         loadoutsIntro = loadoutsIntro or BuildIntroOverlay("seenBuildSlotsIntro",
-            "Interface\\Icons\\INV_Scroll_03", "Echo Builds", LOADOUTS_INTRO)
+            "Interface\\Icons\\INV_Scroll_03", L["Echo Builds"], LOADOUTS_INTRO)
         loadoutsIntro:Show()
     elseif loadoutsIntro then
         loadoutsIntro:Hide()
@@ -4088,17 +4083,17 @@ local function OpenLoadoutRowMenu(opts)
         { text = opts.name, isTitle = true, notCheckable = true },
     }
     if opts.edit then
-        table.insert(items, { text = "Edit", notCheckable = true, func = opts.edit })
+        table.insert(items, { text = L["Edit"], notCheckable = true, func = opts.edit })
     end
     if opts.rename then
-        table.insert(items, { text = "Rename", notCheckable = true, func = opts.rename })
+        table.insert(items, { text = L["Rename"], notCheckable = true, func = opts.rename })
     end
-    table.insert(items, { text = "Export", notCheckable = true, func = opts.export })
+    table.insert(items, { text = L["Export"], notCheckable = true, func = opts.export })
     if opts.deactivate then
-        table.insert(items, { text = "Clear highlight", notCheckable = true, func = opts.deactivate })
+        table.insert(items, { text = L["Clear highlight"], notCheckable = true, func = opts.deactivate })
     end
     if opts.delete then
-        table.insert(items, { text = "|cffff4040Delete|r", notCheckable = true, func = opts.delete })
+        table.insert(items, { text = L["|cffff4040Delete|r"], notCheckable = true, func = opts.delete })
     end
     EasyMenu(items, gearMenuHolder, "cursor", 0, 0, "MENU")
 end
@@ -4303,7 +4298,7 @@ local function UpdateLoadoutMenu()
     end
 
     -- ── Loadouts: the live builds (slot 1 free, the rest gold-purchasable) ──
-    AddRow({ text = "Loadouts", header = true })
+    AddRow({ text = L["Loadouts"], header = true })
     for slot = 1, maxSlots do
         local stored = serverSlots[slot]
         local isLocked = slot > unlocked
@@ -4311,8 +4306,8 @@ local function UpdateLoadoutMenu()
             local cost = (svc.GetServerSlotCostGold and svc.GetServerSlotCostGold(slot)) or 0
             local purchasable = slot == unlocked + 1
             AddRow({
-                text = purchasable and string.format("Unlock slot %d (%dg)", slot, cost)
-                    or ("Locked slot " .. slot),
+                text = purchasable and string.format(L["Unlock slot %d (%dg)"], slot, cost)
+                    or T("Locked slot {n}", { n = slot }),
                 icon = ASSETS .. "lock",
                 grey = not purchasable,
                 onClick = purchasable and function()
@@ -4320,10 +4315,10 @@ local function UpdateLoadoutMenu()
                 end or nil,
             })
         elseif stored then
-            local name = stored.name ~= "" and stored.name or ("Loadout " .. slot)
+            local name = stored.name ~= "" and stored.name or T("Loadout {n}", { n = slot })
             local label = name
             if activeSlot ~= slot and (stored.missing or 0) > 0 then
-                label = string.format("%s |cffffd700(%d draw%s)|r", name, stored.missing,
+                label = string.format(L["%s |cffffd700(%d draw%s)|r"], name, stored.missing,
                     stored.missing > 1 and "s" or "")
             end
             AddActivateRow(label, slot, "Interface\\Icons\\Spell_Shadow_SoulGem",
@@ -4331,15 +4326,15 @@ local function UpdateLoadoutMenu()
         else
             -- Never played loadout: switching to it starts it from scratch, with
             -- every draw the level owes it.
-            local name = "Loadout " .. slot
-            AddActivateRow(string.format("Empty loadout %d |cff808080(start it)|r", slot), slot,
+            local name = T("Loadout {n}", { n = slot })
+            AddActivateRow(string.format(L["Empty loadout %d |cff808080(start it)|r"], slot), slot,
                 "Interface\\Icons\\Spell_Shadow_SoulGem", nil, true, nil)
         end
     end
 
     -- ── Wishlists: designed builds beyond the loadout slots (unlimited
     -- pool, ids assigned by the server on upload/import) ──
-    AddRow({ text = "Wishlists", header = true })
+    AddRow({ text = L["Wishlists"], header = true })
     local designedIds = {}
     for slot in pairs(serverSlots) do
         if slot > maxSlots then table.insert(designedIds, slot) end
@@ -4347,13 +4342,13 @@ local function UpdateLoadoutMenu()
     table.sort(designedIds)
     for _, slot in ipairs(designedIds) do
         local stored = serverSlots[slot]
-        local name = stored.name ~= "" and stored.name or ("Wishlist " .. slot)
+        local name = stored.name ~= "" and stored.name or T("Wishlist {n}", { n = slot })
         AddActivateRow(name, slot, "Interface\\Icons\\INV_Scroll_03",
             GearFor(slot, stored, name, false), false, nil)
     end
 
     AddRow({
-        text = "|cff20ff20New Wishlist|r",
+        text = L["|cff20ff20New Wishlist|r"],
         icon = "Interface\\AddOns\\ProjectEbonhold\\modules\\collections\\Interface\\PaperDollInfoFrame\\Character-Plus",
         onClick = function()
             pendingWishlistTargetSlot = nil
@@ -4361,7 +4356,7 @@ local function UpdateLoadoutMenu()
         end,
     })
     AddRow({
-        text = "Import",
+        text = L["Import"],
         icon = "Interface\\Icons\\INV_Letter_15",
         onClick = function()
             StaticPopup_Show("PROJECTEBONHOLD_LOADOUT_IMPORT")
@@ -4404,10 +4399,10 @@ local function UpdateLoadoutFooter()
         -- while building.
         loadoutDD:Hide()
         if loadoutMenu then loadoutMenu:Hide() end
-        loadoutPrimaryBtn:SetText("Done")
+        loadoutPrimaryBtn:SetText(L["Done"])
         loadoutPrimaryBtn:SetScript("OnClick", function() Journal.FinishLoadoutBuilder() end)
         loadoutPrimaryBtn:Show()
-        loadoutSecondaryBtn:SetText("Cancel")
+        loadoutSecondaryBtn:SetText(L["Cancel"])
         loadoutSecondaryBtn:SetScript("OnClick", function() Journal.CancelLoadoutBuilder() end)
         loadoutSecondaryBtn:Show()
         return
@@ -4443,10 +4438,10 @@ local function UpdateLoadoutFooter()
         local slots = svc and svc.GetServerBuildSlots and svc.GetServerBuildSlots() or {}
         local activeSlot = (svc and svc.GetServerActiveSlot and svc.GetServerActiveSlot()) or 1
         local live = slots[activeSlot]
-        local text = (live and live.name ~= "" and live.name) or ("Loadout " .. activeSlot)
+        local text = (live and live.name ~= "" and live.name) or T("Loadout {n}", { n = activeSlot })
         local wish = GetActiveBuildOverview()
         if wish then
-            local wname = (wish.name and wish.name ~= "") and wish.name or "Unnamed"
+            local wname = (wish.name and wish.name ~= "") and wish.name or L["Unnamed"]
             text = text .. " |cffa080e0/ " .. wname .. "|r"
         end
         UIDropDownMenu_SetText(loadoutDD, text)
@@ -4649,9 +4644,9 @@ function Journal.TryLockEcho(button)
         return
     end
     local spellId = button.spellId
-    local spellName = GetSpellInfo(spellId) or "this echo"
+    local spellName = GetSpellInfo(spellId) or L["this echo"]
     StaticPopupDialogs["PROJECTEBONHOLD_JOURNAL_LOCK_ECHO"] = {
-        text = "Make " .. spellName .. " permanent? It will be kept between runs.",
+        text = T("Make {name} permanent? It will be kept between runs.", { name = spellName }),
         button1 = YES,
         button2 = NO,
         OnAccept = function()
@@ -4709,7 +4704,7 @@ end
 function Journal.StartLoadoutBuilder(name, targetSlot)
     name = tostring(name or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if name == "" then
-        UIErrorsFrame:AddMessage("Invalid wishlist name.", 1, 0.2, 0.2)
+        UIErrorsFrame:AddMessage(L["Invalid wishlist name."], 1, 0.2, 0.2)
         return
     end
     builderDraft = { name = name, entries = {}, targetSlot = targetSlot }
@@ -4764,9 +4759,9 @@ end
 
 -- Offered when finishing an EDIT: tweak the name before saving, or keep it
 StaticPopupDialogs["PROJECTEBONHOLD_LOADOUT_RENAME"] = {
-    text = "Update the wishlist's name before saving?",
+    text = L["Update the wishlist's name before saving?"],
     button1 = ACCEPT,
-    button2 = "Keep Name",
+    button2 = L["Keep Name"],
     hasEditBox = 1,
     maxLetters = 32,
     OnShow = function(self)
@@ -4797,7 +4792,7 @@ function Journal.FinishLoadoutBuilder()
             { spellId = spellId, quality = e.quality, stacks = e.stacks, avoid = e.avoid or nil })
     end
     if #list == 0 then
-        UIErrorsFrame:AddMessage("Pick at least one echo before saving.", 1, 0.2, 0.2)
+        UIErrorsFrame:AddMessage(L["Pick at least one echo before saving."], 1, 0.2, 0.2)
         return
     end
     -- Wishes first, refusals last. The server stores entries sorted by spell id,
@@ -4826,60 +4821,9 @@ function Journal.CancelLoadoutBuilder()
     SelectTab(TAB_ALL)
 end
 
--- Re-skins a UIPanelScrollFrameTemplate's scrollbar with the same ornate
--- knob + top/middle/bottom track pieces ezCollections' own
--- HybridScrollBarTrimTemplate uses (Mounts/Pets list panes), instead of the
--- plain grey default scrollbar (just a thin groove, no track art at all).
+-- The journal's scroll bars are DragonUI's (utils.UseDragonScrollBar, owner 2026-11-12).
 local function SkinScrollBar(scrollFrameToSkin)
-    local name = scrollFrameToSkin:GetName()
-    local bar = name and _G[name .. "ScrollBar"]
-    if not bar then return end
-
-    local thumb = bar.GetThumbTexture and bar:GetThumbTexture()
-    if thumb then
-        thumb:SetTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
-        thumb:SetSize(18, 24)
-    end
-
-    -- Nudge the up/down buttons themselves to sit inside the panel's modest
-    -- 6px wrap, rather than resizing the wrap to fit wherever they default
-    -- to (that read as extra dead space once the panel had a visible
-    -- border). AdjustPointsOffset doesn't exist on this 3.3.5 client --
-    -- read the button's existing (single) anchor and re-set it with an
-    -- adjusted y offset instead.
-    local function NudgeVertically(btn, dy)
-        if not btn then return end
-        local point, relativeTo, relativePoint, x, y = btn:GetPoint(1)
-        if not point then return end
-        btn:SetPoint(point, relativeTo, relativePoint, x or 0, (y or 0) + dy)
-    end
-    local upBtn = _G[name .. "ScrollBarScrollUpButton"]
-    local downBtn = _G[name .. "ScrollBarScrollDownButton"]
-    local upDy, downDy = 6, -6
-    NudgeVertically(upBtn, upDy)
-    NudgeVertically(downBtn, downDy)
-
-    -- Track pieces follow the SAME nudge as their button, instead of being
-    -- anchored to the (unmoved) bar -- otherwise the buttons slide but the
-    -- track art they sit inside stays put and visibly stops matching them.
-    local track = "Interface\\PaperDollInfoFrame\\UI-Character-ScrollBar"
-    local top = bar:CreateTexture(nil, "ARTWORK")
-    top:SetTexture(track)
-    top:SetSize(24, 48)
-    top:SetPoint("TOPLEFT", bar, "TOPLEFT", -4, 17 + upDy)
-    top:SetTexCoord(0, 0.45, 0, 0.20)
-
-    local bottom = bar:CreateTexture(nil, "ARTWORK")
-    bottom:SetTexture(track)
-    bottom:SetSize(24, 64)
-    bottom:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", -4, -15 + downDy)
-    bottom:SetTexCoord(0.515625, 0.97, 0.1440625, 0.4140625)
-
-    local middle = bar:CreateTexture(nil, "ARTWORK")
-    middle:SetTexture(track)
-    middle:SetPoint("TOPLEFT", top, "BOTTOMLEFT")
-    middle:SetPoint("BOTTOMRIGHT", bottom, "TOPRIGHT")
-    middle:SetTexCoord(0, 0.45, 0.1640625, 1)
+    utils.UseDragonScrollBar(scrollFrameToSkin)
 end
 
 -- ── Frame construction ───────────────────────────────────────────────────────
@@ -4913,7 +4857,7 @@ local function CreateJournalFrame()
 
     local title = journalFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", headerTex, "TOP", 0, -14)
-    title:SetText("Echo Journal")
+    title:SetText(L["Echo Journal"])
 
     local closeButton = CreateFrame("Button", nil, journalFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", journalFrame, "TOPRIGHT", -5, -5)
@@ -4986,7 +4930,7 @@ local function CreateJournalFrame()
     -- look of a bare UIDropDownMenuTemplate) -- the actual menu is a
     -- separate invisible UIDropDownMenuTemplate frame toggled open by it.
     local QUALITY_HEX = { [0] = "ffffff", [1] = "19ff19", [2] = "0066ff", [3] = "cc66ff" }
-    local QUALITY_NAMES = { [0] = "Common", [1] = "Uncommon", [2] = "Rare", [3] = "Epic" }
+    local QUALITY_NAMES = { [0] = L["Common"], [1] = L["Uncommon"], [2] = L["Rare"], [3] = L["Epic"] }
 
     -- Position (both this and searchBox) is set dynamically in Refresh() --
     -- on the Echoes tab they live inside the catalog column's own header,
@@ -5008,19 +4952,19 @@ local function CreateJournalFrame()
     local function GetFilterSummary()
         local parts = {}
         if selectedTomesOnly then
-            table.insert(parts, "Tomes")
+            table.insert(parts, L["Tomes"])
         end
         if selectedKnownTomesOnly then
-            table.insert(parts, "Known tomes")
+            table.insert(parts, L["Known tomes"])
         end
         if selectedMyClassOnly then
-            table.insert(parts, "My class")
+            table.insert(parts, L["My class"])
         end
         if selectedEnabledOnly then
-            table.insert(parts, "Enabled")
+            table.insert(parts, L["Enabled"])
         end
         if selectedDisabledOnly then
-            table.insert(parts, "Disabled")
+            table.insert(parts, L["Disabled"])
         end
         for quality = 0, 3 do
             if selectedQualities[quality] then
@@ -5030,10 +4974,10 @@ local function CreateJournalFrame()
         local fams = {}
         for fam in pairs(selectedFamilies) do table.insert(fams, fam) end
         table.sort(fams)
-        for _, fam in ipairs(fams) do table.insert(parts, fam) end
+        for _, fam in ipairs(fams) do table.insert(parts, L[fam]) end   -- sorted on the English key, shown translated
 
-        if #parts == 0 then return "All Filters" end
-        if #parts > 2 then return #parts .. " filters" end
+        if #parts == 0 then return L["All Filters"] end
+        if #parts > 2 then return T("{count} filters", { count = #parts }) end
         return table.concat(parts, ", ")
     end
 
@@ -5079,7 +5023,7 @@ local function CreateJournalFrame()
 
     local function AddFamilyToggle(fam, text, level)
         local info = UIDropDownMenu_CreateInfo()
-        info.text = text
+        info.text = L[text]   -- display only: selectedFamilies stays keyed by the English family
         info.keepShownOnClick = true
         info.checked = selectedFamilies[fam] and true or false
         info.func = function()
@@ -5100,14 +5044,14 @@ local function CreateJournalFrame()
 
         if level == 1 then
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Quality"
+            info.text = L["Quality"]
             info.hasArrow = true
             info.notCheckable = true
             info.value = "QUALITY"
             UIDropDownMenu_AddButton(info, level)
 
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Family"
+            info.text = L["Family"]
             info.hasArrow = true
             info.notCheckable = true
             info.value = "FAMILY"
@@ -5116,7 +5060,7 @@ local function CreateJournalFrame()
             -- All tome-related filters grouped under one submenu (see the
             -- level-2 "TOMES" branch below)
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Tomes"
+            info.text = L["Tomes"]
             info.hasArrow = true
             info.notCheckable = true
             info.value = "TOMES"
@@ -5125,7 +5069,7 @@ local function CreateJournalFrame()
             -- Echoes the player's own class can actually obtain (same
             -- predicate the builder/tome views already force)
             info = UIDropDownMenu_CreateInfo()
-            info.text = "My class only"
+            info.text = L["My class only"]
             info.keepShownOnClick = true
             info.checked = selectedMyClassOnly
             info.func = function()
@@ -5136,7 +5080,7 @@ local function CreateJournalFrame()
             UIDropDownMenu_AddButton(info, level)
 
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Reset filters"
+            info.text = L["Reset filters"]
             info.notCheckable = true
             info.func = function()
                 selectedQualities = {}
@@ -5155,7 +5099,7 @@ local function CreateJournalFrame()
             -- Replaces the former Tomes tab: restricts the catalog to
             -- tome-locked echoes (class-filtered, like the old tab).
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Tomes only"
+            info.text = L["Tomes only"]
             info.keepShownOnClick = true
             info.checked = selectedTomesOnly
             info.func = function()
@@ -5167,7 +5111,7 @@ local function CreateJournalFrame()
 
             -- Learned tomes only (golden-halo entries of the catalog)
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Known tomes only"
+            info.text = L["Known tomes only"]
             info.keepShownOnClick = true
             info.checked = selectedKnownTomesOnly
             info.func = function()
@@ -5180,7 +5124,7 @@ local function CreateJournalFrame()
             -- Enabled/Disabled tome echoes (the right-click toggle state);
             -- mutually exclusive, so picking one clears the other.
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Enabled only"
+            info.text = L["Enabled only"]
             info.keepShownOnClick = true
             info.checked = selectedEnabledOnly
             info.func = function()
@@ -5192,7 +5136,7 @@ local function CreateJournalFrame()
             UIDropDownMenu_AddButton(info, level)
 
             info = UIDropDownMenu_CreateInfo()
-            info.text = "Disabled only"
+            info.text = L["Disabled only"]
             info.keepShownOnClick = true
             info.checked = selectedDisabledOnly
             info.func = function()
@@ -5205,7 +5149,7 @@ local function CreateJournalFrame()
         elseif level == 2 and UIDROPDOWNMENU_MENU_VALUE == "QUALITY" then
             -- Multi-select: entries toggle and the menu stays open
             info = UIDropDownMenu_CreateInfo()
-            info.text = "All Qualities"
+            info.text = L["All Qualities"]
             info.checked = (next(selectedQualities) == nil)
             info.func = function()
                 selectedQualities = {}
@@ -5233,7 +5177,7 @@ local function CreateJournalFrame()
             end
         elseif level == 2 and UIDROPDOWNMENU_MENU_VALUE == "FAMILY" then
             info = UIDropDownMenu_CreateInfo()
-            info.text = "All Families"
+            info.text = L["All Families"]
             info.checked = (next(selectedFamilies) == nil)
             info.func = function()
                 selectedFamilies = {}
@@ -5250,7 +5194,7 @@ local function CreateJournalFrame()
 
             for _, class in ipairs(classes) do
                 info = UIDropDownMenu_CreateInfo()
-                info.text = class
+                info.text = L[class]   -- the value below keeps the English class
                 info.hasArrow = true
                 info.notCheckable = true
                 info.value = "FAMILY_CLASS:" .. class
@@ -5310,18 +5254,18 @@ local function CreateJournalFrame()
     -- Standard WoW top-tabs (same template family as PetPaperDollFrameTab):
     -- TabButtonTemplate needs GLOBAL names, its textures resolve via $parent
     local mineBtn = CreateFrame("Button", "ProjectEbonholdLoadoutTabMine", lc, "TabButtonTemplate")
-    mineBtn:SetText("My Builds")
+    mineBtn:SetText(L["My Builds"])
     mineBtn:SetPoint("TOPLEFT", lc, "TOPLEFT", 0, 6)
     PanelTemplates_TabResize(mineBtn, 0)
     local commBtn = CreateFrame("Button", "ProjectEbonholdLoadoutTabCommunity", lc, "TabButtonTemplate")
-    commBtn:SetText("Community")
+    commBtn:SetText(L["Community"])
     commBtn:SetPoint("LEFT", mineBtn, "RIGHT", 6, 0)
     PanelTemplates_TabResize(commBtn, 0)
 
     -- New/Import: bigger than the row buttons, full-size font
-    local importBtn = utils.CreateSimpleCustomButton(lc, "Import", nil, 94, 31)
+    local importBtn = utils.CreateSimpleCustomButton(lc, L["Import"], nil, 94, 31)
     importBtn:SetPoint("TOPRIGHT", lc, "TOPRIGHT", 0, 4)
-    local newBtn = utils.CreateSimpleCustomButton(lc, "New Wishlist", nil, 116, 31)
+    local newBtn = utils.CreateSimpleCustomButton(lc, L["New Wishlist"], nil, 116, 31)
     newBtn:SetPoint("RIGHT", importBtn, "LEFT", -4, 0)
     lc.mineBtn, lc.commBtn = mineBtn, commBtn
 
@@ -5332,7 +5276,7 @@ local function CreateJournalFrame()
     UIDropDownMenu_SetWidth(classDD, 120)
     local function SetClassFilter(token)
         selectedLoadoutClass = token
-        UIDropDownMenu_SetText(classDD, token and ClassDisplay(token) or "All Classes")
+        UIDropDownMenu_SetText(classDD, token and ClassDisplay(token) or L["All Classes"])
         if loadoutView == "community" then
             RequestCommunityLoadouts() -- re-query the server with the new class
         end
@@ -5342,7 +5286,7 @@ local function CreateJournalFrame()
 
     UIDropDownMenu_Initialize(classDD, function(self, level)
         local info = UIDropDownMenu_CreateInfo()
-        info.text = "All Classes"
+        info.text = L["All Classes"]
         info.checked = (selectedLoadoutClass == nil)
         info.func = function() SetClassFilter(nil) end
         UIDropDownMenu_AddButton(info, level)
@@ -5357,7 +5301,7 @@ local function CreateJournalFrame()
     end)
     -- Default filter: the player's own class
     UIDropDownMenu_SetText(classDD,
-        selectedLoadoutClass and ClassDisplay(selectedLoadoutClass) or "All Classes")
+        selectedLoadoutClass and ClassDisplay(selectedLoadoutClass) or L["All Classes"])
 
     -- The loadout builder's Done/Cancel now live on the loadout footer's
     -- New Wishlist/Import buttons instead of a separate banner here (see
@@ -5377,9 +5321,9 @@ local function CreateJournalFrame()
     end)
     newBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("New Wishlist", 1, 1, 1)
+        GameTooltip:SetText(L["New Wishlist"], 1, 1, 1)
         GameTooltip:AddLine(
-            "Creates an |cffa080e0Echo Wishlist|r build: pick its echoes in the catalog, then save it.\nWhile active, its echoes are highlighted in your draws.",
+            L["Creates an |cffa080e0Echo Wishlist|r build: pick its echoes in the catalog, then save it.\nWhile active, its echoes are highlighted in your draws."],
             0.9, 0.9, 0.9, true)
         GameTooltip:Show()
     end)
@@ -5490,7 +5434,7 @@ local function CreateJournalFrame()
     emptyText:SetWidth(MY_RUN_PANEL_W - 40)
     emptyText:SetJustifyH("CENTER")
     emptyText:SetTextColor(0.55, 0.55, 0.55)
-    emptyText:SetText("You have no echoes yet.\n\nLevel up during a run to earn new echoes.")
+    emptyText:SetText(L["You have no echoes yet.\n\nLevel up during a run to earn new echoes."])
     myRunEmptyState.text = emptyText -- UpdateMyRunPanel swaps it while a search is on
 
     -- ── Loadout controls: active loadout + slot switcher + create/import ──
@@ -5523,11 +5467,11 @@ local function CreateJournalFrame()
     -- Draft-only Done/Cancel pair (see UpdateLoadoutFooter): hidden in
     -- normal use -- creating/importing wishlists now happens from rows
     -- inside the dropdown's menu, not from standing buttons.
-    loadoutPrimaryBtn = ShrinkButtonFont(utils.CreateSimpleCustomButton(loadoutFooter, "Done",
+    loadoutPrimaryBtn = ShrinkButtonFont(utils.CreateSimpleCustomButton(loadoutFooter, L["Done"],
         nil, 90, 22))
     loadoutPrimaryBtn:Hide()
 
-    loadoutSecondaryBtn = ShrinkButtonFont(utils.CreateSimpleCustomButton(loadoutFooter, "Cancel",
+    loadoutSecondaryBtn = ShrinkButtonFont(utils.CreateSimpleCustomButton(loadoutFooter, L["Cancel"],
         nil, 80, 22))
     loadoutSecondaryBtn:Hide()
 
@@ -5627,8 +5571,8 @@ microIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 microIcon:SetSize(18, 18)
 microIcon:SetPoint("BOTTOM", microButton, "BOTTOM", 0, 9)
 
-microButton.tooltipText = "Character Progression"
-microButton.newbieText = "Your echoes, skill tree, transmogrify, mounts and companions."
+microButton.tooltipText = L["Character Progression"]
+microButton.newbieText = L["Your echoes, skill tree, transmogrify, mounts and companions."]
 
 -- "New echo" alert bubble above the micro button (same recipe as the skill
 -- tree alert). Closing it with the X disables it permanently.
@@ -5646,7 +5590,7 @@ microButton.Alert.Text = microButton.Alert:CreateFontString(nil, "OVERLAY", "Gam
 microButton.Alert.Text:SetJustifyV("TOP")
 microButton.Alert.Text:SetSize(188, 0)
 microButton.Alert.Text:SetPoint("TOPLEFT", 16, -18)
-microButton.Alert.Text:SetText("You gained a new echo! Open your Echo Journal to see it.")
+microButton.Alert.Text:SetText(L["You gained a new echo! Open your Echo Journal to see it."])
 
 microButton.Alert.CloseButton = CreateFrame("Button", nil, microButton.Alert, "UIPanelCloseButton")
 microButton.Alert.CloseButton:SetPoint("TOPRIGHT", 6, 6)
@@ -5694,14 +5638,12 @@ function Journal.NotifyNewEcho()
     if not ProjectEbonholdDB.seenFirstEchoAlert then
         ProjectEbonholdDB.seenFirstEchoAlert = true
         ShowJournalAlert(microButton:IsVisible()
-            and ("Your echo is here! Click this button to open |cffffd700Character Progression|r, " ..
-                "your echoes are in the |cffffd700Echoes|r tab.")
-            or ("Your echo is in |cffffd700Character Progression|r, |cffffd700Echoes|r tab. " ..
-                "Type |cffffd700/collections|r to open it."), "seenFirstEchoAlert")
+            and L["Your echo is here! Click this button to open |cffffd700Character Progression|r, your echoes are in the |cffffd700Echoes|r tab."]
+            or L["Your echo is in |cffffd700Character Progression|r, |cffffd700Echoes|r tab. Type |cffffd700/collections|r to open it."], "seenFirstEchoAlert")
         return
     end
     if ProjectEbonholdDB.hideNewEchoAlert then return end
-    ShowJournalAlert("You gained a new echo! Open your Echo Journal to see it.")
+    ShowJournalAlert(L["You gained a new echo! Open your Echo Journal to see it."])
 end
 
 -- Called by the perk service when the discovery list gains a tome echo (the
@@ -5719,8 +5661,8 @@ function Journal.NotifyTomeLearned(echoSpellId)
     if journalFrame and journalFrame:IsShown() then return end
     local name = GetSpellInfo(echoSpellId)
     ShowJournalAlert(name
-        and ("You unlocked a new Tome Echo: |cffffd700" .. name .. "|r! Open your Echo Journal to see it.")
-        or "You unlocked a new Tome Echo! Open your Echo Journal to see it.")
+        and T("You unlocked a new Tome Echo: |cffffd700{name}|r! Open your Echo Journal to see it.", { name = name })
+        or L["You unlocked a new Tome Echo! Open your Echo Journal to see it."])
 end
 
 -- Called by the orb service when the server reports a POSITIVE applied delta on
@@ -5738,8 +5680,8 @@ function Journal.NotifyOrbsGained(count)
     if ProjectEbonholdDB.hideOrbAlert then return end
     if journalFrame and journalFrame:IsShown() then return end
     ShowJournalAlert(count == 1
-        and "You gained an |cffffd700Orb of Lost Memories|r! Open your Echo Journal to spend it."
-        or ("You gained |cffffd700" .. count .. " Orbs of Lost Memories|r! Open your Echo Journal to spend them."),
+        and L["You gained an |cffffd700Orb of Lost Memories|r! Open your Echo Journal to spend it."]
+        or T("You gained |cffffd700{count} Orbs of Lost Memories|r! Open your Echo Journal to spend them.", { count = count }),
         "hideOrbAlert")
 end
 

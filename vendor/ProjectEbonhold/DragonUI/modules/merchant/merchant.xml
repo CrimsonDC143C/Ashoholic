@@ -1,0 +1,6 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="merchant_frame.lua"/>
+    <Script file="sell_junk.lua"/>
+    <Script file="buyback_undo.lua"/>
+    <Script file="auto_services.lua"/>
+</Ui>

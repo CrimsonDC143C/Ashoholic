@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 
 
 local Perks = {}
@@ -104,10 +105,9 @@ autoAcceptTimer:SetScript("OnUpdate", function(self, elapsed)
         else
             echoLink = tostring(choice.spellId)
         end
-        DEFAULT_CHAT_FRAME:AddMessage(string.format(
-            "|cff33ff99[Echoes]|r Auto-accepted %s from your loadout%s.",
-            echoLink,
-            active and active.name and (" |cffffffff\"" .. active.name .. "\"|r") or ""))
+        DEFAULT_CHAT_FRAME:AddMessage(T("|cff33ff99[Echoes]|r Auto-accepted {echo} from your loadout{name}.", {
+            echo = echoLink,
+            name = active and active.name and T(" |cffffffff\"{name}\"|r", { name = active.name }) or "" }))
     elseif Perks.currentChoice and ProjectEbonhold.PerkUI and ProjectEbonhold.PerkUI.Show then
         -- Selection was refused (already pending, stale choice...): fall back
         -- to the normal selection UI so the roll is never lost.
@@ -232,13 +232,13 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PLAYER_PERK_CHOICE,
             for i, choice in ipairs(choices) do
                 local spellName = GetSpellInfo(choice.spellId)
                 local qualityNames = {
-                    [0] = "Common",
-                    [1] = "Uncommon",
-                    [2] = "Rare",
-                    [3] = "Epic",
-                    [4] = "Legendary"
+                    [0] = L["Common"],
+                    [1] = L["Uncommon"],
+                    [2] = L["Rare"],
+                    [3] = L["Epic"],
+                    [4] = L["Legendary"]
                 }
-                local qualityName = qualityNames[choice.quality] or "Unknown"
+                local qualityName = qualityNames[choice.quality] or L["Unknown"]
             end
         end
     end)
@@ -748,9 +748,30 @@ function Perks.FreezePerk(perkIndex)
     return true
 end
 
+-- Echoes banished this run on the ACTIVE loadout, in the order the server sent them. Only ever
+-- written from SEND_PERK_BANISHED: each loadout keeps its own list, so after a switch the
+-- server's list is the only one that is right.
+Perks.banishedPerks = {}
+
+ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_BANISHED, function(body)
+    local list = {}
+    if body and body ~= "" then
+        for idStr in string.gmatch(body, "[^,]+") do
+            local id = tonumber(idStr)
+            if id and id > 0 then
+                list[#list + 1] = id
+            end
+        end
+    end
+    Perks.banishedPerks = list
+end)
+
 ProjectEbonhold = ProjectEbonhold or {}
 ProjectEbonhold.Perks = Perks
 ProjectEbonhold.PerkService = ProjectEbonhold.PerkService or {}
+ProjectEbonhold.PerkService.GetBanishedPerks = function()
+    return Perks.banishedPerks
+end
 ProjectEbonhold.PerkService.RequestChoice = Perks.RequestChoice
 ProjectEbonhold.PerkService.SelectPerk = Perks.SelectPerk
 ProjectEbonhold.PerkService.RequestGrantedPerks = Perks.RequestGrantedPerks
@@ -821,7 +842,7 @@ ProjectEbonhold.PerkService.ToggleTomeEcho = function(spellId)
     local data = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[spellId]
     if not (data and data.isTome) then return false end
     if (UnitLevel("player") or 1) ~= 1 then
-        UIErrorsFrame:AddMessage("Tomes can be enabled or disabled at level 1 only.", 1, 0.2, 0.2)
+        UIErrorsFrame:AddMessage(L["Tomes can be enabled or disabled at level 1 only."], 1, 0.2, 0.2)
         return false
     end
     local enable = ProjectEbonhold.PerkService.IsTomeEchoDisabled(spellId) and "1" or "0"
@@ -1028,7 +1049,7 @@ local function ParseEchoBuilderLink(text)
     end
     if #echoes == 0 then return nil end
     -- "death-knight" -> "DEATHKNIGHT"; no class in the link = the player's own
-    return { name = "Website build", class = SanitizeLoadoutClass(slug), echoes = echoes }
+    return { name = L["Website build"], class = SanitizeLoadoutClass(slug), echoes = echoes }
 end
 
 ProjectEbonhold.PerkService.ImportEchoLoadout = function(text)
@@ -1081,7 +1102,7 @@ local function BuildSlotRequestBusy()
         Perks.pendingBuildSlotRequest = nil
         return false
     end
-    UIErrorsFrame:AddMessage("Please wait a moment before the next build action.", 1, 0.82, 0)
+    UIErrorsFrame:AddMessage(L["Please wait a moment before the next build action."], 1, 0.82, 0)
     return true
 end
 
@@ -1266,38 +1287,36 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_PERK_LOADOUT_RESULT,
 
         if status == "FAIL" then
             local reasons = {
-                disabled = "Echo loadouts are disabled on this realm.",
-                slot = (op == "delete") and "A loadout cannot be deleted - only wishlists can." or "Invalid loadout slot.",
-                empty = "This slot is empty.",
-                same = "You are already playing this loadout.",
-                combat = "You cannot switch loadouts in combat.",
-                dead = "You cannot switch loadouts while dead.",
-                locked = "This loadout slot is locked - unlock it with gold first.",
-                max = "All loadout slots are already unlocked.",
-                money = "You don't have enough gold to unlock this slot.",
-                invalid = (op == "switch") and "Your echoes are not loaded yet. Try again in a moment."
-                    or "This build contains no echoes usable by your class.",
-                full = "You have too many wishlists. Delete one first.",
+                disabled = L["Echo loadouts are disabled on this realm."],
+                slot = (op == "delete") and L["A loadout cannot be deleted - only wishlists can."] or L["Invalid loadout slot."],
+                empty = L["This slot is empty."],
+                same = L["You are already playing this loadout."],
+                combat = L["You cannot switch loadouts in combat."],
+                dead = L["You cannot switch loadouts while dead."],
+                locked = L["This loadout slot is locked - unlock it with gold first."],
+                max = L["All loadout slots are already unlocked."],
+                money = L["You don't have enough gold to unlock this slot."],
+                invalid = (op == "switch") and L["Your echoes are not loaded yet. Try again in a moment."]
+                    or L["This build contains no echoes usable by your class."],
+                full = L["You have too many wishlists. Delete one first."],
             }
             UIErrorsFrame:AddMessage(reasons[detail]
-                or ("Loadout " .. tostring(op) .. " failed (" .. tostring(detail) .. ")."), 1, 0.2, 0.2)
+                or T("Loadout {op} failed ({detail}).", { op = tostring(op), detail = tostring(detail) }), 1, 0.2, 0.2)
         elseif status == "OK" and op == "switch" then
             local slots = Perks.serverBuildSlots or {}
             local build = slots[tonumber(detail) or 0]
-            local name = build and build.name ~= "" and build.name or ("Loadout " .. tostring(detail))
-            UIErrorsFrame:AddMessage("Now playing loadout " .. name .. ".", 0.1, 1, 0.1)
+            local name = build and build.name ~= "" and build.name or T("Loadout {n}", { n = tostring(detail) })
+            UIErrorsFrame:AddMessage(T("Now playing loadout {name}.", { name = name }), 0.1, 1, 0.1)
         elseif status == "OK" and op == "unlock" then
-            UIErrorsFrame:AddMessage("Loadout slot " .. tostring(detail) .. " unlocked (account-wide).", 0.1, 1, 0.1)
+            UIErrorsFrame:AddMessage(T("Loadout slot {n} unlocked (account-wide).", { n = tostring(detail) }), 0.1, 1, 0.1)
         elseif status == "OK" and op == "upload" then
             -- detail: "<slot>" or "<slot>,<skipped>" when echoes were dropped
             local slot, skipped = tostring(detail):match("^(%d+),?(%d*)$")
             skipped = tonumber(skipped)
             if skipped and skipped > 0 then
-                UIErrorsFrame:AddMessage(string.format(
-                    "Build saved (%d echo%s not usable by your class skipped).",
-                    skipped, skipped > 1 and "es" or ""), 1, 0.82, 0)
+                UIErrorsFrame:AddMessage(T("Build saved ({count} echo{es} not usable by your class skipped).", { count = skipped, es = (skipped > 1 and "es" or "") }), 1, 0.82, 0)
             else
-                UIErrorsFrame:AddMessage("Build saved.", 0.1, 1, 0.1)
+                UIErrorsFrame:AddMessage(L["Build saved."], 0.1, 1, 0.1)
             end
         end
 

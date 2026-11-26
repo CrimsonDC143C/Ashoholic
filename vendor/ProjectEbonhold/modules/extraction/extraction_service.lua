@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local L = ProjectEbonhold.L
 
 ExtractionService = ExtractionService or {}
 ExtractionService.currentCost = nil   -- copper amount (extraction)
@@ -66,7 +67,7 @@ end)
 -- server list only flags which are learned, and the applied count is read from the equipped
 -- item links (8th field = ItemRandomProperties = enchantId). A learned id the data file does not
 -- know is ignored: the data file and the server ship together.
-ExtractionService.CATEGORY_NAMES = { [1] = "Offensive", [2] = "Defensive", [3] = "Resource", [4] = "Utility", [5] = "Mobility" }
+ExtractionService.CATEGORY_NAMES = { [1] = L["Offensive"], [2] = L["Defensive"], [3] = L["Resource"], [4] = L["Utility"], [5] = L["Mobility"] }
 ExtractionService.affixByEnchant = {}   -- enchantId (ItemRandomProperties) -> affix entry
 ExtractionService.learnedAffixes = {}   -- one entry per (family, rank), static order
 
@@ -92,6 +93,22 @@ function ExtractionService.RefreshAppliedCounts()
     for _, affix in ipairs(ExtractionService.learnedAffixes) do
         affix.appliedCount = counts[affix.enchantId] or 0
     end
+end
+
+-- DISPLAY ONLY: the affix name in the player's language ("Iron Will III" -> its translation + " III").
+-- affix.name / familyName stay English: they are searched, sorted and compared.
+function ExtractionService.DisplayName(affix)
+    if not affix or not affix.name then return nil end
+    local fam = affix.familyName
+    if fam and affix.name:sub(1, #fam) == fam then
+        return L[fam] .. affix.name:sub(#fam + 1)
+    end
+    return affix.name
+end
+
+-- DISPLAY ONLY: the rank text template in the player's language, markers kept, BEFORE rendering.
+function ExtractionService.DisplayText(affix)
+    return affix and affix.text and L[affix.text] or nil
 end
 
 local function BuildStaticEntry(db, familyId, rank, learnedSet, counts)
@@ -180,14 +197,22 @@ end)
 ------------------------------------------------------------
 -- Legendary Torment upgrade (Enchanted Anvil)
 ------------------------------------------------------------
-ExtractionService.upgradeInfo = nil   -- { tokenId, needed, held, nextEntry, label } or nil
+ExtractionService.upgradeInfo = nil   -- { tokenId, needed, held, nextEntry, label, bracket } or nil
 
-function ExtractionService.RequestLegendaryUpgradeInfo(bag, slot)
-    ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_LEGENDARY_UPGRADE_INFO, bag .. "," .. slot)
+-- target = the Torment bracket the player picked (1-4); nil = the server's default, the
+-- highest bracket the Marks pay. A higher Mark pays a lower bracket (pooled, lowest first).
+local function BagSlotTarget(bag, slot, target)
+    local body = bag .. "," .. slot
+    if target then body = body .. "," .. target end
+    return body
 end
 
-function ExtractionService.RequestLegendaryUpgrade(bag, slot)
-    ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_LEGENDARY_UPGRADE, bag .. "," .. slot)
+function ExtractionService.RequestLegendaryUpgradeInfo(bag, slot, target)
+    ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_LEGENDARY_UPGRADE_INFO, BagSlotTarget(bag, slot, target))
+end
+
+function ExtractionService.RequestLegendaryUpgrade(bag, slot, target)
+    ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_LEGENDARY_UPGRADE, BagSlotTarget(bag, slot, target))
 end
 
 -- SEND_LEGENDARY_UPGRADE_INFO (516): "NONE" or "tokenId,needed,held,nextEntry,label"
@@ -202,6 +227,7 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_LEGENDARY_UPGRADE_INFO, 
                 held       = tonumber(heldStr),
                 nextEntry  = tonumber(nextStr),
                 label      = label,
+                bracket    = math.floor(tonumber(nextStr) / 1000000),   -- the bracket quoted
             }
         end
     end

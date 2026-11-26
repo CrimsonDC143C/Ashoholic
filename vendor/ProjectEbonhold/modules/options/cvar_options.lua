@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- File: cvar_options.lua
 -- Integrates a curated subset of AwesomeCVar's options (Camera, Nameplates,
 -- Font Rendering, Stance Option) directly into the ProjectEbonhold Interface
@@ -12,16 +13,16 @@ local CVarOptions = {}
 -- ────────────────────────────────────────────────────────────────────────────
 
 local CAMERA_CVARS = {
-    { name = "cameraFov",                 label = "Camera FoV",
+    { name = "cameraFov",                 label = L["Camera FoV"],
       type = "slider", min = 60, max = 150, step = 1, default = 100 },
-    { name = "cameraDistanceMax",         label = "Camera Distance",
-      desc = "Sets the maximum distance the camera can zoom out from the player.",
+    { name = "cameraDistanceMax",         label = L["Camera Distance"],
+      desc = L["Sets the maximum distance the camera can zoom out from the player."],
       type = "slider", min = 0, max = 50, step = 1, default = 15 },
-    { name = "cameraIndirectVisibility",  label = "Camera Indirect Visibility",
-      desc = "When enabled, the camera can move freely through certain world objects rather than being blocked by them.",
+    { name = "cameraIndirectVisibility",  label = L["Camera Indirect Visibility"],
+      desc = L["When enabled, the camera can move freely through certain world objects rather than being blocked by them."],
       type = "toggle", default = 0 },
-    { name = "cameraIndirectAlpha",       label = "Camera Indirect Alpha",
-      desc = "Sets the transparency level of objects that come between the camera and the player character.",
+    { name = "cameraIndirectAlpha",       label = L["Camera Indirect Alpha"],
+      desc = L["Sets the transparency level of objects that come between the camera and the player character."],
       type = "slider", min = 0.6, max = 1, step = 0.05, default = 0.6 },
 }
 
@@ -30,101 +31,101 @@ local NAMEPLATE_CVARS = {
     -- creates a plate object for that unit type at all, full stop. No
     -- amount of addon-side reskinning can show a nameplate the engine
     -- never built in the first place.
-    { name = "nameplateShowFriends", label = "Show Friendly Nameplates",
-      desc = "Master switch for friendly units (players and NPCs) getting a nameplate at all.",
+    { name = "nameplateShowFriends", label = L["Show Friendly Nameplates"],
+      desc = L["Master switch for friendly units (players and NPCs) getting a nameplate at all."],
       type = "toggle", default = 1 },
-    { name = "nameplateShowEnemies", label = "Show Enemy Nameplates",
-      desc = "Master switch for hostile units getting a nameplate at all.",
+    { name = "nameplateShowEnemies", label = L["Show Enemy Nameplates"],
+      desc = L["Master switch for hostile units getting a nameplate at all."],
       type = "toggle", default = 1 },
     -- Mode controls (radio in source; rendered as dropdown here)
-    { name = "nameplateStacking", label = "Nameplate Stacking Mode",
-      desc = "'Smart' mode allows nameplates to bypass the stacking push if there is sufficient space below.",
+    { name = "nameplateStacking", label = L["Nameplate Stacking Mode"],
+      desc = L["'Smart' mode allows nameplates to bypass the stacking push if there is sufficient space below."],
       type = "mode", default = 0, modes = {
-        { value =  0, label = "Overlapping" },
-        { value =  1, label = "Stacking (All)" },
-        { value =  2, label = "Stacking (Enemies)" },
-        { value =  3, label = "Stacking (Friends)" },
-        { value = -1, label = "Smart Stacking (All)" },
-        { value = -2, label = "Smart Stacking (Enemies)" },
-        { value = -3, label = "Smart Stacking (Friends)" },
+        { value =  0, label = L["Overlapping"] },
+        { value =  1, label = L["Stacking (All)"] },
+        { value =  2, label = L["Stacking (Enemies)"] },
+        { value =  3, label = L["Stacking (Friends)"] },
+        { value = -1, label = L["Smart Stacking (All)"] },
+        { value = -2, label = L["Smart Stacking (Enemies)"] },
+        { value = -3, label = L["Smart Stacking (Friends)"] },
     }},
-    { name = "nameplateMouseMode", label = "Nameplate Mouseover Mode",
-      desc = "'Raise' options elevate the mouseover nameplate's frame level above lower-level nameplates.",
+    { name = "nameplateMouseMode", label = L["Nameplate Mouseover Mode"],
+      desc = L["'Raise' options elevate the mouseover nameplate's frame level above lower-level nameplates."],
       type = "mode", default = 0, modes = {
-        { value = 0, label = "Default" },
-        { value = 1, label = "Click-through Enemies" },
-        { value = 2, label = "CT Enemy + Raise Friend" },
-        { value = 3, label = "CT Enemy + Raise Friend (Combat)" },
-        { value = 4, label = "Click-through Friends" },
-        { value = 5, label = "CT Friend + Raise Enemy" },
-        { value = 6, label = "CT Friend + Raise Enemy (Combat)" },
-        { value = 7, label = "Always Raise Occluded" },
-        { value = 8, label = "Raise Occluded (Combat Only)" },
+        { value = 0, label = L["Default"] },
+        { value = 1, label = L["Click-through Enemies"] },
+        { value = 2, label = L["CT Enemy + Raise Friend"] },
+        { value = 3, label = L["CT Enemy + Raise Friend (Combat)"] },
+        { value = 4, label = L["Click-through Friends"] },
+        { value = 5, label = L["CT Friend + Raise Enemy"] },
+        { value = 6, label = L["CT Friend + Raise Enemy (Combat)"] },
+        { value = 7, label = L["Always Raise Occluded"] },
+        { value = 8, label = L["Raise Occluded (Combat Only)"] },
     }},
-    { name = "nameplateClampTop", label = "Nameplate Clamp Top Mode",
+    { name = "nameplateClampTop", label = L["Nameplate Clamp Top Mode"],
       type = "mode", default = 0, modes = {
-        { value = 0, label = "Off" },
-        { value = 1, label = "Clamp All" },
-        { value = 2, label = "Clamp Bosses Only" },
+        { value = 0, label = L["Off"] },
+        { value = 1, label = L["Clamp All"] },
+        { value = 2, label = L["Clamp Bosses Only"] },
     }},
-    { name = "nameplateHitboxAnchor", label = "Nameplate Hitbox Anchor",
-      desc = "Sets the vertical origin point of the nameplate's clickable area.",
+    { name = "nameplateHitboxAnchor", label = L["Nameplate Hitbox Anchor"],
+      desc = L["Sets the vertical origin point of the nameplate's clickable area."],
       type = "mode", default = 1, modes = {
-        { value = 0, label = "Top" },
-        { value = 1, label = "Center" },
-        { value = 2, label = "Bottom" },
+        { value = 0, label = L["Top"] },
+        { value = 1, label = L["Center"] },
+        { value = 2, label = L["Bottom"] },
     }},
     -- Sliders
-    { name = "nameplatePlacement",         label = "Nameplate Placement Offset",
-      desc = "A vertical offset ratio that displaces nameplates from their default anchor point.",
+    { name = "nameplatePlacement",         label = L["Nameplate Placement Offset"],
+      desc = L["A vertical offset ratio that displaces nameplates from their default anchor point."],
       type = "slider", min = -1, max = 2, step = 0.01, default = 0.66 },
-    { name = "nameplateDistance",          label = "Nameplate Display Distance",
+    { name = "nameplateDistance",          label = L["Nameplate Display Distance"],
       type = "slider", min = 41, max = 100, step = 1, default = 41 },
-    { name = "nameplateHysteresisDecay",   label = "Nameplate Pair Breakup Rate",
-      desc = "Controls how quickly stacking pairs dissolve once nameplates are no longer overlapping.",
+    { name = "nameplateHysteresisDecay",   label = L["Nameplate Pair Breakup Rate"],
+      desc = L["Controls how quickly stacking pairs dissolve once nameplates are no longer overlapping."],
       type = "slider", min = 0.25, max = 30, step = 0.05, default = 1 },
-    { name = "nameplateOcclusionAlpha",    label = "Nameplate Occlusion Alpha",
-      desc = "Controls the opacity of nameplates when they are blocked by obstacles or terrain.",
+    { name = "nameplateOcclusionAlpha",    label = L["Nameplate Occlusion Alpha"],
+      desc = L["Controls the opacity of nameplates when they are blocked by obstacles or terrain."],
       type = "slider", min = 0, max = 1, step = 0.01, default = 1 },
-    { name = "nameplateNonTargetAlpha",    label = "Nameplate Non-Target Alpha",
+    { name = "nameplateNonTargetAlpha",    label = L["Nameplate Non-Target Alpha"],
       type = "slider", min = 0, max = 1, step = 0.01, default = 0.5 },
-    { name = "nameplateAlphaSpeed",        label = "Nameplate Alpha Blending Speed",
-      desc = "Controls how fast nameplates animate toward new opacity targets (1 = Instant).",
+    { name = "nameplateAlphaSpeed",        label = L["Nameplate Alpha Blending Speed"],
+      desc = L["Controls how fast nameplates animate toward new opacity targets (1 = Instant)."],
       type = "slider", min = 0.01, max = 1, step = 0.01, default = 1 },
-    { name = "nameplateClampTopOffset",    label = "Nameplate Clamped Top Offset",
+    { name = "nameplateClampTopOffset",    label = L["Nameplate Clamped Top Offset"],
       type = "slider", min = 0, max = 0.15, step = 0.01, default = 0.1 },
-    { name = "nameplateRaiseDistance",     label = "Stacking Max Vertical Push Distance",
+    { name = "nameplateRaiseDistance",     label = L["Stacking Max Vertical Push Distance"],
       type = "slider", min = 1, max = 20, step = 0.25, default = 8 },
-    { name = "nameplatePullDistance",      label = "Stacking Max Horizontal Pull Distance",
+    { name = "nameplatePullDistance",      label = L["Stacking Max Horizontal Pull Distance"],
       type = "slider", min = 0, max = 0.75, step = 0.01, default = 0.25 },
-    { name = "nameplateBandX",             label = "Nameplate X Space",
+    { name = "nameplateBandX",             label = L["Nameplate X Space"],
       type = "slider", min = 0.1, max = 1,   step = 0.01, default = 0.7 },
-    { name = "nameplateBandY",             label = "Nameplate Y Space",
+    { name = "nameplateBandY",             label = L["Nameplate Y Space"],
       type = "slider", min = 0.1, max = 1.5, step = 0.01, default = 1 },
-    { name = "nameplateRaiseSpeed",        label = "Stacking Vertical Raise Speed",
+    { name = "nameplateRaiseSpeed",        label = L["Stacking Vertical Raise Speed"],
       type = "slider", min = 1, max = 250, step = 1, default = 100 },
-    { name = "nameplateLowerSpeed",        label = "Stacking Vertical Lower Speed",
+    { name = "nameplateLowerSpeed",        label = L["Stacking Vertical Lower Speed"],
       type = "slider", min = 1, max = 250, step = 1, default = 100 },
-    { name = "nameplatePullSpeed",         label = "Stacking Horizontal Pull Speed",
+    { name = "nameplatePullSpeed",         label = L["Stacking Horizontal Pull Speed"],
       type = "slider", min = 1, max = 250, step = 1, default = 50 },
-    { name = "nameplateInertia",           label = "Nameplate Stacking Inertia",
-      desc = "Controls the physical weight of nameplate movement during stacking.",
+    { name = "nameplateInertia",           label = L["Nameplate Stacking Inertia"],
+      desc = L["Controls the physical weight of nameplate movement during stacking."],
       type = "slider", min = 0, max = 20, step = 0.1, default = 1 },
-    { name = "nameplateHitboxHeightE",     label = "Enemy Nameplate Hitbox Height",
+    { name = "nameplateHitboxHeightE",     label = L["Enemy Nameplate Hitbox Height"],
       type = "slider", min = 0, max = 1, step = 0.01, default = 1 },
-    { name = "nameplateHitboxWidthE",      label = "Enemy Nameplate Hitbox Width",
+    { name = "nameplateHitboxWidthE",      label = L["Enemy Nameplate Hitbox Width"],
       type = "slider", min = 0, max = 1, step = 0.01, default = 1 },
-    { name = "nameplateHitboxHeightF",     label = "Friendly Nameplate Hitbox Height",
+    { name = "nameplateHitboxHeightF",     label = L["Friendly Nameplate Hitbox Height"],
       type = "slider", min = 0, max = 1, step = 0.01, default = 1 },
-    { name = "nameplateHitboxWidthF",      label = "Friendly Nameplate Hitbox Width",
+    { name = "nameplateHitboxWidthF",      label = L["Friendly Nameplate Hitbox Width"],
       type = "slider", min = 0, max = 1, step = 0.01, default = 1 },
 }
 
 -- Simplified font-rendering toggle: 0 = off, 1 = on (we don't expose mode 2).
 local FONT_RENDERING_CVAR = {
     name = "MSDFMode",
-    label = "Enable advanced font rendering",
-    desc = "Enables vector-based (MSDF) font rendering, dramatically improving glyph quality. Requires a UI reload to take effect.",
+    label = L["Enable advanced font rendering"],
+    desc = L["Enables vector-based (MSDF) font rendering, dramatically improving glyph quality. Requires a UI reload to take effect."],
     type = "toggle",
     default = 1,
     reloadRequired = true,
@@ -374,7 +375,7 @@ function CVarOptions.Build(parent, yOffset, hookWheel, contentWidth)
     -- Top-level header
     local header = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     header:SetPoint("TOPLEFT", 12, yOffset)
-    header:SetText("Advanced (CVars)")
+    header:SetText(L["Advanced (CVars)"])
     yOffset = yOffset - 22
 
     local subtitle = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -382,7 +383,7 @@ function CVarOptions.Build(parent, yOffset, hookWheel, contentWidth)
     subtitle:SetWidth(contentWidth - 24)
     subtitle:SetJustifyH("LEFT")
     subtitle:SetTextColor(0.85, 0.85, 0.85)
-    subtitle:SetText("These settings change in-game console variables (CVars). They persist between sessions.")
+    subtitle:SetText(L["These settings change in-game console variables (CVars). They persist between sessions."])
     yOffset = yOffset - (subtitle:GetStringHeight() + 10)
 
     -- Reload-required notice (hidden until needed)
@@ -391,13 +392,13 @@ function CVarOptions.Build(parent, yOffset, hookWheel, contentWidth)
     reloadNotice:SetWidth(contentWidth - 24)
     reloadNotice:SetJustifyH("LEFT")
     reloadNotice:SetTextColor(1.0, 0.82, 0.0)
-    reloadNotice:SetText("Some changes require a UI reload (/reload) to take effect.")
+    reloadNotice:SetText(L["Some changes require a UI reload (/reload) to take effect."])
     reloadNotice:Hide()
     CVarOptions._reloadLabel = reloadNotice
     yOffset = yOffset - 18
 
-    yOffset = buildSection(parent, "Camera",         CAMERA_CVARS,    yOffset, hookWheel, contentWidth, refreshList)
-    yOffset = buildSection(parent, "Font Rendering", { FONT_RENDERING_CVAR }, yOffset, hookWheel, contentWidth, refreshList)
+    yOffset = buildSection(parent, L["Camera"],         CAMERA_CVARS,    yOffset, hookWheel, contentWidth, refreshList)
+    yOffset = buildSection(parent, L["Font Rendering"], { FONT_RENDERING_CVAR }, yOffset, hookWheel, contentWidth, refreshList)
 
     CVarOptions._refreshList = refreshList
     return yOffset
@@ -409,7 +410,7 @@ function CVarOptions.Refresh()
     for _, fn in ipairs(CVarOptions._refreshList) do
         local ok, err = pcall(fn)
         if not ok and DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[ProjectEbonhold]|r CVar refresh error: " .. tostring(err))
+            DEFAULT_CHAT_FRAME:AddMessage(T("|cffff5555[ProjectEbonhold]|r CVar refresh error: {err}", { err = tostring(err) }))
         end
     end
 end

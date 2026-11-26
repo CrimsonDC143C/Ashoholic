@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 local UITexts = ProjectEbonhold.UITexts
@@ -14,11 +15,11 @@ local isEmpowermentCollapsed = false
 
 local qualityInfo =
 {
-    [0] = { name = "Common", color = { 1, 1, 1 }, border = 0 },
-    [1] = { name = "Uncommon", color = { 0.1, 1.0, 0.1 }, border = 1 },
-    [2] = { name = "Rare", color = { 0.0, 0.4, 1.0 }, border = 2 },
-    [3] = { name = "Epic", color = { 0.6, 0.2, 1.0 }, border = 3 },
-    [4] = { name = "Legendary", color = { 1.0, 0.5, 0.0 }, border = 4 }
+    [0] = { name = L["Common"], color = { 1, 1, 1 }, border = 0 },
+    [1] = { name = L["Uncommon"], color = { 0.1, 1.0, 0.1 }, border = 1 },
+    [2] = { name = L["Rare"], color = { 0.0, 0.4, 1.0 }, border = 2 },
+    [3] = { name = L["Epic"], color = { 0.6, 0.2, 1.0 }, border = 3 },
+    [4] = { name = L["Legendary"], color = { 1.0, 0.5, 0.0 }, border = 4 }
 }
 
 local SNAP_GAP = 6
@@ -149,6 +150,8 @@ WatchFrame:SetScript("OnUpdate", function(self, elapsed)
     if not UIParent:IsShown() then return end
     -- placed by Edit Mode (modules/editMode/edit_mode.lua), which keeps it there itself
     if self.ebhEditModePlaced then return end
+    -- ElvUI holds it on its own mover (put back after any SetPoint of ours: a fight 4x a second)
+    if _G.WatchFrameHolder then return end
     -- WatchFrame holds the secure quest-item buttons, so it is protected: an addon SetPoint in
     -- combat is refused (4x a second, "Interface action failed because of an AddOn"). Wait.
     if InCombatLockdown() then return end
@@ -296,7 +299,7 @@ local function CreatePlayerRunFrame()
     local hardmodeTierText = hardmodeButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     hardmodeTierText:SetPoint("LEFT", hardmodeSkullIcon, "RIGHT", 3, 0)
     hardmodeTierText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    hardmodeTierText:SetText("|cffAAAAAANormal|r")
+    hardmodeTierText:SetText(L["|cffAAAAAANormal|r"])
     hardmodeButton.tierText = hardmodeTierText
     playerRunFrame.hardmodeTierText = hardmodeTierText
 
@@ -307,32 +310,32 @@ local function CreatePlayerRunFrame()
             if svc and svc.GetCurrentDifficulty then
                 local diff = svc.GetCurrentDifficulty()
                 if diff <= 1 then
-                    GameTooltip:SetText("Normal Mode", 0.7, 0.7, 0.7)
-                    GameTooltip:AddLine("No Torment: monsters have their normal strength.", 1, 1, 1, true)
+                    GameTooltip:SetText(L["Normal Mode"], 0.7, 0.7, 0.7)
+                    GameTooltip:AddLine(L["No Torment: monsters have their normal strength."], 1, 1, 1, true)
                 else
-                    GameTooltip:SetText("Torment " .. (diff - 1), 1, 0.3, 0.3)
-                    GameTooltip:AddLine("Increased difficulty and rewards.", 1, 1, 1, true)
+                    GameTooltip:SetText(T("Torment {diff}", { diff = (diff - 1) }), 1, 0.3, 0.3)
+                    GameTooltip:AddLine(L["Increased difficulty and rewards."], 1, 1, 1, true)
                 end
             else
-                GameTooltip:SetText("Normal Mode", 0.7, 0.7, 0.7)
+                GameTooltip:SetText(L["Normal Mode"], 0.7, 0.7, 0.7)
             end
         else
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             local svc = ProjectEbonhold.HardmodeService
             local tier = svc and svc.GetCurrentDifficulty() or 1
             local dungeonTier = svc and svc.GetInstanceDifficulty and svc.GetInstanceDifficulty()
-            local function Name(t) return t > 1 and ("Torment " .. (t - 1)) or "Normal" end
+            local function Name(t) return t > 1 and (T("Torment {t}", { t = (t - 1) })) or L["Normal"] end
             if dungeonTier then
                 -- Inside a Dungeon Finder run at another tier: the dungeon's rules apply for now.
-                GameTooltip:SetText("|cffFF2020Dungeon: " .. Name(dungeonTier) .. "|r", 1, 0.2, 0.2)
-                GameTooltip:AddLine("Your Torment: " .. Name(tier), 0.8, 0.8, 0.8)
-                GameTooltip:AddLine("The dungeon runs at the difficulty picked in the Dungeon Finder; your own difficulty returns when you leave.", 1, 1, 1, true)
+                GameTooltip:SetText(T("|cffFF2020Dungeon: {dungeonTier}|r", { dungeonTier = Name(dungeonTier) }), 1, 0.2, 0.2)
+                GameTooltip:AddLine(T("Your Torment: {tier}", { tier = Name(tier) }), 0.8, 0.8, 0.8)
+                GameTooltip:AddLine(L["The dungeon runs at the difficulty picked in the Dungeon Finder; your own difficulty returns when you leave."], 1, 1, 1, true)
             elseif tier > 1 then
-                GameTooltip:SetText("|cffFF2020Torment " .. (tier - 1) .. "|r", 1, 0.2, 0.2)
+                GameTooltip:SetText(T("|cffFF2020Torment {tier}|r", { tier = (tier - 1) }), 1, 0.2, 0.2)
             else
-                GameTooltip:SetText("Torment", 0.8, 0.8, 0.8)
+                GameTooltip:SetText(L["Torment"], 0.8, 0.8, 0.8)
             end
-            GameTooltip:AddLine("Click to open the Torment difficulty panel.", nil, nil, nil, true)
+            GameTooltip:AddLine(L["Click to open the Torment difficulty panel."], nil, nil, nil, true)
         end
         GameTooltip:Show()
     end)
@@ -390,8 +393,8 @@ local function CreatePlayerRunFrame()
         local catchup = playerRunFrame.currentCatchupPct or 0
         if catchup > 0 then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("|cffffcc00Catch-Up Bonus: +" .. catchup .. "%|r", 1, 0.8, 0)
-            GameTooltip:AddLine("Until your account catches up with the previous patches.", nil, nil, nil, true)
+            GameTooltip:AddLine(T("|cffffcc00Catch-Up Bonus: +{catchup}%|r", { catchup = catchup }), 1, 0.8, 0)
+            GameTooltip:AddLine(L["Until your account catches up with the previous patches."], nil, nil, nil, true)
         end
         GameTooltip:Show()
     end)
@@ -475,10 +478,9 @@ local function CreatePlayerRunFrame()
     catchupHitbox:SetScript("OnEnter", function(self)
         if not (playerRunFrame.currentCatchupPct and playerRunFrame.currentCatchupPct > 0) then return end
         GameTooltip:SetOwner(self, IsTransparentDesign() and "ANCHOR_TOP" or "ANCHOR_RIGHT")
-        GameTooltip:SetText("|cffffcc00Catch-Up Bonus|r", 1, 0.8, 0)
+        GameTooltip:SetText(L["|cffffcc00Catch-Up Bonus|r"], 1, 0.8, 0)
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("+" .. (playerRunFrame.currentCatchupPct or 0) ..
-            "% until your account catches up with the previous patches.",
+        GameTooltip:AddLine(T("+{currentCatchupPct}% until your account catches up with the previous patches.", { currentCatchupPct = (playerRunFrame.currentCatchupPct or 0) }),
             nil, nil, nil, true)
         GameTooltip:Show()
     end)
@@ -735,8 +737,8 @@ local function CreatePlayerRunFrame()
     end)
     eyeButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Eye of the Reaper", 0.58, 0.44, 0.86)
-        GameTooltip:AddLine("Break it under an open sky to call the Reaper to this layer, at your Torment. Its Harvest kills beyond any resurrection; slay it to seal your gauge for the rest of the run.", 1, 1, 1, true)
+        GameTooltip:SetText(L["Eye of the Reaper"], 0.58, 0.44, 0.86)
+        GameTooltip:AddLine(L["Break it under an open sky to call the Reaper to this layer, at your Torment. Its Harvest kills beyond any resurrection; slay it to seal your gauge for the rest of the run."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
     eyeButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -788,17 +790,17 @@ local function CreatePlayerRunFrame()
         local ashes = playerRunFrame.currentSoulPoints or 0
         local shards = playerRunFrame.currentSoulShards or 0
         GameTooltip:AddLine(" ")
-        GameTooltip:AddDoubleLine("If you offer now",
+        GameTooltip:AddDoubleLine(L["If you offer now"],
             "|TInterface\\Icons\\inv_soulash:12:12:0:0|t " .. ProjectEbonhold.FormatThousands(math.floor(ashes * mult + 0.5)) ..
             "  |TInterface\\Icons\\inv_10_jewelcrafting3_soulcage_frost:12:12:0:0|t " .. ProjectEbonhold.FormatThousands(math.floor(shards * mult + 0.5)),
             1, 0.82, 0, 1, 1, 1)
         local ct = ProjectEbonhold.Contracts
         if ct and ct.Lines then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Your contracts", 0.66, 0.86, 1)
+            GameTooltip:AddLine(L["Your contracts"], 0.66, 0.86, 1)
             addLines(ct.Lines())
             if ct.received then
-                GameTooltip:AddDoubleLine("Offerings left this week", math.max(0, (ct.max or 0) - (ct.used or 0)) .. " / " .. (ct.max or 0), 0.8, 0.8, 0.8, 1, 1, 1)
+                GameTooltip:AddDoubleLine(L["Offerings left this week"], math.max(0, (ct.max or 0) - (ct.used or 0)) .. " / " .. (ct.max or 0), 0.8, 0.8, 0.8, 1, 1, 1)
             end
         end
         GameTooltip:AddLine(" ")
@@ -952,7 +954,7 @@ local function CreateEmpowermentFrame()
 
     local title = titleFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("CENTER", titleFrame, "CENTER", 5, 5)
-    title:SetText("Echoes")
+    title:SetText(L["Echoes"])
     empowermentFrame.title = title
     -- Exposed so the Orb of Lost Memories counter can sit in this bar, level with the echoes it
     -- acts on, mirroring the browser button on the other side.
@@ -971,8 +973,8 @@ local function CreateEmpowermentFrame()
     browserButton:SetScript("OnEnter", function(self)
         browserIcon:SetVertexColor(1.2, 1.2, 1.2)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Echo Journal", 1, 1, 1)
-        GameTooltip:AddLine("Your run, your collection and all existing echoes", nil, nil, nil, true)
+        GameTooltip:SetText(L["Echo Journal"], 1, 1, 1)
+        GameTooltip:AddLine(L["Your run, your collection and all existing echoes"], nil, nil, nil, true)
         GameTooltip:Show()
     end)
     browserButton:SetScript("OnLeave", function(self)
@@ -1048,7 +1050,7 @@ local function CreateEmpowermentFrame()
     -- Placeholder text
     local searchPlaceholder = searchFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     searchPlaceholder:SetPoint("LEFT", searchFrame, "LEFT", 6, 0)
-    searchPlaceholder:SetText("Search echoes...")
+    searchPlaceholder:SetText(L["Search echoes..."])
     searchPlaceholder:SetTextColor(0.4, 0.4, 0.4)
     empowermentFrame.searchPlaceholder = searchPlaceholder
 
@@ -1142,7 +1144,7 @@ local function ShowPerkSelectorForLocking(perksData, slotIndex)
     end
 
     if #availablePerks == 0 then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffFF0000You don't have any echoes to lock!|r")
+        DEFAULT_CHAT_FRAME:AddMessage(L["|cffFF0000You don't have any echoes to lock!|r"])
         return
     end
 
@@ -1197,7 +1199,7 @@ local function ShowPerkSelectorForLocking(perksData, slotIndex)
 
     selectorFrame.title = selectorFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     selectorFrame.title:SetPoint("TOP", selectorFrame, "TOP", 0, -20)
-    selectorFrame.title:SetText("Select Echo to Make Permanent")
+    selectorFrame.title:SetText(L["Select Echo to Make Permanent"])
 
     local closeButton = CreateFrame("Button", nil, selectorFrame, "UIPanelCloseButton")
     closeButton:SetPoint("TOPRIGHT", selectorFrame, "TOPRIGHT", -5, -5)
@@ -1205,6 +1207,7 @@ local function ShowPerkSelectorForLocking(perksData, slotIndex)
 
     local uniqueName = "PerkSelectorScrollFrame" .. math.random(1, 999999)
     local scrollFrame = CreateFrame("ScrollFrame", uniqueName, selectorFrame, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scrollFrame)  -- DragonUI's scroll bar (utils.lua)
     scrollFrame:SetPoint("TOPLEFT", selectorFrame, "TOPLEFT", 10, -45)
     scrollFrame:SetPoint("BOTTOMRIGHT", selectorFrame, "BOTTOMRIGHT", -30, 10)
 
@@ -1523,7 +1526,7 @@ local function UpdateEmpowermentDisplay(perksData)
     end
 
     if empowermentFrame.title then
-        empowermentFrame.title:SetText("Echoes")
+        empowermentFrame.title:SetText(L["Echoes"])
     end
 
     empowermentFrame.gridContainer:Show()
@@ -1668,7 +1671,7 @@ local function UpdateEmpowermentDisplay(perksData)
                     local qData = qualityInfo[self.lockedPerkData.quality or 0] or qualityInfo[0]
                     local spellName = GetSpellInfo(self.lockedPerkId)
                     GameTooltip:ClearLines()
-                    GameTooltip:AddLine(spellName or ("Spell " .. self.lockedPerkId), qData.color[1], qData.color[2],
+                    GameTooltip:AddLine(spellName or (T("Spell {lockedPerkId}", { lockedPerkId = self.lockedPerkId })), qData.color[1], qData.color[2],
                         qData.color[3])
                     GameTooltip:AddLine(qData.name, 0.5, 0.5, 0.5)
                     local lockedPerkDb = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[self.lockedPerkId]
@@ -1687,18 +1690,19 @@ local function UpdateEmpowermentDisplay(perksData)
                     local cc = self._countCommon or 0
                     if cl > 0 or ce > 0 or cr > 0 or cu > 0 or cc > 0 then
                         GameTooltip:AddLine(" ")
-                        if cl > 0 then GameTooltip:AddLine("Legendary: " .. cl, 1.0, 0.5, 0.0) end
-                        if ce > 0 then GameTooltip:AddLine("Epic: " .. ce, 0.6, 0.2, 1.0) end
-                        if cr > 0 then GameTooltip:AddLine("Rare: " .. cr, 0.0, 0.4, 1.0) end
-                        if cu > 0 then GameTooltip:AddLine("Uncommon: " .. cu, 0.1, 1.0, 0.1) end
-                        if cc > 0 then GameTooltip:AddLine("Common: " .. cc, 1, 1, 1) end
+                        if cl > 0 then GameTooltip:AddLine(T("Legendary: {cl}", { cl = cl }), 1.0, 0.5, 0.0) end
+                        if ce > 0 then GameTooltip:AddLine(T("Epic: {ce}", { ce = ce }), 0.6, 0.2, 1.0) end
+                        if cr > 0 then GameTooltip:AddLine(T("Rare: {cr}", { cr = cr }), 0.0, 0.4, 1.0) end
+                        if cu > 0 then GameTooltip:AddLine(T("Uncommon: {cu}", { cu = cu }), 0.1, 1.0, 0.1) end
+                        if cc > 0 then GameTooltip:AddLine(T("Common: {cc}", { cc = cc }), 1, 1, 1) end
                     end
                     GameTooltip:AddLine(" ")
-                    GameTooltip:AddLine("|cffFFD700Right-click to unlock|r", 1, 1, 0.5, true)
+                    GameTooltip:AddLine(L["|cffFFD700Right-click to unlock|r"], 1, 1, 0.5, true)
+                    utils.AddShiftHint(GameTooltip, self.lockedPerkId)
                 else
-                    GameTooltip:SetText("Permanent Echo Slot", 1, 0.82, 0)
+                    GameTooltip:SetText(L["Permanent Echo Slot"], 1, 0.82, 0)
                     GameTooltip:AddLine(
-                    "Click to select an Echo to carry into your next run at maximum of stack 1. This echo is in addition to all the Echoes you'll unlock during that run.",
+                    L["Click to select an Echo to carry into your next run at maximum of stack 1. This echo is in addition to all the Echoes you'll unlock during that run."],
                         1, 1, 1, true)
                 end
                 GameTooltip:Show()
@@ -1709,7 +1713,7 @@ local function UpdateEmpowermentDisplay(perksData)
                     local link = GetSpellLink(self.lockedPerkId)
                     if not link then
                         local name = GetSpellInfo(self.lockedPerkId)
-                        if name then link = ("|cff71d5ff|Hspell:%d|h[%s]|h|r"):format(self.lockedPerkId, name) end
+                        if name then link = (L["|cff71d5ff|Hspell:%d|h[%s]|h|r"]):format(self.lockedPerkId, name) end
                     end
                     if link then
                         if not ChatEdit_GetActiveWindow() then ChatEdit_ActivateChat(ChatEdit_ChooseBoxForSend()) end
@@ -1719,9 +1723,9 @@ local function UpdateEmpowermentDisplay(perksData)
                 end
                 if button == "RightButton" and not IsShiftKeyDown() and self.lockedPerkId then
                     StaticPopupDialogs["UNLOCK_PERK_CONFIRM"] = {
-                        text = "Unlock this echo from the permanent slot?",
-                        button1 = "Yes",
-                        button2 = "No",
+                        text = L["Unlock this echo from the permanent slot?"],
+                        button1 = YES,
+                        button2 = NO,
                         OnAccept = function()
                             if ProjectEbonhold.PerkService.UnlockPerk(self.lockedPerkId) then
                                 C_Timer.After(0.5, function()
@@ -1855,7 +1859,7 @@ local function UpdateEmpowermentDisplay(perksData)
                 local link = GetSpellLink(sid)
                 if not link then
                     local name = GetSpellInfo(sid)
-                    if name then link = ("|cff71d5ff|Hspell:%d|h[%s]|h|r"):format(sid, name) end
+                    if name then link = (L["|cff71d5ff|Hspell:%d|h[%s]|h|r"]):format(sid, name) end
                 end
                 if link then
                     if not ChatEdit_GetActiveWindow() then ChatEdit_ActivateChat(ChatEdit_ChooseBoxForSend()) end
@@ -1875,7 +1879,7 @@ local function UpdateEmpowermentDisplay(perksData)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:ClearLines()
             local qData = qualityInfo[pd.quality] or qualityInfo[0]
-            GameTooltip:AddLine(pd.spellName or ("Spell " .. pd.spellId), qData.color[1], qData.color[2], qData.color[3])
+            GameTooltip:AddLine(pd.spellName or (T("Spell {spellId}", { spellId = pd.spellId })), qData.color[1], qData.color[2], qData.color[3])
             GameTooltip:AddLine(qData.name, 0.5, 0.5, 0.5)
             local perkDb = ProjectEbonhold.PerkDatabase and ProjectEbonhold.PerkDatabase[pd.spellId]
             local familyLine = perkDb and utils.FormatPerkFamilies(perkDb.families)
@@ -1904,26 +1908,27 @@ local function UpdateEmpowermentDisplay(perksData)
             if cl > 0 or ce > 0 or cr > 0 or cu > 0 or cc > 0 then
                 GameTooltip:AddLine(" ")
                 if cl > 0 then
-                    GameTooltip:AddLine("Legendary: " .. cl, 1.0, 0.5, 0.0)
+                    GameTooltip:AddLine(T("Legendary: {cl}", { cl = cl }), 1.0, 0.5, 0.0)
                 end
                 if ce > 0 then
-                    GameTooltip:AddLine("Epic: " .. ce, 0.6, 0.2, 1.0)
+                    GameTooltip:AddLine(T("Epic: {ce}", { ce = ce }), 0.6, 0.2, 1.0)
                 end
                 if cr > 0 then
-                    GameTooltip:AddLine("Rare: " .. cr, 0.0, 0.4, 1.0)
+                    GameTooltip:AddLine(T("Rare: {cr}", { cr = cr }), 0.0, 0.4, 1.0)
                 end
                 if cu > 0 then
-                    GameTooltip:AddLine("Uncommon: " .. cu, 0.1, 1.0, 0.1)
+                    GameTooltip:AddLine(T("Uncommon: {cu}", { cu = cu }), 0.1, 1.0, 0.1)
                 end
                 if cc > 0 then
-                    GameTooltip:AddLine("Common: " .. cc, 1, 1, 1)
+                    GameTooltip:AddLine(T("Common: {cc}", { cc = cc }), 1, 1, 1)
                 end
             end
             if utils.IsDevRealm() then
                 GameTooltip:AddLine(" ")
-                GameTooltip:AddLine("|cffFF6600[DEV] Left-click to add stack|r", 1, 1, 1, true)
-                GameTooltip:AddLine("|cffFF6600[DEV] Right-click to remove stack|r", 1, 1, 1, true)
+                GameTooltip:AddLine(L["|cffFF6600[DEV] Left-click to add stack|r"], 1, 1, 1, true)
+                GameTooltip:AddLine(L["|cffFF6600[DEV] Right-click to remove stack|r"], 1, 1, 1, true)
             end
+            utils.AddShiftHint(GameTooltip, pd.instances[1] and pd.instances[1].spellId or pd.spellId)
             GameTooltip:Show()
         end)
         iconFrame:SetScript("OnLeave", function(self) GameTooltip:Hide() end)
@@ -1960,13 +1965,13 @@ local function RefreshHardmodeTierText()
     if not (svc and svc.GetCurrentDifficulty) then return end
     local diff = svc.GetCurrentDifficulty()
     local dungeonTier = svc.GetInstanceDifficulty and svc.GetInstanceDifficulty()
-    local function Name(t) return t > 1 and ("Torment " .. (t - 1)) or "Normal" end
+    local function Name(t) return t > 1 and (T("Torment {t}", { t = (t - 1) })) or L["Normal"] end
     if dungeonTier then
-        playerRunFrame.hardmodeTierText:SetText("|cffFF4444" .. Name(dungeonTier) .. "|r |cffAAAAAA(yours: " .. Name(diff) .. ")|r")
+        playerRunFrame.hardmodeTierText:SetText(T("|cffFF4444{dungeonTier}|r |cffAAAAAA(yours: {diff})|r", { dungeonTier = Name(dungeonTier), diff = Name(diff) }))
     elseif diff <= 1 then
-        playerRunFrame.hardmodeTierText:SetText("|cffAAAAAANormal|r")
+        playerRunFrame.hardmodeTierText:SetText(L["|cffAAAAAANormal|r"])
     else
-        playerRunFrame.hardmodeTierText:SetText("|cffFF4444Torment " .. (diff - 1) .. "|r")
+        playerRunFrame.hardmodeTierText:SetText(T("|cffFF4444Torment {diff}|r", { diff = (diff - 1) }))
     end
 end
 
@@ -2211,20 +2216,16 @@ local hudTips = {
     {
         when = function() return true end,
         tour = HudTip("seenHudTipRun", {
-            title = "Your run",
-            text = "This frame follows your run: one life, from level 1 until you " ..
-                "|cffff4040accept death|r. What you earn here is not safe yet. It reaches " ..
-                "your account, and your |cffffd700Skill Tree|r, when you make an offering at a " ..
-                "Spirit Healer or when the run ends.",
+            title = L["Your run"],
+            text = L["This frame follows your run: one life, from level 1 until you |cffff4040accept death|r. What you earn here is not safe yet. It reaches your account, and your |cffffd700Skill Tree|r, when you make an offering at a Spirit Healer or when the run ends."],
             zone = function() return playerRunFrame end,
         }),
     },
     {
         when = function() return (playerRunFrame.currentSoulPoints or 0) > 0 end,
         tour = HudTip("seenHudTipAshes", {
-            title = "Soul Ashes",
-            text = "Earned from every kill that gives experience. Hover the counter to see your " ..
-                "multiplier: |cffffd700achievements|r and |cffffd700Prestige|r raise it for good.",
+            title = L["Soul Ashes"],
+            text = L["Earned from every kill that gives experience. Hover the counter to see your multiplier: |cffffd700achievements|r and |cffffd700Prestige|r raise it for good."],
             zone = function()
                 return playerRunFrame.soulAshIcon, playerRunFrame.soulPointsText
             end,
@@ -2234,14 +2235,11 @@ local hudTips = {
         -- the first gain, not a run that already holds some when the HUD loads
         when = function() return playerRunFrame.gainedSoulShards end,
         tour = HudTip("seenHudTipShards", {
-            title = "Soul Shards",
+            title = L["Soul Shards"],
             -- server sources: ContentCatalogueMgr::PayClear (the clear: every boss dead, via
-            -- InstanceClear), TormentChampionMgr (champions, Torment only), CallboardMgr
+            -- InstanceClear), TormentChampionMgr (Champion's Standards held, Torment only), CallboardMgr
             -- (contract rewards). Same facts as constants.lua tooltips.soulShards.
-            text = "Paid when |cffffd700every boss|r of a dungeon or raid is dead, by dungeon " ..
-                "|cffffd700champions|r in Torment, and by some Hero's Call Board contracts. " ..
-                "Like your Soul Ashes, they stay in the run until you make an offering or " ..
-                "the run ends.",
+            text = L["Paid when |cffffd700every boss|r of a dungeon or raid is dead, by |cffffd700Champion's Standards|r held in Torment, and by some Hero's Call Board contracts. Like your Soul Ashes, they stay in the run until you make an offering or the run ends."],
             zone = function()
                 return playerRunFrame.soulShardIcon, playerRunFrame.soulShardsText
             end,
@@ -2253,11 +2251,8 @@ local hudTips = {
             return diedThisSession or (d and (d.paidRezsUsed or 0) > 0)
         end,
         tour = HudTip("seenHudTipDeath", {
-            title = "Death and resurrection",
-            text = "You can come back by paying part of your run: the first resurrection costs " ..
-                "|cffffd70025%|r of its Soul Ashes and Shards, |cffff4040each next one 25% more|r. " ..
-                "Another player can also resurrect you, once per run. The number is how many " ..
-                "you paid this run. |cffff4040Accepting death|r ends the run.",
+            title = L["Death and resurrection"],
+            text = L["You can come back by paying part of your run: the first resurrection costs |cffffd70025%|r of its Soul Ashes and Shards, |cffff4040each next one 25% more|r. Another player can also resurrect you, once per run. The number is how many you paid this run. |cffff4040Accepting death|r ends the run."],
             zone = function() return playerRunFrame.hearthIcon, playerRunFrame.freeRezText end,
         }),
     },
@@ -2269,12 +2264,8 @@ local hudTips = {
             return ct and ct.list and #ct.list > 0 and UnitLevel("player") >= 3
         end,
         tour = HudTip("seenHudTipContracts", {
-            title = "Spirit Healer, contracts and offering",
-            text = "Every Spirit Healer offers |cffffd700Death contracts|r: kill 50 creatures in " ..
-                "a zone, or every boss of a dungeon or a raid. Each one you fulfil raises this " ..
-                "bar. Then make an |cffffd700offering|r at any Spirit Healer: your run's Soul " ..
-                "Ashes and Shards go to your account multiplied by |cffffd700(1 + bonus)|r. The " ..
-                "bonus then starts over and your run goes on. Five offerings a week.",
+            title = L["Spirit Healer, contracts and offering"],
+            text = L["Every Spirit Healer offers |cffffd700Death contracts|r: kill 50 creatures in a zone, or every boss of a dungeon or a raid. Each one you fulfil raises this bar. Then make an |cffffd700offering|r at any Spirit Healer: your run's Soul Ashes and Shards go to your account multiplied by |cffffd700(1 + bonus)|r. The bonus then starts over and your run goes on. Five offerings a week."],
             -- the track, not gaugeFill: the fill is 1 px wide while the bonus is 0
             zone = function() return playerRunFrame.gaugeTrack end,
         }),
@@ -2292,12 +2283,8 @@ local hudTips = {
             return rp and (rp.gauge or 0) > 0
         end,
         tour = HudTip("seenHudTipGaze", {
-            title = "The Reaper's Gaze",
-            text = "This bar is your |cffffd700contract bonus|r, up to +400%. It only rises when " ..
-                "you fulfil a |cffffd700Death contract|r: 50 creatures in a zone (+10%), every " ..
-                "boss of a dungeon (+25%) or a raid (+125%). Dying loses the contracts in " ..
-                "progress, never the bonus. |cffff4040Accepting death|r banks your ashes without " ..
-                "the bonus, and the bonus is gone. Hover the bar any time to see all of this again.",
+            title = L["The Reaper's Gaze"],
+            text = L["This bar is your |cffffd700contract bonus|r, up to +400%. It only rises when you fulfil a |cffffd700Death contract|r: 50 creatures in a zone (+10%), every boss of a dungeon (+25%) or a raid (+125%). Dying loses the contracts in progress, never the bonus. |cffff4040Accepting death|r banks your ashes without the bonus, and the bonus is gone. Hover the bar any time to see all of this again."],
             zone = function() return playerRunFrame.bracketFrame end,
         }),
     },
@@ -2310,10 +2297,8 @@ local hudTips = {
                 or (svc and svc.GetCurrentDifficulty and (svc.GetCurrentDifficulty() or 1) > 1)
         end,
         tour = HudTip("seenHudTipTorment", {
-            title = "Torment",
-            text = "Torment is open to you. This is your difficulty: click it to open the " ..
-                "Torment panel. A higher Torment makes monsters stronger and rewards better, " ..
-                "and the Spirit Healer offers its Death contracts at your Torment.",
+            title = L["Torment"],
+            text = L["Torment is open to you. This is your difficulty: click it to open the Torment panel. A higher Torment makes monsters stronger and rewards better, and the Spirit Healer offers its Death contracts at your Torment."],
             zone = function() return playerRunFrame.hardmodeButton end,
         }),
     },

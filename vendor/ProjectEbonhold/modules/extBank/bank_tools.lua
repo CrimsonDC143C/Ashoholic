@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- bank_tools.lua — search box and Sort on the personal bank (the stock BankFrame),
@@ -8,7 +9,8 @@ local addonName, addon = ...
 -- Sort: the server has no bank sort, so items move one at a time with
 -- PickupContainerItem, waiting for the server to unlock both slots before the
 -- next move. The next move is planned again from the real contents each time:
--- a drop onto the same item merges the stacks instead of swapping them.
+-- partial stacks of one item are merged first (a drop onto the same item
+-- merges the stacks instead of swapping them), then the items are ordered.
 -- Same order as the Extended Bank sort (ExtBank.SortKey, from extBank.lua).
 -- Bagnon replaces the BankFrame and has its own search: nothing is added there.
 
@@ -107,7 +109,7 @@ local function Refresh()
     end
 
     if searchText == "" then status:SetText("")
-    elseif hits == 0 then status:SetText("|cffff5555none|r")
+    elseif hits == 0 then status:SetText(L["|cffff5555none|r"])
     else status:SetText(("|cffffd100%d|r"):format(hits)) end
 
     local used, total = 0, 0
@@ -116,7 +118,7 @@ local function Refresh()
         total = total + n
         used = used + n - (GetContainerNumFreeSlots(bag) or 0)
     end
-    usage:SetText(("|cffa8a8a8Slots used:|r |cffffd100%d|r / %d"):format(used, total))
+    usage:SetText((L["|cffa8a8a8Slots used:|r |cffffd100%d|r / %d"]):format(used, total))
 end
 
 -- -------------------------------------------------------------------- sort ----
@@ -144,7 +146,25 @@ end
 
 -- The first move toward the sorted order (source, destination), or nil when sorted.
 local function NextMove()
-    for _, g in ipairs(Groups()) do
+    local groups = Groups()
+    -- Partial stacks of one item first: the later one is dropped onto the first,
+    -- which fills it and leaves the rest behind.
+    for _, g in ipairs(groups) do
+        local open = {}
+        for _, p in ipairs(g) do
+            local link = GetContainerItemLink(p.bag, p.slot)
+            if link then
+                local id = tonumber(link:match("item:(%d+)"))
+                local _, count = GetContainerItemInfo(p.bag, p.slot)
+                local cap = id and select(8, GetItemInfo(id))
+                if cap and cap > 1 and count and count < cap then
+                    if open[id] then return p, open[id] end
+                    open[id] = p
+                end
+            end
+        end
+    end
+    for _, g in ipairs(groups) do
         local keys, sorted = {}, {}
         for i, p in ipairs(g) do
             local link = GetContainerItemLink(p.bag, p.slot)
@@ -171,13 +191,13 @@ end
 local function StopSort(msg)
     sorting.running, sorting.src, sorting.dst = false, nil, nil
     runner:Hide()
-    if sortBtn then sortBtn:SetText("Sort"); sortBtn:Enable() end
+    if sortBtn then sortBtn:SetText(L["Sort"]); sortBtn:Enable() end
     if msg then UIErrorsFrame:AddMessage(msg, 1.0, 0.1, 0.1, 1.0) end   -- red, like the client's own errors
 end
 
 local function Step()
-    if CursorHasItem() then StopSort("Put down the item on your cursor first."); return end
-    if sorting.moves >= MAX_MOVES then StopSort("Some items could not be sorted."); return end
+    if CursorHasItem() then StopSort(L["Put down the item on your cursor first."]); return end
+    if sorting.moves >= MAX_MOVES then StopSort(L["Some items could not be sorted."]); return end
     local src, dst = NextMove()
     if not src then StopSort(); return end
     sorting.moves = sorting.moves + 1
@@ -185,7 +205,7 @@ local function Step()
     PickupContainerItem(dst.bag, dst.slot)
     if CursorHasItem() then   -- the drop was refused (bag type)
         ClearCursor()
-        StopSort("Some items could not be sorted.")
+        StopSort(L["Some items could not be sorted."])
         return
     end
     sorting.src, sorting.dst, sorting.wait = src, dst, 0
@@ -198,7 +218,7 @@ runner:SetScript("OnUpdate", function(self, elapsed)
         local _, _, lockedA = GetContainerItemInfo(sorting.src.bag, sorting.src.slot)
         local _, _, lockedB = GetContainerItemInfo(sorting.dst.bag, sorting.dst.slot)
         if lockedA or lockedB then
-            if sorting.wait > 3 then StopSort("Some items could not be sorted.") end
+            if sorting.wait > 3 then StopSort(L["Some items could not be sorted."]) end
             return
         end
     end
@@ -210,7 +230,7 @@ local function StartSort()
     if sorting.running or not BankFrame:IsShown() then return end
     if CursorHasItem() then return end
     sorting.running, sorting.moves, sorting.src, sorting.wait = true, 0, nil, 0
-    sortBtn:SetText("Sorting..."); sortBtn:Disable()
+    sortBtn:SetText(L["Sorting..."]); sortBtn:Disable()
     runner:Show()
 end
 
@@ -223,7 +243,7 @@ local function Build()
     box:SetPoint("TOPLEFT", BankFrame, "TOPLEFT", 80, -44)
     box:SetAutoFocus(false)
     box:SetMaxLetters(50)
-    box.Instructions:SetText("Search")
+    box.Instructions:SetText(SEARCH)
     status = BankFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     status:SetPoint("LEFT", box, "RIGHT", 6, 0)
 
@@ -249,12 +269,12 @@ local function Build()
     sortBtn = CreateFrame("Button", "ExtBankBankSortButton", BankFrame, "UIPanelButtonTemplate")
     sortBtn:SetWidth(64); sortBtn:SetHeight(22)
     sortBtn:SetPoint("TOPLEFT", BankFrame, "TOPLEFT", 288, -43)
-    sortBtn:SetText("Sort")
+    sortBtn:SetText(L["Sort"])
     sortBtn:SetScript("OnClick", StartSort)
     sortBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Sort")
-        GameTooltip:AddLine("Orders the bank and its bags by type, quality and name, one item at a time.", 0.8, 0.8, 0.8, true)
+        GameTooltip:SetText(L["Sort"])
+        GameTooltip:AddLine(L["Orders the bank and its bags by type, quality and name, one item at a time."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     sortBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)

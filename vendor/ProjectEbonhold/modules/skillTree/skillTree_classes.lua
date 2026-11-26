@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 -- ProjectEbonhold - the class constellations of the skill tree.
 --
 -- Ten small trees (90 nodes each, one per class) orbit the common tree. They do NOT
@@ -73,16 +74,6 @@ CT.pending = {}
 
 function CT.HasPending() return next(CT.pending) ~= nil end
 
--- Apply sends one message per pending node plus the whole loadout (about 32 messages for a full
--- common tree) in a single frame, and the server kicks past 50 (CheckAndKickSpam).
-local MAX_PENDING = 15
-
-local function pendingCount()
-    local n = 0
-    for _ in pairs(CT.pending) do n = n + 1 end
-    return n
-end
-
 -- Owned, or selected for the next Apply: everything (chain, level gate, visuals) reads this.
 function CT.Has(nodeId) return (CT.owned[nodeId] or CT.pending[nodeId]) and true or false end
 
@@ -108,7 +99,8 @@ end
 
 function CT.ClassName(classId)
     local hub = TalentDatabase and TalentDatabase[0] and TalentDatabase[0].classHubs and TalentDatabase[0].classHubs[classId]
-    return hub and hub.name or ("Class " .. tostring(classId))
+    -- display only: every caller shows the result (tooltips, labels, the level-up bubble), none compares it
+    return hub and hub.name and L[hub.name] or (T("Class {classId}", { classId = tostring(classId) }))
 end
 
 local function classColor(classId)
@@ -147,25 +139,25 @@ function CT.AddTooltipLines(tooltip, btn, ashPool)
     local level, owned = CT.Level(classId), CT.OwnedCount(classId)
     local r, g, b = classColor(classId)
     tooltip:AddLine(" ")
-    tooltip:AddLine(CT.ClassName(classId) .. " constellation", r, g, b)
+    tooltip:AddLine(T("{classId} constellation", { classId = CT.ClassName(classId) }), r, g, b)
     if CT.owned[btn.id] then
-        tooltip:AddLine("Owned - permanent, active on every character of your account.", 0.6, 0.85, 0.6, true)
+        tooltip:AddLine(L["Owned - permanent, active on every character of your account."], 0.6, 0.85, 0.6, true)
     elseif CT.pending[btn.id] then
-        tooltip:AddLine("Selected - bought when you Apply your changes.", 0.6, 0.85, 0.6, true)
-        tooltip:AddLine("|cffFFFF00Right-click to take it back|r", 1, 1, 1, true)
+        tooltip:AddLine(L["Selected - bought when you Apply your changes."], 0.6, 0.85, 0.6, true)
+        tooltip:AddLine(L["|cffFFFF00Right-click to take it back|r"], 1, 1, 1, true)
     else
         local cost = nodeCost(btn)
         local levelOk = owned < level
-        tooltip:AddDoubleLine("Class level " .. level .. " - nodes owned " .. owned .. "/" .. level,
-            levelOk and "slot available" or "next slot at level " .. (owned + 1),
+        tooltip:AddDoubleLine(T("Class level {level} - nodes owned {owned}/{level2}", { level = level, owned = owned, level2 = level }),
+            levelOk and L["slot available"] or T("next slot at level {owned}", { owned = (owned + 1) }),
             1, 1, 1, levelOk and 0.1 or 1, levelOk and 1 or 0.3, levelOk and 0.1 or 0.3)
         local afford = (ashPool or 0) >= cost
-        tooltip:AddLine("Cost: " .. FormatThousands(cost) .. " Soul Ashes", afford and 0.1 or 1, afford and 1 or 0.3, afford and 0.1 or 0.3)
-        tooltip:AddLine("Bought for good: the ashes leave your pool on Apply, the node stays through prestige and applies to every character of your account.", 0.8, 0.8, 0.8, true)
+        tooltip:AddLine(T("Cost: {cost} Soul Ashes", { cost = FormatThousands(cost) }), afford and 0.1 or 1, afford and 1 or 0.3, afford and 0.1 or 0.3)
+        tooltip:AddLine(L["Bought for good: the ashes leave your pool on Apply, the node stays through prestige and applies to every character of your account."], 0.8, 0.8, 0.8, true)
         if btn.state == "ready" then
-            tooltip:AddLine("|cff00FF00Left-click to select, then Apply|r", 1, 1, 1, true)
+            tooltip:AddLine(L["|cff00FF00Left-click to select, then Apply|r"], 1, 1, 1, true)
         elseif btn.state == "locked" then
-            tooltip:AddLine("|cffFF6060Take the previous node of this series first|r", 1, 1, 1, true)
+            tooltip:AddLine(L["|cffFF6060Take the previous node of this series first|r"], 1, 1, 1, true)
         end
     end
 end
@@ -201,10 +193,6 @@ function CT.OnClick(btn, button)
 
     if button ~= "LeftButton" then return end
     if btn.state ~= "ready" or CT.Has(btn.id) then return end
-    if pendingCount() >= MAX_PENDING then
-        UIErrorsFrame:AddMessage("Apply your changes before selecting more class nodes.", 1, 0.3, 0.3)
-        return
-    end
 
     CT.pending[btn.id] = true
     ST.PoolAdd("ash", -nodeCost(btn))
@@ -242,8 +230,10 @@ function CT.FlushPending()
         end
     end
 
-    for _, id in ipairs(order) do
-        ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_CLASS_NODE_BUY, tostring(id))
+    -- One message for the whole selection ("id,id,..."): the server buys them in this order.
+    -- One message per node, on top of the loadout pieces, tripped the anti-spam kick.
+    if #order > 0 then
+        ProjectEbonhold.sendToServer(ProjectEbonhold.CS.REQUEST_CLASS_NODE_BUY, table.concat(order, ","))
     end
     return #order
 end
@@ -272,14 +262,14 @@ local function hubTooltip(self)
     local r, g, b = classColor(classId)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:AddLine(CT.ClassName(classId), r, g, b)
-    GameTooltip:AddDoubleLine("Class level", level .. " / " .. CT.MAX_LEVEL, 1, 1, 1, 1, 1, 1)
-    GameTooltip:AddDoubleLine("Nodes owned", CT.OwnedCount(classId) .. " / " .. CT.NODES_PER_CLASS, 1, 1, 1, 1, 1, 1)
-    GameTooltip:AddDoubleLine("Soul Ashes earned", FormatThousands(ashes), 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Class level"], level .. " / " .. CT.MAX_LEVEL, 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Nodes owned"], CT.OwnedCount(classId) .. " / " .. CT.NODES_PER_CLASS, 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Soul Ashes earned"], FormatThousands(ashes), 1, 1, 1, 1, 1, 1)
     if level < CT.MAX_LEVEL then
-        GameTooltip:AddDoubleLine("Next level at", FormatThousands(CT.AshesForLevel(level + 1)), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Next level at"], FormatThousands(CT.AshesForLevel(level + 1)), 1, 1, 1, 1, 1, 1)
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Every Soul Ash you earn while playing a " .. CT.ClassName(classId) .. " raises this bar. Each class level lets you own one more node of this constellation, bought for good with Soul Ashes.", 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(T("Every Soul Ash you earn while playing a {classId} raises this bar. Each class level lets you own one more node of this constellation, bought for good with Soul Ashes.", { classId = CT.ClassName(classId) }), 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
 
@@ -347,7 +337,7 @@ function CT.CreateHubs(canvas, toCanvas)
             name:SetPoint("BOTTOM", f, "TOP", 0, 6)
             name:SetJustifyH("CENTER")
             name:SetWidth(HUB_SIZE * 2)
-            name:SetText(hub.name)
+            name:SetText(L[hub.name])   -- display only
             name:SetTextColor(r, g, b)
             f.name = name
 
@@ -421,7 +411,7 @@ function CT.RefreshHubs()
         local frac = 1
         if level < CT.MAX_LEVEL and hi > lo then frac = (ashes - lo) / (hi - lo) end
         f.bar:SetValue(frac)
-        f.bar.text:SetText(level >= CT.MAX_LEVEL and ("Level " .. level) or ("Level " .. level .. "  " .. math.floor(frac * 100) .. "%"))
+        f.bar.text:SetText(level >= CT.MAX_LEVEL and (T("Level {level}", { level = level })) or (T("Level {level}  {frac}%", { level = level, frac = math.floor(frac * 100) })))
         f.name:SetText(CT.ClassName(classId))
     end
 end
@@ -472,7 +462,7 @@ function CT.OnLevelUp(body)
     -- Shown in the yellow bubble over the Character Progression button, not in the chat:
     -- nobody reads a chat line.
     local name = CT.ClassName(classId)
-    local msg = string.format("|cffffd100%s - class level %d!|r\n\nYou can now own %d node%s in the %s constellation. Open Character Progression to choose one.",
+    local msg = string.format(L["|cffffd100%s - class level %d!|r\n\nYou can now own %d node%s in the %s constellation. Open Character Progression to choose one."],
         name, level, level, level > 1 and "s" or "", name)
     PlaySound("LEVELUP")
     if SkillTreeMicroButton_StartFlashing then SkillTreeMicroButton_StartFlashing() end
@@ -512,11 +502,11 @@ function CT.OnBuyResult(body)
             if ST and ST.MarkUnsavedChanges then ST.MarkUnsavedChanges() end
         end
         local reasons = {
-            invalid = "Unknown node.", notloaded = "Your class progress is not loaded yet, try again.",
-            owned = "You already own this node.", chain = "Buy the previous node of this series first.",
-            level = "Your class level does not allow another node yet.", ashes = "Not enough Soul Ashes.",
+            invalid = L["Unknown node."], notloaded = L["Your class progress is not loaded yet, try again."],
+            owned = L["You already own this node."], chain = L["Buy the previous node of this series first."],
+            level = L["Your class level does not allow another node yet."], ashes = L["Not enough Soul Ashes."],
         }
-        UIErrorsFrame:AddMessage(reasons[a] or ("Purchase refused (" .. tostring(a) .. ")."), 1, 0.3, 0.3)
+        UIErrorsFrame:AddMessage(reasons[a] or (T("Purchase refused ({a}).", { a = tostring(a) })), 1, 0.3, 0.3)
         refreshTree()
     end
 end

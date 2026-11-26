@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addon, Addon = ...
 LoadAddOn("Blizzard_TalentUI")
 CreateFrame("Button", "SkillTreeMicroButton", MainMenuBarArtFrame, "MainMenuBarMicroButton")
@@ -14,8 +15,8 @@ local function setupButton()
     SkillTreeMicroButton:SetPushedTexture([[Interface\AddOns\ProjectEbonhold\assets\ui-microbuttonstreamdl-down]])
     SkillTreeMicroButton:SetHighlightTexture([[Interface\Buttons\UI-MicroButton-Hilight]])
 
-    SkillTreeMicroButton.tooltipText = "Skill Tree"
-    SkillTreeMicroButton.newbieText = "Open your Skill Tree."
+    SkillTreeMicroButton.tooltipText = L["Skill Tree"]
+    SkillTreeMicroButton.newbieText = L["Open your Skill Tree."]
 
     -- Deliberately NOT shown: the unified Character Progression micro button
     -- (EchoJournalMicroButton) covers the Skill Tree tab now.
@@ -47,7 +48,20 @@ local function getCoreMicroButtons()
 end
 
 
+-- DragonUI's micro menu (DragonUI\modules\micromenu.lua, same order as getCoreMicroButtons) owns the
+-- bar when it is on: it parents the buttons to its own strip and turns their SetPoint into a no-op,
+-- so a ClearAllPoints here would leave them with no anchor at all.
+local function dragonUIOwnsMicroMenu()
+    local dui = _G.DragonUI
+    return dui and dui.IsModuleEnabled and dui.db and dui:IsModuleEnabled("micromenu") and true or false
+end
+
 local function positionButtons()
+    -- ElvUI's micro bar (ElvUI\Modules\ActionBars\MicroBar.lua) adopts our buttons and lays them out.
+    if dragonUIOwnsMicroMenu() or ElvUI then
+        if PVPMicroButton then PVPMicroButton:Hide() end
+        return
+    end
     if Dominos and Dominos.MenuBar then
         local buttons = getCoreMicroButtons()
 
@@ -204,7 +218,7 @@ if TalentMicroButton then
         if not PlayerTalentFrame then
             local loaded, reason = LoadAddOn("Blizzard_TalentUI")
             if not loaded and DEFAULT_CHAT_FRAME then
-                DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[ProjectEbonhold]|r Failed to load Blizzard_TalentUI: " .. tostring(reason))
+                DEFAULT_CHAT_FRAME:AddMessage(T("|cffff0000[ProjectEbonhold]|r Failed to load Blizzard_TalentUI: {reason}", { reason = tostring(reason) }))
             end
         end
         if PlayerTalentFrame then
@@ -221,12 +235,23 @@ if LFDMicroButton then
     LFDMicroButton:Enable()
     LFDMicroButton:SetScript("OnEvent", nil)
 
-    -- PVEFrame_ToggleFrame() / ToggleLFDParentFrame can early-return below level 15.
-    -- Replace the click handler so all dungeon finder tabs are accessible.
+    -- The stock ToggleLFDParentFrame() does nothing below SHOW_LFD_LEVEL (15): the button and
+    -- the key binding stayed dead there (2026-11-15). The window opens at any level; below 15 the
+    -- finder itself says when it opens (dungeon_finder.lua NoRandomReason). A post-hook toggles
+    -- the frame only where the stock function refused, so the original is never replaced.
+    if ToggleLFDParentFrame and LFDParentFrame then
+        hooksecurefunc("ToggleLFDParentFrame", function()
+            if (UnitLevel("player") or 0) >= (SHOW_LFD_LEVEL or 15) then return end
+            if LFDParentFrame:IsShown() then
+                HideUIPanel(LFDParentFrame)
+            else
+                ShowUIPanel(LFDParentFrame)
+            end
+        end)
+    end
+
     LFDMicroButton:SetScript("OnClick", function(self)
-        if PVEFrame_ToggleFrame then
-            PVEFrame_ToggleFrame("GroupFinderFrame")
-        elseif ToggleLFDParentFrame then
+        if ToggleLFDParentFrame then
             ToggleLFDParentFrame()
         end
     end)
@@ -314,7 +339,7 @@ if AchievementMicroButton then
                 ShowUIPanel(AchievementFrame)
             end
         elseif DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[ProjectEbonhold]|r Achievement UI failed to load.")
+            DEFAULT_CHAT_FRAME:AddMessage(L["|cffff0000[ProjectEbonhold]|r Achievement UI failed to load."])
         end
     end)
 end
@@ -410,7 +435,7 @@ SkillTreeMicroButton.Alert.Text:SetJustifyV("TOP")
 SkillTreeMicroButton.Alert.Text:SetSize(188, 0)
 SkillTreeMicroButton.Alert.Text:SetPoint("TOPLEFT", 16, -24)
 local DEFAULT_ALERT_TEXT =
-    "You have unspent Skill Points! Open your Skill Tree to empower yourself with new abilities."
+    L["You have unspent Skill Points! Open your Skill Tree to empower yourself with new abilities."]
 SkillTreeMicroButton.Alert.Text:SetText(DEFAULT_ALERT_TEXT)
 
 SkillTreeMicroButton.Alert.CloseButton = CreateFrame("Button", nil, SkillTreeMicroButton.Alert, "UIPanelCloseButton")

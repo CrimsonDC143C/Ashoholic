@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- Initialize module namespace
@@ -16,9 +17,9 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_INSTANCE_ENTERED, functi
     -- Display all bosses to kill in the dungeon
     local dungeonData = addon.INSTANCE_FOLLOWUP_DATA[dungeonId]
     if dungeonData then
-        print("|cff00ff00=== Bosses to Kill ===|r")
+        print(L["|cff00ff00=== Bosses to Kill ===|r"])
         for encounterEntry, bossName in pairs(dungeonData) do
-            print("  • " .. bossName)
+            print("  • " .. L[bossName])   -- display only
         end
         print("|cff00ff00=====================|r")
     end
@@ -56,21 +57,21 @@ ProjectEbonhold.onEventReceived(ProjectEbonhold.SS.SEND_INSTANCE_ENCOUNTERS_COMP
         
         -- Display completed bosses
         if #completedBosses > 0 then
-            print("|cff888888=== Bosses Killed ===|r")
+            print(L["|cff888888=== Bosses Killed ===|r"])
             for _, bossName in ipairs(completedBosses) do
-                print("  |cff888888• " .. bossName .. "|r")
+                print("  |cff888888• " .. L[bossName] .. "|r")   -- display only
             end
         end
         
         -- Display remaining bosses
         if #remainingBosses > 0 then
-            print("|cff00ff00=== Bosses Remaining ===|r")
+            print(L["|cff00ff00=== Bosses Remaining ===|r"])
             for _, bossName in ipairs(remainingBosses) do
-                print("  • " .. bossName)
+                print("  • " .. L[bossName])   -- display only
             end
             print("|cff00ff00========================|r")
         else
-            print("|cffffd700=== All Bosses Defeated! ===|r")
+            print(L["|cffffd700=== All Bosses Defeated! ===|r"])
         end
     end
 end)

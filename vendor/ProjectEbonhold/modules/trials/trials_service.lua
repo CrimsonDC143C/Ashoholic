@@ -38,8 +38,8 @@ Trials.PHASE = { NONE = 0, ENTERING = 1, PREP = 2, RUNNING = 3, RESULT = 4 }
 Trials.REASON = { TIME = 0, DEATH = 1, ABANDON = 2 }
 
 Trials.NAMES = {
-    [1] = "Trial of the Champion",
-    [3] = "Trial of the Crusader",
+    [1] = ProjectEbonhold.L["Trial of the Champion"],
+    [3] = ProjectEbonhold.L["Trial of the Crusader"],
 }
 
 -- Class ids as the server sends them (ChrClasses), their client tokens and English names.
@@ -49,8 +49,8 @@ Trials.CLASS_TOKEN = {
     [6] = "DEATHKNIGHT", [7] = "SHAMAN", [8] = "MAGE", [9] = "WARLOCK", [11] = "DRUID",
 }
 Trials.CLASS_NAME = {
-    [1] = "Warrior", [2] = "Paladin", [3] = "Hunter", [4] = "Rogue", [5] = "Priest",
-    [6] = "Death Knight", [7] = "Shaman", [8] = "Mage", [9] = "Warlock", [11] = "Druid",
+    [1] = ProjectEbonhold.L["Warrior"], [2] = ProjectEbonhold.L["Paladin"], [3] = ProjectEbonhold.L["Hunter"], [4] = ProjectEbonhold.L["Rogue"], [5] = ProjectEbonhold.L["Priest"],
+    [6] = ProjectEbonhold.L["Death Knight"], [7] = ProjectEbonhold.L["Shaman"], [8] = ProjectEbonhold.L["Mage"], [9] = ProjectEbonhold.L["Warlock"], [11] = ProjectEbonhold.L["Druid"],
 }
 
 Trials.enabled = true
@@ -152,7 +152,7 @@ end
 
 function Trials.FormatWaves(waves)
     waves = tonumber(waves) or 0
-    return waves == 1 and "1 wave" or (waves .. " waves")
+    return waves == 1 and ProjectEbonhold.L["1 wave"] or (ProjectEbonhold.T("{waves} waves", { waves = waves }))
 end
 
 -- Trial of the Crusader score -> waves cleared, run time in tenths of a second.

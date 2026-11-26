@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 
 ExtractionUI = ExtractionUI or {}
 
@@ -63,23 +64,27 @@ local SLOT_CATEGORIES = {
     INVTYPE_2HWEAPON       = { [CATEGORY_OFF] = true },
     INVTYPE_SHIELD         = { [CATEGORY_OFF] = true },
     INVTYPE_HOLDABLE       = { [CATEGORY_OFF] = true },
-    -- no ranged weapon (bow, gun, crossbow, thrown, wand) carries an affix (owner, 2026-11-02)
+    -- the ranged slot counts as a trinket (owner, 2026-11-11): bows, guns, crossbows, thrown,
+    -- wands and relics, every category, outside the two weapon affixes
+    INVTYPE_RANGED         = { [CATEGORY_OFF] = true, [CATEGORY_DEF] = true, [CATEGORY_RES] = true, [CATEGORY_UTI] = true, [CATEGORY_MOB] = true },
+    INVTYPE_RANGEDRIGHT    = { [CATEGORY_OFF] = true, [CATEGORY_DEF] = true, [CATEGORY_RES] = true, [CATEGORY_UTI] = true, [CATEGORY_MOB] = true },
+    INVTYPE_THROWN         = { [CATEGORY_OFF] = true, [CATEGORY_DEF] = true, [CATEGORY_RES] = true, [CATEGORY_UTI] = true, [CATEGORY_MOB] = true },
+    INVTYPE_RELIC          = { [CATEGORY_OFF] = true, [CATEGORY_DEF] = true, [CATEGORY_RES] = true, [CATEGORY_UTI] = true, [CATEGORY_MOB] = true },
 }
-local WAND_SUBTYPE = "Wands"
 
 -- Human labels for the slot list shown in the affix tooltip; every weapon-type
 -- equipLoc collapses into one "Weapons" entry so the line stays short.
 local SLOT_LABELS = {
-    INVTYPE_HEAD = "Head", INVTYPE_SHOULDER = "Shoulders", INVTYPE_CHEST = "Chest", INVTYPE_ROBE = "Chest",
-    INVTYPE_LEGS = "Legs", INVTYPE_HAND = "Hands", INVTYPE_TRINKET = "Trinkets", INVTYPE_FINGER = "Rings",
-    INVTYPE_NECK = "Neck", INVTYPE_CLOAK = "Back", INVTYPE_WRIST = "Wrists", INVTYPE_WAIST = "Waist",
-    INVTYPE_FEET = "Feet",
-    INVTYPE_WEAPON = "Weapons", INVTYPE_WEAPONMAINHAND = "Weapons", INVTYPE_WEAPONOFFHAND = "Weapons",
-    INVTYPE_2HWEAPON = "Weapons", INVTYPE_SHIELD = "Weapons", INVTYPE_HOLDABLE = "Weapons",
-    INVTYPE_RANGED = "Weapons", INVTYPE_RANGEDRIGHT = "Weapons", INVTYPE_THROWN = "Weapons",
+    INVTYPE_HEAD = L["Head"], INVTYPE_SHOULDER = L["Shoulders"], INVTYPE_CHEST = L["Chest"], INVTYPE_ROBE = L["Chest"],
+    INVTYPE_LEGS = L["Legs"], INVTYPE_HAND = L["Hands"], INVTYPE_TRINKET = L["Trinkets"], INVTYPE_FINGER = L["Rings"],
+    INVTYPE_NECK = L["Neck"], INVTYPE_CLOAK = L["Back"], INVTYPE_WRIST = L["Wrists"], INVTYPE_WAIST = L["Waist"],
+    INVTYPE_FEET = L["Feet"],
+    INVTYPE_WEAPON = L["Weapons"], INVTYPE_WEAPONMAINHAND = L["Weapons"], INVTYPE_WEAPONOFFHAND = L["Weapons"],
+    INVTYPE_2HWEAPON = L["Weapons"], INVTYPE_SHIELD = L["Weapons"], INVTYPE_HOLDABLE = L["Weapons"],
+    INVTYPE_RANGED = L["Ranged"], INVTYPE_RANGEDRIGHT = L["Ranged"], INVTYPE_THROWN = L["Ranged"], INVTYPE_RELIC = L["Ranged"],
 }
-local SLOT_LABEL_ORDER = { "Head", "Neck", "Shoulders", "Back", "Chest", "Wrists", "Hands", "Waist", "Legs", "Feet",
-                           "Rings", "Trinkets", "Weapons" }
+local SLOT_LABEL_ORDER = { L["Head"], L["Neck"], L["Shoulders"], L["Back"], L["Chest"], L["Wrists"], L["Hands"], L["Waist"], L["Legs"], L["Feet"],
+                           L["Rings"], L["Trinkets"], L["Ranged"], L["Weapons"] }
 
 -- category -> "Head, Chest, ..." built once from SLOT_CATEGORIES
 local CATEGORY_SLOT_TEXT = {}
@@ -99,7 +104,6 @@ local function GetItemAffixRules(link)
     if not link then return nil end
     local _, _, quality, _, _, _, subType, _, equipLoc = GetItemInfo(link)
     if not equipLoc or (quality or 0) <= 2 then return nil end
-    if subType == WAND_SUBTYPE then return nil end
     return SLOT_CATEGORIES[equipLoc]
 end
 
@@ -131,7 +135,7 @@ local CATEGORY_ICONS = {
 }
 
 local function CategoryName(cat)
-    return ExtractionService.CATEGORY_NAMES[cat] or "Other"
+    return ExtractionService.CATEGORY_NAMES[cat] or L["Other"]
 end
 
 local function CategoryText(cat)
@@ -149,12 +153,13 @@ end
 ------------------------------------------------------------
 
 StaticPopupDialogs["EBONHOLD_CONFIRM_LEGENDARY_UPGRADE"] = {
-    text = "Upgrade this item to %s?\n\nIt will consume %s. Enchantments, gems and its affix are kept.",
-    button1 = "Upgrade",
-    button2 = "Cancel",
+    text = L["Upgrade this item to %s?\n\nIt will consume %s. Enchantments, gems and its affix are kept."],
+    button1 = L["Upgrade"],
+    button2 = L["Cancel"],
     OnAccept = function()
         if ExtractionUI.pendingBag and ExtractionUI.pendingSlot then
-            ExtractionService.RequestLegendaryUpgrade(ExtractionUI.pendingBag, ExtractionUI.pendingSlot)
+            local up = ExtractionService.upgradeInfo
+            ExtractionService.RequestLegendaryUpgrade(ExtractionUI.pendingBag, ExtractionUI.pendingSlot, up and up.bracket)
         end
     end,
     timeout = 0,
@@ -164,9 +169,9 @@ StaticPopupDialogs["EBONHOLD_CONFIRM_LEGENDARY_UPGRADE"] = {
 }
 
 StaticPopupDialogs["EBONHOLD_CONFIRM_EXTRACTION"]  = {
-    text = "Destroy %s and learn %s?",
-    button1 = "Extract",
-    button2 = "Cancel",
+    text = L["Destroy %s and learn %s?"],
+    button1 = L["Extract"],
+    button2 = L["Cancel"],
     OnAccept = function()
         if ExtractionUI.pendingBag and ExtractionUI.pendingSlot then
             ExtractionService.RequestExtraction(ExtractionUI.pendingBag, ExtractionUI.pendingSlot)
@@ -180,9 +185,9 @@ StaticPopupDialogs["EBONHOLD_CONFIRM_EXTRACTION"]  = {
 
 -- text is set before each show (it names the affix it replaces)
 StaticPopupDialogs["EBONHOLD_CONFIRM_APPLY_AFFIX"] = {
-    text = "Engrave %s on %s?",
-    button1 = "Engrave",
-    button2 = "Cancel",
+    text = L["Engrave %s on %s?"],
+    button1 = L["Engrave"],
+    button2 = L["Cancel"],
     OnAccept = function()
         if ExtractionUI.pendingBag and ExtractionUI.pendingSlot and ExtractionUI.selectedAffixId then
             ExtractionService.RequestApplyAffix(ExtractionUI.selectedAffixId, ExtractionUI.pendingBag,
@@ -211,7 +216,7 @@ local EMPTY_SLOT          = "Interface\\Buttons\\UI-EmptySlot"
 local ROUND_BORDER        = "Interface\\AddOns\\ProjectEbonhold\\assets\\roundborder"
 
 local TAB_ANVIL, TAB_BOOK = 1, 2
-local TAB_NAMES = { "Anvil", "Affix Book" }
+local TAB_NAMES = { L["Anvil"], L["Affix Book"] }
 
 -- Paper-doll order of the inventory slots that can carry an affix (no shirt, no tabard)
 local EQUIP_ORDER = { 1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18 }
@@ -306,9 +311,8 @@ local function ItemIdOf(link)
     return link and tonumber(link:match("item:(%d+)")) or nil
 end
 
--- What the anvil accepts: gear that takes or carries an affix, and any legendary. A legendary
--- bow takes no affix (no ranged weapon does) but is still raised here: the server decides which
--- items have an upgrade.
+-- What the anvil accepts: gear that takes or carries an affix, and any legendary (the server
+-- decides which items have an upgrade).
 local function GoesOnAnvil(link)
     if GetItemAffixRules(link) or FindItemAffix(link) then return true end
     return select(3, GetItemInfo(link)) == 5
@@ -423,24 +427,25 @@ end
 
 local function AffixText(affix, twoHanded)
     if not affix or not affix.text then return "" end
-    return ExtractionUI.RenderAffixText(affix.text, twoHanded) or affix.text
+    local text = ExtractionService.DisplayText(affix)   -- translated template, markers intact
+    return ExtractionUI.RenderAffixText(text, twoHanded) or text
 end
 
 local function AffixTooltip(owner, affix, twoHanded)
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    GameTooltip:SetText(affix.name, 1, 1, 1)
+    GameTooltip:SetText(ExtractionService.DisplayName(affix), 1, 1, 1)
     GameTooltip:AddLine(AffixText(affix, twoHanded), 1, 0.5, 0, true)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(CategoryText(affix.category) .. ((affix.spec and affix.spec ~= "") and (" - " .. affix.spec) or ""))
+    GameTooltip:AddLine(CategoryText(affix.category) .. ((affix.spec and affix.spec ~= "") and (" - " .. L[affix.spec]) or ""))
     local slotText = CATEGORY_SLOT_TEXT[affix.category or 0]
     if slotText and slotText ~= "" then
-        GameTooltip:AddLine("Slots: " .. slotText, 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(T("Slots: {slots}", { slots = slotText }), 0.7, 0.7, 0.7, true)
     end
     if affix.appliedCount and affix.appliedCount > 0 then
-        GameTooltip:AddLine("Worn: " .. affix.appliedCount .. " time(s)", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(T("Worn: {count} time(s)", { count = affix.appliedCount }), 0.7, 0.7, 0.7)
     end
     if not affix.learned then
-        GameTooltip:AddLine("Not learned yet: extract it from a piece of gear.", 0.6, 0.6, 0.6, true)
+        GameTooltip:AddLine(L["Not learned yet: extract it from a piece of gear."], 0.6, 0.6, 0.6, true)
     end
     GameTooltip:Show()
 end
@@ -498,7 +503,7 @@ local function SelectEntry(e)
     S.key, S.itemId = e.key, ItemIdOf(e.link)
     ExtractionUI.pendingBag, ExtractionUI.pendingSlot, ExtractionUI.pendingLink = e.bag, e.slot, e.link
     S.quoted = false   -- no upgrade line until the server has answered
-    ExtractionService.RequestLegendaryUpgradeInfo(e.bag, e.slot)
+    ExtractionService.RequestLegendaryUpgradeInfo(e.bag, e.slot)   -- no bracket: the server's default
     if e.affix and not e.equipped then
         ExtractionService.RequestExtractionInfo(e.bag, e.slot)
     end
@@ -511,7 +516,7 @@ local function PlaceFromCursor()
     ClearCursor()
     if infoType ~= "item" or not link then return end
     if not GoesOnAnvil(link) then
-        SetStatus("|cffff8040Only rare or better gear can go on the anvil.|r")
+        SetStatus(L["|cffff8040Only rare or better gear can go on the anvil.|r"])
         ExtractionUI.Refresh()
         return
     end
@@ -523,7 +528,7 @@ local function PlaceFromCursor()
             return
         end
     end
-    SetStatus("|cffff0000Only items from your bags or your character can go on the anvil.|r")
+    SetStatus(L["|cffff0000Only items from your bags or your character can go on the anvil.|r"])
     ExtractionUI.Refresh()
 end
 
@@ -533,7 +538,7 @@ end
 
 local function ItemMenuButton(e)
     local info = UIDropDownMenu_CreateInfo()
-    local affix = e.affix and ("  |cff1eff00" .. e.affix.name .. "|r") or ""
+    local affix = e.affix and ("  |cff1eff00" .. ExtractionService.DisplayName(e.affix) .. "|r") or ""
     info.text = IconText(e.texture) .. QualityHex(e.quality) .. e.name .. "|r" .. affix
     info.notCheckable = true
     info.func = function()
@@ -560,17 +565,17 @@ local function InitItemMenu(self, level)
     end
     if level == 1 then
         if #equipped + #bags == 0 then
-            MenuTitle("None of your items can go on the anvil", 1)
+            MenuTitle(L["None of your items can go on the anvil"], 1)
             return
         end
         if #equipped + #bags + 2 <= MENU_MAX then
-            if #equipped > 0 then MenuTitle("Equipped", 1) end
+            if #equipped > 0 then MenuTitle(L["Equipped"], 1) end
             for _, e in ipairs(equipped) do ItemMenuButton(e) end
-            if #bags > 0 then MenuTitle("In your bags", 1) end
+            if #bags > 0 then MenuTitle(L["In your bags"], 1) end
             for _, e in ipairs(bags) do ItemMenuButton(e) end
         else
             -- too many for one level: one sub-menu per place
-            for _, group in ipairs({ { "Equipped", "eq", #equipped }, { "In your bags", "bag", #bags } }) do
+            for _, group in ipairs({ { L["Equipped"], "eq", #equipped }, { L["In your bags"], "bag", #bags } }) do
                 if group[3] > 0 then
                     local info = UIDropDownMenu_CreateInfo()
                     info.text = group[1] .. "  |cff9d9d9d(" .. group[3] .. ")|r"
@@ -599,7 +604,7 @@ local function InitBookCategoryMenu(self, level)
         end
         UIDropDownMenu_AddButton(info, level)
     end
-    Add(0, "All categories")
+    Add(0, L["All categories"])
     for _, cat in ipairs(CATEGORY_ORDER) do Add(cat, CategoryText(cat)) end
 end
 
@@ -680,7 +685,7 @@ local function SetColumn(col, affix, twoHanded, placeholder)
     if affix then
         SetRoundIcon(col.icon, affix.icon)
         col.icon:Show(); col.ring:Show()
-        col.name:SetText("|cff1eff00" .. affix.name .. "|r")
+        col.name:SetText("|cff1eff00" .. ExtractionService.DisplayName(affix) .. "|r")
         col.text:SetText(AffixText(affix, twoHanded))
         col.empty:SetText("")
     else
@@ -775,9 +780,43 @@ local function TokenLabel(tokenId)
         name = GetItemInfo(tokenId)
     end
     local icon = GetItemIcon(tokenId)
-    local label = name or "Mark of Torment"
+    local label = name or L["Mark of Torment"]
     if icon then label = "|T" .. icon .. ":16:16:0:0|t " .. label end
     return label
+end
+
+-- The bracket the item on the anvil is in now (Torment copies sit at id + 1 000 000 x bracket)
+local function CurrentBracket()
+    return S.itemId and math.floor(S.itemId / 1000000) or 0
+end
+
+-- What the confirmed upgrade takes: a higher Mark pays a lower bracket, the server spends the
+-- picked bracket's Marks first, then upward. Mirrors that from the bags (and the bank cache);
+-- nil when the client's counts do not add up to the server's (bank never opened this session).
+local function UpgradeSpend(up)
+    local base = up.tokenId % 1000000
+    local left, parts, seen = up.needed, {}, 0
+    for b = up.bracket, 4 do
+        local token = base + 1000000 * b
+        local have = GetItemCount(token, true) or 0
+        seen = seen + have
+        local take = math.min(left, have)
+        if take > 0 then
+            parts[#parts + 1] = take .. " " .. TokenLabel(token)
+            left = left - take
+        end
+    end
+    if left > 0 or seen ~= up.held then return nil end
+    return table.concat(parts, ", ")
+end
+
+-- Arrows beside the upgrade button: the player picks the bracket, nothing is spent unasked
+local function PickUpgradeBracket(step)
+    local up = ExtractionService.upgradeInfo
+    if not up or not ExtractionUI.pendingBag then return end
+    local target = up.bracket + step
+    if target <= CurrentBracket() or target > 4 then return end
+    ExtractionService.RequestLegendaryUpgradeInfo(ExtractionUI.pendingBag, ExtractionUI.pendingSlot, target)
 end
 
 tokenRetry:SetScript("OnUpdate", function(self, dt)
@@ -857,7 +896,7 @@ local function PickRow(i)
         AffixTooltip(self, self.affix, e and e.equipLoc == "INVTYPE_2HWEAPON")
         if self.wornOn then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Already on your equipped gear:", 1, 0.5, 0.25)
+            GameTooltip:AddLine(L["Already on your equipped gear:"], 1, 0.5, 0.25)
             for _, link in ipairs(self.wornOn) do GameTooltip:AddLine("  " .. link) end
             GameTooltip:Show()
         end
@@ -917,9 +956,9 @@ local function ShowAffixList(opening)
         r.icon:Show()
         -- already worn elsewhere: greyed name and an orange tag (the tooltip names the pieces)
         if r.wornOn then
-            r.name:SetText("|cff9d9d9d" .. a.name .. "|r |cffff8040(worn)|r")
+            r.name:SetText("|cff9d9d9d" .. ExtractionService.DisplayName(a) .. "|r " .. L["|cffff8040(worn)|r"])
         else
-            r.name:SetText("|cffffffff" .. a.name .. "|r")
+            r.name:SetText("|cffffffff" .. ExtractionService.DisplayName(a) .. "|r")
         end
         r.cat:SetText("|cff" .. ((CATEGORY_COLORS[a.category] or {}).hex or "ffffff") .. CategoryName(a.category) .. "|r")
         if ExtractionUI.selectedAffixId == a.id then r.check:Show() else r.check:Hide() end
@@ -930,7 +969,7 @@ local function ShowAffixList(opening)
         local r = PickRow(1)
         r.affix, r.wornOn = nil, nil
         r.check:Hide(); r.icon:Hide(); r.cat:SetText(""); r.name:SetText("")
-        r.head:SetText("|cff9d9d9dNo affix matches this search.|r")
+        r.head:SetText(L["|cff9d9d9dNo affix matches this search.|r"])
         r:Show()
     end
     W.pickContent:SetHeight(n * PICK_ROW_H)
@@ -965,7 +1004,7 @@ local function BuildAffixList(c)
     -- search on top of the list: the echo journal's box, like every search bar of the addon
     local ok, box = pcall(CreateFrame, "EditBox", "EbonholdAnvilPickSearch", pick, "ezCollectionsSearchBoxTemplate")
     if ok and box and box.Instructions then
-        box.Instructions:SetText("Search affixes")
+        box.Instructions:SetText(L["Search affixes"])
     else
         box = CreateFrame("EditBox", "EbonholdAnvilPickSearch", pick, "InputBoxTemplate")
     end
@@ -985,6 +1024,7 @@ local function BuildAffixList(c)
     W.pickSearch = box
 
     local scroll = CreateFrame("ScrollFrame", FRAME_NAME .. "AffixPickScroll", pick, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scroll)  -- DragonUI's scroll bar (utils.lua)
     scroll:SetPoint("TOPLEFT", pick, "TOPLEFT", 8, -7 - 30)
     scroll:SetPoint("BOTTOMRIGHT", pick, "BOTTOMRIGHT", -30, 7)
     local content = CreateFrame("Frame", nil, scroll)
@@ -1032,10 +1072,10 @@ local function BuildAnvilPage(base)
         if e and e.setTooltip then
             e.setTooltip(GameTooltip)
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Click to choose another item, right-click to take it off.", 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine(L["Click to choose another item, right-click to take it off."], 0.6, 0.6, 0.6, true)
         else
-            GameTooltip:SetText("Enchanted Anvil", 1, 1, 1)
-            GameTooltip:AddLine("Click to choose an item, or drag one here.", 0.8, 0.8, 0.8, true)
+            GameTooltip:SetText(L["Enchanted Anvil"], 1, 1, 1)
+            GameTooltip:AddLine(L["Click to choose an item, or drag one here."], 0.8, 0.8, 0.8, true)
         end
         GameTooltip:Show()
     end)
@@ -1066,9 +1106,9 @@ local function BuildAnvilPage(base)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(string.format("%d/%d %s", up.held, up.needed, TokenLabel(up.tokenId)), 0.8, 0.8, 0.8)
         if up.held < up.needed then
-            GameTooltip:AddLine("Earned in " .. up.label .. ".", 1, 0.5, 0.25)
+            GameTooltip:AddLine(T("Earned in {label}.", { label = up.label }), 1, 0.5, 0.25)
         end
-        GameTooltip:AddLine("Enchantments, gems and its affix are kept.", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine(L["Enchantments, gems and its affix are kept."], 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     W.upgrade:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1077,11 +1117,34 @@ local function BuildAnvilPage(base)
         if not up or not ExtractionUI.pendingBag or not ExtractionUI.pendingSlot then return end
         local e = SelectedEntry()
         S.pending = { link = e and e.link, label = up.label }
-        StaticPopup_Show("EBONHOLD_CONFIRM_LEGENDARY_UPGRADE", up.label, up.needed .. " " .. TokenLabel(up.tokenId))
+        local spend = UpgradeSpend(up)
+            or T("{count} {token} or higher Marks, the lowest first", { count = up.needed, token = TokenLabel(up.tokenId) })
+        StaticPopup_Show("EBONHOLD_CONFIRM_LEGENDARY_UPGRADE", up.label, spend)
     end)
 
+    local function Arrow(step, texture, anchor, relPoint, x)
+        local b = CreateFrame("Button", nil, c)
+        b:SetSize(24, 24)
+        b:SetPoint(anchor, W.upgrade, relPoint, x, 0)
+        b:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. texture .. "Page-Up")
+        b:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. texture .. "Page-Down")
+        b:SetDisabledTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. texture .. "Page-Disabled")
+        b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+        b:SetScript("OnClick", function() PickUpgradeBracket(step) end)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(step < 0 and L["Lower Torment bracket"] or L["Higher Torment bracket"])
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        b:Hide()
+        return b
+    end
+    W.upgradePrev = Arrow(-1, "Prev", "RIGHT", "LEFT", -2)
+    W.upgradeNext = Arrow(1, "Next", "LEFT", "RIGHT", 2)
+
     local label = Text(c, "GameFontNormalSmall", 20, 220)
-    label:SetText("ENGRAVE")
+    label:SetText(L["ENGRAVE"])
     -- the dropdown's look, our own list behind its button (BuildAffixList)
     W.affixDD = CreateFrame("Frame", "EbonholdAnvilAffixDropDown", c, "UIDropDownMenuTemplate")
     W.affixDD:SetPoint("TOPLEFT", c, "TOPLEFT", -4, -232)
@@ -1093,8 +1156,8 @@ local function BuildAnvilPage(base)
         if W.pick:IsShown() then HideAffixList() else ShowAffixList(true) end
     end)
 
-    W.cur = Column(c, 10, "CURRENT")
-    W.aft = Column(c, 183, "AFTER")
+    W.cur = Column(c, 10, L["CURRENT"])
+    W.aft = Column(c, 183, L["AFTER"])
     BuildAffixList(c)   -- after the columns, drawn above them
     local arrow = c:CreateTexture(nil, "OVERLAY")
     arrow:SetSize(26, 26)
@@ -1110,12 +1173,12 @@ local function BuildAnvilPage(base)
         local e = SelectedEntry()
         if not e or not e.affix or e.equipped then return end
         S.pending = { link = e.link, old = e.affix }
-        StaticPopup_Show("EBONHOLD_CONFIRM_EXTRACTION", e.link, "|cff1eff00" .. e.affix.name .. "|r")
+        StaticPopup_Show("EBONHOLD_CONFIRM_EXTRACTION", e.link, "|cff1eff00" .. ExtractionService.DisplayName(e.affix) .. "|r")
     end)
     W.extractBtn:SetScript("OnEnter", function(self)
         if not self.tip then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Extract", 1, 1, 1)
+        GameTooltip:SetText(L["Extract"], 1, 1, 1)
         GameTooltip:AddLine(self.tip, 1, 0.82, 0, true)
         GameTooltip:Show()
     end)
@@ -1130,11 +1193,11 @@ local function BuildAnvilPage(base)
         local affix = FindAffix(ExtractionUI.selectedAffixId)
         if not e or not affix then return end
         local d = StaticPopupDialogs["EBONHOLD_CONFIRM_APPLY_AFFIX"]
-        d.text = "Engrave %s on %s?"
-            .. (e.affix and ("\n\nIt replaces " .. e.affix.name .. ".") or "")
-            .. "\n\nCost: " .. FormatCopperSmall(affix.applyCost or 0)
+        d.text = L["Engrave %s on %s?"]
+            .. (e.affix and T("\n\nIt replaces {name}.", { name = ExtractionService.DisplayName(e.affix) }) or "")
+            .. T("\n\nCost: {cost}", { cost = FormatCopperSmall(affix.applyCost or 0) })
         S.pending = { link = e.link, old = e.affix, new = affix }
-        StaticPopup_Show("EBONHOLD_CONFIRM_APPLY_AFFIX", "|cff1eff00" .. affix.name .. "|r", e.link)
+        StaticPopup_Show("EBONHOLD_CONFIRM_APPLY_AFFIX", "|cff1eff00" .. ExtractionService.DisplayName(affix) .. "|r", e.link)
     end)
 end
 
@@ -1143,7 +1206,7 @@ end
 local function BuildSearchBox(parent)
     local ok, box = pcall(CreateFrame, "EditBox", "EbonholdAffixSearchBox", parent, "ezCollectionsSearchBoxTemplate")
     if ok and box and box.Instructions then
-        box.Instructions:SetText("Search affixes")
+        box.Instructions:SetText(L["Search affixes"])
     else
         box = CreateFrame("EditBox", "EbonholdAffixSearchBox", parent, "InputBoxTemplate")
         box:SetAutoFocus(false)
@@ -1173,10 +1236,11 @@ local function BuildBookPage(base)
     UIDropDownMenu_SetWidth(W.catDD, 130)
     UIDropDownMenu_Initialize(W.catDD, InitBookCategoryMenu)
     W.search = BuildSearchBox(c)
-    W.learnedCB = CreateFilterCheck(c, "EbonholdAffixLearnedCheck", "Learned only", 20, 122)
-    W.classCB = CreateFilterCheck(c, "EbonholdAffixClassCheck", "My class only", 160, 122)
+    W.learnedCB = CreateFilterCheck(c, "EbonholdAffixLearnedCheck", L["Learned only"], 20, 122)
+    W.classCB = CreateFilterCheck(c, "EbonholdAffixClassCheck", L["My class only"], 160, 122)
 
     local scroll = CreateFrame("ScrollFrame", FRAME_NAME .. "BookScroll", c, "UIPanelScrollFrameTemplate")
+    utils.UseDragonScrollBar(scroll)  -- DragonUI's scroll bar (utils.lua)
     scroll:SetPoint("TOPLEFT", c, "TOPLEFT", 18, -152)
     scroll:SetPoint("BOTTOMRIGHT", c, "TOPLEFT", 320, -504)
     local content = CreateFrame("Frame", nil, scroll)
@@ -1195,7 +1259,7 @@ local function EnsureBuilt()
     if ok and chrome then
         chrome:SetAllPoints(frame)
         chrome:SetFrameLevel(base)
-        chrome.TitleText:SetText("Enchanted Anvil")
+        chrome.TitleText:SetText(L["Enchanted Anvil"])
         SetPortraitToTexture(chrome.portrait, ICON_ANVIL)
     else
         -- templates missing: plain dialog border so the window still reads as one
@@ -1207,7 +1271,7 @@ local function EnsureBuilt()
         })
         local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOP", frame, "TOP", 0, -14)
-        title:SetText("Enchanted Anvil")
+        title:SetText(L["Enchanted Anvil"])
     end
     local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 4, 5)
@@ -1225,14 +1289,27 @@ local function RefreshUpgrade(entry)
     local up = entry and ExtractionService.upgradeInfo
     if not up then
         W.upgrade:Hide()
+        W.upgradePrev:Hide()
+        W.upgradeNext:Hide()
         W.upgradeHint:SetText((entry and S.quoted)
-            and "|cff9d9d9dOnly legendaries and tier set pieces can be upgraded, up to Torment X.|r" or "")
+            and L["|cff9d9d9dOnly legendaries and tier set pieces can be upgraded, up to Torment X.|r"] or "")
         return
     end
     local color = (up.held >= up.needed) and "|cff00ff00" or "|cffff4040"
-    W.upgradeHint:SetText(string.format("Needs %s%d/%d|r %s", color, up.held, up.needed, TokenLabel(up.tokenId)))
-    W.upgrade:SetText("Upgrade to " .. up.label)
+    W.upgradeHint:SetText(T("Needs {color}{held}/{needed}|r {token} or higher", { color = color, held = up.held, needed = up.needed, token = TokenLabel(up.tokenId) }))
+    W.upgrade:SetText(T("Upgrade to {label}", { label = up.label }))
     W.upgrade:Show()
+    -- arrows only when there is a choice: one bracket below Torment X has a single target
+    local cur = CurrentBracket()
+    if cur + 1 < 4 then
+        W.upgradePrev:Show()
+        W.upgradeNext:Show()
+    else
+        W.upgradePrev:Hide()
+        W.upgradeNext:Hide()
+    end
+    if up.bracket > cur + 1 then W.upgradePrev:Enable() else W.upgradePrev:Disable() end
+    if up.bracket < 4 then W.upgradeNext:Enable() else W.upgradeNext:Disable() end
     if up.held >= up.needed then W.upgrade:Enable() else W.upgrade:Disable() end
 end
 
@@ -1249,18 +1326,20 @@ local function RefreshAnvil()
     if not e then
         W.slot.icon:Hide()
         W.slot.glow:Hide()
-        W.itemName:SetText("Place an item on the anvil")
-        W.itemSub:SetText("Click the slot to choose an item, or drag one here.")
-        W.upgradeHint:SetText("Upgrade legendaries and tier set pieces,\nor engrave and extract affixes.")
+        W.itemName:SetText(L["Place an item on the anvil"])
+        W.itemSub:SetText(L["Click the slot to choose an item, or drag one here."])
+        W.upgradeHint:SetText(L["Upgrade legendaries and tier set pieces,\nor engrave and extract affixes."])
         W.upgrade:Hide()
-        UIDropDownMenu_SetText(W.affixDD, "|cff808080Choose an affix|r")
+        W.upgradePrev:Hide()
+        W.upgradeNext:Hide()
+        UIDropDownMenu_SetText(W.affixDD, L["|cff808080Choose an affix|r"])
         UIDropDownMenu_DisableDropDown(W.affixDD)
         SetColumn(W.cur, nil, false)
         SetColumn(W.aft, nil, false)
-        W.extractBtn:SetText("Extract")
+        W.extractBtn:SetText(L["Extract"])
         W.extractBtn.tip = nil
         W.extractBtn:Disable()
-        W.engraveBtn:SetText("Engrave")
+        W.engraveBtn:SetText(L["Engrave"])
         W.engraveBtn:Disable()
         return
     end
@@ -1280,7 +1359,7 @@ local function RefreshAnvil()
         if e.allowedCats and e.allowedCats[cat] then cats[#cats + 1] = CategoryText(cat) end
     end
     W.itemName:SetText(QualityHex(e.quality) .. e.name .. "|r")
-    W.itemSub:SetText(#cats > 0 and ("Takes affixes: " .. table.concat(cats, ", ")) or "Takes no affix")
+    W.itemSub:SetText(#cats > 0 and T("Takes affixes: {cats}", { cats = table.concat(cats, ", ") }) or L["Takes no affix"])
     RefreshUpgrade(e)
 
     -- the dropdown: learned affixes this item takes
@@ -1297,16 +1376,16 @@ local function RefreshAnvil()
     end
     if e.foreign or #EngravableAffixes(e) == 0 then
         HideAffixList()
-        UIDropDownMenu_SetText(W.affixDD, "|cff808080" .. (e.foreign and "Random enchantment: cannot be engraved"
-            or (not e.allowedCats and "This item takes no affix") or "You know no affix for this slot yet") .. "|r")
+        UIDropDownMenu_SetText(W.affixDD, "|cff808080" .. (e.foreign and L["Random enchantment: cannot be engraved"]
+            or (not e.allowedCats and L["This item takes no affix"]) or L["You know no affix for this slot yet"]) .. "|r")
         UIDropDownMenu_DisableDropDown(W.affixDD)
     else
         UIDropDownMenu_EnableDropDown(W.affixDD)
-        UIDropDownMenu_SetText(W.affixDD, selected and (IconText(selected.icon) .. "|cff1eff00" .. selected.name .. "|r")
-            or "Choose an affix")
+        UIDropDownMenu_SetText(W.affixDD, selected and (IconText(selected.icon) .. "|cff1eff00" .. ExtractionService.DisplayName(selected) .. "|r")
+            or L["Choose an affix"])
     end
 
-    SetColumn(W.cur, current, twoHanded, "No affix")
+    SetColumn(W.cur, current, twoHanded, L["No affix"])
     SetColumn(W.aft, selected, twoHanded, "")   -- empty until an affix is chosen
 
     -- Extract: destroys the item, so bag items only; the server checks again
@@ -1314,30 +1393,29 @@ local function RefreshAnvil()
     local known = current and KnowsRankOrHigher(current)
     if current then
         local cost = current.extractCost or ExtractionService.currentCost or 0
-        W.extractBtn:SetText("Extract  " .. CoinText(cost))
+        W.extractBtn:SetText(T("Extract  {cost}", { cost = CoinText(cost) }))
         local tip
         if e.equipped then
-            tip = "|cffff8040Unequip it first.|r Extracting destroys the item."
+            tip = L["|cffff8040Unequip it first.|r Extracting destroys the item."]
         elseif known then
-            tip = "|cffff8040You already know this affix at this rank or higher.|r Extracting it would teach you nothing."
+            tip = L["|cffff8040You already know this affix at this rank or higher.|r Extracting it would teach you nothing."]
         elseif money < cost then
-            tip = "|cffff4040Not enough gold.|r"
+            tip = L["|cffff4040Not enough gold.|r"]
         end
-        W.extractBtn.tip = tip or ("Destroys the item and teaches you " .. current.name ..
-            ". You can then engrave it on any item that takes " .. CategoryName(current.category) .. " affixes.")
+        W.extractBtn.tip = tip or T("Destroys the item and teaches you {name}. You can then engrave it on any item that takes {category} affixes.", { name = ExtractionService.DisplayName(current), category = CategoryName(current.category) })
         if tip then W.extractBtn:Disable() else W.extractBtn:Enable() end
     else
-        W.extractBtn:SetText("Extract")
-        W.extractBtn.tip = "This item carries no affix."
+        W.extractBtn:SetText(L["Extract"])
+        W.extractBtn.tip = L["This item carries no affix."]
         W.extractBtn:Disable()
     end
 
     if selected then
         local cost = selected.applyCost or 0
-        W.engraveBtn:SetText("Engrave  " .. CoinText(cost))
+        W.engraveBtn:SetText(T("Engrave  {cost}", { cost = CoinText(cost) }))
         if money >= cost then W.engraveBtn:Enable() else W.engraveBtn:Disable() end
     else
-        W.engraveBtn:SetText("Engrave")
+        W.engraveBtn:SetText(L["Engrave"])
         W.engraveBtn:Disable()
     end
 end
@@ -1350,8 +1428,8 @@ local function RefreshBook()
             if a.learned then learnedCount = learnedCount + 1 end
         end
     end
-    W.bookCount:SetText(string.format("Affixes learned  |cffffffff%d / %d|r", learnedCount, families))
-    UIDropDownMenu_SetText(W.catDD, S.bookCategory == 0 and "All categories" or CategoryText(S.bookCategory))
+    W.bookCount:SetText(T("Affixes learned  |cffffffff{learned} / {total}|r", { learned = learnedCount, total = families }))
+    UIDropDownMenu_SetText(W.catDD, S.bookCategory == 0 and L["All categories"] or CategoryText(S.bookCategory))
 
     local learnedOnly, classOnly = W.learnedCB:GetChecked(), W.classCB:GetChecked()
     local list = {}
@@ -1368,10 +1446,10 @@ local function RefreshBook()
         local c = W.cards[i] or CreateCard(i)
         c.affix = affix
         SetRoundIcon(c.icon, affix.icon)
-        c.name:SetText((affix.learned and "|cffffffff" or "|cff9d9d9d") .. affix.name .. "|r")
+        c.name:SetText((affix.learned and "|cffffffff" or "|cff9d9d9d") .. ExtractionService.DisplayName(affix) .. "|r")
         local sub = CategoryText(affix.category)
-        if affix.spec and affix.spec ~= "" then sub = sub .. "|cffa69a83 - " .. affix.spec .. "|r" end
-        if not IsForPlayerClass(affix.classMask) then sub = sub .. "  |cffff6060Other class|r" end
+        if affix.spec and affix.spec ~= "" then sub = sub .. "|cffa69a83 - " .. L[affix.spec] .. "|r" end
+        if not IsForPlayerClass(affix.classMask) then sub = sub .. L["  |cffff6060Other class|r"] end
         c.sub:SetText(sub)
         -- a card not learned is greyed out, no label needed
         c.icon:SetDesaturated(not affix.learned)
@@ -1380,7 +1458,7 @@ local function RefreshBook()
     end
     W.bookContent:SetHeight(math.max(1, #list * (CARD_H + CARD_GAP)))
     if #list == 0 then
-        W.bookEmpty:SetText(learnedOnly and "You have not learned any affix of this kind yet." or "No affix matches these filters.")
+        W.bookEmpty:SetText(learnedOnly and L["You have not learned any affix of this kind yet."] or L["No affix matches these filters."])
         W.bookEmpty:Show()
     else
         W.bookEmpty:Hide()
@@ -1472,7 +1550,7 @@ function ExtractionUI.OnUpgradeSuccess(newEntry)
     if not frame:IsShown() then return end
     local p = S.pending or {}
     local after = newEntry and select(2, GetItemInfo(newEntry))
-    SetStatus((p.link or "Your item") .. " -> " .. (after or p.label or "its next version") .. ".")
+    SetStatus(T("{item} -> {after}.", { item = p.link or L["Your item"], after = after or p.label or L["its next version"] }))
     -- the item is a new object now: take what lands in its slot and quote the next bracket
     S.itemId, S.reselect = nil, true
     RefreshSoon(0.5)
@@ -1480,7 +1558,7 @@ end
 
 function ExtractionUI.OnUpgradeFail(reason)
     if not frame:IsShown() then return end
-    SetStatus("|cffff0000" .. (reason or "Upgrade failed.") .. "|r")
+    SetStatus("|cffff0000" .. (reason or L["Upgrade failed."]) .. "|r")
     ExtractionUI.Refresh()
 end
 
@@ -1492,22 +1570,20 @@ function ExtractionUI.OnExtractionSuccess()
     if not frame:IsShown() then return end
     ClearItem()   -- the item is destroyed
     local p = S.pending or {}
-    SetStatus((p.old and p.old.name or "Affix") .. " extracted from " .. (p.link or "your item")
-        .. " (item destroyed). You can now engrave it.")
+    SetStatus(T("{affix} extracted from {item} (item destroyed). You can now engrave it.", { affix = p.old and ExtractionService.DisplayName(p.old) or L["Affix"], item = p.link or L["your item"] }))
     RefreshSoon(0.5)
 end
 
 function ExtractionUI.OnExtractionFail(reason)
     if not frame:IsShown() then return end
-    SetStatus("|cffff0000" .. (reason or "Extraction failed.") .. "|r")
+    SetStatus("|cffff0000" .. (reason or L["Extraction failed."]) .. "|r")
     ExtractionUI.Refresh()
 end
 
 function ExtractionUI.OnApplySuccess()
     if not frame:IsShown() then return end
     local p = S.pending or {}
-    SetStatus((p.link or "Your item") .. ": " .. (p.old and p.old.name or "no affix") .. " -> "
-        .. (p.new and p.new.name or "new affix") .. ".")
+    SetStatus(T("{item}: {old} -> {new}.", { item = p.link or L["Your item"], old = p.old and ExtractionService.DisplayName(p.old) or L["no affix"], new = p.new and ExtractionService.DisplayName(p.new) or L["new affix"] }))
     ExtractionUI.selectedAffixId = nil
     ExtractionService.RefreshAppliedCounts()
     RefreshSoon(0.5)
@@ -1515,7 +1591,7 @@ end
 
 function ExtractionUI.OnApplyFail(reason)
     if not frame:IsShown() then return end
-    SetStatus("|cffff0000" .. (reason or "Engraving failed.") .. "|r")
+    SetStatus("|cffff0000" .. (reason or L["Engraving failed."]) .. "|r")
     ExtractionUI.Refresh()
 end
 
@@ -1589,6 +1665,21 @@ end
 -- Gossip-based open/close
 ------------------------------------------------------------
 
+-- The anvil (gameobject 192697) is recognised by the name on its gossip window, and
+-- the client shows that name in its own language (gameobject_template_locale). Every
+-- name it can carry: the English one, the add-on's translation, and the stock locales.
+local ANVIL_NAMES = {
+    ["Enchanted Anvil"] = true,
+    [L["Enchanted Anvil"]] = true,
+    ["Enclume enchantée"] = true,          -- frFR
+    ["Verzauberter Amboss"] = true,        -- deDE
+    ["Yunque encantado"] = true,           -- esES, esMX
+    ["Заколдованная наковальня"] = true,   -- ruRU
+    ["마력 깃든 모루"] = true,              -- koKR
+    ["魔法铁砧"] = true,                    -- zhCN
+    ["附魔鐵砧"] = true,                    -- zhTW
+}
+
 local gossipEventFrame = CreateFrame("Frame")
 gossipEventFrame:RegisterEvent("GOSSIP_SHOW")
 gossipEventFrame:RegisterEvent("GOSSIP_CLOSED")
@@ -1600,7 +1691,7 @@ gossipEventFrame:SetScript("OnEvent", function(self, event)
         end
 
         local npcName = GossipFrameNpcNameText and GossipFrameNpcNameText:GetText()
-        if npcName == "Enchanted Anvil" then
+        if npcName and ANVIL_NAMES[npcName] then
             isInExtractionGossip = true
             if GossipFrame then
                 GossipFrame:SetAlpha(0)

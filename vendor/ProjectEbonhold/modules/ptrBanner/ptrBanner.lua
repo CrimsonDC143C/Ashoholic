@@ -1,3 +1,4 @@
+local L, T = ProjectEbonhold.L, ProjectEbonhold.T
 local addonName, addon = ...
 
 -- Top-centered banner that reminds the player they are on the PTR (test) realm
@@ -13,9 +14,7 @@ local function CreateBanner()
     text:SetPoint("CENTER")
     text:SetWidth(700)
     text:SetJustifyH("CENTER")
-    text:SetText(string.format(
-        "|cffff5555[PTR TEST REALM] You are connected to the Public Test Realm \226\128\148 Addon Version %s|r",
-        tostring(addon.version)))
+    text:SetText(T("|cffff5555[PTR TEST REALM] You are connected to the Public Test Realm \226\128\148 Addon Version {version}|r", { version = tostring(addon.version) }))
     banner.text = text
 
     -- Size the frame to its (possibly wrapped) text so a background, if added
